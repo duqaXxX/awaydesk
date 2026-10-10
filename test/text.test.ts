@@ -1,7 +1,7 @@
 /** Strings as Python treated them: its whitespace and its order, where JavaScript's differ. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { compareCodePoints, isSpace, PY_SPACE, strip } from "../src/text.ts";
+import { blank, compareCodePoints, isSpace, PY_SPACE, strip } from "../src/text.ts";
 
 // Every character `str.isspace()` holds true for (CPython 3.12), and no other.
 const PYTHON_SPACES = [
@@ -23,6 +23,11 @@ test("a text is cut of the white space at its ends as Python cuts it", () => {
   assert.equal(strip("﻿ok﻿"), "﻿ok﻿");
   // White space to neither.
   assert.equal(strip("​ok​"), "​ok​");
+});
+
+test("a text of white space alone is blank", () => {
+  for (const text of ["", " ", "\n\t ", "\x1c\x85 　"]) assert.equal(blank(text), true);
+  for (const text of ["a", " a ", "﻿", "​"]) assert.equal(blank(text), false);
 });
 
 test("the pattern and the test by code hold the same whitespace", () => {

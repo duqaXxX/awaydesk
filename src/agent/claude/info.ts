@@ -8,9 +8,9 @@
  * `tests/fixtures/sdk/server-info.json`).
  */
 import type { SDKSessionInfo } from "@anthropic-ai/claude-agent-sdk";
-import { isRecord } from "../../values.ts";
+import { isRecord, records } from "../../values.ts";
 import type { AgentInfo, CommandInfo, ContextUsage, ListedSession, ModelInfo } from "../seam.ts";
-import { number, records, string, type WireRecord, words } from "./wire.ts";
+import { number, string, type WireRecord, words } from "./wire.ts";
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];

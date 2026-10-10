@@ -46,6 +46,14 @@ export function strip(text: string): string {
   return text.slice(start, end);
 }
 
+/** Whether `text` holds nothing but whitespace: Python's `not text.strip()`. */
+export function blank(text: string): boolean {
+  for (let i = 0; i < text.length; i += 1) {
+    if (!isSpace(text.charCodeAt(i))) return false;
+  }
+  return true;
+}
+
 /** Python's `sorted` on strings: by code point, where `Array.prototype.sort` goes by UTF-16 unit. */
 export function compareCodePoints(a: string, b: string): number {
   const left = Array.from(a);

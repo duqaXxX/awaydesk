@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { blank, oneLine, spaced, splitLines } from "../../../src/core/reply/words.ts";
+import { oneLine, spaced, splitLines } from "../../../src/core/reply/words.ts";
 
 test("a text on one line has its runs of white space as one space", () => {
   assert.equal(spaced("  ls   -la\n/x\t"), "ls -la /x");
@@ -21,11 +21,6 @@ test("a text past its limit is cut to the limit with an ellipsis, counted in cha
   assert.equal(oneLine("x".repeat(80), 80), "x".repeat(80));
   // An emoji is one character, as Python's `len` counts it.
   assert.equal(oneLine("🟥".repeat(5), 4), "🟥🟥🟥…");
-});
-
-test("a text of white space alone is blank", () => {
-  for (const text of ["", " ", "\n\t ", "\x1c\x85 　"]) assert.equal(blank(text), true);
-  for (const text of ["a", " a ", "﻿", "​"]) assert.equal(blank(text), false);
 });
 
 test("a text is cut in lines where Python cuts it", () => {

@@ -14,11 +14,6 @@ export function spaced(value: string): string {
     .join(" ");
 }
 
-/** Whether `value` holds nothing but whitespace: Python's `not value.strip()`. */
-export function blank(value: string): boolean {
-  return spaced(value) === "";
-}
-
 // The line boundaries of Python's `str.splitlines`: more than `\n` and `\r`, and not the unit
 // separator U+001F, which is whitespace and no boundary.
 const LINE_END_CODES = [0x0a, 0x0b, 0x0c, 0x0d, 0x1c, 0x1d, 0x1e, 0x85, 0x2028, 0x2029];

@@ -1,8 +1,7 @@
-// Not in the Python suite: asyncio's own semaphore, lock, timeout and shield had no tests there.
+// Not in the Python suite: asyncio's own semaphore, lock and timeout had no tests there.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Gate, TIMED_OUT, within } from "../../../../src/chat/slack/openfile/waiting.ts";
-import { cancellable } from "../../../../src/core/sessions/tasks.ts";
 import { AsyncEvent, FakeClock } from "../../../support/fake-slack.ts";
 
 test("a gate lets its limit of holders in and the next one in when a turn is given back", async () => {
@@ -86,15 +85,4 @@ test("work that fails for its own reason is not taken for a timeout", async () =
     }),
     /its own/,
   );
-});
-
-test("a wait that gives up leaves the promise it waited for running", async () => {
-  const done = new AsyncEvent();
-  const work = done.wait().then(() => "finished");
-  const giving = new AbortController();
-  const waiting = cancellable(work, giving.signal);
-  giving.abort(new Error("gave up"));
-  await assert.rejects(waiting, /gave up/);
-  done.set();
-  assert.equal(await work, "finished");
 });

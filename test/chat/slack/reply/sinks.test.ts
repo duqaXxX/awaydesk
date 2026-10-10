@@ -15,7 +15,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { WebAPICallResult } from "@slack/web-api";
 import type { Preview, TaskStatus, TaskUpdate } from "../../../../src/chat/seam.ts";
 import { formatFooter } from "../../../../src/chat/slack/footer.ts";
-import { blank, len } from "../../../../src/chat/slack/reply/chars.ts";
+import { len } from "../../../../src/chat/slack/reply/chars.ts";
 import * as sinks from "../../../../src/chat/slack/reply/sinks.ts";
 import {
   Cancelled,
@@ -30,6 +30,7 @@ import { TurnRenderer } from "../../../../src/core/reply/renderer.ts";
 import { STOPPED } from "../../../../src/core/reply/words.ts";
 import { StateStore } from "../../../../src/core/state.ts";
 import * as texts from "../../../../src/core/texts.ts";
+import { blank } from "../../../../src/text.ts";
 import {
   AsyncEvent,
   BOT,

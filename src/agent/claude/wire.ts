@@ -4,7 +4,6 @@
  * the union, measured 2026-10-10 on SDK 0.3.296), so nothing here trusts a declared shape: each
  * value is narrowed where it is read.
  */
-import { isRecord } from "../../values.ts";
 
 /** A JSON object off the wire, its values still unread. */
 export type WireRecord = Readonly<Record<string, unknown>>;
@@ -27,9 +26,4 @@ export function integer(value: unknown): number | null {
 /** `value` when it is a number, else null. */
 export function number(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-/** The objects of `value` when it is a list, in order; anything else in it is left out. */
-export function records(value: unknown): WireRecord[] {
-  return Array.isArray(value) ? value.filter(isRecord) : [];
 }

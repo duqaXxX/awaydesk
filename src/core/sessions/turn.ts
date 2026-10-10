@@ -2,8 +2,9 @@
 import { randomUUID } from "node:crypto";
 import type { PromptContent } from "../../agent/seam.ts";
 import type { Reply } from "../../chat/seam.ts";
+import { blank } from "../../text.ts";
 import type { TurnRenderer } from "../reply/renderer.ts";
-import { blank, oneLine } from "../reply/words.ts";
+import { oneLine } from "../reply/words.ts";
 import * as texts from "../texts.ts";
 import { ASKED_LIMIT, NOT_SENT_START } from "./constants.ts";
 import { Event } from "./tasks.ts";

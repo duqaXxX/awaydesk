@@ -14,7 +14,6 @@ import { test } from "node:test";
 import type { Preview, TaskUpdate } from "../../../../src/chat/seam.ts";
 import {
   at,
-  blank,
   lastNewline,
   len,
   lstripNewlines,
@@ -24,7 +23,6 @@ import {
 } from "../../../../src/chat/slack/reply/chars.ts";
 import { ReplySink, UpdateLimiter } from "../../../../src/chat/slack/reply/sinks.ts";
 import { oneLine } from "../../../../src/core/reply/words.ts";
-import { strip } from "../../../../src/text.ts";
 import {
   BOT,
   CHANNEL,
@@ -42,7 +40,6 @@ const G = "🟩";
 // and the one JavaScript takes and Python does not: built by code, never pasted.
 const FILE_SEPARATOR = String.fromCodePoint(0x1c);
 const NEXT_LINE = String.fromCodePoint(0x85);
-const BYTE_ORDER_MARK = String.fromCodePoint(0xfeff);
 
 test("a length is counted in code points", () => {
   assert.equal(len(""), 0);
@@ -63,15 +60,6 @@ test("a cut after n characters never lands inside a pair", () => {
   assert.equal(at(text, 2), 4);
   assert.equal(at(text, 99), text.length);
   assert.equal(at(text, -1), 0);
-});
-
-test("stripping takes python's whitespace", () => {
-  assert.equal(strip(` \t\n${FILE_SEPARATOR}${NEXT_LINE}x y${NEXT_LINE}\r\n`), "x y");
-  // Not whitespace in Python: it stays.
-  assert.equal(strip(`${BYTE_ORDER_MARK}x`), `${BYTE_ORDER_MARK}x`);
-  assert.equal(blank(` ${FILE_SEPARATOR}\n`), true);
-  assert.equal(blank(BYTE_ORDER_MARK), false);
-  assert.equal(blank(""), true);
 });
 
 test("newlines are stripped alone", () => {

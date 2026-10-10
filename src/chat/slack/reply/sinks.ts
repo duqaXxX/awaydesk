@@ -46,7 +46,7 @@ import type { WebClient } from "@slack/web-api";
 import { type Clock, systemClock } from "../../../clock.ts";
 import { Fold, shownPreview } from "../../../core/reply/fold.ts";
 import { cancellable, Mutex } from "../../../core/sessions/tasks.ts";
-import { strip } from "../../../text.ts";
+import { blank, strip } from "../../../text.ts";
 import type { FooterFields, ReplySink as Sink, TaskUpdate } from "../../seam.ts";
 import { formatFooter } from "../footer.ts";
 import {
@@ -78,7 +78,6 @@ import {
 } from "./blocks.ts";
 import {
   at,
-  blank,
   lastNewline,
   len,
   lstripNewlines,

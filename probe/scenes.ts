@@ -25,7 +25,6 @@ import { CAPABILITIES } from "../src/agent/claude/capabilities.ts";
 import { projectsDir } from "../src/agent/claude/listing.ts";
 import { AsyncQueue } from "../src/agent/claude/session.ts";
 import { locate } from "../src/agent/claude/trust.ts";
-import { records } from "../src/agent/claude/wire.ts";
 import type {
   AgentSession,
   PermissionAnswer,
@@ -44,7 +43,7 @@ import { resumeBlocks } from "../src/chat/slack/resume.ts";
 import { gitState } from "../src/core/footer.ts";
 import { preview } from "../src/core/reply/previews.ts";
 import * as texts from "../src/core/texts.ts";
-import { isRecord } from "../src/values.ts";
+import { isRecord, records } from "../src/values.ts";
 import { type Observation, observation } from "./claims.ts";
 import { notOffered, UNAVAILABLE } from "./commands.ts";
 

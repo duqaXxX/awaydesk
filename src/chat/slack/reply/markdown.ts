@@ -7,8 +7,8 @@
  * `re.M` starts a line after `\n` only (JavaScript's also after `\r`, U+2028 and U+2029).
  */
 
-import { PY_SPACE, strip } from "../../../text.ts";
-import { blank, len } from "./chars.ts";
+import { blank, PY_SPACE, strip } from "../../../text.ts";
+import { len } from "./chars.ts";
 import { mrkdwnEscape } from "./escape.ts";
 
 const S = `[${PY_SPACE}]`;

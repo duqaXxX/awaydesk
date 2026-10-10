@@ -23,7 +23,7 @@ import type { KnownBlock, WebClient } from "@slack/web-api";
 import type { StateStore, ThreadState } from "../../core/state.ts";
 import * as texts from "../../core/texts.ts";
 import { getLogger } from "../../log.ts";
-import { isRecord } from "../../values.ts";
+import { isRecord, records } from "../../values.ts";
 import { contextBlock } from "./reply/blocks.ts";
 import { deleteRequest, describe, NOT_STREAMING } from "./reply/errors.ts";
 import type { Limiter } from "./reply/limiter.ts";
@@ -39,11 +39,6 @@ const RUNNING_CARD = ["pending", "in_progress"];
 // Slack's own cap: the read-back count is Slack's (streamed markdown reads back as several
 // blocks), not the sink's, which keeps a margin under it for what it writes itself.
 export const SLACK_BLOCKS = 50;
-
-/** The records of a wire list; `[]` for a field that is absent or not a list. */
-function records(value: unknown): Record<string, unknown>[] {
-  return Array.isArray(value) ? value.filter(isRecord) : [];
-}
 
 /**
  * Repair every thread state.json still shows as left open. One thread's failure (a deleted

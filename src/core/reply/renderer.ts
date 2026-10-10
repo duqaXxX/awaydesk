@@ -10,10 +10,11 @@
  */
 import type { Question, SessionEvent } from "../../agent/seam.ts";
 import type { FooterFields, Preview, ReplySink, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
+import { blank } from "../../text.ts";
 import { formatTokens } from "../footer.ts";
 import * as texts from "../texts.ts";
 import { answered, PREVIEWED, preview } from "./previews.ts";
-import { BACKGROUND, blank, oneLine, STOPPED, splitLines } from "./words.ts";
+import { BACKGROUND, oneLine, STOPPED, splitLines } from "./words.ts";
 
 export const TITLE_LIMIT = 80;
 export const OUTPUT_LIMIT = 200;

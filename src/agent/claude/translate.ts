@@ -14,7 +14,7 @@
  */
 
 import { strip } from "../../text.ts";
-import { isRecord } from "../../values.ts";
+import { isRecord, records } from "../../values.ts";
 import type {
   DiffHunk,
   FileChange,
@@ -23,7 +23,7 @@ import type {
   TaskKind,
   TurnEnding,
 } from "../seam.ts";
-import { integer, number, records, string, type WireRecord, words } from "./wire.ts";
+import { integer, number, string, type WireRecord, words } from "./wire.ts";
 
 // Each task_type (measured on Claude Code 2.1.280: `local_bash` for a background command,
 // `local_agent` for a subagent). A type not listed is a task of no kind the daemon names.

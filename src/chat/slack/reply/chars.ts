@@ -13,7 +13,6 @@
  * - a cut "after N characters" goes through `at` or `take`, which turn the count into the index
  *   that ends that many code points, so a cut never lands inside a surrogate pair.
  */
-import { isSpace } from "../../../text.ts";
 
 function isHigh(code: number): boolean {
   return code >= 0xd800 && code <= 0xdbff;
@@ -53,14 +52,6 @@ export function at(text: string, count: number): number {
 /** Python's `text[:count]`. */
 export function take(text: string, count: number): string {
   return text.slice(0, at(text, count));
-}
-
-/** Python's `not text.strip()`. */
-export function blank(text: string): boolean {
-  for (let i = 0; i < text.length; i += 1) {
-    if (!isSpace(text.charCodeAt(i))) return false;
-  }
-  return true;
 }
 
 /** Python's `text.lstrip("\n")`. */

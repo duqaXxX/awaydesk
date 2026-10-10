@@ -27,6 +27,7 @@ import { questionResult } from "../../../src/agent/claude/requests.ts";
 import { ResumeRefused } from "../../../src/agent/seam.ts";
 import type { Reply } from "../../../src/chat/seam.ts";
 import { Status, ThreadStatus } from "../../../src/chat/slack/reply/status.ts";
+import { resolvePath } from "../../../src/core/paths.ts";
 import type { TurnRenderer } from "../../../src/core/reply/renderer.ts";
 import { APPROVE, type Outcome } from "../../../src/core/requests.ts";
 import {
@@ -849,11 +850,25 @@ test("resolve directory follows a link before the `..` after it", POSIX_ONLY, (t
   mkdirSync(join(tmpPath, "elsewhere", "deep"), { recursive: true });
   symlinkSync(join("..", "in", "deep"), join(root, "a", "link"));
   symlinkSync(join("..", "elsewhere", "deep"), join(root, "out"));
+  symlinkSync(join("a", "link"), join(root, "chain"));
+  symlinkSync(join(root, "in"), join(root, "absolute"));
+  symlinkSync("loop2", join(root, "loop1"));
+  symlinkSync("loop1", join(root, "loop2"));
   assert.equal(resolveDirectory("a/link", root), join(root, "in", "deep"));
   assert.equal(resolveDirectory("a/link/..", root), join(root, "in"));
   assert.equal(resolveDirectory(`${root}/a/link/..`, root), join(root, "in"));
+  assert.equal(resolveDirectory("chain/..", root), join(root, "in"));
+  assert.equal(resolveDirectory("absolute/deep/../..", root), root);
   assert.equal(resolveDirectory("out/..", root), null); // `elsewhere`, outside the root
   assert.equal(resolveDirectory("a/link/../missing", root), null);
+  // A name that is not there is kept and the walk goes on: the link after it is still followed.
+  assert.equal(resolveDirectory("missing/../out", root), null);
+  assert.equal(resolveDirectory("in/deep/../../out/..", root), null);
+  assert.equal(resolveDirectory("missing/../a/link/..", root), join(root, "in"));
+  assert.equal(resolveDirectory("a/missing/../link/..", root), join(root, "in"));
+  // A loop of links is kept as written. Python raised on the folder itself; here it is no folder.
+  assert.equal(resolveDirectory("loop1/..", root), root);
+  assert.equal(resolveDirectory("loop1", root), null);
 });
 
 // A report opens with Claude Code's notification summary (recorded: `Background command "..."
@@ -3822,8 +3837,8 @@ test("cancel while another approval is open shows waiting not working", async (t
 test("working in does not resolve a path on every lookup", async (t) => {
   // `workingIn` used to resolve the path of every live session on every message; each
   // session's folder is now resolved once, at construction. Python patched `Path.resolve`;
-  // here the `realpathSync.native` that `resolvePath` calls is replaced and the built-ins' ES
-  // bindings are synced to it.
+  // here the `lstatSync` that `resolvePath` walks with is replaced and the built-ins' ES
+  // bindings are synced to it. The test first checks that this does stop `resolvePath`.
   const h = harnessFor(t)({
     turns: [[canUseToolCall("Bash", { command: "ls" }), ...sdkMessages("tools")]],
   });
@@ -3831,16 +3846,18 @@ test("working in does not resolve a path on every lookup", async (t) => {
   const second = h.session(OTHER_THREAD);
   await first.submit("clean");
   await h.until(() => pending(h.approvals).length > 0); // first is genuinely busy now
-  const real = fs.realpathSync;
-  const refuse = (): never => {
+  // Typed as a constant, and a plain property of the module object at run time.
+  const patched = fs as { lstatSync: typeof fs.lstatSync };
+  const real = fs.lstatSync;
+  patched.lstatSync = (() => {
     throw new Error("workingIn must not resolve a path on every lookup");
-  };
-  fs.realpathSync = Object.assign(refuse, { native: refuse });
+  }) as typeof fs.lstatSync;
   syncBuiltinESMExports();
   try {
+    assert.throws(() => resolvePath(h.tmpPath), /must not resolve/);
     assert.equal(h.manager.workingIn({ besides: second }), first);
   } finally {
-    fs.realpathSync = real;
+    patched.lstatSync = real;
     syncBuiltinESMExports();
   }
   resolve(h, APPROVE);

@@ -1,7 +1,7 @@
 /** Reading a wire value as `unknown`: each helper gives the value in its type, or null. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { integer, number, records, string, words } from "../../../src/agent/claude/wire.ts";
+import { integer, number, string, words } from "../../../src/agent/claude/wire.ts";
 
 test("a string is read as a string and anything else as none", () => {
   assert.equal(string("ok"), "ok");
@@ -29,9 +29,4 @@ test("a number is read as one, a fraction included", () => {
   for (const value of ["4886", null, undefined, Number.NaN, Number.POSITIVE_INFINITY, false]) {
     assert.equal(number(value), null);
   }
-});
-
-test("the records of a list are its objects, in order", () => {
-  assert.deepEqual(records([{ a: 1 }, "text", null, [{ b: 2 }], { c: 3 }]), [{ a: 1 }, { c: 3 }]);
-  for (const value of [null, undefined, "list", { a: 1 }]) assert.deepEqual(records(value), []);
 });
