@@ -866,9 +866,13 @@ test("resolve directory follows a link before the `..` after it", POSIX_ONLY, (t
   assert.equal(resolveDirectory("in/deep/../../out/..", root), null);
   assert.equal(resolveDirectory("missing/../a/link/..", root), join(root, "in"));
   assert.equal(resolveDirectory("a/missing/../link/..", root), join(root, "in"));
-  // A loop of links is kept as written. Python raised on the folder itself; here it is no folder.
-  assert.equal(resolveDirectory("loop1/..", root), root);
+  // A path through a loop of links names nothing, as the kernel answers it. Python kept the
+  // rest of such a path as written and unread: `loop1/../out` was the root's `out`, which
+  // leads outside (run 2026-10-11).
   assert.equal(resolveDirectory("loop1", root), null);
+  assert.equal(resolveDirectory("loop1/..", root), null);
+  assert.equal(resolveDirectory("loop1/../out", root), null);
+  assert.equal(resolveDirectory("loop1/../in", root), null);
 });
 
 // A report opens with Claude Code's notification summary (recorded: `Background command "..."

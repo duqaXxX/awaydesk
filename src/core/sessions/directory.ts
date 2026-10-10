@@ -1,5 +1,5 @@
 /** Whether a folder can hold a session, the folder a typed path names, and `!status`'s terminal line. */
-import { statSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 import { opendir, stat } from "node:fs/promises";
 import { isAbsolute, sep } from "node:path";
 import { errorCode } from "../../values.ts";
@@ -30,21 +30,26 @@ export async function checkDirectory(
   if (!(await trusted(directory))) throw new DirectoryUntrusted(directory);
 }
 
+/** Whether `path` is `root` or lies under it. */
+function under(path: string, root: string): boolean {
+  return path === root || path.startsWith(root.endsWith(sep) ? root : root + sep);
+}
+
 /** The real directory `raw` names, if it exists under `root`; guards against a typo only. */
 export function resolveDirectory(raw: string, root: string): string | null {
   // A relative path is read under the root: the daemon's own working directory means nothing
   // to the owner (launchd starts it in `/`).
   const written = expandUser(raw);
-  let path: string;
   try {
     // Joined as text, as Python's `root / raw` is: the disk follows a link before a `..`.
-    path = resolvePath(isAbsolute(written) ? written : `${root}/${written}`);
-    if (!statSync(path).isDirectory()) return null;
+    const path = resolvePath(isAbsolute(written) ? written : `${root}/${written}`);
+    if (!statSync(path).isDirectory() || !under(path, root)) return null;
+    // The kernel is asked too, since a session runs in the folder it reaches: whatever the
+    // reading above made of the spelling, that folder lies under the root or is refused.
+    return under(realpathSync.native(path), realpathSync.native(root)) ? path : null;
   } catch {
-    return null; // it names nothing: Python's `resolve` kept the path, and `is_dir` said no
+    return null; // it names nothing, or goes through a loop of links
   }
-  const base = root.endsWith(sep) ? root : root + sep;
-  return path === root || path.startsWith(base) ? path : null;
 }
 
 /** `shlex.quote`: the word as one shell argument, quoted only when it needs to be. */

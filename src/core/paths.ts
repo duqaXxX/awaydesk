@@ -18,22 +18,18 @@ export function expandUser(path: string): string {
 /**
  * `posixpath._joinrealpath` of Python 3.12, not strict: `target` read from `start` one name at a
  * time, each link followed where it stands, so a `..` goes up from where the link led. A name
- * that cannot be looked at is kept as written. Returns the path and whether it is resolved: a
- * loop of links ends the walk, with the rest kept as written.
+ * that cannot be looked at is kept as written. One difference: a loop of links throws `ELOOP`, as
+ * the kernel answers a path through it. Python kept the rest of such a path as written, unread,
+ * and a link in that rest then led wherever it pointed (`loop/../out`).
  */
-function joinReal(
-  start: string,
-  target: string,
-  seen: Map<string, string | null>,
-): [path: string, resolved: boolean] {
+function joinReal(start: string, target: string, seen: Map<string, string | null>): string {
   let path = start;
   let rest = target;
   if (isAbsolute(rest)) {
     path = parse(rest).root;
     rest = rest.slice(path.length);
   }
-  const names = rest.split(SEPARATORS);
-  for (const [index, name] of names.entries()) {
+  for (const name of rest.split(SEPARATORS)) {
     if (name === "" || name === ".") continue;
     if (name === "..") {
       path = dirname(path);
@@ -50,20 +46,18 @@ function joinReal(
       path = next;
       continue;
     }
-    const after = names.slice(index + 1);
-    const known = seen.get(next);
-    if (known === null) return [join(next, ...after), false];
-    if (known !== undefined) {
-      path = known;
-      continue;
+    let led = seen.get(next);
+    if (led === null) {
+      throw Object.assign(new Error("ELOOP: too many symbolic links"), { code: "ELOOP" });
     }
-    seen.set(next, null);
-    const [led, resolved] = joinReal(path, readlinkSync(next), seen);
-    if (!resolved) return [join(led, ...after), false];
+    if (led === undefined) {
+      seen.set(next, null); // being followed: meeting it again is a loop
+      led = joinReal(path, readlinkSync(next), seen);
+      seen.set(next, led);
+    }
     path = led;
-    seen.set(next, path);
   }
-  return [path, true];
+  return path;
 }
 
 /**
@@ -71,9 +65,9 @@ function joinReal(
  * spelling the owner wrote is kept where no link stands. Never `path.resolve`, which folds
  * `link/..` as text before the link is followed and names another folder than the kernel
  * reaches, nor `realpathSync.native`, which fails on a part that is not there and so leaves
- * what follows it unread.
+ * what follows it unread. Throws `ELOOP` on a loop of links.
  */
 export function resolvePath(path: string): string {
   const absolute = isAbsolute(path) ? path : `${process.cwd()}/${path}`;
-  return joinReal("", absolute, new Map())[0];
+  return joinReal("", absolute, new Map());
 }
