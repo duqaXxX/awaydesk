@@ -45,6 +45,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { WebClient } from "@slack/web-api";
 import { type Clock, systemClock } from "../../../clock.ts";
 import { Fold, shownPreview } from "../../../core/reply/fold.ts";
+import { cancellable, Mutex } from "../../../core/sessions/tasks.ts";
 import { strip } from "../../../text.ts";
 import type { FooterFields, ReplySink as Sink, TaskUpdate } from "../../seam.ts";
 import { formatFooter } from "../footer.ts";
@@ -100,15 +101,16 @@ import {
 import { mrkdwnEscape } from "./escape.ts";
 import type { Limiter } from "./limiter.ts";
 import { bannerText, markdownBlocks, markdownCut, plainWords } from "./markdown.ts";
-import { cancellable, Mutex, Task } from "./tasks.ts";
+import { Task } from "./tasks.ts";
 
 export * from "../../../clock.ts";
+export { Cancelled, cancellable, Mutex } from "../../../core/sessions/tasks.ts";
 export * from "./blocks.ts";
 export * from "./clients.ts";
 export * from "./errors.ts";
 export * from "./limiter.ts";
 export * from "./markdown.ts";
-export { Cancelled, cancellable, Mutex, Task } from "./tasks.ts";
+export { Task } from "./tasks.ts";
 
 export const DEBOUNCE_SECONDS = 1.0;
 // The final write has no next rewrite to fix it: one that fails for any reason but its content

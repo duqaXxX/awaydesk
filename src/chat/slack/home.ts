@@ -49,6 +49,7 @@ import { WebAPIPlatformError, type WebClient } from "@slack/web-api";
 import type { ListedSession } from "../../agent/seam.ts";
 import { type Clock, systemClock } from "../../clock.ts";
 import { oneLine } from "../../core/reply/words.ts";
+import { Cancelled, Mutex } from "../../core/sessions/tasks.ts";
 import type { StateStore, ThreadKey } from "../../core/state.ts";
 import * as texts from "../../core/texts.ts";
 import { getLogger } from "../../log.ts";
@@ -57,7 +58,7 @@ import { take } from "./reply/chars.ts";
 import { describe } from "./reply/errors.ts";
 import { mrkdwnEscape, shownAsWritten } from "./reply/escape.ts";
 import { Status } from "./reply/status.ts";
-import { Cancelled, Mutex, Task } from "./reply/tasks.ts";
+import { Task } from "./reply/tasks.ts";
 import { ID_SHOWN, TITLE_LIMIT } from "./resume.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.home");

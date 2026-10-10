@@ -1,7 +1,7 @@
 /**
- * The waits `!open` is made of: a counting gate for git's turns and for one modal's updates, a
- * time limit on the injected clock, and a wait that a requester can give up without stopping the
- * work. Python's `asyncio.Semaphore`, `asyncio.Lock`, `asyncio.timeout` and `asyncio.shield`.
+ * The waits `!open` is made of: a counting gate for git's turns and for one modal's updates, and
+ * a time limit on the injected clock. Python's `asyncio.Semaphore`, `asyncio.Lock` and
+ * `asyncio.timeout`.
  */
 import type { Clock } from "../../../clock.ts";
 
@@ -92,21 +92,4 @@ export async function within<T>(
   } finally {
     finished.abort();
   }
-}
-
-/**
- * `promise`, or the signal's reason when it aborts first. The promise is left running: the other
- * requests for the same work still wait for it.
- */
-export function waitFor<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (signal === undefined) return promise;
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(signal.reason);
-      return;
-    }
-    const onAbort = () => reject(signal.reason);
-    signal.addEventListener("abort", onAbort, { once: true });
-    promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
-  });
 }

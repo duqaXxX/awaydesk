@@ -9,6 +9,7 @@
  * or a git call in flight is never cut, the signal only stops what would follow it.
  */
 import type { ThreadSession } from "../../../core/sessions/session.ts";
+import { Cancelled } from "../../../core/sessions/tasks.ts";
 import * as texts from "../../../core/texts.ts";
 import { fill } from "../../../core/texts.ts";
 import { strip } from "../../../text.ts";
@@ -40,7 +41,6 @@ import {
 import { take } from "../reply/chars.ts";
 import { describe } from "../reply/errors.ts";
 import { shownAsWritten } from "../reply/escape.ts";
-import { Cancelled } from "../reply/tasks.ts";
 import { type Answers, type AppParts, errorName, isCancelled, logger } from "./answers.ts";
 import { interactionActor, isOwner } from "./guards.ts";
 import {

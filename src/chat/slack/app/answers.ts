@@ -18,7 +18,7 @@ import { DirectoryUnavailable, SessionClosed, SessionGone } from "../../../core/
 import type { SessionManager } from "../../../core/sessions/manager.ts";
 import type { ThreadSession } from "../../../core/sessions/session.ts";
 import { describe as nameOf } from "../../../core/sessions/session.ts";
-import { Cancelled as SessionCancelled } from "../../../core/sessions/tasks.ts";
+import { Cancelled } from "../../../core/sessions/tasks.ts";
 import type { StateStore } from "../../../core/state.ts";
 import * as texts from "../../../core/texts.ts";
 import { fill } from "../../../core/texts.ts";
@@ -30,7 +30,6 @@ import { take } from "../reply/chars.ts";
 import { deleteRequest, describe } from "../reply/errors.ts";
 import { markdownEscape, mrkdwnEscape } from "../reply/escape.ts";
 import type { Limiter } from "../reply/limiter.ts";
-import { Cancelled } from "../reply/tasks.ts";
 import { TITLE_LIMIT } from "../resume.ts";
 import { type ChannelGuard, type Identity, isOwner } from "./guards.ts";
 
@@ -83,9 +82,9 @@ export interface AppParts {
   readonly listings: Listings;
 }
 
-/** Whether a wait was cancelled, by the sessions' tasks or by the provider's. */
+/** Whether a wait was cancelled: a task's signal aborted. */
 export function isCancelled(error: unknown): boolean {
-  return error instanceof Cancelled || error instanceof SessionCancelled;
+  return error instanceof Cancelled;
 }
 
 /** The name of an error, as the session's own failures are named: never its words. */

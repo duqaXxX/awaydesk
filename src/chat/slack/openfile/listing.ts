@@ -33,13 +33,14 @@ import type { Repository } from "../../../agent/seam.ts";
 import { type Clock, monotonicClock } from "../../../clock.ts";
 import { foldersWithin } from "../../../core/folders.ts";
 import { runGit } from "../../../core/footer.ts";
+import { cancellable } from "../../../core/sessions/tasks.ts";
 import { getLogger } from "../../../log.ts";
 import { compareCodePoints } from "../../../text.ts";
 import { len } from "../reply/chars.ts";
 import { describe } from "../reply/errors.ts";
 import { relativeTo } from "./paths.ts";
 import { realpathLoose, regularFiles } from "./read.ts";
-import { Gate, TIMED_OUT, waitFor, within } from "./waiting.ts";
+import { Gate, TIMED_OUT, within } from "./waiting.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.openfile");
 
@@ -342,7 +343,7 @@ class Kept<T> {
       };
       started.then(done, done);
     }
-    return [await waitFor(task, options.signal), true];
+    return [await cancellable(task, options.signal), true];
   }
 
   async #make(folder: string, make: () => Promise<[T, number | null]>): Promise<T> {
