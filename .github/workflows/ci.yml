@@ -70,15 +70,15 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-  # The TypeScript unit tests on each system the daemon is meant to run on. They start no
-  # Claude Code process and open no connection.
+  # The TypeScript unit tests on the other systems the daemon is meant to run on: the job above
+  # runs them on Linux. They start no Claude Code process and open no connection.
   systems:
     name: TypeScript tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
