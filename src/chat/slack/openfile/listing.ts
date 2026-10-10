@@ -34,9 +34,10 @@ import { type Clock, monotonicClock } from "../../../clock.ts";
 import { foldersWithin } from "../../../core/folders.ts";
 import { runGit } from "../../../core/footer.ts";
 import { getLogger } from "../../../log.ts";
+import { compareCodePoints } from "../../../text.ts";
 import { len } from "../reply/chars.ts";
 import { describe } from "../reply/errors.ts";
-import { compareCodePoints, relativeTo } from "./paths.ts";
+import { relativeTo } from "./paths.ts";
 import { realpathLoose, regularFiles } from "./read.ts";
 import { Gate, TIMED_OUT, waitFor, within } from "./waiting.ts";
 

@@ -13,6 +13,8 @@
  * - a cut "after N characters" goes through `at` or `take`, which turn the count into the index
  *   that ends that many code points, so a cut never lands inside a surrogate pair.
  */
+import { isSpace } from "../../../text.ts";
+
 function isHigh(code: number): boolean {
   return code >= 0xd800 && code <= 0xdbff;
 }
@@ -51,33 +53,6 @@ export function at(text: string, count: number): number {
 /** Python's `text[:count]`. */
 export function take(text: string, count: number): string {
   return text.slice(0, at(text, count));
-}
-
-// The same set as `PY_SPACE`, by code: a pattern that ends on `$` would start again from every
-// run of spaces, which is quadratic on a long text.
-function isSpace(code: number): boolean {
-  return (
-    (code >= 0x09 && code <= 0x0d) ||
-    (code >= 0x1c && code <= 0x20) ||
-    code === 0x85 ||
-    code === 0xa0 ||
-    code === 0x1680 ||
-    (code >= 0x2000 && code <= 0x200a) ||
-    code === 0x2028 ||
-    code === 0x2029 ||
-    code === 0x202f ||
-    code === 0x205f ||
-    code === 0x3000
-  );
-}
-
-/** Python's `text.strip()`: its whitespace is not `String.prototype.trim`'s. */
-export function strip(text: string): string {
-  let start = 0;
-  let end = text.length;
-  while (start < end && isSpace(text.charCodeAt(start))) start += 1;
-  while (end > start && isSpace(text.charCodeAt(end - 1))) end -= 1;
-  return text.slice(start, end);
 }
 
 /** Python's `not text.strip()`. */

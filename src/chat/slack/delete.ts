@@ -37,6 +37,7 @@ import type { StateStore } from "../../core/state.ts";
 import * as texts from "../../core/texts.ts";
 import { fill } from "../../core/texts.ts";
 import { getLogger } from "../../log.ts";
+import { isRecord } from "../../values.ts";
 import { describe } from "./reply/errors.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.delete");
@@ -59,10 +60,6 @@ export interface ThreadDeleterOptions {
   readonly release: (channelId: string, threadTs: string) => Promise<boolean>;
   /** Ends the hold. */
   readonly free: (channelId: string, threadTs: string) => void;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** The messages of a `conversations.*` answer, `[]` for an answer with none. */

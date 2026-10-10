@@ -19,6 +19,7 @@ import {
   query as sdkQuery,
 } from "@anthropic-ai/claude-agent-sdk";
 import { getLogger } from "../../log.ts";
+import { isRecord } from "../../values.ts";
 import {
   type AgentInfo,
   type AgentSession,
@@ -35,7 +36,7 @@ import { agentInfo, contextUsage as contextUsageOf } from "./info.ts";
 import { userMessage } from "./prompt.ts";
 import { permissionResult, questionResult, toRequest } from "./requests.ts";
 import { Translator } from "./translate.ts";
-import { isRecord, words } from "./wire.ts";
+import { words } from "./wire.ts";
 
 export const logger = getLogger("awaydesk.agent.claude.session");
 

@@ -277,7 +277,10 @@ All notable changes to this project are documented here. The format follows
   Agent SDK nor a Slack package, and `src/chat/` holds the only code that knows a chat library
   (the Slack provider, on `@slack/bolt` 5.1.0 and `@slack/web-api` 8.2.0). `src/agent/seam.ts` and
   `src/chat/seam.ts` hold the types that cross the two seams, and `test/imports.test.ts` fails
-  when a layer imports what it must not. What an owner sees is unchanged: the same words, the same
+  when a layer imports what it must not. `src/clock.ts`, `src/log.ts`, `src/text.ts` and
+  `src/values.ts` sit above the layers, for what more than one of them needs: the clock, the log,
+  Python's whitespace and string order, and the reading of a parsed value or a caught error.
+  What an owner sees is unchanged: the same words, the same
   texts in Slack, the same Slack app manifest, and the same `~/.config/awaydesk/.env` and
   `state.json` (version 2). The command is installed with npm, from a tarball `npm pack` builds (`docs/setup.md`, Part 0), in place of `uv tool install`. The checks are Biome, `tsc --noEmit` and `node --test`,
   which runs the tests from their sources (`npm run check`); the release probe is

@@ -6,8 +6,10 @@
  * PostToolUse reports it after each tool, so a turn stopped or failed before its Stop still
  * moves the footer's branch.
  */
+
+import { isRecord } from "../../values.ts";
 import type { SessionEvent } from "../seam.ts";
-import { isRecord, string, words } from "./wire.ts";
+import { string, words } from "./wire.ts";
 
 function folderChanged(input: unknown): SessionEvent[] {
   const folder = isRecord(input) ? words(input.cwd) : null;

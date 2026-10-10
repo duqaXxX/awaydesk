@@ -6,6 +6,7 @@ import { relative, sep } from "node:path";
 import { FOLDER_ROWS } from "../../core/folders.ts";
 import * as texts from "../../core/texts.ts";
 import { fill } from "../../core/texts.ts";
+import { compareCodePoints } from "../../text.ts";
 import { type ContextBlock, contextBlock } from "./reply/blocks.ts";
 import { shownAsWritten } from "./reply/escape.ts";
 
@@ -37,24 +38,12 @@ function samePath(a: string, b: string): boolean {
   return left.length === right.length && left.every((part, i) => part === right[i]);
 }
 
-/** Python's order on code points, where `<` on JavaScript strings goes by UTF-16 unit. */
-function compareParts(a: string, b: string): number {
-  const left = Array.from(a);
-  const right = Array.from(b);
-  for (let i = 0; i < Math.min(left.length, right.length); i += 1) {
-    const x = left[i] as string;
-    const y = right[i] as string;
-    if (x !== y) return (x.codePointAt(0) as number) - (y.codePointAt(0) as number);
-  }
-  return left.length - right.length;
-}
-
 /** Python sorts a `Path` by its components, so `a/b` comes before `a-b`; a string sort would not. */
 function comparePaths(a: string, b: string): number {
   const left = parts(a);
   const right = parts(b);
   for (let i = 0; i < Math.min(left.length, right.length); i += 1) {
-    const order = compareParts(left[i] as string, right[i] as string);
+    const order = compareCodePoints(left[i] as string, right[i] as string);
     if (order !== 0) return order;
   }
   return left.length - right.length;

@@ -20,21 +20,12 @@
  * - Slack picks the language itself (`transcription.locale`): of three clips spoken in Italian it
  *   heard one as `it-IT` and two as `en-GB`, and the text of those two was wrong.
  */
+import { strip } from "../../text.ts";
 
 // How long a clip waits for the owner to ask Slack for its transcript.
 export const WAIT_SECONDS = 300.0;
 // A transcript of five minutes of speech, the longest clip Slack records, is a few kilobytes.
 export const VTT_LIMIT = 256 * 1024;
-
-// What Python's `str.strip` removes: `str.isspace`, which is not JavaScript's `trim` (it keeps
-// U+FEFF out and takes the separators U+001C to U+001F and U+0085 in).
-const SPACE =
-  "\\t\\n\\v\\f\\r\\x1c-\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
-const STRIP = new RegExp(`^[${SPACE}]+|[${SPACE}]+$`, "g");
-
-function strip(text: string): string {
-  return text.replace(STRIP, "");
-}
 
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)

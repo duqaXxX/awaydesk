@@ -11,6 +11,7 @@
 import type { ThreadSession } from "../../../core/sessions/session.ts";
 import * as texts from "../../../core/texts.ts";
 import { fill } from "../../../core/texts.ts";
+import { strip } from "../../../text.ts";
 import { changedIn } from "../openfile/changed.ts";
 import type { Found } from "../openfile/listing.ts";
 import {
@@ -36,7 +37,7 @@ import {
   TooLarge,
   uploadFile,
 } from "../openfile/read.ts";
-import { strip, take } from "../reply/chars.ts";
+import { take } from "../reply/chars.ts";
 import { describe } from "../reply/errors.ts";
 import { shownAsWritten } from "../reply/escape.ts";
 import { Cancelled } from "../reply/tasks.ts";

@@ -6,8 +6,9 @@
  * and `\w` are Unicode (`PY_SPACE`, `WORD`), its `.` stops at `\n` only, and its `^` under
  * `re.M` starts a line after `\n` only (JavaScript's also after `\r`, U+2028 and U+2029).
  */
-import { PY_SPACE } from "../../../core/reply/words.ts";
-import { blank, len, strip } from "./chars.ts";
+
+import { PY_SPACE, strip } from "../../../text.ts";
+import { blank, len } from "./chars.ts";
 import { mrkdwnEscape } from "./escape.ts";
 
 const S = `[${PY_SPACE}]`;

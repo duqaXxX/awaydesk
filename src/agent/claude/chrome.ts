@@ -17,20 +17,12 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { getLogger } from "../../log.ts";
+import { errorName } from "../../values.ts";
 
 export const logger = getLogger("awaydesk.agent.claude.chrome");
 
 // Python read the record as strict UTF-8 and kept a BOM in the text, where `json.loads` refuses it.
 const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
-
-/** The name a log line gives a failure: the errno code of a system error, else the error's name. */
-function errorName(error: unknown): string {
-  if (error instanceof Error) {
-    const code = (error as { code?: unknown }).code;
-    return typeof code === "string" ? code : error.name;
-  }
-  return typeof error;
-}
 
 /**
  * Whether the owner turned Chrome on by default in Claude Code; false when its record cannot be

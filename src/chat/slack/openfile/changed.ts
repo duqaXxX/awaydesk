@@ -6,7 +6,8 @@
 import type { Repository } from "../../../agent/seam.ts";
 import { type Clock, monotonicClock } from "../../../clock.ts";
 import { GIT_TIMEOUT, runGit } from "../../../core/footer.ts";
-import { len, strip } from "../reply/chars.ts";
+import { strip } from "../../../text.ts";
+import { len } from "../reply/chars.ts";
 import { GIT_CHAINS, relation, scoped, under } from "./listing.ts";
 import { Gate, TIMED_OUT, within } from "./waiting.ts";
 

@@ -21,9 +21,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { listSessions as sdkListSessions } from "@anthropic-ai/claude-agent-sdk";
 import { getLogger } from "../../log.ts";
+import { isRecord } from "../../values.ts";
 import type { ListedSession } from "../seam.ts";
 import { listedSession } from "./info.ts";
-import { isRecord, string } from "./wire.ts";
+import { string } from "./wire.ts";
 
 export const logger = getLogger("awaydesk.agent.claude.listing");
 

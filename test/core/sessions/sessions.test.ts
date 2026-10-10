@@ -838,6 +838,24 @@ test("resolve directory", POSIX_ONLY, (t) => {
   assert.equal(resolveDirectory(join(root, "missing"), root), null);
 });
 
+test("resolve directory follows a link before the `..` after it", POSIX_ONLY, (t) => {
+  // What Python's `(root / raw).resolve()` gave on this layout (run 2026-10-11): the disk goes
+  // up from where a link leads, where `path.resolve` folds `link/..` away as text.
+  const tmpPath = realpathSync(mkdtempSync(join(tmpdir(), "awd-resolve-")));
+  t.after(() => rmSync(tmpPath, { recursive: true, force: true }));
+  const root = join(tmpPath, "root");
+  mkdirSync(join(root, "in", "deep"), { recursive: true });
+  mkdirSync(join(root, "a"));
+  mkdirSync(join(tmpPath, "elsewhere", "deep"), { recursive: true });
+  symlinkSync(join("..", "in", "deep"), join(root, "a", "link"));
+  symlinkSync(join("..", "elsewhere", "deep"), join(root, "out"));
+  assert.equal(resolveDirectory("a/link", root), join(root, "in", "deep"));
+  assert.equal(resolveDirectory("a/link/..", root), join(root, "in"));
+  assert.equal(resolveDirectory(`${root}/a/link/..`, root), join(root, "in"));
+  assert.equal(resolveDirectory("out/..", root), null); // `elsewhere`, outside the root
+  assert.equal(resolveDirectory("a/link/../missing", root), null);
+});
+
 // A report opens with Claude Code's notification summary (recorded: `Background command "..."
 // completed (exit code 0)`, `Agent "..." finished`), never with a tool line.
 
@@ -3804,7 +3822,7 @@ test("cancel while another approval is open shows waiting not working", async (t
 test("working in does not resolve a path on every lookup", async (t) => {
   // `workingIn` used to resolve the path of every live session on every message; each
   // session's folder is now resolved once, at construction. Python patched `Path.resolve`;
-  // here the `realpathSync` that `resolvePath` calls is replaced and the built-ins' ES
+  // here the `realpathSync.native` that `resolvePath` calls is replaced and the built-ins' ES
   // bindings are synced to it.
   const h = harnessFor(t)({
     turns: [[canUseToolCall("Bash", { command: "ls" }), ...sdkMessages("tools")]],
@@ -3814,12 +3832,10 @@ test("working in does not resolve a path on every lookup", async (t) => {
   await first.submit("clean");
   await h.until(() => pending(h.approvals).length > 0); // first is genuinely busy now
   const real = fs.realpathSync;
-  fs.realpathSync = Object.assign(
-    () => {
-      throw new Error("workingIn must not resolve a path on every lookup");
-    },
-    { native: real.native },
-  );
+  const refuse = (): never => {
+    throw new Error("workingIn must not resolve a path on every lookup");
+  };
+  fs.realpathSync = Object.assign(refuse, { native: refuse });
   syncBuiltinESMExports();
   try {
     assert.equal(h.manager.workingIn({ besides: second }), first);

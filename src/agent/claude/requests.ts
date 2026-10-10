@@ -8,6 +8,7 @@
  * not rendering.
  */
 import type { CanUseTool, PermissionResult } from "@anthropic-ai/claude-agent-sdk";
+import { isRecord } from "../../values.ts";
 import type {
   PermissionAnswer,
   PermissionRequest,
@@ -16,7 +17,7 @@ import type {
   QuestionOption,
   QuestionRequest,
 } from "../seam.ts";
-import { isRecord, string, words } from "./wire.ts";
+import { string, words } from "./wire.ts";
 
 export const QUESTION_TOOL = "AskUserQuestion";
 

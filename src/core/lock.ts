@@ -33,6 +33,7 @@ import {
 } from "node:fs";
 import net from "node:net";
 import { join } from "node:path";
+import { errorCode } from "../values.ts";
 
 // `O_EXLOCK` of macOS's `open(2)`: "atomically obtain an exclusive lock", with flock(2) semantics;
 // `#define O_EXLOCK 0x00000020` in `sys/fcntl.h` of the MacOSX SDK (`man 2 open` and that header,
@@ -66,12 +67,6 @@ export interface InstanceLock {
 function nameTaken(error: unknown): boolean {
   const code = errorCode(error);
   return code === "EADDRINUSE" || code === "EEXIST";
-}
-
-function errorCode(error: unknown): string | undefined {
-  return error instanceof Error && "code" in error && typeof error.code === "string"
-    ? error.code
-    : undefined;
 }
 
 /** The address the lock listens on: a socket file in `directory`, a named pipe on Windows. */

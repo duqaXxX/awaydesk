@@ -7,7 +7,8 @@ import { type BigIntStats, constants, type Stats } from "node:fs";
 import { open, realpath, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, posix, sep } from "node:path";
 import type { WebClient } from "@slack/web-api";
-import { compareCodePoints, relativeTo } from "./paths.ts";
+import { compareCodePoints } from "../../../text.ts";
+import { relativeTo } from "./paths.ts";
 
 // Slack's documented limit for a snippet: `snippet_too_large` on `files.getUploadURLExternal`
 // (docs.slack.dev/reference/methods/files.getUploadURLExternal, read 2026-10-05).

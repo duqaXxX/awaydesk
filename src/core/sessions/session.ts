@@ -68,6 +68,7 @@ import {
   gitState,
   sessionTokens,
 } from "../footer.ts";
+import { resolvePath } from "../paths.ts";
 import {
   endedLine,
   type TaskEvent,
@@ -96,7 +97,7 @@ import {
   UNKNOWN_KIND,
 } from "./constants.ts";
 import type { SessionDeps } from "./deps.ts";
-import { checkDirectory, resolvePath, terminalLine } from "./directory.ts";
+import { checkDirectory, terminalLine } from "./directory.ts";
 import { DirectoryUnavailable, SessionClosed, SessionGone } from "./errors.ts";
 import { Cancelled, cancellable, Event, Mutex, Queue, Task } from "./tasks.ts";
 import { type ActiveTurn, notSent, Turn, takenNote } from "./turn.ts";

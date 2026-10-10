@@ -9,9 +9,11 @@
  * `<url|label>` can hide what it links and no text can close its code block.
  */
 import type { PermissionRequest, Question, QuestionOption } from "../../agent/seam.ts";
-import { oneLine, PY_SPACE } from "../../core/reply/words.ts";
+import { oneLine } from "../../core/reply/words.ts";
 import { answerOf } from "../../core/requests.ts";
 import * as texts from "../../core/texts.ts";
+import { PY_SPACE, strip } from "../../text.ts";
+import { isRecord } from "../../values.ts";
 import { shownAsWritten } from "./reply/escape.ts";
 
 export const SECTION_LIMIT = 3000;
@@ -31,12 +33,7 @@ export const TYPED_LIMIT = 300;
 type Block = Record<string, unknown>;
 type Answers = Record<string, string | string[]>;
 
-const EDGES = new RegExp(`^[${PY_SPACE}]+|[${PY_SPACE}]+$`, "g");
 const RUNS = new RegExp(`[${PY_SPACE}]+`);
-
-function strip(text: string): string {
-  return text.replace(EDGES, "");
-}
 
 /** The first `limit` characters, counted in code points as Slack and Python count them. */
 function head(text: string, limit: number): string {
@@ -222,10 +219,6 @@ export function dumpDraft(draft: Draft): string {
     p: Object.fromEntries([...draft.picks].map(([k, v]) => [String(k), v])),
     t: Object.fromEntries([...draft.typed].map(([k, v]) => [String(k), v])),
   });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function text(value: unknown): string {

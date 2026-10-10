@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import type { KnownBlock, ModalView, Option } from "@slack/web-api";
 import * as texts from "../../../core/texts.ts";
 import { fill } from "../../../core/texts.ts";
+import { isRecord } from "../../../values.ts";
 import { contextBlock, plainTextObject } from "../reply/blocks.ts";
 import { len, take } from "../reply/chars.ts";
 import { shownAsWritten } from "../reply/escape.ts";
@@ -139,10 +140,6 @@ export class Target {
 }
 
 type Loose = Record<string, unknown>;
-
-function isRecord(value: unknown): value is Loose {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function own(record: Loose, key: string): unknown {
   return Object.hasOwn(record, key) ? record[key] : undefined;

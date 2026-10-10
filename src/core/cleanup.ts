@@ -12,6 +12,7 @@
  * `ChannelAnswer`.
  */
 import { getLogger, type Logger } from "../log.ts";
+import { errorName } from "../values.ts";
 import type { StateStore, ThreadKey } from "./state.ts";
 
 export const logger = getLogger("awaydesk.core.cleanup");
@@ -47,15 +48,6 @@ export interface CleanOptions {
   /** Seconds since the epoch. */
   readonly now?: () => number;
   readonly logger?: Log;
-}
-
-/** The name a log line gives a failure: the errno code of a system error, else the error's name. */
-function errorName(error: unknown): string {
-  if (error instanceof Error) {
-    const code = (error as { code?: unknown }).code;
-    return typeof code === "string" ? code : error.name;
-  }
-  return typeof error;
 }
 
 /**

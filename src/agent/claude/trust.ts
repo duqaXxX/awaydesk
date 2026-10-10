@@ -43,6 +43,7 @@ import { lstat, open, readFile, readlink, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { getLogger } from "../../log.ts";
+import { errorName } from "../../values.ts";
 import type { Repository } from "../seam.ts";
 
 export const logger = getLogger("awaydesk.agent.claude.trust");
@@ -95,15 +96,6 @@ function isFilesystemOddity(error: unknown): boolean {
 function isMissing(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
   return code === "ENOENT" || code === "ENOTDIR";
-}
-
-/** The name a log line gives a failure: the errno code of a system error, else the error's name. */
-function errorName(error: unknown): string {
-  if (error instanceof Error) {
-    const code = (error as { code?: unknown }).code;
-    return typeof code === "string" ? code : error.name;
-  }
-  return typeof error;
 }
 
 // Python kept the bytes of a path it read apart (surrogate escapes), so `m\xff` never named a folder

@@ -5,8 +5,8 @@
  */
 import * as texts from "../../../core/texts.ts";
 import { fill } from "../../../core/texts.ts";
+import { strip } from "../../../text.ts";
 import { DownloadFailed } from "../attachments.ts";
-import { strip } from "../reply/chars.ts";
 import { describe } from "../reply/errors.ts";
 import { mrkdwnEscape } from "../reply/escape.ts";
 import { Task } from "../reply/tasks.ts";

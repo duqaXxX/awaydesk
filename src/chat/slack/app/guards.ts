@@ -7,6 +7,7 @@
 import { WebAPIPlatformError, type WebClient } from "@slack/web-api";
 import * as texts from "../../../core/texts.ts";
 import { getLogger, type Logger } from "../../../log.ts";
+import { isSpace } from "../../../text.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.app.guards");
 
@@ -106,23 +107,6 @@ export function interactionActor(body: Payload): Actor {
 // The subtypes a message a person wrote can carry: a message with files, and a thread reply also
 // sent to the channel. Any other subtype is an edit, a deletion or a join.
 export const PROMPT_SUBTYPES: readonly string[] = ["file_share", "thread_broadcast"];
-
-/** Python's `str.isspace` for one UTF-16 unit; `String.prototype.trim` differs at U+001C to U+001F, U+0085 and U+FEFF. */
-function isSpace(code: number): boolean {
-  return (
-    (code >= 0x09 && code <= 0x0d) ||
-    (code >= 0x1c && code <= 0x20) ||
-    code === 0x85 ||
-    code === 0xa0 ||
-    code === 0x1680 ||
-    (code >= 0x2000 && code <= 0x200a) ||
-    code === 0x2028 ||
-    code === 0x2029 ||
-    code === 0x202f ||
-    code === 0x205f ||
-    code === 0x3000
-  );
-}
 
 function hasText(value: unknown): boolean {
   return typeof value === "string" && [...value].some((char) => !isSpace(char.charCodeAt(0)));

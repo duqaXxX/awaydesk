@@ -7,6 +7,7 @@
  * `@Claude !word` commands.
  */
 import type { CommandInfo } from "../agent/seam.ts";
+import { compareCodePoints, PY_SPACE, strip } from "../text.ts";
 import * as texts from "./texts.ts";
 
 export interface Help {
@@ -93,31 +94,11 @@ export const HOST_ONLY: ReadonlyMap<string, string> = new Map([
   ["logout", texts.LOGOUT_ON_HOST],
 ]);
 
-// Python's `str.isspace`, which `strip` and `split` follow, is not JavaScript's `\s`: it adds the
-// separators U+001C to U+001F and U+0085, and leaves out U+FEFF.
-const SPACE =
-  "\\t\\n\\v\\f\\r\\x1c-\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
-const LEADING = new RegExp(`^[${SPACE}]+`);
-const TRAILING = new RegExp(`[${SPACE}]+$`);
-const STARTS_WITH_SPACE = new RegExp(`^[${SPACE}]`);
-const WORD_AND_REST = new RegExp(`^([^${SPACE}]+)(?:[${SPACE}]+([\\s\\S]*))?$`);
-const RUNS_OF_SPACE = new RegExp(`[${SPACE}]+`);
-
-function strip(text: string): string {
-  return text.replace(LEADING, "").replace(TRAILING, "");
-}
-
-/** Python's `sorted` on strings: by code point, where `Array.prototype.sort` goes by UTF-16 unit. */
-function compareCodePoints(a: string, b: string): number {
-  const left = Array.from(a);
-  const right = Array.from(b);
-  for (let i = 0; i < Math.min(left.length, right.length); i += 1) {
-    const x = left[i] as string;
-    const y = right[i] as string;
-    if (x !== y) return (x.codePointAt(0) as number) - (y.codePointAt(0) as number);
-  }
-  return left.length - right.length;
-}
+// Python's whitespace, which `strip` and `split` follow, is not JavaScript's `\s` (`text.ts`).
+const TRAILING = new RegExp(`[${PY_SPACE}]+$`);
+const STARTS_WITH_SPACE = new RegExp(`^[${PY_SPACE}]`);
+const WORD_AND_REST = new RegExp(`^([^${PY_SPACE}]+)(?:[${PY_SPACE}]+([\\s\\S]*))?$`);
+const RUNS_OF_SPACE = new RegExp(`[${PY_SPACE}]+`);
 
 /**
  * Map a `!word` message to the daemon's own command or a Claude Code passthrough; null when the

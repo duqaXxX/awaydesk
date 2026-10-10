@@ -10,9 +10,11 @@ One Slack thread is one Claude Code session, which is one `ClaudeSession` in the
 session, and what the session sends back is written into the same thread. Threads of different
 channels run side by side on the one event loop, and each thread keeps the folder it was opened in.
 
-The source is three layers, wired by `main`. `src/clock.ts` and `src/log.ts` sit above them and any
-layer imports them. `test/imports.test.ts` reads the imports of every source file and fails on one
-the table does not allow.
+The source is three layers, wired by `main`. Four files sit above them and any layer imports
+them: `src/clock.ts`, `src/log.ts`, `src/text.ts` (Python's whitespace and its order of strings,
+where JavaScript's differ) and `src/values.ts` (reading a parsed value or a caught error by
+what it is). A helper two layers need lives there, once. `test/imports.test.ts` reads the
+imports of every source file and fails on one the table does not allow.
 
 | Layer | Holds | Imports |
 |---|---|---|

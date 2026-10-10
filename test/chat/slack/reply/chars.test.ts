@@ -19,12 +19,12 @@ import {
   len,
   lstripNewlines,
   rstripNewlines,
-  strip,
   stripNewlines,
   take,
 } from "../../../../src/chat/slack/reply/chars.ts";
 import { ReplySink, UpdateLimiter } from "../../../../src/chat/slack/reply/sinks.ts";
 import { oneLine } from "../../../../src/core/reply/words.ts";
+import { strip } from "../../../../src/text.ts";
 import {
   BOT,
   CHANNEL,

@@ -9,6 +9,7 @@
 import { lstat, opendir, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { getLogger } from "../log.ts";
+import { compareCodePoints } from "../text.ts";
 
 export const logger = getLogger("awaydesk.core.folders");
 
@@ -23,18 +24,6 @@ const ABSENT = new Set(["ENOENT", "ENOTDIR", "EBADF", "ELOOP"]);
 
 function code(error: unknown): string {
   return (error as { code?: unknown } | null)?.code as string;
-}
-
-/** Python's `sorted` on strings: by code point, where `Array.prototype.sort` goes by UTF-16 unit. */
-function compareCodePoints(a: string, b: string): number {
-  const left = Array.from(a);
-  const right = Array.from(b);
-  for (let i = 0; i < Math.min(left.length, right.length); i += 1) {
-    const x = left[i] as string;
-    const y = right[i] as string;
-    if (x !== y) return (x.codePointAt(0) as number) - (y.codePointAt(0) as number);
-  }
-  return left.length - right.length;
 }
 
 async function isFolder(directory: string, name: string): Promise<boolean> {

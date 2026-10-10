@@ -12,6 +12,9 @@
  * prompts the daemon sent, since a prompt comes back as a user record; and whether a compaction
  * is under way, since the status record that ends one says so only to who knows it started.
  */
+
+import { strip } from "../../text.ts";
+import { isRecord } from "../../values.ts";
 import type {
   DiffHunk,
   FileChange,
@@ -20,16 +23,7 @@ import type {
   TaskKind,
   TurnEnding,
 } from "../seam.ts";
-import {
-  integer,
-  isRecord,
-  number,
-  records,
-  string,
-  strip,
-  type WireRecord,
-  words,
-} from "./wire.ts";
+import { integer, number, records, string, type WireRecord, words } from "./wire.ts";
 
 // Each task_type (measured on Claude Code 2.1.280: `local_bash` for a background command,
 // `local_agent` for a subagent). A type not listed is a task of no kind the daemon names.
