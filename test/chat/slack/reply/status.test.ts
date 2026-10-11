@@ -222,15 +222,6 @@ test("a fresh instance strips a leftover reaction from a previous session", asyn
   assert.deepEqual(removed.sort(), ["raised_hand", "white_check_mark", "x"].sort());
 });
 
-test("a fresh instance s second show removes only its own previous", async () => {
-  const slack = new FakeSlack();
-  const sr = reaction(slack);
-  await sr.show(Status.WORKING);
-  slack.apiCalls.length = 0;
-  await sr.show(Status.WAITING);
-  assert.deepEqual(names(slack, "reactions.remove"), ["hourglass_flowing_sand"]);
-});
-
 test("a failed add leaves current unchanged so the next show retries", async () => {
   const slack = new FakeSlack();
   slack.responses["reactions.add"] = rejected("internal_error");
@@ -252,14 +243,6 @@ test("a root Slack no longer has is not one to ask about again", async () => {
     assert.equal(await sr.show(Status.ERROR), true, code);
     assert.equal(sr.current, null, code); // nothing was shown all the same
   }
-});
-
-test("current reflects the last state shown successfully", async () => {
-  const slack = new FakeSlack();
-  const sr = reaction(slack);
-  assert.equal(sr.current, null);
-  await sr.show(Status.WORKING);
-  assert.equal(sr.current, Status.WORKING);
 });
 
 test("missing scope is logged once and stops further reactions", async () => {

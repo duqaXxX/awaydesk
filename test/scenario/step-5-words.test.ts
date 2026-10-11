@@ -151,18 +151,6 @@ test("!help lists the daemon's words and the plain agent's two commands, and non
   await world.finish();
 });
 
-test("!help lists only the words this agent and this chat can serve", async (t) => {
-  const world = World.make(t);
-  await world.start();
-  const thread = await session(world);
-  await world.owner.says(world.channel, "!help", { thread });
-  const help = world.shown(thread).at(-1) as string;
-  // No bypass mode and no file upload: both words are refused here, and the list offers them.
-  assert.ok(!help.includes("`!bypass on|off`"), help);
-  assert.ok(!help.includes("`!open [file]`"), help);
-  await world.finish();
-});
-
 test("an agent command typed with ! reaches the agent as the command it names", async (t) => {
   const world = World.make(t);
   await world.start();

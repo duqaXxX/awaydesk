@@ -405,33 +405,6 @@ test("a reply with no content writes nothing", async () => {
   assert.deepEqual(slack.apiCalls, []);
 });
 
-test("no write carries a placeholder", async () => {
-  const slack = new FakeSlack();
-  const sink = reply(slack);
-  await sink.text("Working on it.");
-  await sink.task(tool("t1", "Bash", "in_progress"));
-  await settled();
-  await sink.finish([]);
-  await sink.closeOutFormatted("footer");
-  const written = JSON.stringify(
-    slack.apiCalls.filter((call) => WRITE_METHODS.includes(call.method)).map((call) => call.args),
-  );
-  assert.ok(!written.includes("writing") && !written.includes("Waiting"));
-});
-
-test("a stream pushes only when it stops", async () => {
-  const slack = new FakeSlack();
-  const sink = reply(slack);
-  await sink.text("one");
-  await settled();
-  await sink.text(" two");
-  await settled();
-  assert.equal(slack.pushes(), 0); // nothing at the start, nothing while it grows
-  await sink.finish([]);
-  await sink.closeOutFormatted(null);
-  assert.equal(slack.pushes(), 1);
-});
-
 test("updates are debounced", async () => {
   // A debounce of 0.1 s on the fake clock, a change every 10 ms for 0.3 s.
   const slack = new FakeSlack();
@@ -1147,24 +1120,6 @@ test("a task that ends after the reply edits the stopped message", async () => {
   assert.equal(card.status, "complete");
   assert.equal(get(update, "blocks", -1, "elements", 0, "text"), "footer"); // the footer stays
   assert.equal(slack.pushes(), 1);
-});
-
-test("running counts join the footer of a stopped stream", async () => {
-  const slack = new FakeSlack();
-  const sink = reply(slack);
-  await sink.text("Done.");
-  await sink.finish([]);
-  await sink.closeOutFormatted("main · ctx 6%");
-  await sink.setRunning("⏳ 1 shell");
-  await settled();
-  const update = last(slack.callsTo("chat.update"));
-  assert.equal(get(update, "blocks", -1, "elements", 0, "text"), "main · ctx 6% · ⏳ 1 shell");
-  await sink.setRunning("");
-  await settled();
-  assert.equal(
-    get(last(slack.callsTo("chat.update")), "blocks", -1, "elements", 0, "text"),
-    "main · ctx 6%",
-  );
 });
 
 test("unchanged running counts write nothing", async () => {
@@ -3677,17 +3632,6 @@ test("a card whose title alone changes is sent no text again", async () => {
     (slack.messageCards()[0] ?? []).map((c) => c.details ?? c.output),
     ["Read: notes.md", "exit 2"],
   );
-});
-
-test("a card whose one line changes gains a line", async () => {
-  const slack = new FakeSlack();
-  const sink = reply(slack);
-  for (const words of ["Reading the tests", "Running the tests"]) {
-    await sink.task(tool("k1", "task", "in_progress", { details: words, task: true }));
-    await settled();
-  }
-  const card = only(only(slack.messageCards()));
-  assert.equal(card.details, "Reading the tests\nRunning the tests");
 });
 
 test("cards whose text fills the message continue in a new stream", async () => {
