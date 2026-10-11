@@ -254,9 +254,12 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `EffortLevel` | `"xhigh"` | value | capabilities.ts: CAPABILITIES | package | none |
 | `HookEvent` | `"PostToolUse"` | value | session.ts: ClaudeSession.#options | reference | none |
 | `HookEvent` | `"Stop"` | value | session.ts: ClaudeSession.#options | reference | none |
-| `PermissionMode` | `"auto"` | value | capabilities.ts: CAPABILITIES | reference | none |
-| `PermissionMode` | `"bypassPermissions"` | value | capabilities.ts: CAPABILITIES | reference | none |
-| `PermissionMode` | `"default"` | value | capabilities.ts: CAPABILITIES | reference | none |
+| `PermissionMode` | `"acceptEdits"` | value | session.ts: PERMISSION_MODES | reference | none |
+| `PermissionMode` | `"auto"` | value | capabilities.ts: CAPABILITIES; session.ts: PERMISSION_MODES | reference | none |
+| `PermissionMode` | `"bypassPermissions"` | value | capabilities.ts: CAPABILITIES; session.ts: PERMISSION_MODES | reference | none |
+| `PermissionMode` | `"default"` | value | capabilities.ts: CAPABILITIES; session.ts: PERMISSION_MODES | reference | none |
+| `PermissionMode` | `"dontAsk"` | value | session.ts: PERMISSION_MODES | reference | none |
+| `PermissionMode` | `"plan"` | value | session.ts: PERMISSION_MODES | reference | none |
 | `PermissionResult.behavior` | `"allow"` | value | requests.ts: permissionResult, questionResult | reference | none |
 | `PermissionResult.behavior` | `"deny"` | value | requests.ts: permissionResult, questionResult | reference | none |
 | `SDKAssistantMessage.message.content[].type` | `"advisor_tool_result"` | value | translate.ts: assistant | measured | none |
@@ -357,8 +360,8 @@ no check covers them here.
   others carry fields that the declaration of their type lacks (`thinking_display` on three stream
   events, `user_message_uuids` on `status`, `logical_parent_uuid` on `compact_boundary`, and more).
 - `ClaudeSession` names a process that ended by the start of the message of the plain `Error`
-  the SDK throws, from its stream, its start or a request: `Claude Code process exited with code `, `Claude Code process terminated
-  by signal ` and `Claude Code returned an error result: `. The package declares no class, field or
+  the SDK throws, from its stream, its start or a request: `Claude Code process exited with code `,
+  `Claude Code process terminated by signal ` and `Claude Code returned an error result: `. The package declares no class, field or
   value for these; the three messages are in the troubleshooting page of the SDK
   (`code.claude.com/docs/en/agent-sdk/troubleshooting`, read 2026-10-11), which says to match on
   the message. A release that words one differently gives the name `Error` again, and no check

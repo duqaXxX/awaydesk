@@ -715,6 +715,22 @@ test("a command Claude Code refuses rejects with its error", LIMIT, async (t) =>
   await assert.rejects(session.setPermissionMode("auto"), (error) => error === refusal);
 });
 
+test(
+  "a mode the owner's settings start a session in is taken, and an unknown one refused",
+  LIMIT,
+  async (t) => {
+    // A bypass switched off hands back the mode the session started in, which is none of the
+    // three roles the capabilities declare when the owner's `defaultMode` says so.
+    const { session, query } = await started(t);
+    for (const mode of ["acceptEdits", "plan", "dontAsk"]) await session.setPermissionMode(mode);
+    assert.deepEqual(
+      query.calls.map((call) => (call.method === "setPermissionMode" ? call.mode : null)),
+      ["acceptEdits", "plan", "dontAsk"],
+    );
+    await assert.rejects(session.setPermissionMode("anything"), RangeError);
+  },
+);
+
 test("the context usage is the model and the share of its window in use", LIMIT, async (t) => {
   const { session, query } = await started(t);
   assert.deepEqual(await session.contextUsage(), {

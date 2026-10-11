@@ -743,7 +743,7 @@ export class ReplySink implements Sink {
       await cancellable(this.ending.settled(), signal);
     }
     this.retry?.cancel();
-    const ok = await this.flush();
+    const ok = await cancellable(this.flush(), signal);
     if (this.closedOut && this.landedValue === null) this.resolve(ok);
     return ok || this.landedValue === true;
   }

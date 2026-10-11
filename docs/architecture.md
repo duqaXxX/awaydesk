@@ -693,7 +693,7 @@ Notes on the table:
    to the row above, and so is every such message at the top level while a streamed one has had no
    `message_stop`, or once a `message_start` named no id. A subagent's reply arrives the same way,
    as one whole `assistant` record with `parent_tool_use_id` and no stream event (measured:
-   "Subagent reply is one record"); the renderer shows no text of a subagent.
+   "Subagent reply is one record"); the back end emits no text of a subagent.
 2. The count reads `Agent: review · 12 calls`. While the subagent runs, its line holds its latest
    calls (`renderer.CHILD_LINES`) as the card's `details`; a streamed card is sent each of them once
    and keeps them all, since a stream only adds to a card's text. The line becomes a task's line: it

@@ -158,8 +158,20 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
   }
 }
 
-// A level or a mode outside what `CAPABILITIES` declares is refused (the seam's contract): the
-// core sends only declared ones.
+// The modes Claude Code takes (`PermissionMode` of the SDK). More than the three roles
+// `CAPABILITIES` declares: the core hands back the mode a session started in, which the owner's
+// own settings choose (`acceptEdits`, `plan`, `dontAsk`), when a bypass is switched off.
+const PERMISSION_MODES: ReadonlySet<string> = new Set([
+  "default",
+  "acceptEdits",
+  "bypassPermissions",
+  "plan",
+  "dontAsk",
+  "auto",
+]);
+
+// A level outside what `CAPABILITIES` declares, or a mode Claude Code does not take, is refused
+// (the seam's contract).
 function effortOf(level: string): EffortLevel {
   if (!CAPABILITIES.effortLevels.includes(level)) {
     throw new RangeError(`unknown effort level: ${level}`);
@@ -168,9 +180,7 @@ function effortOf(level: string): EffortLevel {
 }
 
 function modeOf(mode: PermissionMode): SdkPermissionMode {
-  if (!Object.values(CAPABILITIES.permissionModes).includes(mode)) {
-    throw new RangeError(`unknown permission mode: ${mode}`);
-  }
+  if (!PERMISSION_MODES.has(mode)) throw new RangeError(`unknown permission mode: ${mode}`);
   return mode as SdkPermissionMode;
 }
 
