@@ -131,6 +131,25 @@ test(
   },
 );
 
+test("the session is named with its first prompt, not before, as Claude's is", LIMIT, async () => {
+  // The core takes a stored session id for a session that ran (`ThreadSession.neverRan`), and
+  // resumes it when a setup needs a fresh client: an id announced earlier has no transcript.
+  const agent = new PlainAgent().next(say("One."));
+  const { session, events } = await started(agent);
+  assert.equal(agent.store.has(FOLDER, session.id), false);
+  const first = events.next();
+  const early = await Promise.race([
+    first.then(() => "an event"),
+    new Promise<string>((resolve) => setImmediate(() => resolve("nothing"))),
+  ]);
+  assert.equal(early, "nothing");
+  await session.send(prompt("go"));
+  const named = await first;
+  assert.ok(!named.done && named.value.type === "session_started");
+  await turnOf(events);
+  assert.equal(agent.store.has(FOLDER, session.id), true);
+});
+
 test("say writes deltas of one message, whole writes one text", LIMIT, async () => {
   const agent = new PlainAgent().next(say("Two words")).next(whole("  Whole.  "));
   const { session, events } = await started(agent);

@@ -6,7 +6,8 @@
  * It declares two effort levels that cannot change on a live session, one permission mode,
  * questions, two commands of its own and session listing. It lacks subagents, background tasks,
  * compaction, usage limits, a model list, a changed input, a prompt during a turn and folder
- * trust.
+ * trust. A session is named (`session_started`) with its first prompt, as Claude's is: until
+ * then it has no id the core could resume.
  *
  * A test scripts what each prompt does with `agent.next(...steps)`: one turn per call, played by
  * the next prompt of any session, in order (a prompt past the script gets `say("ok")`). A prompt
@@ -345,11 +346,15 @@ export class PlainSession implements AgentSession {
     this.id = context.id;
     this.options = context.options;
     this.events = this.#queue;
-    this.#queue.push({ type: "session_started", sessionId: this.id, agentVersion: VERSION });
   }
 
   async send(prompt: Prompt): Promise<void> {
     if (this.closed || this.lost) throw new PlainSessionClosed();
+    // Named with the first prompt, as Claude's init record comes with it: the core takes a stored
+    // session id for a session that ran, and resumes it when a setup needs a fresh client.
+    if (this.prompts.length === 0) {
+      this.#queue.push({ type: "session_started", sessionId: this.id, agentVersion: VERSION });
+    }
     this.prompts.push(prompt);
     const text = textOf(prompt);
     this.#context.store.remember(this.options.folder, this.id, text);

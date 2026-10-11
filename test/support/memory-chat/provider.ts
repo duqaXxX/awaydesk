@@ -152,9 +152,11 @@ class MemoryReply implements Reply {
   #render(): string {
     const lines = this.#segments.flatMap((segment) => {
       if (segment.kind === "text") return [segment.text.trim()];
-      const { folded, status, title } = segment.update;
+      const { folded, preview, status, title } = segment.update;
       if (this.#finished && folded !== null) return [folded];
-      return [`[${status}] ${title}`];
+      // The preview is where the core keeps an answered question's answers: under the line.
+      const shown = preview === null ? [] : [preview.title, preview.summary, preview.body];
+      return [`[${status}] ${title}`, ...shown];
     });
     if (this.#closed) {
       lines.push(this.#footer ?? "");
