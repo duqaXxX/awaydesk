@@ -18,6 +18,7 @@ import type { ImagePart, PromptContent, TextPart } from "../../agent/seam.ts";
 import { type Names, named, texts } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
+import { take } from "./reply/chars.ts";
 import { mrkdwnEscape } from "./reply/escape.ts";
 import * as slackTexts from "./texts.ts";
 
@@ -214,12 +215,12 @@ export function limitFor(file: SlackFile): number {
 
 /** `Name: message (cause)`, at most 200 characters, so the owner sees why and not a class alone. */
 function failureDetail(error: unknown): string {
-  if (!(error instanceof Error)) return String(error).slice(0, 200);
+  if (!(error instanceof Error)) return take(String(error), 200);
   // A timeout carries a sentence of the runtime's own; the name says it.
   if (error.name === "TimeoutError") return "TimeoutError";
   let detail = error.message ? `${error.name}: ${error.message}` : error.name;
   if (error.cause instanceof Error && error.cause.message) detail += ` (${error.cause.message})`;
-  return detail.slice(0, 200);
+  return take(detail, 200);
 }
 
 export interface DownloadOptions {

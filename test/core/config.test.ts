@@ -87,6 +87,21 @@ test("reads an env that starts with a byte order mark", () => {
   assert.equal(load(directory).chatVariables.SLACK_BOT_TOKEN, BOT);
 });
 
+test("a value is stripped as Python strips it", () => {
+  // U+001C is whitespace to Python and U+FEFF is not: `\u001c` alone is no value, and the
+  // byte order mark inside a value stays.
+  const directory = scratch();
+  writeEnv(directory, directory, {
+    SLACK_OWNER_USER_ID: "\u001cU000ALICE\u001c",
+    SLACK_USER_TOKEN: "\u001c",
+  });
+  const config = load(directory);
+  assert.equal(config.chatVariables.SLACK_OWNER_USER_ID, "U000ALICE");
+  assert.equal(config.chatVariables.SLACK_USER_TOKEN, undefined);
+  writeEnv(directory, directory, { SLACK_OWNER_USER_ID: "U000ALICE\ufeff" });
+  assert.equal(load(directory).chatVariables.SLACK_OWNER_USER_ID, "U000ALICE\ufeff");
+});
+
 test("the owner s user token is optional and never shown", () => {
   const directory = scratch();
   writeEnv(directory, directory);
@@ -392,6 +407,30 @@ for (const [key, expected] of Object.entries(DOTENV_EXPECTED)) {
     assert.equal(expandEnv(DOTENV_SAMPLE, PROC)[key], expected);
   });
 }
+
+// The reading is Node's `util.parseEnv`, and `docs/setup.md` and the comment of `expandEnv` state
+// where it differs from python-dotenv 1.2.1 (measured 2026-10-11 on Node 26.5.1).
+const NODE_READS: ReadonlyArray<readonly [name: string, text: string, expected: string]> = [
+  ["a # with no space before it starts a comment", "A=a#b", "a"],
+  ["a value that is only a comment is empty", "A= # note", ""],
+  ["a backslash and a t in double quotes stay two characters", 'A="x\\ty"', "x\\ty"],
+  ["two backslashes in double quotes stay two", 'A="x\\\\y"', "x\\\\y"],
+  ["a backslash in single quotes is kept", "A='x\\ny'", "x\\ny"],
+  ["a quote after a backslash still ends the value", 'A="a\\"b"', "a\\"],
+  ["\\n in double quotes is a line break", 'A="x\\ny"', "x\ny"],
+];
+
+for (const [name, text, expected] of NODE_READS) {
+  test(`the file is read as Node reads it: ${name}`, () => {
+    assert.equal(expandEnv(text, {}).A, expected);
+  });
+}
+
+test("a name with a space, text after a quote and an unclosed quote are read, not skipped", () => {
+  assert.equal(expandEnv("KEY WITH SPACE=1", {})["KEY WITH SPACE"], "1");
+  assert.equal(expandEnv('B="p"q', {}).B, "p");
+  assert.equal(expandEnv('A="open\nB=2', {}).A, '"open');
+});
 
 test("an env is expanded to the keys python-dotenv returned", () => {
   assert.deepEqual(expandEnv(DOTENV_SAMPLE, PROC), DOTENV_EXPECTED);

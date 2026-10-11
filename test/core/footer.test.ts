@@ -219,6 +219,13 @@ test("git branch", GIT_LAYOUT, async () => {
   assert.deepEqual(await gitState(join(folder, "missing"), anyRepository), [null, null]);
 });
 
+test("a branch name keeps what Python's strip leaves", GIT_LAYOUT, async () => {
+  // U+FEFF is no whitespace to Python: git prints it, and the name is shown as it is.
+  const folder = repo();
+  git(folder, "switch", "-q", "-c", "feature-x\ufeff");
+  assert.deepEqual(await gitState(folder, anyRepository), ["feature-x\ufeff", [0, 0]]);
+});
+
 test("git changes add staged and unstaged lines", GIT_LAYOUT, async () => {
   const folder = repo();
   assert.deepEqual(await gitChanges(folder), [0, 0]); // no commit yet, nothing written
@@ -252,6 +259,17 @@ for (const [output, expected] of [
     assert.deepEqual(effortChange(output), expected);
   });
 }
+
+test("an output is trimmed as Python's strip trims it", () => {
+  // U+0085 is whitespace to Python and U+FEFF is not.
+  assert.deepEqual(effortChange("\u0085Set effort level to high"), [true, "high"]);
+  assert.deepEqual(effortChange("\ufeffSet effort level to high"), [false, null]);
+});
+
+test("a prompt is trimmed as Python's lstrip trims it before it is read as a command", () => {
+  assert.equal(setsEffort("\u001c/effort high"), true);
+  assert.equal(setsEffort("\ufeff/effort high"), false);
+});
 
 for (const [prompt, expected] of [
   ["/effort high", true],

@@ -8,6 +8,7 @@
  */
 import { Cancelled, fill, named, texts } from "../../../core/port.ts";
 import { strip } from "../../../text.ts";
+import { errorCode } from "../../../values.ts";
 import { changedIn } from "../openfile/changed.ts";
 import type { Found } from "../openfile/listing.ts";
 import {
@@ -170,6 +171,12 @@ export class Open {
       content = await readOpenable(folder, relative);
     } catch (error) {
       if (error instanceof NotAFile) {
+        // The owner reads one sentence whatever the cause; the log says whether the daemon could
+        // not read the file (the code only: never the path, which is the owner's).
+        const cause = errorCode(error.cause);
+        if (cause !== undefined) {
+          logger.info(`could not open a file for ${channel}/${threadTs}: ${cause}`);
+        }
         await this.answers.tellOwner(
           channel,
           threadTs,

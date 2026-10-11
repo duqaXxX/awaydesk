@@ -56,6 +56,7 @@ export interface Inside {
   reader: Task | null;
   expiring: Set<Task>;
   replyOf: WeakMap<TurnRenderer, Reply>;
+  whoseTurn(worded: boolean): Turn | null;
   expectInjectedTurn(): void;
   refreshUsage(): void;
   expireInjectedTurn(signal: AbortSignal): Promise<void>;

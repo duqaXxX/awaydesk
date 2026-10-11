@@ -58,6 +58,7 @@ import type {
 import { ResumeRefused } from "../../agent/seam.ts";
 import type { FooterFields, MessageId, Reply, SessionStatus, ThreadChat } from "../../chat/seam.ts";
 import { getLogger } from "../../log.ts";
+import { strip } from "../../text.ts";
 import { errorName } from "../../values.ts";
 import {
   effortChange,
@@ -90,11 +91,10 @@ import {
   STORED_STATUS,
   SUMMARY_IS_END_LINE,
   TASK_EVENTS,
-  TASK_KINDS,
   TASK_REPLIES_KEPT,
   TASKS_KEPT,
   TURN_EVENTS,
-  UNKNOWN_KIND,
+  taskKind,
 } from "./constants.ts";
 import type { SessionDeps } from "./deps.ts";
 import { checkDirectory, repositoryBy, terminalLine, trustedBy } from "./directory.ts";
@@ -797,8 +797,14 @@ export class ThreadSession {
         if (choice === true) {
           mode = this.modeFor(true);
           await cancellable(client.setPermissionMode(mode), signal);
-        } else if (choice === false && this.nativeMode === modes.bypass) {
-          // An explicit off outlives a rebuild: the folder's own bypass would return.
+        } else if (choice === false && (this.nativeMode === modes.bypass || !info.permissionMode)) {
+          // An explicit off outlives a rebuild: the folder's own bypass would return. An agent
+          // that reports no mode (a release can drop the field) may have started in it.
+          if (!info.permissionMode) {
+            logger.warning(
+              `the agent reported no permission mode for ${this.where}, setting ${modes.default}`,
+            );
+          }
           mode = modes.default;
           await cancellable(client.setPermissionMode(mode), signal);
         }
@@ -1068,7 +1074,12 @@ export class ThreadSession {
       for (const pending of this.deps.approvals.denyAll(this.channelId, this.threadId)) {
         await this.deleteRequest(pending.messageTs);
       }
-      await client.interrupt();
+      try {
+        await client.interrupt();
+      } catch (error) {
+        // A query already closed refuses the request; the tasks below still stop.
+        logger.warning(`could not interrupt ${this.where}: ${errorName(error)}`);
+      }
     }
     for (const taskId of tasks) {
       this.stopped.add(taskId);
@@ -1792,7 +1803,7 @@ export class ThreadSession {
     } else {
       const origin = this.taskReplies.get(event.taskId);
       const label = description || (origin?.taskTitle(event.taskId) ?? null);
-      const name = (TASK_KINDS[taskType] ?? UNKNOWN_KIND)[1];
+      const name = taskKind(taskType)[1];
       const outcome = event.status === "completed" ? "finished" : event.status;
       text = `${name} "${oneLine(label || event.taskId, 120)}" ${outcome}`;
     }
@@ -2146,7 +2157,7 @@ export class ThreadSession {
     const first = this.sent[0];
     if (this.injectedExpected || first === undefined) return null;
     const head = first.prompt;
-    const plain = typeof head === "string" && !head.trimStart().startsWith("/");
+    const plain = typeof head === "string" && !strip(head).startsWith("/");
     if (worded && this.notificationWaits && plain) return null;
     this.sent.shift();
     return first;
@@ -2366,7 +2377,7 @@ export class ThreadSession {
     for (const [taskId, renderer] of this.taskReplies) {
       if (options.awaitedOnly && this.afterRestart.has(taskId)) continue;
       if (renderer.runningTasks.includes(taskId)) {
-        const kind = (TASK_KINDS[this.tasks.get(taskId)?.[0] ?? ""] ?? UNKNOWN_KIND)[0];
+        const kind = taskKind(this.tasks.get(taskId)?.[0] ?? "")[0];
         counts.set(kind, (counts.get(kind) ?? 0) + 1);
       }
     }

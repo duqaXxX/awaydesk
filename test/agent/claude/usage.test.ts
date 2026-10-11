@@ -51,6 +51,12 @@ test("a zone the runtime does not know gives no reset", () => {
   assert.equal(parseReset("Sep 24 at 1:10am (+02:00)", NOW), null);
 });
 
+test("a reset is read with Python's strip around it", () => {
+  // U+0085 and U+001C are whitespace to Python and U+FEFF is not.
+  assert.equal(parseReset("\u0085Sep 24 at 12am (UTC)\u001c", NOW), Date.UTC(2026, 8, 24, 0, 0));
+  assert.equal(parseReset("\ufeffSep 24 at 12am (UTC)", NOW), null);
+});
+
 test("a date that does not exist gives no reset", () => {
   assert.equal(parseReset("Feb 30 at 1:10am (UTC)", NOW), null);
   assert.equal(parseReset("Sep 24 at 1:99am (UTC)", NOW), null);

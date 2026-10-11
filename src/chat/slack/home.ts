@@ -254,7 +254,11 @@ function localDay(epochSeconds: number): number {
   return Math.floor(Date.UTC(at.getFullYear(), at.getMonth(), at.getDate()) / 86_400_000);
 }
 
-/** Python's `str.casefold()`, which `toLowerCase` alone lacks for `ß`, final sigma and the like. */
+/**
+ * A search key: upper case, then lower case, so that `ß` and the final sigma meet their other
+ * spelling. It is not full Unicode case folding (a few hundred scalar values fold differently,
+ * `ẞ` stays `ß`), which is enough here: the title and the query go through this same function.
+ */
 function casefold(text: string): string {
   return text.toUpperCase().toLowerCase();
 }

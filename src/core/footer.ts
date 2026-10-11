@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import type { ModelTokens, PromptContent, Repository } from "../agent/seam.ts";
 import type { FooterFields, UsageLimit } from "../chat/seam.ts";
 import { getLogger } from "../log.ts";
+import { strip } from "../text.ts";
 import { errorName } from "../values.ts";
 
 export const logger = getLogger("awaydesk.core.footer");
@@ -257,7 +258,7 @@ export async function gitState(
       return [null, null];
     }
     const out = await runGit(found, ["branch", "--show-current"], signal);
-    branch = out ? out.trim() || null : null;
+    branch = out ? strip(out) || null : null;
     if (!found.insideGitDir) {
       changes = await changesOf(found, signal);
     }
@@ -279,7 +280,7 @@ export async function gitState(
  * the footer follows their output. A model change without an effort clears the level.
  */
 export function effortChange(output: string): [changed: boolean, effort: string | null] {
-  const text = output.trim();
+  const text = strip(output);
   const effort = EFFORT_OUTPUT.exec(text);
   if (effort) {
     return [true, (effort[1] as string).toLowerCase()];
@@ -296,7 +297,7 @@ export function effortChange(output: string): [changed: boolean, effort: string 
  * turn is the model's, which what the agent read can shape: it is never read as an output.
  */
 export function setsEffort(prompt: PromptContent): boolean {
-  return typeof prompt === "string" && EFFORT_COMMAND.test(prompt.trimStart());
+  return typeof prompt === "string" && EFFORT_COMMAND.test(strip(prompt));
 }
 
 /** The tokens of a turn summed over its models; null when it used none. */

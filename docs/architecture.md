@@ -1181,7 +1181,10 @@ so a choice Slack kept from other rows is none. The row's value is untrusted inp
 `read.readOpenable` resolves the links, refuses a path that leaves the folder or is no regular file,
 then opens the resolved path once (`O_NOFOLLOW | O_NONBLOCK`), reads the size from that descriptor
 and reads at most `read.SNIPPET_LIMIT` (1 MB) from it; an empty file is refused before any upload
-(`texts.OPEN_EMPTY`). Slack gets those bytes, as a `Buffer` in the upload's `file` field: handing it
+(`texts.OPEN_EMPTY`). Every other failure of the open, the stat or the read is a `read.NotAFile` too,
+and the owner reads `texts.OPEN_NOT_A_FILE` of it; when it has a cause with an error code
+(`EACCES`, `ENOENT`), `Open.openFile` logs that code once with the channel and thread ids, never
+the path. Slack gets those bytes, as a `Buffer` in the upload's `file` field: handing it
 the path would let the library open the path again, following links and with no size limit.
 
 ## Sessions
@@ -1264,7 +1267,11 @@ closed when the start returns (`ThreadSession.connect`).
   (`ThreadSession.nativeMode`, kept as reported). All three are read from the SDK's initialization
   result, which carries the aliases and the mode (measured: "Initialization result"). `!bypass off`
   returns to that mode, or to `default` when the folder's own settings start it in
-  `bypassPermissions`. `ThreadSession.bypass` is the one answer to "does this run in bypass": the
+  `bypassPermissions`. An agent that reports no mode (`AgentInfo.permissionMode` null: a release can
+  drop the field, which the SDK's types do not declare) is read as `default` and, for a thread whose
+  stored choice is off, sent `default` anyway, since the process may have started in bypass; the log
+  says once, with the channel and thread ids, that the agent reported no permission mode.
+  `ThreadSession.bypass` is the one answer to "does this run in bypass": the
   owner's choice when there is one, else `ThreadSession.nativeMode`. The footer's `⚡ bypass`,
   `!status`, the channel list and the setup's checkbox all read it.
 - The daemon never chooses the mode a thread runs in with bypass off: it is the one the owner's
@@ -1293,7 +1300,8 @@ closed when the start returns (`ThreadSession.connect`).
   the session or the running turn.
 - Messages are queued and run one at a time; each gets its own reply in the thread. `!stop`
   interrupts the running turn, denies its pending approvals and stops the thread's background tasks
-  (`AgentSession.stopTask`), then shows `✅` on the root through `ThreadSession.react`, which clears
+  (`AgentSession.stopTask`); an interrupt or a stop of one task that the agent refuses is logged by
+  the error's name and the others go on. It then shows `✅` on the root through `ThreadSession.react`, which clears
   `ThreadSession.errorStanding`: a stop the owner gave is not an error.
 - The same-folder hold: before a message would wake an idle session (`messages.messages`), a
   live session of any other thread, of any channel, whose resolved folder is the same and is not

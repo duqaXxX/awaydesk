@@ -46,7 +46,7 @@ import {
 import { DirectoryMissing, SessionClosed } from "../../../src/core/sessions/errors.ts";
 import { SessionManager } from "../../../src/core/sessions/manager.ts";
 import { ThreadSession } from "../../../src/core/sessions/session.ts";
-import { asked } from "../../../src/core/sessions/turn.ts";
+import { asked, Turn } from "../../../src/core/sessions/turn.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { setLevel, setWriter } from "../../../src/log.ts";
@@ -2020,6 +2020,34 @@ test("bypass from the folder s own settings shows and turns off", async (t) => {
   assert.ok(!statuses(h).at(-1)?.startsWith("⚡ bypass"));
 });
 
+test("a stored bypass off is sent when the agent reports no mode, with one line in the log", async (t) => {
+  // The initialize answer without `current_permission_mode`, which no SDK type declares: what a
+  // release that drops the field gives. The process may have started in bypass.
+  const info = infoOf({ commands: [] });
+  assert.equal(info.permissionMode, null);
+  const warnings = logged(t, "warning");
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")], info });
+  const session = h.session();
+  h.state.setBypass(CHANNEL, THREAD, false);
+  await (await session.submit("list the files")).done.wait();
+  assert.deepEqual(h.clients[0]?.modes, ["default"]);
+  assert.equal(session.mode, "default");
+  const unreported = warnings.filter((line) => line.includes("reported no permission mode"));
+  assert.equal(unreported.length, 1, warnings.join("\n"));
+  assert.ok(unreported[0]?.includes(`${CHANNEL}/${THREAD}`));
+});
+
+test("a stored bypass off sends nothing when the agent reports the default mode", async (t) => {
+  const info = infoOf({ commands: [], current_permission_mode: "default" });
+  const warnings = logged(t, "warning");
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")], info });
+  const session = h.session();
+  h.state.setBypass(CHANNEL, THREAD, false);
+  await (await session.submit("list the files")).done.wait();
+  assert.deepEqual(h.clients[0]?.modes, []);
+  assert.ok(!warnings.some((line) => line.includes("reported no permission mode")));
+});
+
 const AUTO_INFO = infoOf({ commands: [], current_permission_mode: "auto" });
 
 test("a thread claude code started in auto mode says so in status only", async (t) => {
@@ -2436,6 +2464,47 @@ test("status shows a running task while the reply s own closing still waits", as
   assert.equal(runningBlock(h.slack.messageBlocks().at(-1) ?? []), null);
   assert.ok((await session.status()).endsWith("\nBackground: `1 shell`"));
 });
+
+test("a queued prompt is a command by Python's lstrip: U+001C is skipped, U+FEFF is not", async (t) => {
+  const h = harnessFor(t)({});
+  const session = h.session();
+  const state = inside(session);
+  state.notificationWaits = true;
+  // A report turn that opens with words leaves a plain prompt waiting, and takes a command's.
+  for (const [prompt, taken] of [
+    ["\u001c/compact", true],
+    ["\ufeff/compact", false],
+  ] as const) {
+    const turn = new Turn(prompt, null as never);
+    state.sent = [turn];
+    assert.equal(state.whoseTurn(true), taken ? turn : null, JSON.stringify(prompt));
+  }
+});
+
+/** The recorded background run with the type its task starts under changed to `taskType`. */
+function retypedBackground(taskType: string): ReturnType<typeof splitBackground> {
+  return splitBackground(
+    sdkMessages("background").map((item) =>
+      isSystem(item, "task_started") && "record" in item
+        ? { record: { ...item.record, task_type: taskType } }
+        : item,
+    ),
+  );
+}
+
+// The type comes from the agent: a name of `Object.prototype` is no kind of ours.
+for (const taskType of ["constructor", "toString", "__proto__"]) {
+  test(`a task of type ${taskType} counts and ends as an unknown kind`, async (t) => {
+    const [first, notice, injected] = retypedBackground(taskType);
+    const h = harnessFor(t)({ turns: [first] });
+    const session = h.session();
+    await (await session.submit("start it")).done.wait();
+    assert.ok((await session.status()).endsWith("\nBackground: `1 task`"));
+    h.clients[0]?.inject([...notice, ...injected]);
+    await h.until(() => h.bodies().some((body) => body.includes('Task "')));
+    assert.ok(!h.bodies().some((body) => body.includes("undefined")), h.bodies().join("\n"));
+  });
+}
 
 test("status refreshes the usage limits and the next one shows them", async (t) => {
   const h = harnessFor(t)({ turns: [] });
@@ -2856,6 +2925,33 @@ test("a stop held by a background task says so and bang stop ends it", async (t)
   // No report turn follows a stopped task, so the stop does not wait INJECTED_TURN_WAIT for one.
   h.clients[0]?.inject(stoppedEnd(notice));
   await drainEnds(h, drain);
+});
+
+test("a stop whose interrupt is refused still stops the background tasks", async (t) => {
+  // The SDK rejects a control request on a query it has cleaned up ("Query closed before
+  // response received", read in sdk.mjs 0.3.296) and one the CLI refuses with its own error.
+  const [first] = splitBackground();
+  const taskId = String(systemRecord(first, "task_started").task_id);
+  const warnings = logged(t, "warning");
+  const h = harnessFor(t)({
+    turns: [first, [canUseToolCall("Bash", { command: "rm -rf build" }), ...sdkMessages("tools")]],
+  });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await session.submit("clean"); // a turn that waits on an approval, with the command running
+  await h.until(() => pending(h.approvals).length > 0);
+  const client = h.clients[0];
+  assert.ok(client !== undefined);
+  client.interrupt = async () => {
+    throw new TypeError("Query closed before response received");
+  };
+  assert.equal(await session.stop(), true);
+  assert.deepEqual(client.stoppedTasks, [taskId]);
+  const refused = warnings.filter((line) => line.includes("could not interrupt"));
+  assert.equal(refused.length, 1, warnings.join("\n"));
+  const line = String(refused[0]);
+  assert.ok(line.includes(`${CHANNEL}/${THREAD}`) && line.includes("TypeError"));
+  assert.ok(!line.includes("Query closed")); // the error's name, never its text
 });
 
 test("a stop of a background task ends the reply like any other end", async (t) => {
