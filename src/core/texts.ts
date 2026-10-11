@@ -149,7 +149,7 @@ export const BECAUSE_RESTARTED = "awaydesk restarted";
 export const BECAUSE_SHUTDOWN = "awaydesk stopped";
 export const BECAUSE_STOPPED = naming("{agent} stopped");
 export const ENDED_RESTARTING = "awaydesk is restarting; send your message again in a moment";
-// Never shown: an idle close (D9) always finds nothing running, sent or queued to end with it.
+// Never shown: an idle close always finds nothing running, sent or queued to end with it.
 export const ENDED_IDLE = "awaydesk closed this idle session";
 export const RESTARTING = "awaydesk is restarting; send this again in a moment.";
 // Under RESTARTING, and after a channel's `!status`, while a stop waits: one row per thread that
@@ -175,14 +175,14 @@ export const COMPACTED_PLAIN = "Compacted the conversation.";
 export const NO_OUTPUT = naming("_Done. {agent} returned no text._");
 export const BIND_OK =
   "Bound this channel to `{directory}`. The next message starts a new session there.";
-// D5: an old thread's session keeps the folder it was created in; `{old}` names each of them
+// An old thread's session keeps the folder it was created in; `{old}` names each of them
 // (comma-separated, backticked).
 export const BIND_OK_ELSEWHERE =
   "Bound this channel to `{directory}`. New messages start sessions there; existing threads " +
   "keep working in {old}, where their sessions live.";
 export const BIND_UNAVAILABLE =
   "Bound this channel to `{directory}`, but no session can start there yet. {reason}";
-// D5: shown, ephemeral, before every prompt in a thread whose folder differs from the channel's.
+// Shown, ephemeral, before every prompt in a thread whose folder differs from the channel's.
 export const OLD_THREAD_FOLDER = naming(
   "This session works in `{old}`, the folder it was created in: {agent} resumes a session " +
     "only there. New messages in the channel use `{new}`.",
@@ -238,7 +238,7 @@ export const NOTHING_TO_STOP = "Nothing is running in this channel.";
 // Both answers to `!stop` in a thread are posts that stay: an ephemeral line is gone on reload.
 export const STOPPED_THREAD = "Stopped.";
 export const NOTHING_TO_STOP_THREAD = "Nothing is running in this session.";
-// D8: two sessions in one folder at once.
+// The same-folder hold: two sessions in one folder at once.
 export const HOLD_QUESTION = "Another session is working in this folder: {link}. Send anyway?";
 export const HOLD_UNPOSTED = naming(
   "awaydesk could not show this question in {chat}, so the message was not sent. Send it again.",
@@ -357,7 +357,7 @@ export const RESUME_HELD =
   "This thread already holds a session: send `!resume` again in the channel to pick another.";
 // What the list is rewritten to after a Resume click, only when it cannot be deleted.
 export const RESUME_LISTED = "Resumed {title} in {link}.";
-// D6: a session held by any thread of any channel is never resumed a second time; `{link}` is the
+// A session held by any thread of any channel is never resumed a second time; `{link}` is the
 // holding thread's permalink (a plain fallback when Slack would not give one).
 export const RESUME_ELSEWHERE = "This session is already open in another thread: {link}.";
 // `!guide`: how to use the bot, in the owner's words, as parts that `src/core/guide.ts` chooses

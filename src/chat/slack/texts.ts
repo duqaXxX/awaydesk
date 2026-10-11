@@ -125,7 +125,7 @@ export const APPROVAL_CUT =
 export const RESUME_EMPTY = "No sessions in `{directory}` yet.";
 // Every session of the folder is already open in a thread: the list has no row to offer.
 export const RESUME_NONE_LEFT = "No session to resume in `{directory}`.";
-// Under the list: the sessions a thread already holds (D6), counted and not listed (issue #69).
+// Under the list: the sessions a thread already holds, counted and not listed (issue #69).
 export const RESUME_OPEN_ONE = "1 more is open in its own thread.";
 export const RESUME_OPEN_MANY = "{count} more are open in their own threads.";
 export const RESUME_BUTTON = "Resume";

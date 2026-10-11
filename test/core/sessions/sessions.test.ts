@@ -2427,7 +2427,7 @@ test("status during a turn shows the model and the context", async (t) => {
 });
 
 test("status shows a running task while the reply s own closing still waits", async (t) => {
-  // D1: the closing message (where the running count would show) waits for the task; `!status`
+  // The closing message (where the running count would show) waits for the task; `!status`
   // is the one place that still shows it meanwhile.
   const [first] = splitBackground();
   const h = harnessFor(t)({ turns: [first] });
@@ -2689,7 +2689,7 @@ test("a stop waits for the reply s final write", async (t) => {
 
 for (const bypass of [true, false]) {
   test(`a stop posts nothing in a thread that has nothing running [${bypass ? "True" : "False"}]`, async (t) => {
-    // Bypass outlives a restart (D3), so nothing is said about it: a message would only notify.
+    // Bypass outlives a restart, so nothing is said about it: a message would only notify.
     const h = harnessFor(t)({});
     await h.session().setBypass(bypass);
     h.state.setSession(CHANNEL, THREAD, "sess-ran");
@@ -3038,7 +3038,7 @@ test("bypass whose client closes under it says the session closed", async (t) =>
   assert.equal(thread(h).bypass, null); // never stored
 });
 
-// D9: the effort level `/effort` sets is stored per thread and passed back on the next connect;
+// The effort level `/effort` sets is stored per thread and passed back on the next connect;
 // a Claude Code process with nothing to do for an hour closes itself, and the next message
 // rebuilds it.
 
@@ -3252,8 +3252,8 @@ test("a gone session is left out of sessions of", async (t) => {
   assert.deepEqual(h.manager.sessionsOf(CHANNEL), []);
 });
 
-// D9 races: the resume race, the routing race, the re-arm points after a word's connect and an
-// expired report wait, the effort edge cases and the eviction of a closed session.
+// Idle close races: the resume race, the routing race, the re-arm points after a word's connect
+// and an expired report wait, the effort edge cases and the eviction of a closed session.
 
 test("ensure connected waits for the predecessor s disconnect before resuming", async (t) => {
   // The CLI needs real time to flush and exit after EOF: a rebuild must never resume the same
@@ -3419,7 +3419,7 @@ test("drain suppresses the idle close", async (t) => {
   assert.ok(!session.closed);
 });
 
-// D9 close ordering: close() must signal doneClosing even when a step inside it raises, the
+// Close ordering: close() must signal doneClosing even when a step inside it raises, the
 // predecessor chain must hold past an unconnected middle generation, submit's own awaits must
 // not be closeable under it, and a few more missed re-arm points.
 
@@ -3536,7 +3536,7 @@ test("a failed query re arms the idle close", async (t) => {
   await h.until(() => session.closed, 1);
 });
 
-// The status reaction (D10): one on each session's root message, driven by `ThreadSession`
+// The status reaction: one on each session's root message, driven by `ThreadSession`
 // itself. `Harness.reactions` reads it from `FakeSlack.apiCalls`, never a session's own internals.
 
 /** The reactions that stand on the root message after every add and remove, in call order. */
@@ -3610,7 +3610,7 @@ test("stop shows done", async (t) => {
 });
 
 test("quick turn after stop ends on working", async (t) => {
-  // D10 item 1: `StatusReaction.current` only updates once its own `reactions.add` returns.
+  // `StatusReaction.current` only updates once its own `reactions.add` returns.
   // A quick turn right after a stop can end (and try to react working, then done) before
   // that slow round trip lands, so gating on `current` alone missed the standing ❌ and let
   // an already-in-flight ⏳ add stick with nothing left to ever remove it.
@@ -3661,7 +3661,7 @@ test("a drain that cuts a busy session shows error", async (t) => {
 });
 
 test("work drain path leaves hourglass", async (t) => {
-  // D10 item 2: `work`'s own draining branch dropped a taken turn's prompt with a `fail` that
+  // `work`'s own draining branch dropped a taken turn's prompt with a `fail` that
   // reacted to nothing at all: the ⏳ (or ✅, once the session read idle) a submit had already
   // shown stood as if that turn had gone through, though it never did.
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
@@ -3719,7 +3719,7 @@ test("owner query crossing a task notification is answered once with no error", 
 });
 
 test("an abandon s error stands through a later unreported expiry", async (t) => {
-  // D10: `expireUnreported`'s own tail used to call `reactDoneIfIdle` unconditionally,
+  // `expireUnreported`'s own tail used to call `reactDoneIfIdle` unconditionally,
   // flipping a standing ❌ (here, `abandon({error: true})`, a crashed CLI) back to ✅ once the
   // session reads idle again, even though no new work ever started.
   const [first, notice] = splitBackground();
@@ -3823,17 +3823,17 @@ test("a close right after a turn ends leaves done alone on the root", async (t) 
   assert.ok(!removed.slice(removed.indexOf(Status.WORKING)).includes(Status.DONE));
 });
 
-// --- D8: hold reactions (Phase 3 final fix wave) ---
+// --- The same-folder hold's reactions ---
 
 test("hold end reacts from the thread s history after a client reset", async (t) => {
-  // `client === null` alone is not "brand-new thread": a D9 idle close or a restart evicts the
+  // `client === null` alone is not "brand-new thread": an idle close or a restart evicts the
   // object and hands the thread a fresh one on its next lookup, `client` reset but its
   // history (a stored session id) intact.
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
   const session = h.session();
   await (await session.submit("list the files")).done.wait();
   assert.notEqual(thread(h).sessionId, null);
-  inside(session).client = null; // what a D9 idle close or a restart hands the thread's next lookup
+  inside(session).client = null; // what an idle close or a restart hands the thread's next lookup
   session.holdStart();
   await h.idle(); // let the WAITING reaction's fire-and-forget task run
   await session.holdEnd({ continued: false });
@@ -4008,7 +4008,7 @@ test("a subagent s commands have no card and no end line in the report", async (
   h.clients[0]?.inject(report);
   await h.until(() => session.idle && h.reactions().at(-1) === Status.DONE, 3.0);
   assert.equal(waits.entered, 1); // the agent's own notification
-  const bodies = h.bodies(); // D1: the report renders into the reply that started the agent
+  const bodies = h.bodies(); // The report renders into the reply that started the agent
   assert.equal(bodies.length, 1);
   const body = at(bodies, 0);
   assert.ok(body.split("✓ ").length - 1 === 1 && body.includes('✓ Agent "'));

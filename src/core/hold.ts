@@ -1,8 +1,9 @@
 /**
- * Questions that hold a message before it is sent. D8: before a message wakes an idle session
- * while a live session of another thread (any channel) is busy in the same resolved folder, the
- * daemon asks `Another session is working in this folder: <link>. Send anyway?`, with two
- * buttons, `Send anyway` and `Don't send`, which the code calls Continue and Cancel.
+ * Questions that hold a message before it is sent. The same-folder hold: before a message wakes
+ * an idle session while a live session of another thread (any channel) is busy in the same
+ * resolved folder, the daemon asks
+ * `Another session is working in this folder: <link>. Send anyway?`, with two buttons,
+ * `Send anyway` and `Don't send`, which the code calls Continue and Cancel.
  * The session setup (`setup.ts`) is the other one: model, effort and bypass, then Start.
  *
  * Kept in memory only, like `Approvals`: a hold never outlives the process (`!stop`, a top-level
