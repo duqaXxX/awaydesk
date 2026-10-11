@@ -94,6 +94,15 @@ function fileOrder(text: string, keys: readonly string[]): string[] {
  * the file (the last value is used and expanded once, where python-dotenv expands each
  * occurrence) and a bare `NAME` line with no `=` (python-dotenv records it as unset and
  * `${NAME:-d}` then gives nothing; here `d`).
+ *
+ * The syntax is Node's. Of 24 cases run through `util.parseEnv` of Node 26.5.1 and python-dotenv
+ * 1.2.1 (2026-10-11), 7 read differently: a `#` right after an unquoted
+ * value starts a comment (`C=a#b` is `a`; python-dotenv keeps `a#b`), and `A= # note` is empty
+ * (python-dotenv: `# note`); inside quotes a backslash is kept as written, `\n` in double quotes
+ * aside, so `\t` and `\\` stay two characters and a `\"` ends the value at that quote
+ * (python-dotenv decodes them); and three shapes python-dotenv skips as malformed are read: a
+ * name with a space (`KEY WITH SPACE=1`), text after a closing quote (`B="p"q` is `p`) and an
+ * unclosed quote (the value keeps the quote).
  */
 export function expandEnv(text: string, env: Env = process.env): Record<string, string> {
   const raw = new Map(Object.entries(parseEnv(text)));

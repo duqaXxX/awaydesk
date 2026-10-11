@@ -207,6 +207,9 @@ How the file is read:
 - One `NAME=value` per line, with `export ` allowed in front. A value may be in single or double
   quotes. In an unquoted value a `#` starts a comment even with no space before it, so quote a
   value that holds one.
+- Inside quotes a backslash is kept as written, except that `\n` in double quotes becomes a line
+  break. `\t` and `\\` stay two characters, and a quote after a backslash still ends the value,
+  so write a value that holds a quote in the other kind of quotes.
 - A value is trimmed, and a variable with an empty value counts as missing.
 - `${NAME}` and `${NAME:-default}` inside a value become the value of `NAME` defined above in the
   same file, else the one in awaydesk's own environment, else the default, else nothing.
