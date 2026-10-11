@@ -55,8 +55,7 @@ test("a record that cannot be read leaves chrome off", async () => {
   assert.ok(!(await chromeEnabled(home))); // no file at all
   await writeFile(join(home, ".claude.json"), "{not json");
   assert.ok(!(await chromeEnabled(home)));
-  // Python named the exceptions (FileNotFoundError, JSONDecodeError); here the errno code and the
-  // error's own name.
+  // The warning names the failure by its errno code, or by the error's own name when it has none.
   assert.deepEqual(warnings, [
     "could not read Claude Code's Chrome setting: ENOENT",
     "could not read Claude Code's Chrome setting: SyntaxError",

@@ -1,10 +1,10 @@
-/** A path the owner wrote, read as Python's `Path(...).expanduser().resolve()` read it. */
+/** A path the owner wrote, read as Python's `Path(...).expanduser().resolve()` reads it. */
 import { lstatSync, readlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, parse } from "node:path";
 import { errorCode } from "../values.ts";
 
-/** What Python's `Path.exists` and `Path.is_dir` read as "not there" rather than as a failure. */
+/** What Python's `Path.exists` and `Path.is_dir` read as "not there", not as a failure. */
 export const ABSENT: ReadonlySet<string> = new Set(["ENOENT", "ENOTDIR", "EBADF", "ELOOP"]);
 
 const SEPARATORS = process.platform === "win32" ? /[\\/]+/ : /\/+/;
@@ -22,8 +22,8 @@ export function expandUser(path: string): string {
  * `posixpath._joinrealpath` of Python 3.12, not strict: `target` read from `start` one name at a
  * time, each link followed where it stands, so a `..` goes up from where the link led. A name
  * that cannot be looked at is kept as written. One difference: a loop of links throws `ELOOP`, as
- * the kernel answers a path through it. Python kept the rest of such a path as written, unread,
- * and a link in that rest then led wherever it pointed (`loop/../out`).
+ * the kernel answers a path through it. Python keeps the rest of such a path as written, unread,
+ * and a link in that rest then leads wherever it points (`loop/../out`).
  */
 function joinReal(start: string, target: string, seen: Map<string, string | null>): string {
   let path = start;

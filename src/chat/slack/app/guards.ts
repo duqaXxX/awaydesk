@@ -28,7 +28,7 @@ function text(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
-/** Python's `bool(value)` for a parsed JSON value: `[]`, `{}`, `""`, `0`, `false` and null are false. */
+/** Whether a parsed JSON value is present: `[]`, `{}`, `""`, `0`, `false` and null are not. */
 function truthy(value: unknown): boolean {
   if (value === undefined || value === null) return false;
   if (Array.isArray(value)) return value.length > 0;
@@ -70,8 +70,8 @@ export function isOwner(
  */
 export function messageActor(event: Payload, body: Payload): Actor {
   let team: string | null;
-  // Python falls back only on a missing or null `team`: a value of another type is a team nobody
-  // has, never a reason to read the files or the envelope instead.
+  // Only a missing or null `team` falls back: a value of another type is a team nobody has,
+  // never a reason to read the files or the envelope instead.
   if (event.team !== undefined && event.team !== null) {
     team = text(event.team);
   } else if (truthy(event.files)) {
@@ -85,8 +85,8 @@ export function messageActor(event: Payload, body: Payload): Actor {
 }
 
 /**
- * The one workspace all the files name, else null. Python raised on a `files` that is not a list
- * of objects, which dropped the message; here it names no workspace, which refuses it.
+ * The one workspace all the files name, else null. A `files` that is not a list of objects names
+ * no workspace, which refuses the message.
  */
 function filesTeam(files: unknown): string | null {
   if (!Array.isArray(files)) return null;
@@ -99,7 +99,7 @@ function filesTeam(files: unknown): string | null {
 export function interactionActor(body: Payload): Actor {
   const user = record(body.user);
   const team = text(record(body.team).id);
-  // Python compares the home team as it came: only a missing or null one defers to `team`.
+  // The home team is compared as it came: only a missing or null one defers to `team`.
   const home = user.team_id;
   const same = home === undefined || home === null || (typeof home === "string" && home === team);
   return [text(user.id), same ? team : null];

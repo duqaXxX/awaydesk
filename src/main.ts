@@ -1,26 +1,24 @@
 #!/usr/bin/env node
 /**
- * `awaydesk`: start the daemon (normally from the LaunchAgent in docs/setup.md). Port of
- * `__main__.py`, and the one module that may import all three layers.
+ * `awaydesk`: start the daemon (normally from the LaunchAgent in docs/setup.md). The one module
+ * that may import all three layers.
  *
- * What Node changes about the Python entry point:
+ * How the process behaves under Node:
  *
  * - Signals. `SIGTERM` and `SIGINT` are caught with `process.on`, from the start of `run` up to
- *   the end of the shutdown, as `loop.add_signal_handler` was. Node's signal watchers do not
- *   keep the event loop alive, and a listener removed at the end puts the default disposition
- *   back.
+ *   the end of the shutdown. Node's signal watchers do not keep the event loop alive, and a
+ *   listener removed at the end puts the default disposition back.
  * - What keeps the process running. A pending promise holds nothing. While the daemon waits for
  *   a signal, the Socket Mode client and the cleanup's timer are what the libraries and the
  *   clock happen to keep alive, so `run` holds one timer of its own until the shutdown ends. On
  *   a stop it clears that timer and closes everything else it made (the cleanup's sleep and the
  *   drain's limit are aborted, never left to run out).
- * - Errors nobody handles. asyncio logged a task's exception that was never retrieved, and a
- *   callback's exception, and went on. A rejected promise or a thrown exception in Node would
- *   end the process at once, without the shutdown below, with open replies and a Claude Code
+ * - Errors nobody handles. A rejected promise or a thrown exception that nobody handles would
+ *   end a Node process at once, without the shutdown below, with open replies and a Claude Code
  *   process per session. `installProcessHandlers` logs each by its name (the message and the
- *   stack can quote a request). After a rejected promise nobody handled the daemon goes on, as
- *   the Python one did: it is a piece of work that failed with nobody waiting for it, and with
- *   a listener set Node leaves the process running (`--unhandled-rejections`, default `throw`).
+ *   stack can quote a request). After a rejected promise nobody handled the daemon goes on: it
+ *   is a piece of work that failed with nobody waiting for it, and with a listener set Node
+ *   leaves the process running (`--unhandled-rejections`, default `throw`).
  *   An uncaught exception stops the daemon as a SIGINT would (the shutdown without a drain:
  *   sessions closed, lock released) and ends the process with status 1, so that launchd starts
  *   a clean daemon and the crash repair runs: Node's documentation of the event says it is not
@@ -30,17 +28,16 @@
  *   Slack refuses the app token for good (`invalid_auth` and the four other codes of
  *   `UnrecoverableSocketModeStartError`) nothing but that rejection shows it. The log then
  *   holds `unhandled rejection: <code>`, and the fix is the token and a restart.
- * - The end of the process. `main` ends it with the code `run` gave as soon as `run` returns,
- *   as the Python interpreter ended when `asyncio.run` did. Node would otherwise stay alive
- *   for as long as anything holds its event loop, and the Socket Mode connection does after
- *   every stop: `SocketModeReceiver.stop` of `@slack/bolt` 5.1.0 does not wait for the client's
- *   `disconnect`, the WebSocket stays open once the close frame is sent, and
- *   `@slack/socket-mode` 3.1.0 ends it only when its own ping goes unanswered (measured on
- *   2026-10-10: 5.9 seconds after the stop, three times out of three). In that time the lock is
- *   already free, and launchd, which sees a live job, starts nothing. A stop that a failure
- *   asked for and that has not returned after `FAILURE_STOP_SECONDS` ends the process with 1 on
- *   a timer that does not keep it alive (`deferred`): a shutdown stuck on a connection would
- *   leave the daemon deaf.
+ * - The end of the process. `main` ends it with the code `run` gave as soon as `run` returns.
+ *   Node would otherwise stay alive for as long as anything holds its event loop, and the
+ *   Socket Mode connection does after every stop: `SocketModeReceiver.stop` of `@slack/bolt`
+ *   5.1.0 does not wait for the client's `disconnect`, the WebSocket stays open once the close
+ *   frame is sent, and `@slack/socket-mode` 3.1.0 ends it only when its own ping goes
+ *   unanswered (measured on 2026-10-10: 5.9 seconds after the stop, three times out of three).
+ *   In that time the lock is already free, and launchd, which sees a live job, starts nothing.
+ *   A stop that a failure asked for and that has not returned after `FAILURE_STOP_SECONDS` ends
+ *   the process with 1 on a timer that does not keep it alive (`deferred`): a shutdown stuck on
+ *   a connection would leave the daemon deaf.
  * - The entry point. `import.meta.main` (Node 22.18, `@since v22.18.0` in `@types/node`, and
  *   run on 22.23 and 26.5) is true only for the module the process started with, a symlink in
  *   `node_modules/.bin` included: Node runs the real path. Comparing `process.argv[1]` with
@@ -261,7 +258,7 @@ export async function deleter(
  * (`drain`), `SIGINT` does not, since a Ctrl-C in a terminal reaches the Claude Code processes
  * too, which share the daemon's process group. A signal that arrives while the drain runs ends
  * the wait. One that arrives before the drain starts (during a long repair, say) is only
- * counted, as Python's `stop.clear()` did.
+ * counted.
  */
 export class StopSignals {
   readonly received: Stop[] = [];

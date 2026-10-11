@@ -1,4 +1,4 @@
-/** Paths the way Python's `Path` treated them. */
+/** Paths as Python's `Path` treats them. */
 import { isAbsolute, relative, sep } from "node:path";
 
 /** `Path.is_relative_to` and `relative_to`: `path` from `root` when it lies under it, else null. */

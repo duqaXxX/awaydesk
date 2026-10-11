@@ -1,12 +1,11 @@
 /**
- * Port of `tests/test_home.py`. How the Python tests that waited on the wall clock or reached
- * into `Home` were written here:
+ * The Home tab's session index, `Home`. How the tests are built:
  * - the debounce, the retry and the close timeout run on a `FakeClock`, advanced by the test;
  *   `Home` reads the page's "now" from it too, so it starts at `EPOCH`;
- * - a Slack call held open is `FakeSlack.gate`, not a replaced client method;
- * - the state's observer is wired to `Home.request`, which marks the threads stale as
- *   `told_by_state` did through `_stale`; the debounced publish it schedules never fires, since
- *   those tests never advance the clock;
+ * - a Slack call held open is `FakeSlack.gate`;
+ * - the state's observer is wired to `Home.request` (`toldByState`), which marks the threads
+ *   stale; the debounced publish it schedules never fires, since those tests never advance the
+ *   clock;
  * - the machine's time zone is `process.env.TZ`, which Node reads again on every change.
  */
 import assert from "node:assert/strict";
@@ -586,8 +585,7 @@ const OLD_THREAD = "1789000000.000100";
 const NEW_THREAD = "1789000500.000100";
 const EMPTY_THREAD = "1789000900.0001";
 
-/** An error whose class name is what the log line carries (Python: `OSError`). */
-/** Python's `OSError`, as Node gives one: an error with the system's code. */
+/** An error whose class name is what the log line carries, with the system's code as Node gives. */
 class OSError extends Error {
   readonly code = "EIO";
 }

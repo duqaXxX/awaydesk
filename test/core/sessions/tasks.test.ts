@@ -1,4 +1,4 @@
-// Not in the Python suite: asyncio's own shield, tasks, semaphore and lock had no tests there.
+// The primitives of `src/core/sessions/tasks.ts`: cancellable, Event, Mutex, Semaphore and Task.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cancellable, Event, Mutex, Semaphore, Task } from "../../../src/core/sessions/tasks.ts";
@@ -48,7 +48,7 @@ async function logged(work: () => void | Promise<void>): Promise<string[]> {
 }
 
 test("a task that fails with nobody asking for its result is logged by name and place, not words", async () => {
-  // asyncio wrote `Task exception was never retrieved`; a promise nobody awaits fails in silence.
+  // A promise nobody awaits fails in silence, so the task logs its failure itself.
   for (const immediate of [false, true]) {
     const lines = await logged(async () => {
       const task = new Task(

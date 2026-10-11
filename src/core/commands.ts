@@ -261,7 +261,7 @@ export function commandParts(
     .split(RUNS_OF_SPACE)
     .filter((word) => word !== "")
     .join(" ");
-  // The cut counts code points, as Python's `len` did: a unit-wise cut could split an emoji.
+  // The cut counts code points: a unit-wise cut could split an emoji.
   const points = Array.from(description);
   if (points.length > DESCRIPTION_LIMIT) {
     description = `${points.slice(0, DESCRIPTION_LIMIT - 1).join("")}…`;

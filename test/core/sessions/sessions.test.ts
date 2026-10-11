@@ -1,10 +1,10 @@
 /**
  * The sessions as a whole: what a thread's session does from a prompt to its reply, what ends
- * it, and what the manager does across threads. Port of `tests/test_sessions.py`, in its order.
+ * it, and what the manager does across threads.
  *
- * Python's fake stood in for the SDK's client; here the scripted agent stands at the agent seam
- * (`test/support/sessions.ts`). A test of what the back end does with a start (the SDK's own
- * options, the `--chrome` argument) is the agent module's, and is not here.
+ * The scripted agent stands at the agent seam (`test/support/sessions.ts`). A test of what the
+ * back end does with a start (the SDK's own options, the `--chrome` argument) is the agent
+ * module's, and is not here.
  */
 import assert from "node:assert/strict";
 import fs, {
@@ -154,7 +154,7 @@ function firstOptions(questions: readonly JsonObject[]): Record<string, string> 
   );
 }
 
-/** What Python raised at connect for a session id Claude Code no longer has. */
+/** What connect raises for a session id Claude Code no longer has. */
 function gone(): Error {
   return new ResumeRefused();
 }
@@ -240,8 +240,8 @@ test("a gone session fails a queued turn and leaks no process", async (t) => {
     ["gone"],
   );
   assert.deepEqual(h.bodies(), [texts.SESSION_GONE, texts.SESSION_GONE]);
-  // The worker must not be left spinning on an empty queue nobody will ever fill again. Python
-  // looked for its task among the loop's; here the task says whether it has ended.
+  // The worker must not be left spinning on an empty queue nobody will ever fill again: the
+  // task says whether it has ended.
   await h.idle();
   assert.equal(inside(session).worker?.done, true);
   assert.equal(inside(session).idleExpiry, null);
@@ -249,7 +249,7 @@ test("a gone session fails a queued turn and leaks no process", async (t) => {
   assert.ok(h.clients.every((client) => !client.connected));
 });
 
-/** Hold each `submit` where its reply is made, one gate per call, as Python patched `_sink`. */
+/** Hold each `submit` where its reply is made, one gate per call. */
 function gatedSinks(t: TestContext, gates: readonly AsyncEvent[]): { entered: number } {
   const state = { entered: 0 };
   const prototype = ThreadSession.prototype as unknown as { sink(): Reply | Promise<Reply> };
@@ -401,7 +401,7 @@ test("stop landed gives up when the stopped turn never ends", async (t) => {
   const turn = await session.submit("clean");
   await h.until(() => pending(h.approvals).length > 0);
   assert.equal(await session.stop(), true);
-  // Python lowered STOP_TAIL_WAIT and waited it out; here the sessions' clock crosses it.
+  // The sessions' clock crosses STOP_TAIL_WAIT.
   let landed = false;
   const waiting = session.stopLanded().then(() => {
     landed = true;
@@ -841,7 +841,7 @@ test("resolve directory", POSIX_ONLY, (t) => {
 });
 
 test("resolve directory follows a link before the `..` after it", POSIX_ONLY, (t) => {
-  // What Python's `(root / raw).resolve()` gave on this layout (run 2026-10-11): the disk goes
+  // What Python's `(root / raw).resolve()` gives on this layout (run 2026-10-11): the disk goes
   // up from where a link leads, where `path.resolve` folds `link/..` away as text.
   const tmpPath = realpathSync(mkdtempSync(join(tmpdir(), "awd-resolve-")));
   t.after(() => rmSync(tmpPath, { recursive: true, force: true }));
@@ -867,9 +867,9 @@ test("resolve directory follows a link before the `..` after it", POSIX_ONLY, (t
   assert.equal(resolveDirectory("in/deep/../../out/..", root), null);
   assert.equal(resolveDirectory("missing/../a/link/..", root), join(root, "in"));
   assert.equal(resolveDirectory("a/missing/../link/..", root), join(root, "in"));
-  // A path through a loop of links names nothing, as the kernel answers it. Python kept the
-  // rest of such a path as written and unread: `loop1/../out` was the root's `out`, which
-  // leads outside (run 2026-10-11).
+  // A path through a loop of links names nothing, as the kernel answers it. Python's
+  // `resolve` kept the rest of such a path as written and unread: `loop1/../out` was the root's
+  // `out`, which leads outside (run 2026-10-11).
   assert.equal(resolveDirectory("loop1", root), null);
   assert.equal(resolveDirectory("loop1/..", root), null);
   assert.equal(resolveDirectory("loop1/../out", root), null);
@@ -945,9 +945,8 @@ test("a task type is forgotten when the task ends", async (t) => {
   assert.equal(inside(session).tasks.size, 0);
 });
 
-// A background agent's end, as the SDK delivered it (recorded 2026-09-24 by
-// actions/scripts/2026-09-24-task-notification-summary-probe.py): its summary is the agent's
-// result, not a status line.
+// A background agent's end, as the SDK delivered it (recorded 2026-09-24): its summary is the
+// agent's result, not a status line.
 function agentEnd(taskId: string, toolUseId: string): Item {
   return {
     record: {
@@ -994,7 +993,7 @@ test("the task record is bounded", async (t) => {
       ? { record: { ...record, task_id: "other" } }
       : item;
   });
-  // Python lowered TASKS_KEPT to 1.
+  // One task is kept (`tasksKept: 1`).
   const h = harnessFor(t, { tasksKept: 1 })({ turns: [first, renamed] });
   const session = h.session();
   await (await session.submit("one")).done.wait();
@@ -1090,8 +1089,8 @@ test("the unreported expiry timer does not outlive close", async (t) => {
 test("closing a session does not cancel a pending usage refresh", async (t) => {
   // A usage refresh shares one probe, and its one client, across every session; a refresh cut
   // in the middle would leave that shared client answering the next lookup, of any session,
-  // late. `close` cancels its own timers, never a refresh. Python read the refresh's task;
-  // here the refresh is given no signal at all, and the test reads that it is still under way.
+  // late. `close` cancels its own timers, never a refresh. The refresh is given no signal at
+  // all, and the test reads that it is still under way.
   const h = harnessFor(t)({});
   const session = h.session();
   const started = new AsyncEvent();
@@ -1123,8 +1122,8 @@ function openGate(h: Harness, gate: AsyncEvent): void {
 }
 
 /**
- * The wait for a report turn runs out: Python lowered INJECTED_TURN_WAIT and let it pass, here
- * the sessions' clock crosses it once what was injected has been read.
+ * The wait for a report turn runs out: the sessions' clock crosses INJECTED_TURN_WAIT once what
+ * was injected has been read.
  */
 async function reportTurnNeverCame(h: Harness): Promise<void> {
   await h.idle();
@@ -1187,9 +1186,8 @@ test("a report turn keeps the reply it renders into open while the expiry sweeps
   // exclusion). Replies A and B each hold a task. The first notification's wait passes and the
   // expiry's sweep stops on the end of that reply; the second notification arrives and the
   // report turn starts, rendering into the second reply. A sweep that resumed under the turn
-  // would close that reply with its snapshot of the active turn (none). Python's sweep walked
-  // a set ordered by hash and the test fixed that order; here the sweep walks the replies in
-  // the order their tasks started, which is the order the test needs (A first).
+  // would close that reply with its snapshot of the active turn (none). The sweep walks the
+  // replies in the order their tasks started, which is the order the test needs (A first).
   const [first, notice, injected] = splitBackground();
   const [firstB, noticeB] = renamedBackground();
   const h = harnessFor(t)({ turns: [first, firstB] });
@@ -1241,9 +1239,8 @@ test("a close during the expiry s work ends promptly and leaks no task", async (
   const session = h.session();
   await (await session.submit("start it")).done.wait();
   const a = taskReply(session, "bny2rux7d");
-  // Python slowed its fake Slack by a tenth of a second and timed the close: `close` settles
-  // every reply, which waits for the write in flight. Here that write is held at a gate and let
-  // go once the close has reached it, and no clock is read.
+  // `close` settles every reply, which waits for the write in flight. That write is held at a
+  // gate and let go once the close has reached it, and no clock is read.
   const gate = armGate(h);
   h.clients[0]?.inject(notice);
   await reportTurnNeverCame(h);
@@ -1259,7 +1256,7 @@ test("a close during the expiry s work ends promptly and leaks no task", async (
   openGate(h, gate);
   await closing;
   await h.sleep(0.2); // the write Slack still held answers, then nothing is left
-  // Python looked for a live `_expire_injected_turn` or `_end_out` task.
+  // The expiry task has ended and no other was made.
   assert.ok(working?.done && inside(session).expiry === working);
   assert.equal(await a.sink.waitLanded(), true);
 });
@@ -1354,15 +1351,15 @@ test("a close while a notification waits after the expiry s work leaks no task",
   assert.ok(waiting !== null && !waiting.done);
   await session.close();
   assert.ok(waiting.done);
-  // Python looked for a live `_expire_injected_turn` task: none was made after this one.
+  // No expiry task was made after this one.
   assert.equal(inside(session).expiry, waiting);
 });
 
 test("a close during the expiry s write with a notification pending arms no timer", async (t) => {
   // The expiry task `close` is cancelling must not arm the wait of the notification that came
   // during its write: `close` cancels twice, which is all that would catch such a timer.
-  // Python counted the timers made; here a timer is a task the session keeps, and the one the
-  // session holds after the close is still the one that was writing.
+  // A timer is a task the session keeps, and the one the session holds after the close is still
+  // the one that was writing.
   const [h, session] = twoBackgrounds(t);
   const [notice, noticeB, , , gate] = await twoRepliesWithAGate(h, session);
   inside(session).taskReplies.delete("bny2rux7d"); // A's records are held: the expiry posts them
@@ -1389,8 +1386,8 @@ test("a sweep that fails still arms the wait of a notification that came during 
   h.slack.gate = null;
   let sweeps = 0;
   t.mock.method(inside(session), "sweepClosedOut", async (signal?: AbortSignal) => {
-    // `expireUnreported` sweeps too: only the expiry's own sweep fails. Python asked which
-    // task was running; here the sweep is handed the signal of the task that calls it.
+    // `expireUnreported` sweeps too: only the expiry's own sweep fails. The sweep is handed the
+    // signal of the task that calls it.
     if (signal === undefined || signal !== inside(session).expiry?.signal) return;
     sweeps += 1;
     if (sweeps === 1) {
@@ -1503,7 +1500,7 @@ test("two prompts tasks ending together each reply ends", async (t) => {
   // reply (the first of the two ended tasks).
   h.clients[0]?.inject([...notice, ...noticeB, ...injected]);
   await h.until(() => a.closedOut);
-  // Python's lowered wait could pass while it polled: the sessions' clock crosses it here.
+  // The sessions' clock crosses the wait.
   await h.clock.advance(INJECTED_TURN_WAIT);
   await h.until(() => b.closedOut);
   await h.until(() => noStreamOpen(h));
@@ -1552,7 +1549,7 @@ test("ended tasks are forgotten past the limit", async (t) => {
     );
     return record !== null && task ? { record: { ...record, task_id: "other" } } : item;
   });
-  // Python lowered TASK_REPLIES_KEPT to 1.
+  // One task reply is kept (`taskRepliesKept: 1`).
   const h = harnessFor(t, { taskRepliesKept: 1 })({ turns: [first, renamed] });
   const session = h.session();
   await (await session.submit("start it")).done.wait();
@@ -1631,7 +1628,7 @@ test("a notification with no turn updates its line and releases the queue", asyn
   h.clients[0]?.inject(notice);
   await h.sleep(0.05);
   const second = await session.submit("next");
-  await reportTurnNeverCame(h); // Python lowered the wait, which passed while it waited
+  await reportTurnNeverCame(h); // the wait for a report turn passes
   await second.done.wait();
   // The task is known: its end shows on the line where it started, not in a post of its own.
   // That line updates a reply whose own turn has already finished, which debounces like any
@@ -1731,7 +1728,7 @@ test("a failed background post still releases the queue", async (t) => {
   h.clients[0]?.inject(notice);
   await h.sleep(0.02);
   const second = await session.submit("next");
-  await reportTurnNeverCame(h); // Python lowered the wait, which passed while it waited
+  await reportTurnNeverCame(h); // the wait for a report turn passes
   await second.done.wait();
   assert.deepEqual(h.clients[0]?.queries, ["start it", "next"]);
 });
@@ -1789,7 +1786,7 @@ test(
 );
 
 test("a path the system refuses to look at names no folder", async () => {
-  // A null in a path: Node throws before any call to the system. Python's `is_dir` said no.
+  // A null in a path: Node throws before any call to the system, and the folder is missing.
   await assert.rejects(
     checkDirectory("/home/dev/pro\0ject", async () => true),
     (error: unknown) => error instanceof DirectoryMissing,
@@ -1897,9 +1894,8 @@ test("an approval slack refuses to show is denied and logged", async (t) => {
 
 test("a footer that fails to build still ends the reply", async (t) => {
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
-  // Python replaced `git_state` with one that raised. Here the lookup `gitState` makes of the
-  // back end fails, which is the one part of it the session supplies, and `gitState` lets any
-  // failure but its own timeout through.
+  // The lookup `gitState` makes of the back end fails, which is the one part of it the session
+  // supplies, and `gitState` lets any failure but its own timeout through.
   h.backend.repository = async () => {
     throw new TypeError("invalid start byte");
   };
@@ -2607,8 +2603,8 @@ function startDrain(h: Harness): Drain {
 
 /**
  * One poll of the drain has passed: what is ready runs, and the sessions' clock moves on by the
- * interval the drain sleeps between its checks. Where a Python test slept a moment and asserted
- * the drain was still waiting, the drain has looked once more by the time this returns.
+ * interval the drain sleeps between its checks. The drain has looked once more by the time this
+ * returns, so a test can assert it is still waiting.
  */
 async function polled(h: Harness): Promise<void> {
   await h.idle();
@@ -2922,8 +2918,8 @@ test("bang stop ends background tasks outside a stop too", async (t) => {
 });
 
 /**
- * Every line the daemon logs from here on, parsed: Python's `caplog` over the whole `awaydesk`
- * logger tree, where `logged` reads one logger. Call `stop` when the part under test is over.
+ * Every line the daemon logs from here on, parsed, over the whole `awaydesk` logger tree, where
+ * `logged` reads one logger. Call `stop` when the part under test is over.
  */
 function captureLog(): {
   readonly entries: Array<{ level: string; name: string; message: string }>;
@@ -3168,8 +3164,8 @@ test("the idle close waits for an expected report turn", async (t) => {
   await (await session.submit("start it")).done.wait();
   h.clients[0]?.inject(notice); // a report turn is expected; not idle until it arrives
   await h.idle();
-  // Python outlasted the idle delay inside the report's wait (0.05 s against 30 s); the real
-  // delay is the longer one, so what is checked is that no idle timer runs during the wait.
+  // The idle delay is the longer one, so what is checked is that no idle timer runs during the
+  // report's wait.
   assert.equal(inside(session).idleExpiry, null);
   await h.clock.advance(INJECTED_TURN_WAIT - 1);
   assert.ok(!session.closed && h.clients[0]?.connected === true);
@@ -3469,8 +3465,7 @@ test("a third generation session waits through an unconnected middle one", async
 });
 
 test("the idle close cannot fire during submit s own awaits", async (t) => {
-  // Python slowed `submit`'s own chat.postMessage calls (through `_sink`) past the idle delay;
-  // making the reply waits for nothing here, so the test holds `sink` as the tests above do.
+  // Making the reply waits for nothing, so the test holds `sink` as the tests above do.
   // Without the fix, the timer armed at submit's own entry would reset instead of staying
   // cancelled, and fire while `submit` is still awaiting the reply.
   const h = harnessFor(t)({ turns: [sdkMessages("tools"), sdkMessages("tools")] });
@@ -3641,9 +3636,9 @@ test("a drain that cuts a busy session shows error", async (t) => {
 });
 
 test("work drain path leaves hourglass", async (t) => {
-  // D10 item 2: `work`'s own draining branch dropped a taken turn's prompt with `fail`'s
-  // `notify=False`, which never reacted at all: the ⏳ (or ✅, once the session read idle) a
-  // submit had already shown stood as if that turn had gone through, though it never did.
+  // D10 item 2: `work`'s own draining branch dropped a taken turn's prompt with a `fail` that
+  // reacted to nothing at all: the ⏳ (or ✅, once the session read idle) a submit had already
+  // shown stood as if that turn had gone through, though it never did.
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
   const session = h.session();
   await (await session.submit("first")).done.wait();
@@ -3724,9 +3719,8 @@ test("a dropped queued turn with a running task gets a note and no reply", async
   const h = harnessFor(t)({ turns: [first] });
   const session = h.session();
   await (await session.submit("start it")).done.wait();
-  // Queued, and dropped before the worker takes it. Python's `await submit()` ran straight
-  // through, so the drop came in the same step; `submit` queues in its synchronous part for
-  // the same reason, and awaiting it first would let the worker take the turn meanwhile.
+  // Queued, and dropped before the worker takes it. `submit` queues in its synchronous part, and
+  // awaiting it first would let the worker take the turn meanwhile.
   const queuing = session.submit("next");
   const dropping = session.dropQueued({ error: true });
   const second = await queuing;
@@ -3783,7 +3777,7 @@ test("a close right after a turn ends leaves done alone on the root", async (t) 
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
   const session = h.session();
   // A Slack round trip that is slow for the ⏳ removal only: held at the gate until the close
-  // has begun, where Python slept 0.3 s. The fake's gate holds a method whatever it removes,
+  // has begun. The fake's gate holds a method whatever it removes,
   // and the first removal of a thread's root is a strip of the other names, so this one is
   // held by name.
   const gate = new AsyncEvent();
@@ -3870,10 +3864,9 @@ test("cancel while another approval is open shows waiting not working", async (t
 });
 
 test("working in does not resolve a path on every lookup", async (t) => {
-  // `workingIn` used to resolve the path of every live session on every message; each
-  // session's folder is now resolved once, at construction. Python patched `Path.resolve`;
-  // here the `lstatSync` that `resolvePath` walks with is replaced and the built-ins' ES
-  // bindings are synced to it. The test first checks that this does stop `resolvePath`.
+  // `workingIn` resolves no path on a message: each session's folder is resolved once, at
+  // construction. The `lstatSync` that `resolvePath` walks with is replaced and the built-ins'
+  // ES bindings are synced to it. The test first checks that this does stop `resolvePath`.
   const h = harnessFor(t)({
     turns: [[canUseToolCall("Bash", { command: "ls" }), ...sdkMessages("tools")]],
   });
@@ -3909,7 +3902,7 @@ test("the manager names the threads with a live session", async (t) => {
 
 test("a stop says what it waits for in a message where slack refuses a status", async (t) => {
   // The token cannot set a thread status: Slack refused the first call, and the flag that
-  // says so is the process's (Python set `ThreadStatus._refused` directly).
+  // says so is the process's.
   const [first] = splitBackground();
   const h = harnessFor(t)({ turns: [first] });
   h.slack.responses["assistant.threads.setStatus"] = rejected("missing_scope");

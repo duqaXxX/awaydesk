@@ -1,12 +1,10 @@
 /**
- * The last section of `tests/test_slack_app.py`: the log lines of issue #142, and an audio clip as
- * a prompt (issue #35). Port of the tests from the first to the end of the file.
+ * The log lines of issue #142, and an audio clip as a prompt (issue #35).
  *
- * Python's `caplog` reads the records of the logger `awaydesk.slack_app` (`app`) and the text of
- * every record under `awaydesk` (`text`). Here `app` is what the module's exported logger was
- * asked to write, through `mock.method`, and `text` is every line the daemon's log wrote, through
- * the log's own writer. A clip's wait (`voice.WAIT_SECONDS`) is crossed by advancing the handlers'
- * clock: nothing waits on the wall clock.
+ * `app` is what the module's exported logger was asked to write, through `mock.method`, and
+ * `text` is every line the daemon's log wrote, through the log's own writer. A clip's wait
+ * (`voice.WAIT_SECONDS`) is crossed by advancing the handlers' clock: nothing waits on the wall
+ * clock.
  */
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";

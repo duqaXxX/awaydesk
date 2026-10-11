@@ -122,7 +122,7 @@ function asRaw(value: unknown, what: string): Raw {
   return value;
 }
 
-/** The key's value; a missing key reads as Python's `KeyError` did: the key in quotes. */
+/** The key's value; a missing key is `Malformed`, named by the key in quotes. */
 function required(raw: Raw, key: string): unknown {
   if (!Object.hasOwn(raw, key)) throw new Malformed(`'${key}'`);
   return raw[key];
@@ -593,8 +593,8 @@ export class StateStore {
     let channels: Map<string, ChannelRecord>;
     let migrated = false;
     try {
-      // Python's `read_text` stops on bytes that are not UTF-8 and keeps a BOM, which the JSON
-      // parser then refuses; `TextDecoder` does the same with these two options.
+      // Bytes that are not UTF-8 stop the read and a BOM is kept, which the JSON parser then
+      // refuses; `TextDecoder` does both with these two options.
       const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
       const raw = asRaw(JSON.parse(text), "the file");
       const version = required(raw, "version");
@@ -627,8 +627,8 @@ export class StateStore {
   }
 
   /**
-   * Written synchronously, as Python's was, so two changes never interleave: the next line of the
-   * caller runs with the file already renamed into place.
+   * Written synchronously, so two changes never interleave: the next line of the caller runs
+   * with the file already renamed into place.
    */
   private write(channels: ReadonlyMap<string, ChannelRecord>): void {
     const data = {

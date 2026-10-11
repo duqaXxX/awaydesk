@@ -302,8 +302,7 @@ test("the activity line is refused once slack says the token cannot set one", as
 });
 
 test("the status line counts its refresh on the steady clock, not on the wall clock", async () => {
-  // Python counted it on `loop.time()`: a step of the system clock must neither bring a
-  // refresh forward nor put it off.
+  // A step of the system clock must neither bring a refresh forward nor put it off.
   const slack = new FakeSlack();
   const wall = new FakeClock();
   const steady = new FakeClock();

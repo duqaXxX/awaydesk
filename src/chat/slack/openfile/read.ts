@@ -105,10 +105,10 @@ export function titleOf(relative: string): string {
  * The content of the already resolved file `target`, opened once; everything after is read from
  * that descriptor, so what was checked is what is read. Throws `NotAFile` or `TooLarge`.
  *
- * Python's `os.open` is `fs.promises.open` with numeric flags from `fs.constants`
- * (`O_RDONLY | O_NONBLOCK | O_NOFOLLOW`: a file that became a link in between is refused, a FIFO
- * is never waited on); `os.fstat` is the handle's `stat`; `os.read` is the handle's `read` at the
- * current position, up to SNIPPET_LIMIT + 1 bytes; `os.close` is the handle's `close`.
+ * It is opened with `fs.promises.open` and numeric flags from `fs.constants` (`O_RDONLY |
+ * O_NONBLOCK | O_NOFOLLOW`: a file that became a link in between is refused, a FIFO is never
+ * waited on). The handle's `stat` says it is a regular file under the limit, its `read` takes the
+ * bytes at the current position, up to SNIPPET_LIMIT + 1, and its `close` ends it.
  */
 export async function readOnce(
   target: string,
@@ -203,10 +203,10 @@ export async function newestFirst(folder: string, relatives: Iterable<string>): 
  * the file's name and the path from the folder as its title, nothing posted on success. Rejects
  * with Slack's error.
  *
- * Python passed `content=bytes`. `@slack/web-api` 8.2.0 types `content` as a string
- * (`FileUploadStringContents`, `types/request/files.d.ts`) and encodes it as UTF-8, which would
- * damage a binary file; its `file` field takes a `Buffer` as the bytes (a `string` there is a
- * path read from disk, `dist/file-upload.js` `getFileData`). A Buffer is what is passed.
+ * `@slack/web-api` 8.2.0 types `content` as a string (`FileUploadStringContents`,
+ * `types/request/files.d.ts`) and encodes it as UTF-8, which would damage a binary file; its
+ * `file` field takes a `Buffer` as the bytes (a `string` there is a path read from disk,
+ * `dist/file-upload.js` `getFileData`). A Buffer is what is passed.
  */
 export async function uploadFile(
   client: WebClient,

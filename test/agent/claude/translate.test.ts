@@ -3,7 +3,7 @@
  * values are read off the recordings: `test/fixtures/sdk/*.jsonl`, Claude Code 2.1.286, with
  * `compact`, `auto-compact` and `auto-compact-report-turn` on 2.1.292. The shapes no recording
  * holds (a server tool's blocks, a stream that names no message) are the ones the Python SDK's
- * parser and the Python renderer read, claude-agent-sdk 0.2.165.
+ * message parser reads, claude-agent-sdk 0.2.165.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -202,7 +202,7 @@ test("a turn the agent reports as failed ends as an error", () => {
 });
 
 test("an origin of the owner's own is the owner's turn", () => {
-  // `human` is the Python package's `MessageOriginKind` for the owner's prompt (0.2.165); the
+  // `human` is the Python SDK's `MessageOriginKind` for the owner's prompt (0.2.165); the
   // recordings carry no origin on such a turn.
   const translator = new Translator();
   const result = record("clear", 15);
@@ -515,7 +515,7 @@ test("a subagent's calls name the call that runs it", () => {
 
 test("a server tool's call starts and ends like any other", () => {
   // No recording holds one: the blocks are those the Python SDK's parser reads
-  // (`server_tool_use`, `advisor_tool_result`), which the Python renderer shows as a call.
+  // (`server_tool_use`, `advisor_tool_result`), and the reply shows them as a call.
   const translator = new Translator();
   const wire = record("tools", 19);
   const base = wire.message as JsonObject;
@@ -1187,10 +1187,9 @@ test("every result gives exactly one end of turn", () => {
 });
 
 test("the first record of a turn that Python's session starts it on gives an event", () => {
-  // Python starts a turn on the first stream event, assistant, user or result record that no
-  // prompt's replay accounts for and no call runs, or on a compaction when a prompt is waiting.
-  // Here a turn starts on an event, so that record must give one, or the reply would open
-  // later than it did.
+  // A turn starts on the first stream event, assistant, user or result record that no prompt's
+  // replay accounts for and no call runs, or on a compaction when a prompt is waiting. A turn
+  // starts on an event, so that record must give one, or the reply would open late.
   const starting = new Set(["stream_event", "assistant", "user", "result"]);
   for (const name of sdkRecordings()) {
     const wire = sdkRecords(name);

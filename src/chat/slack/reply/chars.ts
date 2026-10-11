@@ -1,6 +1,6 @@
 /**
- * Text counted and trimmed the way the Python daemon counted it, which is what the limits of a
- * reply were measured against.
+ * Text counted and trimmed in code points, which is what the limits of a reply were measured
+ * against.
  *
  * Python's `len` and its slices count code points; a JavaScript string counts UTF-16 units, two
  * for an emoji or any other character past U+FFFF (the red and green squares of every diff

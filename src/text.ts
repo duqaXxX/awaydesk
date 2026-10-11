@@ -1,7 +1,7 @@
 /**
- * Strings the way Python's `str` treated them, where JavaScript's `String` differs: what counts
- * as whitespace, and the order of two strings. The texts the daemon cuts and sorts were cut and
- * sorted by Python, and the goldens hold its results. Any layer imports this.
+ * Strings the way Python's `str` treats them, where JavaScript's `String` differs: what counts
+ * as whitespace, and the order of two strings. The texts the daemon cuts and sorts come out as
+ * Python cut and sorted them, and the goldens hold those results. Any layer imports this.
  */
 
 // What Python's `str.split()`, `str.strip()` and `\s` take for whitespace (`str.isspace`), as

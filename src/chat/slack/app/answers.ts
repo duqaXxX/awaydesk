@@ -1,12 +1,8 @@
 /**
  * What every listener shares: the checks each one runs on its own, where the daemon's own answers
- * go, and how a failure after the checks reaches the owner. Port of the helpers `build_app`
- * closed over in `slack_app.py` (`deliver`, `notice`, `say`, `tell_owner`, `in_channel`,
- * `reply_on_failure`, `admitted`, `acknowledge`, `remove_request`, the links and the restart
- * notice).
+ * go, and how a failure after the checks reaches the owner.
  *
- * How asyncio is said here is the header of `core/sessions/session.ts`. A coroutine handed to
- * `reply_on_failure` did not start until it was awaited: here it is a function, called inside.
+ * The work handed to `replyOnFailure` is a function, called inside its guard.
  */
 import type { KnownBlock, WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
@@ -94,8 +90,8 @@ export class Answers {
   }
 
   /**
-   * Whether the daemon has stopped. A listener that finds it so ends silently: asyncio cancelled
-   * the listeners with the loop, where Node's go on at their next await.
+   * Whether the daemon has stopped. A listener that finds it so ends silently: Node's listeners
+   * go on at their next await after the stop.
    */
   get stopped(): boolean {
     return this.parts.stopped.aborted;

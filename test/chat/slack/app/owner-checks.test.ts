@@ -4,10 +4,8 @@
  * proves it does), sent again by another user and by the owner's id from another workspace: the
  * daemon then calls Slack for nothing, not even to read the channel, and changes nothing.
  *
- * Not a port: the Python suite holds these refusals in the section of each feature
- * (`test_nobody_else_can_approve`, `test_a_setup_click_from_someone_else_is_ignored`,
- * `test_typing_by_anyone_else_updates_nothing`, ...), and this file keeps them in one table so a
- * listener added to `buildApp` without its check has one place to fail.
+ * The refusals are kept in one table, apart from the section of each feature, so a listener added
+ * to `buildApp` without its check has one place to fail.
  */
 import assert from "node:assert/strict";
 import { join } from "node:path";

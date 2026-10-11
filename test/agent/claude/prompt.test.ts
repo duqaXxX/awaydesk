@@ -1,7 +1,7 @@
 /**
  * A prompt as the one user message of a turn. The shape is the Agent SDK's streaming input
- * (`SDKUserMessage`, TypeScript SDK 0.3.296), and the one Python's `prompt.user_message` built:
- * the message the SDK itself builds for a string, plus the uuid Claude Code replays it under.
+ * (`SDKUserMessage`, TypeScript SDK 0.3.296): the message the SDK itself builds for a string,
+ * plus the uuid Claude Code replays it under.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";

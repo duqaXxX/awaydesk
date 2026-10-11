@@ -69,9 +69,8 @@ export function result(subject: Claim, outcome: Outcome, detail: string): Result
 }
 
 // The guards are the TypeScript back end's symbols that read what a claim names: the daemon's
-// own code is where a break shows (the Python probe named the Python daemon's). The claims about
-// the Agent SDK's own symbols name the TypeScript ones: the initialization result for Python's
-// server info, `Options.effort` for `ClaudeAgentOptions(effort=...)`.
+// own code is where a break shows. The claims about the Agent SDK's own symbols name its
+// symbols, such as the initialization result and `Options.effort`.
 export const CLAIMS: readonly Claim[] = [
   claim(
     "P1",

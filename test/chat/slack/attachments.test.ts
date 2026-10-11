@@ -114,8 +114,8 @@ test("text and files make a plain prompt", () => {
   assert.equal(prompt, "Summarize this file.\n\nAttached files:\n- /tmp/cws/F1-notes.txt");
 });
 
-// Python asserted on the SDK's block (`source: {type, media_type, data}`); the seam's image part
-// is `{type, mediaType, data}`, and the Claude back end converts.
+// The seam's image part is `{type, mediaType, data}`, and the Claude back end converts it to the
+// SDK's block.
 test("images make one message of content blocks", () => {
   const blocks = promptFor(
     "What is in this image?",
@@ -135,7 +135,7 @@ test("images make one message of content blocks", () => {
   assert.equal(imageOnly[0]?.type, "image");
 });
 
-/** A `fetch` that answers as the Python tests' server did, and records what it was asked. */
+/** A `fetch` that answers with what `make` returns, and records what it was asked. */
 function answering(make: () => Response) {
   const calls: { url: string; init: RequestInit }[] = [];
   const fetch: FetchFn = async (url, init) => {
@@ -320,7 +320,7 @@ test("a folder that is not private is logged at start", WINDOWS, async (t) => {
   assert.ok(warnings.some((message) => message.includes("not private")));
 });
 
-// Added for the TypeScript port: the cases `fetch` has and aiohttp's session did not.
+// The ways `fetch` fails: a body that breaks in the middle, a timeout, a cancel.
 
 test("a failure in the middle of the body is a failed download", async () => {
   const body = new ReadableStream<Uint8Array>({
@@ -373,10 +373,9 @@ test("a size shown in megabytes rounds a tie to even, as Python does", () => {
 });
 
 // Review round 2026-10-10: a declared size that is not a finite non-negative integer, as a number
-// or as ASCII digits, is refused. Python's `int()` raised on most of these, which dropped the
-// message; on `"999_999_999"` and on non-ASCII digits it read a number (a refusal for the first
-// because it is over the limits, none for the second). Here every one is refused with the text of
-// a file awaydesk cannot take, the closest existing one, since no size can be shown.
+// or as ASCII digits, is refused with the text of a file awaydesk cannot take, the closest
+// existing one, since no size can be shown. `"999_999_999"` and non-ASCII digits are among them:
+// Python's `int()` reads both as numbers.
 const UNREADABLE_SIZES: Array<[string, unknown]> = [
   ["abc", "abc"],
   ["Infinity", "Infinity"],
@@ -430,7 +429,7 @@ test("a file whose size is unreadable and has no name is called by its id", () =
   );
 });
 
-// Python: an absent or false size is 0, and the digits of a string are the size.
+// An absent or false size is 0, and the digits of a string are the size.
 const READABLE_SIZES: Array<[string, unknown, string | null]> = [
   ["missing", undefined, null],
   ["null", null, null],

@@ -17,8 +17,6 @@ import {
 } from "../../support/fake-slack.ts";
 import type { JsonObject } from "../../support/fixtures.ts";
 
-// ported from tests/test_delete.py
-
 const ROOT = "1790000000.000001";
 const OWNER = "U000ALICE";
 const BOT = "U000BOT";

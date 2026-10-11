@@ -34,14 +34,14 @@
  * 2026-10-01): the owner's own top-level message there starts the session, so the thread is one
  * the owner started and its replies notify.
  *
- * Port of `home.py`. How Python's asyncio became JavaScript here:
+ * How the waits are made:
  * - `publish` runs under a FIFO `Mutex`, so the publishes run one at a time and each is built
- *   after the one before it landed. A task cancelled by its owner is an `AbortSignal` that
+ *   after the one before it landed. A publish is given up through an `AbortSignal` that
  *   `publish` looks at before each Slack call and before `views.publish`: a call in flight is
  *   awaited and its answer used, never cut short, and a cancelled publish never sends its page.
- * - `asyncio.create_task` of the debounced loop and of the retry is a `Task`; `asyncio.timeout`
- *   in `close` is a race against the clock's sleep that aborts the publish when the sleep wins.
- * - `asyncio.Semaphore` is the sessions' `Semaphore`.
+ * - The debounced loop and the retry are each a `Task`; the time limit in `close` is a race
+ *   against the clock's sleep that aborts the publish when the sleep wins.
+ * - `asking` is a `Semaphore` of `THREADS_AT_ONCE` places.
  * - Every wait goes through the injected `Clock`.
  */
 import { createHash } from "node:crypto";
@@ -178,7 +178,7 @@ export interface ThreadFacts {
   readonly reaction: string | null;
 }
 
-/** Python's `float(text)` for what a root carries: a ValueError for anything that is no number. */
+/** Python's `float(text)` for what a root carries; it throws for anything that is no number. */
 function pyFloat(value: unknown): number {
   if (typeof value === "number") return value;
   const text = String(value).trim();
@@ -975,7 +975,7 @@ export class Home {
       cleaning: new Set(this.cleaning),
     });
     signal?.throwIfAborted();
-    // The shape is the one the Python daemon sent; `@slack/types` declares it as `HomeView`.
+    // `@slack/types` declares this shape as `HomeView`.
     await this.slack.views.publish({
       user_id: this.owner,
       view: view as unknown as Parameters<WebClient["views"]["publish"]>[0]["view"],

@@ -1,8 +1,7 @@
 /**
  * What a session manager does once a stop has closed its sessions (`closeAll`): a listener that
  * was still in flight when the shutdown ended must not build a session nobody will close, nor
- * write `state.json` after the lock was released. Python had no such state: `asyncio.run`
- * cancelled every listener when `run()` returned.
+ * write `state.json` after the lock was released.
  *
  * What each entry point of the manager does after the close:
  * - `get`: null, as for a thread that is not a session (no session is built).

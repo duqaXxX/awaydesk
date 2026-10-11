@@ -2,8 +2,8 @@
  * Claude's markdown as Slack reads it: how many blocks it makes of a text and where to cut one,
  * and the text with its markers gone, for a notification's banner.
  *
- * Every pattern here is Python's, ported for what differs between the two engines: Python's `\s`
- * and `\w` are Unicode (`PY_SPACE`, `WORD`), its `.` stops at `\n` only, and its `^` under
+ * The patterns follow Python's regular expression rules where the two engines differ: Python's
+ * `\s` and `\w` are Unicode (`PY_SPACE`, `WORD`), its `.` stops at `\n` only, and its `^` under
  * `re.M` starts a line after `\n` only (JavaScript's also after `\r`, U+2028 and U+2029).
  */
 
@@ -163,7 +163,7 @@ export function bannerText(paragraph: string, options: { limit?: number } = {}):
   if (limit === undefined) return mrkdwnEscape(plain);
   const out: string[] = [];
   let size = 0;
-  // By code point, as Python walks a string: an emoji is one character of the limit.
+  // By code point: an emoji is one character of the limit.
   for (const char of plain) {
     const piece = mrkdwnEscape(char);
     const cost = len(piece);

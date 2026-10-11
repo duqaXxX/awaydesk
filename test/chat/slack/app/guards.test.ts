@@ -241,10 +241,10 @@ test("the envelope stands in for no other kind of message", () => {
   assert.deepEqual(messageActor({ ...teamless, subtype: "file_share" }, body), [OWNER, null]);
 });
 
-// Review round 2026-10-10: a wrong-typed value is a refusal, as in Python (`guards.py` falls back
-// only on `None`). Every expected value below is the answer `awaydesk.guards` gave on the same
-// payload; where Python raised (`AttributeError`, `TypeError`), the payload never reaches Claude
-// there and is refused here, the safe side of the same outcome.
+// Review round 2026-10-10: a wrong-typed value is a refusal, as in the Python daemon (its guards
+// fell back only on `None`). Every expected value below is the answer those guards gave on the
+// same payload; where Python raised (`AttributeError`, `TypeError`), the payload never reached
+// Claude there and is refused here, the safe side of the same outcome.
 
 /** The owner verdict over an actor. */
 function allowed(actor: readonly [string | null, string | null]): boolean {

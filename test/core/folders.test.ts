@@ -28,7 +28,7 @@ function tree(root: string, ...paths: string[]): void {
   for (const path of paths) mkdirSync(join(root, path), { recursive: true });
 }
 
-/** The listed folders as `Path.relative_to(root).as_posix()` shows them: the root is ".". */
+/** The listed folders relative to `root`, with `/` separators: the root is ".". */
 function relatives(root: string, folders: string[]): string[] {
   return folders.map((folder) => relative(root, folder).split("\\").join("/") || ".");
 }
@@ -84,9 +84,8 @@ test("stops one past the rows shown", async () => {
   assert.ok(checked.length < FOLDER_ROWS + 1 + TRUST_BATCH); // the batch that crossed the line, at most
 });
 
-// The Python tests that read `bind_blocks` (each folder is a row with a bind button, more folders
-// than rows, no trusted folder, the root is shown as written) test Slack blocks, which the chat
-// provider builds: they are ported with it.
+// The Slack rows built from these folders (a bind button each, more folders than rows, no trusted
+// folder, the root as written) are the chat provider's, tested in `test/chat/slack/bind.test.ts`.
 
 test("the root is listed and a repository root alone", async () => {
   const root = scratch();
@@ -95,9 +94,8 @@ test("the root is listed and a repository root alone", async () => {
 });
 
 test("higher levels fill the rows first", async () => {
-  // A folder with many subfolders must not hide the projects beside it. The Python test read the
-  // rows `bind_blocks` makes of the first FOLDER_ROWS folders; here those folders are read off the
-  // list itself.
+  // A folder with many subfolders must not hide the projects beside it. The first FOLDER_ROWS
+  // folders of the list are the ones that become rows.
   const root = scratch();
   tree(
     root,

@@ -1,10 +1,8 @@
 /**
- * Port of `tests/test_sinks.py`, in the file's order.
- *
- * Python's tests waited on the wall clock: a debounce shrunk to 10 ms, `asyncio.sleep` for it to
- * pass. Here every pause of the sink is on a `FakeClock` and a test moves that clock: `settled()`
- * lets a debounce of zero seconds fire and the loop run dry, `passed(seconds)` crosses a pause.
- * A caller Python cancelled (`task.cancel()`) is a caller whose `AbortSignal` aborts.
+ * The reply sink, `ReplySink`: how a reply is written to a Slack thread. Every pause of the sink
+ * is on a `FakeClock` and a test moves that clock: `settled()` lets a debounce of zero seconds
+ * fire and the loop run dry, `passed(seconds)` crosses a pause. A caller that is cancelled is a
+ * caller whose `AbortSignal` aborts.
  */
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -80,7 +78,7 @@ class SelfPacedClock implements Clock {
   }
 }
 
-/** The lines a sink logged, in order: Python's `caplog`. */
+/** The lines a sink logged, in order. */
 class Recorded implements Logger {
   lines: { level: string; message: string }[] = [];
 
@@ -115,9 +113,9 @@ interface ReplyOptions {
   onOpenReply?: (old: string | null, fresh: string | null) => void;
   onWrite?: () => void;
   logger?: Logger;
-  /** Zero unless a test is about the debounce itself (Python's `fast` fixture: 10 ms). */
+  /** Zero unless a test is about the debounce itself. */
   debounceSeconds?: number;
-  /** Python's `monkeypatch.setattr(sinks, "FINAL_RETRY_SECONDS", ...)`. */
+  /** The wait before the final write is sent once more (`FINAL_RETRY_SECONDS` unless given). */
   finalRetrySeconds?: number;
 }
 
@@ -130,7 +128,7 @@ function reply(slack: FakeSlack, options: ReplyOptions = {}): ReplySink {
     teamId: TEAM,
     userId: OWNER,
     botUserId: BOT,
-    // Python's default limiter paced on the wall clock; this one never makes a test wait.
+    // The default limiter paces on the wall clock; this one never makes a test wait.
     limiter: options.limiter ?? new UpdateLimiter({ clock: new SelfPacedClock() }),
     clock,
     onOpenReply: options.onOpenReply,
@@ -141,7 +139,7 @@ function reply(slack: FakeSlack, options: ReplyOptions = {}): ReplySink {
   });
 }
 
-/** What a test reaches into, as Python's reached `sink._ending` and patched `sink._flush`. */
+/** What a test reaches into: the sink's `ending` task and its `flush`. */
 function inner(sink: ReplySink): { ending: Task<boolean> | null; flush: () => Promise<boolean> } {
   return sink as unknown as { ending: Task<boolean> | null; flush: () => Promise<boolean> };
 }
@@ -151,15 +149,14 @@ function methods(slack: FakeSlack): string[] {
   return slack.apiCalls.map((call) => call.method).filter((m) => WRITE_METHODS.includes(m));
 }
 
-/** One turn of the event loop, which drains every microtask: `asyncio.sleep(0)`. */
+/** One turn of the event loop, which drains every microtask. */
 function tick(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
 /**
  * Long enough for a debounced write: the debounce (zero seconds) fires and what it woke runs to
- * its next wait. Five rounds, as Python's 50 ms held five debounces of 10 ms: a pass that finds
- * the reply changed under it debounces again.
+ * its next wait. Five rounds: a pass that finds the reply changed under it debounces again.
  */
 async function settled(): Promise<void> {
   for (let round = 0; round < 5; round += 1) {
@@ -174,9 +171,8 @@ async function passed(seconds: number): Promise<void> {
 }
 
 /**
- * Python's `asyncio.wait_for(awaitable, 1.0)`: the promise must settle without anything else
- * happening. Nothing in these tests waits on a real timer, so one still pending once the loop
- * has turned over would never settle.
+ * The promise must settle without anything else happening. Nothing in these tests waits on a
+ * real timer, so one still pending once the loop has turned over would never settle.
  */
 async function soon<T>(promise: Promise<T>): Promise<T> {
   let done = false;
@@ -247,13 +243,13 @@ function str(value: Maybe): string {
   return value as string;
 }
 
-/** Python's `[x] = items`. */
+/** The only element of a list of one. */
 function only<T>(items: readonly T[]): T {
   assert.equal(items.length, 1);
   return items[0] as T;
 }
 
-/** The last element: Python's `items[-1]`. */
+/** The last element. */
 function last<T>(items: readonly T[]): T {
   assert.ok(items.length > 0, "an empty list has no last element");
   return items.at(-1) as T;
@@ -408,7 +404,7 @@ test("a stream pushes only when it stops", async () => {
 });
 
 test("updates are debounced", async () => {
-  // Python's wall clock, on the fake one: a debounce of 0.1 s, a change every 10 ms for 0.3 s.
+  // A debounce of 0.1 s on the fake clock, a change every 10 ms for 0.3 s.
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock, debounceSeconds: 0.1 });
@@ -686,7 +682,7 @@ test("an end that raises still resolves landed", async () => {
 test("an ending cut off while it is posted is posted before anything is shortened", async () => {
   const slack = new FakeSlack();
   const sink = await longReply(slack);
-  // Slack holds the ending's post open, where Python's fake answered 50 ms late.
+  // Slack holds the ending's post open.
   const gate = new AsyncEvent();
   slack.gate = gate;
   slack.gateMethod = "chat.postMessage";
@@ -1839,8 +1835,8 @@ test("answers longer than a message still show and the reply goes on", async () 
 
 test("a subagent card counts its calls from a recorded turn", async () => {
   // subagent-foreground.jsonl (CLI 2.1.286): the agent's task ends before the Agent call's
-  // result. Python fed the recording through a `TurnRenderer`; until that is ported, the sink
-  // is given the calls Python's renderer made for it (the reply golden), up to the turn's end.
+  // result. The sink is given the calls the renderer makes for the recording (the reply golden),
+  // up to the turn's end.
   const slack = new FakeSlack();
   const sink = reply(slack);
   const whole = get(golden("reply", "subagent-foreground"), "whole", "calls");
@@ -1997,8 +1993,8 @@ function pairwise(values: readonly number[]): [number, number][] {
 }
 
 test("the debounce holds while streaming through a slow round trip", async () => {
-  // Python's 10 ms debounce and 50 ms round trip, a hundred times longer and on the fake clock:
-  // the debounce is DEBOUNCE_SECONDS itself, a round trip takes 5 seconds, a change every 2.
+  // On the fake clock: the debounce is DEBOUNCE_SECONDS itself, a round trip takes 5 seconds, a
+  // change comes every 2.
   const clock = new FakeClock();
   const slack = new TimedSlack(clock, 5);
   const sink = reply(slack, { clock, debounceSeconds: sinks.DEBOUNCE_SECONDS });
@@ -2015,7 +2011,7 @@ test("the debounce holds while streaming through a slow round trip", async () =>
 });
 
 test("two busy sinks share one limiter and each reaches its end", async () => {
-  // Python's 0.6 s window and 30 ms steps, a hundred times longer and on the fake clock.
+  // A window of 60 s and steps of 3 s, on the fake clock.
   const [limit, window, burst] = [9, 60, 1];
   const clock = new FakeClock();
   const slack = new TimedSlack(clock);
@@ -2226,9 +2222,7 @@ test("update limiter refund never exceeds burst", async () => {
   assert.equal((limiter as unknown as { tokens: number }).tokens, 2);
 });
 
-// The helpers of the tests that follow in `tests/test_sinks.py`, each under the section comment
-// it has there, in the file's order. The tests themselves are ported from `an append refused for
-// its content stops the stream and goes on by update` on, each under its section.
+// The helpers of the tests that follow.
 
 // A run of calls: two cards while the reply is written, a line of counts once its body ended.
 
@@ -2536,11 +2530,10 @@ test("a start of unknown outcome says so in the log", async () => {
 });
 
 // `the connection retry skips the calls that create a message` is in `clients.test.ts`: the policy
-// moved from a slack-sdk handler to the client, and is tested there on the real `WebClient`.
+// is the client's, and is tested there on the real `WebClient`.
 
 /**
- * Slack applies the call, and its answer is held until `release` is set: the Python test slept
- * 0.1 s on the wall clock (`SlowAfterApply`) where this one waits for the event.
+ * Slack applies the call, and its answer is held until `release` is set.
  */
 class HeldAfterApply extends FakeSlack {
   holdMethod: string | null = null;
@@ -2765,13 +2758,13 @@ test("a late preview that does not fit its message is cut with a pointer", async
 // The sink's own cost: a message whose span did not change is not rendered again.
 
 test("a message whose span did not change is not rendered again", async () => {
-  // Python patched the module's `piece_blocks` and counted its calls. An ES export cannot be
-  // patched, and `pieceBlocks` reads the text of a piece through `Tool.piece` alone: the test
-  // counts the calls of that method on the one tool that holds a preview.
-  // The Python test filled the message with 60 `Read` calls, which the fold keeps to two cards:
-  // the reply never rolled over, there was no frozen message, and `calls == []` held whether or
-  // not the skip existed (checked by running it, 2026-10-10). The calls here are task cards,
-  // which the fold leaves alone, so the first message does freeze with its preview.
+  // An ES export cannot be patched, and `pieceBlocks` reads the text of a piece through
+  // `Tool.piece` alone: the test counts the calls of that method on the one tool that holds a
+  // preview.
+  // Task cards fill the message, not `Read` calls: the fold keeps 60 `Read` calls to two cards, so
+  // the reply never rolls over, no message freezes, and an empty `calls` would hold whether or not
+  // the skip existed (checked by running it, 2026-10-10). The fold leaves task cards alone, so the
+  // first message does freeze with its preview.
   const slack = new FakeSlack();
   const sink = reply(slack);
   const view = preview("Write(a.txt)", "Wrote 1 line to a.txt", "1 hi");
@@ -3349,7 +3342,7 @@ test("words that reach the model while the end is written open no message", asyn
   await sink.text("Hello.");
   await settled();
   await sink.finish([]);
-  // The stream's stop takes a while: Python delayed every call 20 ms and sent the words 5 ms in.
+  // The stream's stop takes a while: the gate holds it while the words arrive.
   const gate = new AsyncEvent();
   slack.gate = gate;
   slack.gated.clear();
@@ -4101,9 +4094,8 @@ test("a dropped update of a continuation is an end that did not land", async () 
   assert.equal(await sink.closeOutFormatted("footer"), false);
 });
 
-// Behaviours of the TypeScript port that no test of `tests/test_sinks.py` reaches, found by
-// mutating the source and running the tests above (2026-10-10): each fails when its line is
-// taken out.
+// Behaviours the tests above do not reach, found by mutating the source and running them
+// (2026-10-10): each test below fails when its line is taken out.
 
 test("an ending posted from a stream that sent everything leaves the first message without it", async () => {
   // The stopped stream shows its whole span, so it needs no write: until the ending leaves the
@@ -4172,8 +4164,7 @@ test("a continuation post Slack refuses at the end is retried as text and logged
 });
 
 test("a change that arrives while a write waits its turn is sent with it", async () => {
-  // The plan is worked out again after the limiter's wait (Python: `_flush_stream`'s second
-  // `_plan`), so one append carries both texts.
+  // The plan is worked out again after the limiter's wait, so one append carries both texts.
   const slack = new FakeSlack();
   const gate = new AsyncEvent();
   const waiting = new AsyncEvent();

@@ -68,7 +68,7 @@ test("loads a private env", () => {
 });
 
 test("reads an env that starts with a byte order mark", () => {
-  // Some editors write one, and python-dotenv, which read this file before, strips it.
+  // Some editors write one, and python-dotenv, whose reading the loader follows, strips it.
   const directory = scratch();
   const env = writeEnv(directory, directory);
   writeFileSync(env, `\ufeff${readFileSync(env, "utf8")}`, { mode: 0o600 });
@@ -189,7 +189,7 @@ test("does not touch the process environment", () => {
 });
 
 // Review round 2026-10-10: `ALLOWED_ROOT` is made absolute as text and resolved on the disk, so a
-// `..` after a link is followed from where the link leads, as `Path.resolve()` does.
+// `..` after a link is followed from where the link leads, as Python's `Path.resolve()` does.
 
 /** `root/link` leads to `elsewhere/deep`; Python resolves `root/link/..` to `elsewhere`. */
 function linkLayout(): string {
@@ -246,7 +246,7 @@ test("a root whose missing part is followed by dot dot folds it as Python does",
   assert.equal(loadConfig(directory).allowedRoot, join(directory, "root", "deep"));
 });
 
-// Review round 2026-10-10: python-dotenv, which read this file before, expands `${NAME}` and
+// Review round 2026-10-10: python-dotenv, whose reading the loader follows, expands `${NAME}` and
 // `${NAME:-default}` by default. The sample below is a scratch file read by python-dotenv 1.2.4
 // (`dotenv_values`, interpolate on) with the process environment set to PROC below; each expected
 // value is what it returned. A name resolves from the file's earlier values, then the process

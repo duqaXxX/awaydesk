@@ -1,7 +1,5 @@
 /**
- * The daemon's two Slack clients on one token, with the retry policy the Python daemon had
- * (`make_clients` in `__main__.py`, slack-sdk's handlers, and `ConnectionRetryUnlessCreating` in
- * `render/sinks.py`):
+ * The daemon's two Slack clients on one token, with the daemon's retry policy:
  *
  * - every call that Slack rate limited (HTTP 429) is sent again after the `Retry-After` Slack
  *   gave, up to 3 times. That is safe for every method: a rate limited call never ran.
@@ -75,7 +73,7 @@ const BACKOFF_FACTOR = 0.5;
 export interface ClientOptions extends Omit<WebClientOptions, keyof typeof SENT_ONCE | "logger"> {
   /** Waits the pause before a retry. */
   readonly clock?: Clock;
-  /** The jitter added to a pause, in [0, 1) seconds, as Python's `random.random()`. */
+  /** The jitter added to a pause, in [0, 1) seconds. */
   readonly random?: () => number;
 }
 
@@ -134,12 +132,15 @@ class PolicyClient extends WebClient {
   }
 }
 
-/** Python's shared client: connection and rate limit retries for every call. */
+/** The shared client: connection and rate limit retries for every call. */
 export function sharedClient(token: string | undefined, options: ClientOptions = {}): WebClient {
   return new PolicyClient(token, [], options);
 }
 
-/** Python's replies client: the shared client's policy, except that `CREATING_METHODS` are not resent on a connection failure. */
+/**
+ * The replies client: the shared client's policy, except that `CREATING_METHODS` are not resent
+ * on a connection failure.
+ */
 export function repliesClient(token: string | undefined, options: ClientOptions = {}): WebClient {
   return new PolicyClient(token, CREATING_METHODS, options);
 }

@@ -33,10 +33,9 @@
  * `commondir`, a worktree's `gitdir`) are cut at their line ends as git cuts them (setup.c and
  * worktree.c, git 2.54.0, read 2026-10-06): a different cut names a different path than git's.
  *
- * Every check runs on `node:fs/promises`, so a slow disk never holds the event loop. The Python
- * module ran the same synchronous code on a thread; the awaits here are at the same places, and
- * the paths are compared as directories on disk by device and inode (`stat` with `bigint`, since a
- * 64-bit inode does not fit a number), never by string.
+ * Every check runs on `node:fs/promises`, so a slow disk never holds the event loop. The paths
+ * are compared as directories on disk by device and inode (`stat` with `bigint`, since a 64-bit
+ * inode does not fit a number), never by string.
  */
 import { type BigIntStats, constants, type Stats } from "node:fs";
 import { lstat, open, readFile, readlink, stat } from "node:fs/promises";
@@ -52,8 +51,8 @@ export const logger = getLogger("awaydesk.agent.claude.trust");
 export const GITFILE_BYTES = 1 << 20;
 
 /**
- * Python's `realpath` gave up on a long enough chain of symlinks with a `RecursionError`
- * (3.12); here a nested resolution deeper than this does. The kernel follows 40 links at most.
+ * A nested resolution deeper than this gives up, as Python 3.12's `realpath` does with a
+ * `RecursionError` on a long enough chain of symlinks. The kernel follows 40 links at most.
  */
 const MAX_SYMLINK_DEPTH = 255;
 
@@ -75,8 +74,8 @@ class SymlinkChainTooDeep extends Error {
   }
 }
 
-// Python's `OSError` is an error with a `syscall`; its `ValueError` for a NUL in a path is
-// Node's `ERR_INVALID_ARG_VALUE`.
+// A system error is an error with a `syscall`; a NUL in a path is Node's
+// `ERR_INVALID_ARG_VALUE`, which `isValueError` takes.
 function isOsError(error: unknown): boolean {
   return error instanceof Error && typeof (error as { syscall?: unknown }).syscall === "string";
 }
@@ -98,9 +97,8 @@ function isMissing(error: unknown): boolean {
   return code === "ENOENT" || code === "ENOTDIR";
 }
 
-// Python kept the bytes of a path it read apart (surrogate escapes), so `m\xff` never named a folder
-// called `m\ufffd`; a replacement character would. A path read from a file is decoded strictly, and
-// one that is not UTF-8 is metadata this module cannot use.
+// A replacement character would let `m\xff` name a folder called `m\ufffd`. A path read from a
+// file is decoded strictly, and one that is not UTF-8 is metadata this module cannot use.
 const FATAL_UTF8 = new TextDecoder("utf-8", { fatal: true });
 
 function decodePath(bytes: Buffer): string | null {
@@ -111,7 +109,7 @@ function decodePath(bytes: Buffer): string | null {
   }
 }
 
-// Python read the record as strict UTF-8 and kept a BOM in the text, where `json.loads` refuses it.
+// Strict UTF-8, and a BOM stays in the text, where `JSON.parse` refuses it.
 const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 function sameStat(a: BigIntStats, b: BigIntStats): boolean {
@@ -250,8 +248,8 @@ async function regularFile(path: string): Promise<Buffer | null> {
     if (!found.isFile() || found.size > GITFILE_BYTES) {
       return null;
     }
-    // Up to the limit, not up to `found.size`: a file that grew since the `fstat` is read whole, as
-    // Python's `os.read(fd, GITFILE_BYTES)` did, where a prefix would name another path.
+    // Up to the limit, not up to `found.size`: a file that grew since the `fstat` is read whole,
+    // where a prefix would name another path.
     const buffer = Buffer.allocUnsafe(GITFILE_BYTES);
     const { bytesRead } = await handle.read(buffer, 0, GITFILE_BYTES, 0);
     return buffer.subarray(0, bytesRead);
@@ -470,9 +468,9 @@ async function readTrusted(recordPath: string): Promise<ReadonlySet<string>> {
   }
   const accepted = new Set<string>();
   for (const [path, state] of Object.entries(projects)) {
-    // A lone surrogate cannot be encoded as a path: Python's lookup of it failed, where Node's
-    // would name the folder with a replacement character. With the `u` flag a pair is one code
-    // point, so `\p{Surrogate}` finds only a lone one (`isWellFormed` is not in the project's lib).
+    // A lone surrogate cannot be encoded as a path: Node would name the folder with a replacement
+    // character. With the `u` flag a pair is one code point, so `\p{Surrogate}` finds only a lone
+    // one (`isWellFormed` is not in the project's lib).
     if (
       !LONE_SURROGATE.test(path) &&
       typeof state === "object" &&

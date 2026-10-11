@@ -1,8 +1,6 @@
 /**
  * `!bind` and `!resume`, typed or clicked: which folder a channel's next thread starts in, and
- * which stored session a thread continues. Port of `bind_to`, `announce_bind`, `folder_named`,
- * `list_folders`, `on_bind`, `bind_clicked`, `handle_resume`, `resume_into_thread`, `on_resume`,
- * `resume_clicked` and `show_resumed` of `slack_app.py`.
+ * which stored session a thread continues.
  */
 import type { ListedSession } from "../../../agent/seam.ts";
 import { oneLine } from "../../../core/reply/words.ts";

@@ -3,7 +3,7 @@
  * options and the streaming input the SDK takes, plays scripted batches of the CLI's recorded
  * wire records, and records every control call made on it. Nothing below it is mocked.
  *
- * What it offers (the TypeScript counterpart of `FakeClaudeClient` of the Python tests):
+ * What it offers:
  * - `turns`: one batch answers each prompt it is sent, in order, with the replay of the prompt
  *   after the turn's `init` as Claude Code sends it under `--replay-user-messages` (recorded
  *   2026-10-06, CLI 2.1.286, and 2026-10-09, 2.1.292);

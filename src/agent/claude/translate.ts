@@ -2,10 +2,9 @@
  * Claude Code's wire records into the daemon's session events.
  *
  * A record is one object as the CLI wrote it, which the Agent SDK's `query()` yields unchanged.
- * Each is read as `unknown` and narrowed field by field. What is read here is what the Python
- * renderer and session read off the SDK's messages (`render.renderer.TurnRenderer.feed`,
- * `sessions.ThreadSession._dispatch`), parsed as the Python SDK's `parse_message` parsed them
- * (claude-agent-sdk 0.2.165), so the core decides from events what it decided from messages.
+ * Each is read as `unknown` and narrowed field by field. What is read here is what the renderer
+ * and the session need off the SDK's messages, so the core decides from events and never from a
+ * wire record.
  *
  * Three things need memory across records, and `Translator` keeps them for one session: which
  * messages a stream announced, since Claude Code sends a streamed text again whole; which
@@ -209,7 +208,7 @@ function assistant(memory: Memory, record: WireRecord): SessionEvent[] {
     } else if (block.type === "tool_result") {
       events.push(...callEnded(block, parentCallId, block.is_error === true, null));
     } else if (block.type === "advisor_tool_result") {
-      // The one server tool result the Python SDK's parser kept: it carries no error flag.
+      // A server tool result: it carries no error flag.
       events.push(...callEnded(block, parentCallId, false, null));
     }
   }
@@ -427,7 +426,7 @@ function endingOf(record: WireRecord): TurnEnding {
 
 function result(memory: Memory, record: WireRecord): SessionEvent[] {
   // The stream's memory is a turn's: an interrupted stream has no `message_stop`, and the next
-  // turn must not read as still inside it. Python kept this per reply, which a turn's end closed.
+  // turn must not read as still inside it.
   memory.streamed.clear();
   memory.open.clear();
   memory.unnamed = false;
@@ -471,9 +470,9 @@ const HANDLERS = {
 export const TRANSLATED_KINDS: readonly string[] = Object.keys(HANDLERS);
 
 /**
- * The recorded kinds the daemon does not read, as the Python daemon did not: nothing in the
- * reply or in the session depends on them. A kind in neither list is new, and
- * `test/agent/claude/translate.test.ts` fails on the recording that carries it.
+ * The recorded kinds the daemon does not read: nothing in the reply or in the session depends
+ * on them. A kind in neither list is new, and `test/agent/claude/translate.test.ts` fails on the
+ * recording that carries it.
  */
 export const UNREAD_KINDS: readonly string[] = [
   // The queue of a prompt sent while a turn runs; absent from the SDK's union of messages.

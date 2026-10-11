@@ -18,7 +18,7 @@ export type ViewAnswer =
 /** How a listener acknowledges Slack: once, before anything else it does. */
 export type Ack = (answer?: ViewAnswer) => Promise<void>;
 
-/** The object a field holds, or an empty one for anything else: Python's `body.get(key) or {}`. */
+/** The object a field holds, or an empty one for anything else. */
 export function record(value: unknown): Payload {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Payload)
@@ -30,14 +30,14 @@ export function text(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
-/** The list a field holds, or an empty one: Python's `body.get(key) or []`. */
+/** The list a field holds, or an empty one. */
 export function items(value: unknown): readonly unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
 /**
  * Python's `str(value)` for what a payload holds: a missing field reads `None`, which names no
- * message, thread or request, as it did there.
+ * message, thread or request.
  */
 export function str(value: unknown): string {
   if (value === undefined || value === null) return "None";
@@ -47,7 +47,7 @@ export function str(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** Python's truth of a parsed JSON value, which `or` goes by: empty and zero are false. */
+/** Whether a parsed JSON value is present: empty and zero are not. */
 function truthy(value: unknown): boolean {
   if (value === undefined || value === null) return false;
   if (Array.isArray(value)) return value.length > 0;
@@ -61,8 +61,8 @@ export function firstAction(body: Payload): Payload {
 }
 
 /**
- * The ts of the message a button sits on, which Python read as `body["message"]["ts"]`: a click
- * that names none throws, as the missing key did there, and the listener's failure is logged.
+ * The ts of the message a button sits on: a click that names none throws, and the listener's
+ * failure is logged.
  */
 export function messageTs(body: Payload): string {
   const message = body.message;
@@ -88,8 +88,8 @@ export function clickThread(body: Payload): string {
  * When an interaction happened, from its `action_ts`: what orders the updates it causes. `now`,
  * the arrival time in seconds, for a payload that carries none.
  *
- * Python's `float()` also read `inf`, `nan` and digits grouped with `_`, which Slack never
- * writes: here those are a payload that carries no time.
+ * `inf`, `nan` and digits grouped with `_`, which Slack never writes, are a payload that carries
+ * no time.
  */
 export function actionKey(action: Payload, now: () => number): number {
   const raw = action.action_ts;

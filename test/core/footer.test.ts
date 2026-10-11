@@ -277,7 +277,7 @@ test("git changes never write the index", GIT_LAYOUT, async () => {
   assert.equal(statSync(index, { bigint: true }).mtimeNs, before);
 });
 
-// What the Python tests leave to `format` and to `datetime`, and `toFixed` and `Date` do otherwise.
+// Where `toFixed` and `Date` round and cut otherwise than Python's `format` and `datetime`.
 
 test("a tie rounds to the even digit as Python writes it", () => {
   assert.equal(formatTokens(12_250), "12.2k");

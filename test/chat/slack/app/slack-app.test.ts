@@ -1,8 +1,7 @@
 /**
- * The handlers, through Bolt's own entry point. Port of `tests/test_slack_app.py`, in its order,
- * from its first test to the same-folder hold's section (which is `slack-app-hold.test.ts`):
- * messages and words, the Home controls, approvals and the question form, `!resume`, attached
- * files and `!bind`.
+ * The handlers, through Bolt's own entry point: messages and words, the Home controls, approvals
+ * and the question form, `!resume`, attached files and `!bind`. The same-folder hold is in
+ * `slack-app-hold.test.ts`.
  */
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync } from "node:fs";
@@ -91,7 +90,7 @@ const ANYONE_ELSE: ReadonlyArray<readonly [user: string, team: string]> = [
   [STRANGER, TEAM],
   [OWNER, OTHER_TEAM],
 ];
-// Python's `user0` and `user1`: a click by another user, and by the owner from another workspace.
+// A click by another user, and by the owner from another workspace.
 const OTHER_USERS: readonly Body[] = [{ id: STRANGER }, { team_id: OTHER_TEAM }];
 // What the recorded files download to.
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -612,7 +611,7 @@ test("bang status dates an idle session by its last message not its file", async
     listed(other, "Another session of the folder", nowMs, 1), // no live thread
   ];
   const asked: string[][] = [];
-  // Python replaced `sessions.by_last_activity`: here the back end's own dating answers.
+  // The back end's own dating answers.
   world.backend.datedSessions = async (_folder, found) => {
     asked.push(found.map((session) => session.id));
     return found.map((session) => ({ ...session, lastModified: nowMs - 16 * 60_000 }));
@@ -761,7 +760,7 @@ test("bang stop inside a thread stops only that session", async (t) => {
   const posted = world.slack.callsTo("chat.postMessage").length;
   await world.dispatch(reply("!stop", THREAD));
   // The fake client's turn never ends, so the answer goes out once the stop's wait for the
-  // reply's end is over: Python lowered `STOP_TAIL_WAIT`, here the sessions' clock crosses it.
+  // reply's end is over: the sessions' clock crosses `STOP_TAIL_WAIT`.
   await world.clock.advance(STOP_TAIL_WAIT);
   await world.until(() => world.slack.callsTo("chat.postMessage").length > posted);
   // One line that stays in the thread: an ephemeral one is gone on reload (issue #85).
@@ -1111,7 +1110,7 @@ test("slack links reach claude as typed", () => {
   );
 });
 
-/** An error named as Python's exception class was: the name is what `ERROR_REPLY` shows. */
+/** An error with the given name: the name is what `ERROR_REPLY` shows. */
 function named(name: string, message: string): Error {
   const error = new Error(message);
   error.name = name;
@@ -1493,7 +1492,7 @@ test("only the list reads the transcripts for dates", async (t) => {
   const world = worldOf(t);
   // Matching an id or a title, or checking a click, needs no dates: they cost a file read each.
   const dated: string[] = [];
-  // Python replaced `sessions.by_last_activity`: here the back end's own dating answers.
+  // The back end's own dating answers.
   world.backend.datedSessions = async (folder, stored) => {
     dated.push(folder);
     return [...stored];
@@ -1528,8 +1527,7 @@ test("a typed resume under the picker resumes nothing", async (t) => {
 });
 
 /**
- * A listing of the folder's sessions that says when it began and answers when the test lets it:
- * Python's `list_sessions` reading the old folder's transcripts for 200 ms.
+ * A listing of the folder's sessions that says when it began and answers when the test lets it.
  */
 function slowListing(world: World): { listed: AsyncEvent; release: AsyncEvent } {
   const listed = new AsyncEvent();
@@ -1658,7 +1656,7 @@ test("an image reaches claude as an image block", async (t) => {
   await world.dispatch(body);
   const queries = world.queries();
   assert.equal(queries.length, 1);
-  // The seam's parts of one message: Python's SDK took `message.content` blocks.
+  // The seam's parts of one message.
   const content = queries[0] as unknown as Body[];
   assert.deepEqual(content[0], { type: "text", text: body.event.text });
   assert.equal(content[1]?.type, "image");

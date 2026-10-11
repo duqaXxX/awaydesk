@@ -10,20 +10,18 @@
  * calls a minute for the app) read from
  * docs.slack.dev/reference/methods/assistant.threads.setStatus, 2026-10-02.
  *
- * Port of `render/status.py`. How Python's asyncio became JavaScript here:
- * - A task cancelled by its owner is an `AbortSignal`. `StatusReaction.show` takes one and looks
- *   at it while it waits for the lock and after each Slack call returns; a `WebClient` call cannot
- *   be interrupted, so a cancel lands when the call in flight is back, never in the middle of it.
+ * How the waits are made:
+ * - A cancel is an `AbortSignal`. `StatusReaction.show` takes one and looks at it while it waits
+ *   for the lock and after each Slack call returns; a `WebClient` call cannot be interrupted, so
+ *   a cancel lands when the call in flight is back, never in the middle of it.
  *   `ThreadStatus` gives its own task an `AbortController` that `close` aborts, with the same
  *   rule: the call in flight is awaited and its answer used.
- * - `asyncio.Lock` is the sessions' `Mutex`, whose wait the signal can leave.
- * - `asyncio.Event` plus `wait_for(event.wait(), delay)` is a wake flag with one waiter, raced
- *   against `clock.sleep(delay)`; the clock is a parameter, in seconds.
- * - `asyncio.create_task` starts its coroutine on the next turn of the loop, so the code that
- *   called `show` finishes first. The keeper does the same by yielding one microtask before its
- *   first look at the state.
- * - The two process-wide flags are module state; `resetStatusFlags` is what Python's tests did
- *   with their autouse fixture.
+ * - The lock is the sessions' `Mutex`, whose wait the signal can leave.
+ * - A keeper's nap is a wake flag with one waiter, raced against `clock.sleep(delay)`; the clock
+ *   is a parameter, in seconds.
+ * - The keeper yields one microtask before its first look at the state, so the code that called
+ *   `show` finishes first.
+ * - The two process-wide flags are module state; `resetStatusFlags` clears them for the tests.
  */
 import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
@@ -45,7 +43,7 @@ export const THREAD_STATUS_AFTER_WRITE_SECONDS = 2.0;
 // Answers that say the app's token cannot call the method at all (its reference's error list).
 export const THREAD_STATUS_REFUSED: readonly string[] = ["missing_scope", "not_allowed_token_type"];
 
-/** The reaction names, in the order Python's enum listed them (it is the order of a strip). */
+/** The reaction names, in the order of a strip. */
 export const Status = {
   WORKING: "hourglass_flowing_sand",
   WAITING: "raised_hand",
@@ -59,7 +57,7 @@ let missingScope = false;
 // Process-wide, once true: no instance calls Slack for a thread status again this run.
 let refusedStatus = false;
 
-/** Forget both "stop for the rest of the run" flags: for the tests, as Python's fixture did. */
+/** Forget both "stop for the rest of the run" flags: for the tests. */
 export function resetStatusFlags(): void {
   missingScope = false;
   refusedStatus = false;
@@ -239,8 +237,7 @@ export interface ThreadStatusOptions {
 }
 
 // The task that makes the calls. `done` is set in the task's own `finally`, the moment it
-// returns, as `asyncio.Task.done()` is: a `kick` between that and any later tick must start a
-// new one.
+// returns: a `kick` between that and any later tick must start a new one.
 interface Keeper {
   readonly stop: AbortController;
   done: boolean;
@@ -276,7 +273,7 @@ export class ThreadStatus {
   #fallback: string = texts.THREAD_WORKING_STATUS;
   #shown = false; // whether Slack was last asked to show it
   #due = 0; // when it is next set, by the clock
-  #woken = false; // `asyncio.Event`: asked for again since the task last looked
+  #woken = false; // asked for again since the task last looked
   #waiter: (() => void) | null = null; // the task's nap, when it is in one
   #keeper: Keeper | null = null;
   #failed: string | null = null;
@@ -373,7 +370,7 @@ export class ThreadStatus {
     const signal = keeper.stop.signal;
     let retried = false;
     try {
-      await Promise.resolve(); // `create_task` runs its coroutine after the caller's code
+      await Promise.resolve(); // the caller's code finishes first
       while (true) {
         this.#woken = false;
         if (signal.aborted) return;

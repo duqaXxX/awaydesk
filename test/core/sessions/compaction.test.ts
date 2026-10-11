@@ -5,7 +5,7 @@
  * one turn of a longer session in which Claude Code compacted on its own;
  * `auto-compact-report-turn` is the end of a session just past its threshold, from the turn
  * that starts a background command to the turn Claude Code starts to report it, which compacts
- * first. Port of `tests/test_sessions_compaction.py`.
+ * first.
  *
  * Measured there: a compaction opens with a `status` record that says `compacting` and ends
  * with one that carries `compact_result`, and `compact_boundary` follows. They come before
@@ -163,7 +163,7 @@ test("a report turn that compacts first is waited for", async (t) => {
   await (await h.session().submit("start it")).done.wait();
   h.clients[0]?.inject(report.slice(0, began));
   await h.idle();
-  // Several times the wait for a report turn: Python lowered the wait and slept through six.
+  // Several times the wait for a report turn: the compaction holds the reply open past it.
   await h.clock.advance(INJECTED_TURN_WAIT * 6);
   assert.deepEqual(h.slack.callsTo("chat.stopStream"), []);
   assert.equal(statusLines(h).at(-1), COMPACTING);

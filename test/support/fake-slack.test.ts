@@ -30,8 +30,6 @@ import {
 } from "./fake-slack.ts";
 import type { JsonObject } from "./fixtures.ts";
 
-// ported from tests/test_fakes.py
-
 test("fake slack returns recorded responses", async () => {
   const slack = new FakeSlack();
   const auth = await slack.auth.test();

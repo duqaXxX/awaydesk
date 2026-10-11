@@ -44,7 +44,7 @@ test("unknown wording fails soft", () => {
   assert.deepEqual(usage.session, { percent: 9, resetsAt: null });
 });
 
-// What the Python tests do not pin and `Intl` has to reproduce from `zoneinfo`.
+// Zones and wall times, where `Intl` has to give the answers Python's `zoneinfo` gave.
 
 test("a zone the runtime does not know gives no reset", () => {
   assert.equal(parseReset("Sep 24 at 1:10am (Nowhere/Zone)", NOW), null);
@@ -83,7 +83,7 @@ test("the offset is the zone's on the day of the reset, not on the day of now", 
 });
 
 test("a wall time the zone repeats is its first occurrence and one it skips takes the old offset", () => {
-  // zoneinfo, fold=0 (PEP 495): Berlin 2026-10-25 02:30 happens twice (the first is UTC+2), and
+  // Python's zoneinfo, fold=0 (PEP 495): Berlin 2026-10-25 02:30 happens twice (the first is UTC+2), and
   // 2026-03-29 02:30 never happens (read with the offset before the jump, UTC+1).
   const winter = Date.UTC(2026, 0, 2);
   assert.equal(

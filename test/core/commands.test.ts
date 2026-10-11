@@ -16,8 +16,8 @@ import { sdkJson } from "../support/fixtures.ts";
 
 /**
  * The chat provider's markdown escape, which the core takes as a parameter: the same characters
- * as `MARKDOWN_INLINE` in the Python `render/escape.py` (Slack's markdown block reference, read
- * 2026-09-25).
+ * as `MARKDOWN_INLINE` in `src/chat/slack/reply/escape.ts` (Slack's markdown block reference,
+ * read 2026-09-25).
  */
 function markdownEscape(text: string): string {
   return text.replace(/([\\`*_{}[\]()&~])/g, "\\$1");
@@ -271,8 +271,6 @@ test("a hint with a backtick cannot break the line", () => {
   const text = helpOf([command("x", "d", { argumentHint: "[`file`]" })]);
   assert.ok(text.split("\n").includes("!x \\[\\`file\\`\\] d"));
 });
-
-// What the Python tests reach through `help_text` and `host_only` callers, checked on their own.
 
 test("a description is cut by code points, never inside an emoji", () => {
   const [, description] = commandParts(command("x", `${"a".repeat(98)}😀😀😀`), markdownEscape);

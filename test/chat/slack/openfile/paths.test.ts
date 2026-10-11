@@ -1,4 +1,3 @@
-// Not in the Python suite: Python's `Path` needed no test of its own.
 import assert from "node:assert/strict";
 import { join, resolve } from "node:path";
 import { test } from "node:test";

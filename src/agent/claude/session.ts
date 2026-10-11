@@ -6,8 +6,7 @@
  * (`replay-user-messages` makes Claude Code say which prompts it took). Everything the process
  * says comes back as the records of the query's stream, which a `Translator` turns into the
  * seam's events, and as the calls of the permission callback and of the two hooks the daemon
- * registers. The Python daemon held one `ClaudeSDKClient` per session and read its stream in a
- * task of its own; this class is that pair.
+ * registers. A task of its own (`#pump`) reads that stream.
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -51,7 +50,7 @@ const PERMISSION_MODES: ReadonlySet<string> = new Set([
   "dontAsk",
   "auto",
 ]);
-// What Python reported when the stream ended without an exception.
+// The reason given when the stream ends without an exception.
 const PROCESS_EXITED = "the Claude Code process exited";
 // What a call is told when nobody could be asked about it. The daemon's own text for it
 // (`APPROVAL_UNPOSTED`) is passed to the constructor: this layer does not import `src/core/`.
@@ -89,8 +88,7 @@ export interface SessionConfig extends StartOptions {
   readonly chrome: boolean;
   /**
    * A session the daemon starts for itself (the usage probe), not for a thread: it is not given
-   * the permission to bypass that a thread's `!bypass on` needs. Python's probe built a bare
-   * client, the folder and no setting source, nothing else.
+   * the permission to bypass that a thread's `!bypass on` needs.
    */
   readonly bare?: boolean;
 }

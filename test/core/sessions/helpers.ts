@@ -1,7 +1,6 @@
 /**
  * What the session tests share: the recordings cut into the scenes several files replay, and
- * the way into a session's private state where a Python test read an underscore attribute.
- * Python kept these in `tests/test_sessions.py`, which the other files imported.
+ * the way into a session's private state.
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -27,7 +26,7 @@ import {
   splitTurns,
 } from "../../support/sessions.ts";
 
-/** A session's private state, by the names the class gives it: Python's `session._name`. */
+/** A session's private state, by the names the class gives it. */
 export interface Inside {
   client: AgentSession | null;
   active: ActiveTurn | null;
@@ -74,7 +73,7 @@ export function inside(session: ThreadSession): Inside {
   return session as unknown as Inside;
 }
 
-/** The ids of the requests waiting for the owner: Python's `h.approvals._pending`. */
+/** The ids of the requests waiting for the owner. */
 export function pending(approvals: Approvals): string[] {
   return [...(approvals as unknown as { entries: Map<string, unknown> }).entries.keys()];
 }
@@ -352,8 +351,7 @@ export function said(h: Harness): string {
 }
 
 /**
- * The lines the sessions log at `level` from here on: Python's `caplog`. Restored when the test
- * ends.
+ * The lines the sessions log at `level` from here on. Restored when the test ends.
  */
 export function logged(t: TestContext, level: "info" | "warning" | "error"): string[] {
   const lines: string[] = [];
@@ -363,12 +361,9 @@ export function logged(t: TestContext, level: "info" | "warning" | "error"): str
   return lines;
 }
 
-// What the tests of `tests/test_sessions.py` not ported yet share, in its order.
-
 /**
- * A task's end with another status: Python's `dataclasses.replace(m, status=...)`. The status of
- * a `task_updated` record is in its patch, a notification's is its own; any other item is left
- * as it is.
+ * A task's end with another status. The status of a `task_updated` record is in its patch, a
+ * notification's is its own; any other item is left as it is.
  */
 export function withTaskStatus(item: Item, status: string): Item {
   const record = recordOf(item);
@@ -403,8 +398,8 @@ export function stoppedEnd(notice: readonly Item[]): Item[] {
 }
 
 /**
- * Counts how often a session starts waiting for a report turn: Python's `ExpectedTurns`, which
- * wrapped `ThreadSession._expect_injected_turn` for every session of the test.
+ * Counts how often a session starts waiting for a report turn, by wrapping `expectInjectedTurn`
+ * for every session of the test.
  */
 export function expectedTurns(t: TestContext): { entered: number } {
   const counted = { entered: 0 };
@@ -447,7 +442,7 @@ export function taskCards(h: Harness): JsonObject[] {
 
 /**
  * A repository one level down the channel's folder, which is no repository itself, on the
- * branch `feature-x`: Python's `repo` fixture.
+ * branch `feature-x`.
  */
 export function repoUnder(tmpPath: string): string {
   const repo = join(tmpPath, "app");

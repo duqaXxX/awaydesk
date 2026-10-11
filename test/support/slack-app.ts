@@ -1,7 +1,7 @@
 /**
  * The harness of the handlers' tests: the real app `buildApp` makes, over `FakeSlack`, with a real
- * `SessionManager` on the scripted agent back end of the sessions harness (`sessions.ts`). Port of
- * `World`, its fixtures and the payload builders of `tests/test_slack_app.py`.
+ * `SessionManager` on the scripted agent back end of the sessions harness (`sessions.ts`), with the
+ * payload builders the handlers' tests share.
  *
  * A payload goes in through Bolt's own entry point, `App.processEvent({ body, ack })`, the call
  * `SocketModeReceiver` makes for each `slack_event` (`@slack/bolt` 5.1.0,
@@ -9,10 +9,9 @@
  * `callback_id` or event type is under test with the listener itself. The receiver the app is
  * built with opens no socket. What was passed to `ack` is what `dispatch` answers.
  *
- * Time. Python's `dispatch` slept 50 ms for the listener's task to run. Here `dispatch` waits
- * for the daemon to come to rest (`idle`): every promise callback and every task that is ready
- * has run, and no file or git call is in flight (`process.getActiveResourcesInfo`, read against
- * what the test runner itself keeps open). Nothing
+ * Time. `dispatch` waits for the daemon to come to rest (`idle`): every promise callback and
+ * every task that is ready has run, and no file or git call is in flight
+ * (`process.getActiveResourcesInfo`, read against what the test runner itself keeps open). Nothing
  * waits on the wall clock. Four fake clocks stand for it: `clock` is the sessions' (the idle
  * close, a stop's wait for the reply's end, the drain's poll), `slackClock` the provider's (a
  * reply's debounce), `appClock` the handlers' (a clip's wait, the rows of an opening modal, a
@@ -20,7 +19,7 @@
  *
  * What it takes from the sessions harness: `FakeAgentBackend` and `FakeAgentSession`, wrapped
  * (`WorldBackend`) so that each client is scripted when it is made, from the world's
- * `connectGate`, `connectError` and `permissionMode`, as Python's client factory read them.
+ * `connectGate`, `connectError` and `permissionMode`.
  */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -113,7 +112,7 @@ export function recorded(kind: string): Body {
   return structuredClone(slackPayload(name));
 }
 
-/** A session as the agent lists it: Python's `SDKSessionInfo(session_id, summary, last_modified, file_size, custom_title)`. */
+/** A session as the agent lists it. */
 export function listed(
   id: string,
   title: string,
@@ -135,19 +134,19 @@ export class Dispatched {
     return this.acks.length > 0;
   }
 
-  /** Python's `response.status`: 200 once acknowledged, 404 when no listener took the payload. */
+  /** The status a receiver answers with: 200 once acknowledged, 404 when no listener took it. */
   get status(): number {
     return this.acknowledged ? 200 : 404;
   }
 
-  /** Python's `json.loads(response.body)`: what the acknowledgement carried, null when nothing. */
+  /** What the acknowledgement carried, null when nothing. */
   get body(): Body | null {
     const last = this.acks.at(-1);
     return last === undefined || last === null ? null : (last as Body);
   }
 }
 
-/** The back end of a world: each client is scripted when it is made, as Python's factory did. */
+/** The back end of a world: each client is scripted when it is made. */
 class WorldBackend extends FakeAgentBackend {
   script: () => Script = () => ({});
 
@@ -339,7 +338,7 @@ export class World {
     this.app = this.built.app;
   }
 
-  /** Every agent session started, in order: Python's `world.clients`. */
+  /** Every agent session started, in order: the back end's `sessions`. */
   get clients(): FakeAgentSession[] {
     return this.backend.sessions;
   }
@@ -364,8 +363,7 @@ export class World {
 
   /**
    * Let the daemon come to rest: what is ready runs, every task that starts on a later turn of
-   * the event loop too, and every file or git call in flight comes back. Where Python slept a
-   * moment for the daemon to act.
+   * the event loop too, and every file or git call in flight comes back.
    */
   async idle(): Promise<void> {
     let calm = 0;
@@ -379,7 +377,7 @@ export class World {
   /**
    * Feed one payload to the app as the socket would, let the daemon come to rest, and answer
    * what the payload was acknowledged with. A listener that waits for the owner (a setup with
-   * `autoStart` off, a hold) is still running when this returns, as it was in Python.
+   * `autoStart` off, a hold) is still running when this returns.
    */
   async dispatch(body: Body): Promise<Dispatched> {
     const response = new Dispatched();
@@ -424,8 +422,8 @@ export class World {
   }
 
   /**
-   * What Python's `settle(seconds)` waited through: the daemon comes to rest, Start is pressed on
-   * every setup that showed up meanwhile, and again until none is left to press.
+   * The daemon comes to rest, Start is pressed on every setup that showed up meanwhile, and
+   * again until none is left to press.
    */
   async settle(): Promise<void> {
     for (let round = 0; round < 5; round += 1) {
@@ -443,9 +441,9 @@ export class World {
   }
 
   /**
-   * Wait for a condition on the fakes, as Python's `until` polled it: the daemon comes to rest,
-   * and Slack's clock moves on a hundredth of a second at a time, for two seconds of it at most,
-   * so a reply's debounce passes as it did while Python polled.
+   * Wait for a condition on the fakes by polling it: the daemon comes to rest, and Slack's clock
+   * moves on a hundredth of a second at a time, for two seconds of it at most, so a reply's
+   * debounce passes while it polls.
    */
   async until(condition: () => boolean, limit = 2.0): Promise<void> {
     await this.idle();
@@ -478,8 +476,8 @@ export class World {
 }
 
 /**
- * A world maker for one test, as the `world` fixture and `World(slack, tmp_path, ...)` were:
- * each world it made is closed and its folder removed when the test ends.
+ * A world maker for one test: each world it made is closed and its folder removed when the test
+ * ends.
  */
 export function worldFor(t: TestContext): ((options?: WorldOptions) => World) & {
   readonly slack: FakeSlack;
@@ -490,7 +488,7 @@ export function worldFor(t: TestContext): ((options?: WorldOptions) => World) & 
   const tmpPath = realpathSync(mkdtempSync(join(tmpdir(), "awd-app-")));
   // The two "stop for the rest of the run" flags are the process's: each test starts clear.
   resetStatusFlags();
-  // The daemon's log stays out of the test report, as pytest kept it: a test that reads a line
+  // The daemon's log stays out of the test report: a test that reads a line
   // replaces the logger's method (`mock.method`), which this does not touch.
   const writer = setWriter(() => {});
   // A timer that keeps the loop alive for the test's duration: on Node 22 a test that awaits
@@ -513,12 +511,12 @@ export function worldFor(t: TestContext): ((options?: WorldOptions) => World) & 
   );
 }
 
-/** The `world` fixture: one bound world for the test. */
+/** One bound world for the test. */
 export function worldOf(t: TestContext): World {
   return worldFor(t)();
 }
 
-/** The `manual` fixture: a world whose setups wait for the test to press Start. */
+/** A world whose setups wait for the test to press Start. */
 export function manualWorld(t: TestContext): World {
   const world = worldOf(t);
   world.autoStart = false;
@@ -673,7 +671,7 @@ export function buttonValue(blocks: Body[], actionId: string): string {
   throw new assert.AssertionError({ message: `no ${actionId} button in the posted blocks` });
 }
 
-/** The questions of the form's tests, as the agent seam gives them (Python's `QUESTIONS`). */
+/** The questions of the form's tests, as the agent seam gives them. */
 export const QUESTIONS: readonly Question[] = [
   {
     text: "Colour?",
@@ -835,9 +833,9 @@ export function setupClick(
 
 /**
  * Resolve the hold a message shows before `chat.postMessage` has answered, as a fast click does
- * when it arrives ahead of the HTTP answer. Python wrapped the client's `api_call`; here the
- * post's scripted answer does it, since the client binds its methods to `apiCall` when it is
- * made: the hold is resolved once Slack has the message and before the daemon has its ts.
+ * when it arrives ahead of the HTTP answer. The post's scripted answer does it, since the client
+ * binds its methods to `apiCall` when it is made: the hold is resolved once Slack has the
+ * message and before the daemon has its ts.
  */
 export function answerInsidePost(
   world: World,
@@ -964,7 +962,7 @@ export function madeBeforeTheThread(path: string): string {
   return realpathSync(path);
 }
 
-/** The `project` fixture: the channel's folder as a repository with one commit, `README`. */
+/** The channel's folder as a repository with one commit, `README`. */
 export function projectOf(world: World): string {
   return madeBeforeTheThread(join(world.root, "app"));
 }

@@ -1,8 +1,8 @@
 /**
  * A background subagent that hands its report back, replayed from `subagent-handback`: recorded
  * on 2026-10-10 with `@anthropic-ai/claude-agent-sdk` 0.3.296 and Claude Code 2.1.296, the
- * owner's setting sources loaded. Not a port: the Python daemon's recordings (Claude Code
- * 2.1.286) end a background subagent with its notification and one turn that reports it.
+ * owner's setting sources loaded. The recordings made on Claude Code 2.1.286 end a background
+ * subagent with its notification and one turn that reports it.
  *
  * Measured there, and on Claude Code 2.1.294 through the Python SDK 0.2.165 the same day: the
  * subagent's last call is `SubagentHandback`; its report reaches the main agent as a message

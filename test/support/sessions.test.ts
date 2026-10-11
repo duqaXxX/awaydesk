@@ -1,7 +1,6 @@
 /**
  * The scripted agent is useful only if it carries the recorded shapes: pin what the session
- * tests rely on. Port of the SDK half of `tests/test_fakes.py`, read at the agent seam: what
- * Python checked on the SDK's parsed messages is checked here on the events the fake gives.
+ * tests rely on, read at the agent seam, on the events the fake gives.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";

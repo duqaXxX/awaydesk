@@ -1,18 +1,13 @@
 /**
- * The same-folder hold: two busy sessions in one folder. Port of the section of
- * `tests/test_slack_app.py` that opens with `# --- D8: two busy sessions in one folder`, in its
- * order. The harness is `test/support/slack-app.ts`.
+ * The same-folder hold: two busy sessions in one folder. The harness is
+ * `test/support/slack-app.ts`.
  *
- * Ported through `cancel after a finished report turn shows done not a stale reaction`, the last
- * test of the section.
- *
- * What stands for Python's private fields. A session's `_status.current` is the reaction on the
- * root message, so it is read as the reactions Slack holds on it (`standing`: `reactions.add` and
- * `reactions.remove` replayed in order). `_drop_client` and `_closed`, which a test sets to put a
- * session where a race leaves it, are TypeScript `private` members, reached by a cast in
- * `Internals`: there is no public way to reach that state without the teardown the test stands in
- * for. The idle-close task, found by name in Python, is observed as a session the fake clock
- * cannot close.
+ * How a test reads a session's state. The status reaction on the root message is read as the
+ * reactions Slack holds on it (`standing`: `reactions.add` and `reactions.remove` replayed in
+ * order). `dropClient` and `closedFlag`, which a test sets to put a session where a race leaves
+ * it, are `private` members, reached by a cast in `Internals`: there is no public way to reach
+ * that state without the teardown the test stands in for. The idle-close timer is observed as a
+ * session the fake clock cannot close.
  */
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
@@ -100,7 +95,7 @@ function postAnswers(
   };
 }
 
-// Python's `user0` and `user1`: a click by another user, and by the owner from another workspace.
+// A click by another user, and by the owner from another workspace.
 const OTHER_USERS: readonly Body[] = [{ id: STRANGER }, { team_id: OTHER_TEAM }];
 
 test("a busy session in the same folder holds the message", async (t) => {
@@ -269,7 +264,7 @@ test("a click for another channel is refused", async (t) => {
   assert.equal(world.ephemerals().at(-1), texts.HOLD_GONE);
 });
 
-// `_status.current is None` and the like: no reaction stands on the root.
+// No reaction stands on the root.
 test("a drain starting right after continue does not leave a stale raised hand", async (t) => {
   const world = worldOf(t);
   await startAHold(world);
@@ -421,8 +416,8 @@ test("a drain cancels the hold", async (t) => {
   assert.ok(world.ephemerals().includes(texts.NOT_SENT));
 });
 
-// Python looked for the session's `idle-close-<channel>-<thread>` task by name; the timer here
-// sleeps on the sessions' clock, so a clock that passes the whole wait shows whether it is armed.
+// The idle-close timer sleeps on the sessions' clock, so a clock that passes the whole wait shows
+// whether it is armed.
 test("the idle close timer does not fire while held", async (t) => {
   const world = worldOf(t);
   await startAHold(world);
@@ -510,10 +505,9 @@ test("a message queued behind a drain cancelled hold is also refused", async (t)
   assert.ok((world.ephemerals().at(-1) as string).startsWith(texts.RESTARTING));
 });
 
-// Python cancelled the task awaiting the hold's future. No handler is cancelled in this daemon:
-// the wait ends only through `Holds` (a click, `!stop`, a drain). So the same two outcomes are
-// read after a wait that ends with no answer: the marker leaves `waitingForOwner`, and the
-// question's id is gone from `holds`.
+// No handler is cancelled in this daemon: the wait ends only through `Holds` (a click, `!stop`, a
+// drain). So the two outcomes are read after a wait that ends with no answer: the marker leaves
+// `waitingForOwner`, and the question's id is gone from `holds`.
 test("a cancelled wait does not leak the hold", async (t) => {
   const world = worldOf(t);
   await startAHold(world);
@@ -531,9 +525,9 @@ test("a cancelled wait does not leak the hold", async (t) => {
 test("a hold decided before its message ts is known does not flicker", async (t) => {
   const world = worldOf(t);
   await world.dispatch(message("busy elsewhere", { ts: OTHER_THREAD }));
-  // The question is posted, but not yet recorded in `holds`: Python gated the post's answer,
-  // here the stop (`holds.cancel`, exactly what `!stop` does) lands inside the post, once Slack
-  // has the message and before the daemon has its ts, as `answerInsidePost` does for a click.
+  // The question is posted, but not yet recorded in `holds`: the stop (`holds.cancel`, exactly
+  // what `!stop` does) lands inside the post, once Slack has the message and before the daemon
+  // has its ts, as `answerInsidePost` does for a click.
   postAnswers(world, texts.HOLD_QUESTION.split("{")[0] as string, () => {
     world.holds.cancel(CHANNEL, THREAD);
     return undefined;

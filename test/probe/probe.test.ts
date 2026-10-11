@@ -223,7 +223,7 @@ test("the recorded commands are the fixture s", () => {
   for (const expected of ["compact", "model", "clear"]) assert.ok(names.has(expected), expected);
 });
 
-// --- The scenes' helpers (probe/scenes.ts): no Python counterpart ------------------------------
+// --- The scenes' helpers (probe/scenes.ts) -------------------------------------------------------
 
 test("a wait that ran out or a system error is the machine's, any other failure is the SDK's", async () => {
   const { isEnvironment, ProbeTimeout } = await import("../../probe/scenes.ts");

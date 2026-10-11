@@ -3,11 +3,11 @@
  * the provider already has: a `ReplySink` per reply, the `StatusReaction` on the thread's root,
  * the `ThreadStatus` line under its last message, and the request messages of `requests.ts`.
  *
- * What it adds to those parts is their wiring, which the Python session did itself: every pass
- * of a reply that wrote, and every notice, tells the status line (Slack clears a thread's status
- * when the app replies); the seam's four statuses are the four reactions; an answered question
- * is rewritten on the budget every reply draws from; and a failed post or rewrite crosses the
- * seam as a `ChatError` named by Slack's code.
+ * What it adds to those parts is their wiring: every pass of a reply that wrote, and every
+ * notice, tells the status line (Slack clears a thread's status when the app replies); the
+ * seam's four statuses are the four reactions; an answered question is rewritten on the budget
+ * every reply draws from; and a failed post or rewrite crosses the seam as a `ChatError` named
+ * by Slack's code.
  */
 import type { KnownBlock, WebClient } from "@slack/web-api";
 import type { PermissionRequest, Question, QuestionRequest } from "../../agent/seam.ts";
@@ -63,8 +63,8 @@ export interface SlackChatOptions {
   /** Wall-clock seconds and every pause of a reply. */
   readonly clock?: Clock;
   /**
-   * The clock the status line counts its refreshes on: a monotonic one, as Python's
-   * `loop.time()` was, so that a step of the system clock neither delays nor repeats a refresh.
+   * The clock the status line counts its refreshes on: a monotonic one, so that a step of the
+   * system clock neither delays nor repeats a refresh.
    * A test's one clock serves for both.
    */
   readonly steady?: Clock;

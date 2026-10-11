@@ -97,8 +97,8 @@ test("a run that names no outcome still reports", () => {
   assert.ok(comment?.includes("skipped"));
 });
 
-// Not in the Python file, which loaded the module: the entry point reads the environment of the
-// workflow and prints the JSON the shell script pipes into jq.
+// The entry point reads the environment of the workflow and prints the JSON the shell script
+// pipes into jq.
 function run(env: Record<string, string>) {
   const clean: NodeJS.ProcessEnv = { PATH: process.env.PATH, ...env };
   return spawnSync(process.execPath, [SCRIPT], { env: clean, encoding: "utf8" });

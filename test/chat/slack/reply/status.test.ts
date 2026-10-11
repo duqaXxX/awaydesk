@@ -17,14 +17,12 @@ import {
   THREAD,
 } from "../../../support/fake-slack.ts";
 
-// ported from tests/test_status.py
-
-// `missingScope` and the status refusal are process-wide by design (D10): reset around each test
+// `missingScope` and the status refusal are process-wide by design: reset around each test
 // so one test's `missing_scope` never leaks into the next.
 beforeEach(resetStatusFlags);
 afterEach(resetStatusFlags);
 
-/** Every line the module logs, by level; `text` is the lines joined, as `caplog.text` was. */
+/** Every line the module logs, by level; `text` is the lines joined. */
 class Lines implements Logger {
   readonly warnings: string[] = [];
   readonly others: string[] = [];
@@ -431,7 +429,7 @@ test("a close that cuts the clearing call short clears the thread status itself"
   assert.deepEqual(statuses(slack), [SHOWN, CLEARED]);
 });
 
-// Not in the Python file: the same close, with the clearing call it waits for failing.
+// The same close, with the clearing call it waits for failing.
 test("a close that waits for a clearing call that fails clears the thread status itself", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();

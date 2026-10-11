@@ -82,7 +82,7 @@ function field(file: SlackFile, key: string): unknown {
   return (file as Record<string, unknown>)[key];
 }
 
-/** Python's `int(value or 0)` on a field that is a number or a numeric string. */
+/** A field that is a number or a numeric string, as a whole number; absent or false reads 0. */
 function integer(value: unknown): number {
   const number = Number(value || 0);
   return Number.isFinite(number) ? Math.trunc(number) : 0;
@@ -90,9 +90,8 @@ function integer(value: unknown): number {
 
 /**
  * A declared size in bytes: a finite non-negative integer, as a number or as ASCII digits, and an
- * absent or false one is 0, as Python's `int(value or 0)` read it. Null for anything else, which
- * Python either raised on (dropping the message) or read more loosely than Slack ever writes
- * (`"999_999_999"`, non-ASCII digits, a sign or padding): a file of that kind is refused.
+ * absent or false one is 0. Null for anything else: `"999_999_999"`, non-ASCII digits, a sign or
+ * padding are not what Slack writes, and a file of that kind is refused.
  */
 function declaredSize(value: unknown): number | null {
   if (value === undefined || value === null || value === false || value === 0 || value === "") {

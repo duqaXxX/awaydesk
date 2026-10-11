@@ -1,13 +1,13 @@
 /**
- * Text counted as Python counted it. Two halves: the helpers of `chars.ts` on their own, and the
- * sink over texts full of characters past U+FFFF (the squares of a diff, an emoji), whose every
- * limit must fall where Python's fell.
+ * Text counted in code points, as Python counts it. Two halves: the helpers of `chars.ts` on their
+ * own, and the sink over texts full of characters past U+FFFF (the squares of a diff, an emoji),
+ * whose every limit must fall where the Python daemon's reply sink put it.
  *
  * The recordings never cross a limit with such a character, so the golden files cannot tell a
  * count in UTF-16 units from one in code points. The second half can: each scenario was replayed
- * on the Python `ReplySink` (the source of 2026-10-10, over `tests/fakes.FakeSlack`, with the
- * golden files' discipline and `FakeClock.advance` for the 280 seconds), and `PYTHON` holds what
- * it sent: per Slack call, the method and the sizes in code points of what the call carried.
+ * on the Python daemon's reply sink (source of 2026-10-10, over its Slack test double, with the
+ * golden files' discipline and a fake clock advanced for the 280 seconds), and `PYTHON` holds
+ * what it sent: per Slack call, the method and the sizes in code points of what the call carried.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";

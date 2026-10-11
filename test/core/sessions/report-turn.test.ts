@@ -1,8 +1,7 @@
 /**
  * An agent continued with `SendMessage` in a daemon that never saw the call that first started
  * it (issue #150), replayed from a recording made on 2026-10-05 with claude-agent-sdk 0.2.163
- * and its bundled CLI 2.1.286 (`report-turn-agent-resume`). Port of
- * `tests/test_sessions_report_turn.py`.
+ * and its bundled CLI 2.1.286 (`report-turn-agent-resume`).
  *
  * Measured there: an agent continued with `SendMessage` keeps its task id, and its own records
  * name the call that first started it, not the `SendMessage` call. Claude Code takes a prompt

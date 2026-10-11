@@ -16,7 +16,7 @@
  * for those and adopts what landed. Constructed with another client, the sink would post or
  * append twice after a reset.
  *
- * How asyncio's cancellation is said here. Whoever stops a sink (`!stop`, a close, a restart)
+ * How a sink is stopped. Whoever stops a sink (`!stop`, a close, a restart)
  * follows the same rule:
  *
  * 1. A pass is never cancelled. A pass is `flush`: it takes the lock, brings every message to
@@ -24,9 +24,8 @@
  *    stops waiting for it, and the next pass queues behind it on the lock. `@slack/web-api` cannot
  *    abort a call in flight (the only signal `WebClient.makeRequest` gives `fetch` is the client's
  *    own timeout), and a call given up after Slack took it loses a message's ts or posts an
- *    ending twice. Python shielded its passes for that reason wherever a task could be cancelled
- *    (`_later`, `_retry_final`, `close_out`); here the shield is the rule, so no wait inside a
- *    pass (the lock, the limiter, a Slack call, a read-back) takes a signal.
+ *    ending twice. For that reason no wait inside a pass (the lock, the limiter, a Slack call, a
+ *    read-back) takes a signal.
  * 2. What can be cancelled is a wait outside a pass, and it is cancelled with an `AbortSignal`:
  *    the debounce before a write, the pause before the end's one retry, the stream's 280 seconds
  *    (each a `Task` with its own signal, aborted by `Task.cancel`), and a caller's own wait for a
@@ -35,9 +34,9 @@
  *    abort the signal you gave it, then `settle()` to wait for what is in flight.
  * 3. A cancelled wait rejects with the signal's reason; a `Task` aborts with `Cancelled`. A task
  *    that was cancelled while its shielded pass ran sees `signal.aborted` when the pass returns
- *    and does nothing more, as a Python task cancelled inside `asyncio.shield` did.
- * 4. The lock is `Mutex`: first come, first served, as `asyncio.Lock`.
- * 5. State a Python task carried by being alive is explicit: `pending` is null whenever no
+ *    and does nothing more.
+ * 4. The lock is `Mutex`: first come, first served.
+ * 5. State is explicit, never carried by a task being alive: `pending` is null whenever no
  *    debounce waits (cleared by the task itself as it returns, and by whoever cancels it), and
  *    `landedValue` says whether and how the end resolved.
  */
@@ -128,7 +127,7 @@ export const ADOPT_WORDS = 40;
 /** (part, offset): a UTF-16 index into a text part, elements into a tool. */
 export type Cursor = readonly [part: number, offset: number];
 
-/** `a <= b`, as Python orders two tuples. */
+/** `a <= b`: by part, then by offset. */
 function upTo(a: Cursor, b: Cursor): boolean {
   return a[0] < b[0] || (a[0] === b[0] && a[1] <= b[1]);
 }
@@ -209,7 +208,7 @@ export class Tool {
     return this.shownPieces[piece - 1] ?? "";
   }
 
-  /** The characters of piece `piece`, as Python's `len` counts them. */
+  /** The characters of piece `piece`, counted in code points (`len` of `chars.ts`). */
   pieceSize(piece: number): number {
     return this.sizes[piece - 1] ?? 0;
   }

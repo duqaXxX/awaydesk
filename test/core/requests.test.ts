@@ -132,7 +132,7 @@ test("a request decided before its message is known says so", () => {
   assert.equal(pending.messageTs, "1790000000.000002");
 });
 
-// The bookkeeping the Python tests reached through the dict.
+// The bookkeeping of the pending requests.
 
 test("a discarded request is gone", () => {
   const approvals = new Approvals();

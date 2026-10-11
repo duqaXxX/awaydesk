@@ -18,8 +18,6 @@ import {
 } from "../../support/fake-slack.ts";
 import { type JsonObject, slackPayload } from "../../support/fixtures.ts";
 
-// ported from tests/test_repair.py
-
 const STOPPED_BLOCK = {
   type: "context",
   elements: [{ type: "mrkdwn", text: texts.STOPPED_BEFORE_ANSWER }],

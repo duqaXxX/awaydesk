@@ -24,7 +24,7 @@ export class ConfigError extends Error {
 
 /**
  * The tokens are non-enumerable, so `util.inspect`, `JSON.stringify` and a log line that prints
- * the object never show them (Python's `repr=False`). A spread copy of a `Config` drops them.
+ * the object never show them. A spread copy of a `Config` drops them.
  */
 export interface Config {
   readonly botToken: string;
@@ -63,13 +63,14 @@ function fileOrder(text: string, keys: readonly string[]): string[] {
 
 /**
  * The values of a `.env` text with `${NAME}` and `${NAME:-default}` expanded as python-dotenv does
- * by default (`interpolate=True`, which this file was read with before). A name resolves from the
- * values the file defined above it, else from `env`, else to its default, else to nothing; an
- * `env` entry that is empty counts as set. The expanded value is final: nothing in it is expanded
- * again. Quotes were dropped by `parseEnv` and python-dotenv expands inside single quotes too, so
- * every value is expanded alike. Not ported: a key repeated in the file (the last value is used
- * and expanded once, where python-dotenv expands each occurrence) and a bare `NAME` line with no
- * `=` (python-dotenv records it as unset and `${NAME:-d}` then gives nothing; here `d`).
+ * by default (`interpolate=True`), which is how the Python daemon read this file. A name
+ * resolves from the values the file defined above it, else from `env`, else to its default, else
+ * to nothing; an `env` entry that is empty counts as set. The expanded value is final: nothing in
+ * it is expanded again. Quotes were dropped by `parseEnv` and python-dotenv expands inside single
+ * quotes too, so every value is expanded alike. Differences from python-dotenv: a key repeated in
+ * the file (the last value is used and expanded once, where python-dotenv expands each
+ * occurrence) and a bare `NAME` line with no `=` (python-dotenv records it as unset and
+ * `${NAME:-d}` then gives nothing; here `d`).
  */
 export function expandEnv(text: string, env: Env = process.env): Record<string, string> {
   const raw = new Map(Object.entries(parseEnv(text)));

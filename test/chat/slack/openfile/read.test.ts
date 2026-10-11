@@ -68,8 +68,8 @@ test("a symlink that leaves the folder is refused after it is resolved", POSIX, 
 
 test("a path swapped for a link after it was resolved is not followed", POSIX, async () => {
   // The check and the read are one open: a file that becomes a link between resolving its path
-  // and opening it is refused, not read from wherever the link leads. Python patched `_locate` to
-  // hand back the stale path; here `readOnce` is handed it, since it is the part that opens.
+  // and opening it is refused, not read from wherever the link leads. `readOnce` is handed the
+  // stale path, since it is the part that opens.
   const folder = app();
   const outside = write(tmp.dir, "outside/secret.txt", "OUTSIDE\n");
   const inside = write(folder, "notes.md", "inside\n");
@@ -93,8 +93,8 @@ test("a file over one megabyte is too large", async () => {
 });
 
 test("a file that grows while it is read never gives more than the limit", async () => {
-  // `fstat` said it fits; by the time it is read it holds more. Python patched `os.fstat`; here
-  // the handle's `stat` is wrapped to grow the file when it is asked.
+  // `fstat` said it fits; by the time it is read it holds more. The handle's `stat` is wrapped
+  // to grow the file when it is asked.
   const folder = app();
   const path = write(folder, "growing.log", "x".repeat(10));
   const grows = async (target: string): Promise<Opened> => {
@@ -122,8 +122,7 @@ test("regular files keeps what exists in order and stops at the limit", async ()
 });
 
 test("regular files reads its paths only as far as the limit needs", async () => {
-  // What Python's `test_a_search_checks_files_only_until_the_limit...` counted by patching
-  // `_locate`: a path is checked as it is taken from the iterable, and no more are taken.
+  // A path is checked as it is taken from the iterable, and no more are taken.
   const folder = app();
   const names = Array.from(
     { length: 40 },
@@ -164,7 +163,7 @@ test("a changed file that leaves the folder through a link is not listed", POSIX
 });
 
 test("files modified at the same time come in the order of their paths", async () => {
-  // Extra, not in the Python file: the tie-break of `newest_first`, in code point order.
+  // The tie-break of `newestFirst`, in code point order.
   const folder = app();
   for (const name of ["b.py", "B.py", "a.py"]) {
     utimesSync(write(folder, name), 1_780_000_000, 1_780_000_000);
@@ -172,13 +171,13 @@ test("files modified at the same time come in the order of their paths", async (
   assert.deepEqual(await newestFirst(folder, ["b.py", "a.py", "B.py"]), ["B.py", "a.py", "b.py"]);
 });
 
-// --- the path and the upload (extra: Python tested these with the handlers) ---
+// --- the path and the upload ---
 
 test(
   "a path that goes back up through a link is resolved where the link leads",
   POSIX,
   async () => {
-    // Extra: `realpath` follows `..` after the link before it, as Python's does. Lexical
+    // `realpath` follows `..` after the link before it, as Python's does. Lexical
     // normalization would turn `link/../inside.txt` into the folder's own file.
     const folder = app();
     write(folder, "inside.txt", "inside\n");

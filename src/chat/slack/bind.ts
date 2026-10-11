@@ -38,7 +38,7 @@ function samePath(a: string, b: string): boolean {
   return left.length === right.length && left.every((part, i) => part === right[i]);
 }
 
-/** Python sorts a `Path` by its components, so `a/b` comes before `a-b`; a string sort would not. */
+/** Paths sort by components as Python sorts a `Path`, so `a/b` comes before `a-b`. */
 function comparePaths(a: string, b: string): number {
   const left = parts(a);
   const right = parts(b);

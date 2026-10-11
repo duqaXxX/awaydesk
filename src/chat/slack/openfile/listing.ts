@@ -113,7 +113,7 @@ async function repositoryFolders(folder: string): Promise<string[]> {
   try {
     below = await foldersWithin(folder);
   } catch (error) {
-    // Python caught `OSError`: a system error has a code.
+    // A system error has a code.
     if (typeof (error as { code?: unknown } | null)?.code === "string") return [];
     throw error;
   }

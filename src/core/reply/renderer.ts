@@ -32,7 +32,7 @@ export type Sink<Footer = FooterFields> = Omit<ReplySink, "closeOut"> & {
 type EventOf<T extends SessionEvent["type"]> = Extract<SessionEvent, { type: T }>;
 export type TaskStarted = EventOf<"task_started">;
 export type TurnEnded = EventOf<"turn_ended">;
-/** An event of a task's life: Python's `TaskFrame`. */
+/** An event of a task's life. */
 export type TaskEvent = EventOf<"task_started" | "task_progress" | "task_updated" | "task_ended">;
 
 function line(

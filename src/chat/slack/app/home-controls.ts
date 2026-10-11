@@ -1,6 +1,6 @@
 /**
  * The controls of the session index (the app's Home tab, `home.ts`): its filters, Show all, Edit,
- * Delete and Clean up. Port of `home_owner` and the `on_home_*` listeners of `slack_app.py`.
+ * Delete and Clean up.
  */
 import { EDIT_ON, type Home, readFilter } from "../home.ts";
 import { type AppParts, logger } from "./answers.ts";

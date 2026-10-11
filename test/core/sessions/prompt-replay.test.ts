@@ -1,8 +1,7 @@
 /**
  * A prompt Claude Code takes into a running turn, known from the replay of the prompt (issue
  * #150), replayed from recordings made on 2026-10-06 with claude-agent-sdk 0.2.163 and its
- * bundled CLI 2.1.286, with `--replay-user-messages` (`prompt-replay-<scene>`). Port of
- * `tests/test_sessions_prompt_replay.py`.
+ * bundled CLI 2.1.286, with `--replay-user-messages` (`prompt-replay-<scene>`).
  *
  * Measured there: Claude Code re-emits each prompt as a `user` record carrying the uuid the
  * caller sent. A prompt that gets a turn of its own is replayed after that turn's `init` and
@@ -349,9 +348,9 @@ test("every prompt goes out with a uuid of the daemons own", async (t) => {
   }
   const client = h.clients[0];
   assert.ok(client !== undefined);
-  // What Python read on the SDK's side of the client (the `replay-user-messages` argument, the
-  // `user` type and the null parent of each message sent) is the back end's to test: here, what
-  // the core hands the seam.
+  // The SDK's side of the client (the `replay-user-messages` argument, the `user` type and the
+  // null parent of each message sent) is the back end's to test: here, what the core hands the
+  // seam.
   assert.deepEqual(
     client.sent.map((prompt) => prompt.content),
     ["first", "/usage", blocks],

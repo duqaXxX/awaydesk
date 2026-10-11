@@ -9,8 +9,8 @@ import {
 import { getLogger, type Logger } from "../../../log.ts";
 import { errorName } from "../../../values.ts";
 
-// The sink's lines: Python logged them all under `awaydesk.render.sinks`. `sinks.ts` imports this
-// logger and, through `export *`, its callers get the `Logger` type from here.
+// The sink's lines all go under one logger name. `sinks.ts` imports this logger and, through
+// `export *`, its callers get the `Logger` type from here.
 export const logger = getLogger("awaydesk.chat.slack.reply.sinks");
 export type { Logger };
 

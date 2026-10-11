@@ -1,13 +1,11 @@
 /**
  * `ClaudeSession` on a fake `query()`, scripted from the recordings under `test/fixtures/sdk/`.
- * Python had no test file for this wrapper: its behaviour was tested through `test_sessions.py`
- * on `FakeClaudeClient`, whose scripted batches, injected turns, permission calls, hook runs, end
- * of stream and failing stream `test/support/fake-query.ts` offers again.
+ * `test/support/fake-query.ts` scripts the fake: batches, injected turns, permission calls, hook
+ * runs, an end of stream and a failing stream.
  *
- * The options are those Python's `client_options` passed, and the SDK's option names are those
- * of the TypeScript SDK 0.3.296 (`sdk.d.ts`). The one difference: `allow-dangerously-skip-
- * permissions` is the SDK's own option `allowDangerouslySkipPermissions`, which writes the same
- * flag on the command line.
+ * The SDK's option names are those of the TypeScript SDK 0.3.296 (`sdk.d.ts`).
+ * `allow-dangerously-skip-permissions` is the SDK's own option `allowDangerouslySkipPermissions`,
+ * which writes the same flag on the command line.
  */
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";

@@ -35,7 +35,7 @@ type Answers = Record<string, string | string[]>;
 
 const RUNS = new RegExp(`[${PY_SPACE}]+`);
 
-/** The first `limit` characters, counted in code points as Slack and Python count them. */
+/** The first `limit` characters, counted in code points as Slack counts them. */
 function head(text: string, limit: number): string {
   return Array.from(text).slice(0, limit).join("");
 }

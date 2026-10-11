@@ -2,10 +2,9 @@
  * A recorded SDK stream as the session events the core reads: the records of a recording through
  * the Claude back end's `Translator`, as one live session would give them.
  *
- * Python's tests fed the SDK's parsed messages (`sdk_messages`) and cut them in turns after each
- * `ResultMessage` (`split_turns`). Here the events are cut after each `turn_ended`, which is the
- * same cut: a result record gives that one event, and every other record's events stay in its
- * turn. A stretch of records after the last result is a turn when it gave an event.
+ * The events are cut in turns after each `turn_ended`: a result record gives that one event, and
+ * every other record's events stay in its turn. A stretch of records after the last result is a
+ * turn when it gave an event.
  */
 import { Translator } from "../../src/agent/claude/translate.ts";
 import type { SessionEvent, SessionEventType } from "../../src/agent/seam.ts";
@@ -31,7 +30,7 @@ export function recordedEvents(name: string, sent: readonly string[] = []): Sess
   return translated(sdkRecords(name), translator);
 }
 
-/** The turns of a stream of events: cut after each end of turn, as `split_turns` cut messages. */
+/** The turns of a stream of events: cut after each end of turn. */
 export function splitTurns(events: readonly SessionEvent[]): SessionEvent[][] {
   const turns: SessionEvent[][] = [[]];
   for (const event of events) {

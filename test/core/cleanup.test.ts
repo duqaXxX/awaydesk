@@ -199,8 +199,8 @@ test("a thread opened while the folders are read is kept", async () => {
 });
 
 test("clean goes on to prune when the channel check itself fails", async () => {
-  // The Python test replaced `forget_gone_channels` with a function that raises; here the check
-  // fails the way it can: `live`, read once the channel is found gone, raises on that first read.
+  // The check fails the way it can: `live`, read once the channel is found gone, raises on that
+  // first read.
   const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });
   let reads = 0;
 
@@ -227,8 +227,6 @@ test("clean survives a folder that cannot be read and a slack that fails", async
   assert.notEqual(state.thread(CHANNEL, THREAD), null);
   assert.ok(log.lines.join("\n").includes("could not prune stale threads"));
 });
-
-// What the lookup's contract adds to the Python tests, which had no lookup to fail.
 
 test("a lookup that throws is no answer", async () => {
   const answers: Record<string, ChannelAnswer> = { [CHANNEL]: "there", [GONE_CHANNEL]: "gone" };

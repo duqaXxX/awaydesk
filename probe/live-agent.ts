@@ -7,8 +7,8 @@
  *
  * Each session works in a fresh temporary folder and takes no setting source, so nothing of the
  * owner's settings, hooks or permission rules is in play. Prompts are a few words and the whole
- * run is a few cents of tokens. One line per check, `PASS` or `FAIL` and what it saw; `INFO` lines
- * settle the questions the spike and the translation left open. Exits 1 when a check fails.
+ * run is a few cents of tokens. One line per check, `PASS` or `FAIL` and what it saw; an `INFO`
+ * line answers a question and decides nothing. Exits 1 when a check fails.
  *
  * A reply's text is never printed beyond a few characters of evidence, and no path is printed.
  */

@@ -6,8 +6,6 @@ import { FOLDER_ROWS } from "../../../src/core/folders.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { fill } from "../../../src/core/texts.ts";
 
-// ported from the four tests of tests/test_folders.py that read `bind_blocks`
-
 // A directory that need not exist: `bindBlocks` only reads the paths it is given.
 const ROOT = join("/srv", "projects");
 

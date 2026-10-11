@@ -1,6 +1,6 @@
 /**
  * One agent session per chat thread: its agent process, its queue of turns, and the reader that
- * turns the agent's events into replies. Port of `ThreadSession` in `sessions.py`.
+ * turns the agent's events into replies.
  *
  * The session knows neither library. It starts its agent through the agent seam
  * (`AgentBackend.start`) and reads `SessionEvent`s; it writes its thread through the chat seam
@@ -8,40 +8,38 @@
  * `StateStore`: the root's status when it asks for one, a request once the chat has named its
  * message, and a reply's open message when the reply says it changed.
  *
- * How asyncio is said here. One translation, used everywhere in this folder:
+ * How waits and cancels are made. One convention, used everywhere in this folder:
  *
- * 1. A Python task is a `Task` (`tasks.ts`): the worker that sends one prompt at a time, the
+ * 1. Concurrent work is a `Task` (`tasks.ts`): the worker that sends one prompt at a time, the
  *    reader that follows the agent's events, and the timers (`expireInjectedTurn`,
  *    `expireUnreported`, `closeWhenIdle`). A `Task` starts on the next turn of the event loop,
  *    never inside the call that made it, and the waiters of an `Event` wake on the next turn
- *    too: asyncio ran both only after the code that made them ready had reached a real wait,
- *    and this class sets state right after creating a task and right after releasing a turn
- *    (`Turn.done` is set before the turn stops being the active one). `cancel()` aborts the
- *    task's `AbortSignal` with `Cancelled`.
+ *    too: the code that made them ready reaches a real wait first, and this class sets state
+ *    right after creating a task and right after releasing a turn (`Turn.done` is set before
+ *    the turn stops being the active one). `cancel()` aborts the task's `AbortSignal` with
+ *    `Cancelled`.
  * 2. Every wait a cancel could interrupt takes that signal: `Event.wait`, `Mutex.acquire`,
  *    `Queue.get`, `Clock.sleep` (every pause goes through the injected clock), the wait for
  *    the agent's next event, and, through `cancellable`, the wait for a call that cannot be
  *    cut. The wait then rejects with `Cancelled`, which unwinds through the same `try` and
- *    `finally` blocks Python's `CancelledError` did, so a Python `finally` is still a
- *    `finally`. A catch-all rethrows `Cancelled` first, as `except Exception` let it pass.
+ *    `finally` blocks as any error. A catch-all rethrows `Cancelled` first.
  * 3. A call that has begun is never cut: a write to the chat (the rule of the Slack sink), the
  *    agent's start, a git call. The signal only releases whoever waited for it. Where the
  *    result of such a call would be lost, an explicit cleanup picks it up: a session whose
  *    start was given up is closed when the start returns (`connect`).
- * 4. asyncio delivered a cancel once, and the awaits of a `finally` that ran after it were not
- *    interrupted again; an aborted signal stays aborted. So a `finally` hands on `live(signal)`,
- *    which is no signal at all once it has aborted.
- * 5. A cancelled Python task whose `finally` did work is explicit state plus an explicit call:
- *    the request handlers of a closing session are resolved by `Approvals.denyAll` and awaited
- *    (`asking`), where Python's reader was cancelled inside them.
- * 6. Where Python relied on there being no `await` between a check and an act, the stretch is
- *    synchronous here too and marked `(sync)` with the reason. JavaScript yields at every
- *    `await`, also on a call that never waits, where Python ran such a call straight through:
- *    so what Python did around a call that only looked asynchronous (making a reply, moving
- *    the running counts) is done here with no `await` at all, and a turn is made the active
- *    one before its first write.
- * 7. A reaction is asked for at once and not awaited (`react`): Python made a task for it, and
- *    the chat makes the changes in the order they were asked.
+ * 4. An aborted signal stays aborted, so a wait in a `finally` that ran after the cancel would
+ *    be interrupted at once. A `finally` therefore hands on `live(signal)`, which is no signal
+ *    at all once it has aborted.
+ * 5. What a cancelled task leaves to clean up is explicit state plus an explicit call: the
+ *    request handlers of a closing session are resolved by `Approvals.denyAll` and awaited
+ *    (`asking`).
+ * 6. Where nothing may happen between a check and an act, the stretch is synchronous and
+ *    marked `(sync)` with the reason. JavaScript yields at every `await`, also on a call that
+ *    never waits: so around a call that only looks asynchronous (making a reply, moving the
+ *    running counts) there is no `await` at all, and a turn is made the active one before its
+ *    first write.
+ * 7. A reaction is asked for at once and not awaited (`react`): the chat makes the changes in
+ *    the order they were asked.
  */
 import { basename } from "node:path";
 import type {
@@ -107,7 +105,7 @@ export const logger = getLogger("awaydesk.core.sessions");
 
 type TaskEnded = Extract<SessionEvent, { type: "task_ended" }>;
 
-/** The signal for a `finally`: none once it has aborted, since asyncio cancelled a task once. */
+/** The signal for a `finally`: none once it has aborted, since an aborted signal stays aborted. */
 function live(signal: AbortSignal | undefined): AbortSignal | undefined {
   return signal?.aborted ? undefined : signal;
 }
@@ -647,9 +645,9 @@ export class ThreadSession {
     let turn: Turn;
     try {
       this.idleTimerCheck();
-      // (sync) Python awaited `_sink`, which never waited: the prompt was queued in the same
-      // step it arrived in, ahead of whatever the reader had not read yet. So the reply is
-      // awaited here only when making it does wait, which is what the check below is for.
+      // (sync) The prompt is queued in the same step it arrived in, ahead of whatever the
+      // reader had not read yet. So the reply is awaited here only when making it does wait,
+      // which is what the check below is for.
       const made = this.sink();
       turn = new Turn(prompt, made instanceof Promise ? await made : made);
       if (this.closedFlag) {
@@ -664,7 +662,7 @@ export class ThreadSession {
         return turn;
       }
       // (sync) from here to the end: the turn is queued, the worker made and the idle timer
-      // read with nothing in between, as Python did after its last await.
+      // read with nothing in between.
       this.queue.putNowait(turn);
       // A submitted turn is working, unless an approval or question already open in this
       // thread still holds it (that state stands until it is answered). New work, so any
@@ -915,8 +913,8 @@ export class ThreadSession {
   }
 
   /**
-   * Set the stored effort on the live client, where Python started a fresh one: what the
-   * session knows of the level is left as a connect with that stored level leaves it.
+   * Set the stored effort on the live client: what the session knows of the level is left as a
+   * connect with that stored level leaves it.
    */
   private async changeEffort(client: AgentSession, effort: string | null): Promise<void> {
     const level = this.validEffort(effort);
@@ -1007,8 +1005,7 @@ export class ThreadSession {
    * alone already answers `!stop`.
    */
   async stop(): Promise<boolean | null> {
-    // (sync) With no hold open, nothing waits between the call and the checks below: Python's
-    // `cancel_hold` returned at once then.
+    // (sync) With no hold open, nothing waits between the call and the checks below.
     const hold = this.deps.holds.cancel(this.channelId, this.threadTs);
     const held = hold !== null;
     if (hold !== null) await this.deleteRequest(hold.messageTs);
@@ -1181,8 +1178,7 @@ export class ThreadSession {
         release();
       }
       this.deps.approvals.denyAll(this.channelId, this.threadTs);
-      // Python's reader was cancelled inside a request it waited on, whose `finally` then ran:
-      // here the denial above resolves each handler, and each is awaited to its end.
+      // The denial above resolves each handler of a request, and each is awaited to its end.
       await Promise.allSettled([...this.asking]);
       for (const messageTs of requestsToDelete) await this.deleteRequest(messageTs);
       // A turn the worker took but had not sent yet is in no queue.
@@ -1733,7 +1729,7 @@ export class ThreadSession {
    * said with it: no step taken, no text, no task's end line, no held task event, no notice.
    * Claude Code gives a task's notification such a turn once the task's report was handed back
    * (measured 2026-10-10, `subagent-handback.jsonl`). With an end line or a held event waiting,
-   * the turn is the report that says them, as before.
+   * the turn is the report that says them.
    */
   private saidNothing(event: TurnEnded): boolean {
     return (
@@ -2051,9 +2047,9 @@ export class ThreadSession {
       this.reportOf = null; // the prompt's own turn: what was named is not the next turn
       renderer = this.newRenderer(turn.sink);
     }
-    // (sync) The turn is the active one before its first write. Python set it once this method
-    // returned and nothing ran in between; here every `await` below yields, and a turn already
-    // out of `sent` and not yet active would read as idle to a drain, a `!stop` or a timer.
+    // (sync) The turn is the active one before its first write: every `await` below yields, and
+    // a turn already out of `sent` and not yet active would read as idle to a drain, a `!stop`
+    // or a timer.
     const active: ActiveTurn = { turn, renderer, taken: [] };
     this.active = active;
     if (opening !== null) await renderer.feedNotice(opening);
@@ -2260,8 +2256,8 @@ export class ThreadSession {
 
   /**
    * A new reply, which becomes this thread's latest and takes over the running counts. It
-   * writes nothing until the agent has something to show. (sync) Python awaited calls here
-   * that never waited; nothing may run between the reply being made and the counts moving.
+   * writes nothing until the agent has something to show. (sync) Nothing may run between the
+   * reply being made and the counts moving.
    */
   private newReply(): Reply {
     const reply = this.thread.openReply((old, fresh) =>
@@ -2278,8 +2274,8 @@ export class ThreadSession {
   }
 
   /**
-   * `newReply`, as the one step of `submit` that Python awaited. It does not wait; a test
-   * replaces it with one that does, to hold a prompt between its arrival and its queue.
+   * `newReply`, as the step of `submit` that makes the reply. It does not wait; a test replaces
+   * it with one that does, to hold a prompt between its arrival and its queue.
    */
   private sink(): Reply | Promise<Reply> {
     return this.newReply();

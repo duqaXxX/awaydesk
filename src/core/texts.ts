@@ -1,9 +1,8 @@
 /** Every sentence the owner can read in Slack. English only; one place to review the wording. */
 
 /**
- * Fills a template's `{name}` fields the way Python's `str.format` did: every template below keeps
- * its `{name}` fields as written, and a caller fills one with this. A field without a value throws,
- * as Python's `KeyError` did.
+ * Fills a template's `{name}` fields: every template below keeps its `{name}` fields as written,
+ * and a caller fills one with this. A field without a value throws.
  */
 export function fill(template: string, values: Readonly<Record<string, string | number>>): string {
   return template.replace(/\{([a-z_]+)\}/g, (_field, name: string) => {
@@ -164,7 +163,7 @@ export const BIND_OUTSIDE =
   "example `!bind my-project`.";
 export const UPLOAD_FAILED =
   "Nothing was sent to Claude: {name} {reason}. Send the message again without it.";
-// An audio clip waits for the transcript only the owner can ask Slack for (`voice.py`).
+// An audio clip waits for the transcript only the owner can ask Slack for (`voice.ts`).
 export const CLIP_WAITING =
   "Waiting for this clip's transcript: choose `Generate transcript` on the clip, and its text " +
   "is sent to Claude.";
@@ -460,8 +459,9 @@ export const HOME_LAST_7 = "Last 7 days";
 export const HOME_LAST_30 = "Last 30 days";
 export const HOME_SEARCH_LABEL = "Search titles";
 export const HOME_SEARCH_HINT = "Type a word and press Enter";
-// `!guide`: how to use the bot, in the owner's words. tests/test_commands.py fails when a word of
-// the daemon is missing here; keep the tone plain and every line true of the current behaviour.
+// `!guide`: how to use the bot, in the owner's words. `test/core/commands.test.ts` fails when a
+// word of the daemon is missing here; keep the tone plain and every line true of the current
+// behaviour.
 export const GUIDE =
   "**awaydesk**\n" +
   "This channel runs Claude Code on your Mac, in one folder, and answers you alone. One Slack " +

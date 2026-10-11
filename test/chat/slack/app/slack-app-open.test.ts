@@ -1,14 +1,12 @@
 /**
- * `!open`, through Bolt's own entry point. Port of `tests/test_slack_app.py` from its `!open`
- * section to the log lines of issue #142 (which are `slack-app-clip.test.ts`): the picker's button
- * and modal, a name typed in the thread, and what nobody but the owner may do with either.
+ * `!open`, through Bolt's own entry point: the picker's button and modal, a name typed in the
+ * thread, and what nobody but the owner may do with either. The log lines of issue #142 are in
+ * `slack-app-clip.test.ts`.
  *
- * Where Python replaced a function of the daemon (`trusted_repository`, `Listings.of`,
- * `walk_files`, `_locate`, `OPEN_WAIT`) these tests stand at the same place: the lookup the world's
- * back end answers with (`world.backend.repository`), a `Listings` of their own over it, and the
- * handlers' clock (`world.appClock`), whose `OPEN_WAIT` is crossed by advancing it. A wait for
- * the daemon to come to rest is `world.idle()` or `world.settle()`; nothing waits on the wall
- * clock.
+ * The tests stand at three seams: the lookup the world's back end answers with
+ * (`world.backend.repository`), a `Listings` of their own over it, and the handlers' clock
+ * (`world.appClock`), whose `OPEN_WAIT` is crossed by advancing it. A wait for the daemon to come
+ * to rest is `world.idle()` or `world.settle()`; nothing waits on the wall clock.
  */
 import assert from "node:assert/strict";
 import {
@@ -120,7 +118,7 @@ function worldWith<L extends Listings>(
   return world;
 }
 
-/** Python's `Listings.of` patched to note the folders it was asked for, and answer as before. */
+/** A `Listings` that notes the folders it was asked for, and answers as before. */
 class WatchedListings extends Listings {
   readonly listed: string[] = [];
 
@@ -130,7 +128,7 @@ class WatchedListings extends Listings {
   }
 }
 
-/** A walk of a plain folder that ran out of time with `found` in hand (Python's `cut_walk`). */
+/** A walk of a plain folder that ran out of time with `found` in hand. */
 class CutListings extends Listings {
   readonly #found: readonly string[];
   #made = false;
@@ -659,7 +657,7 @@ test("typing lists at most ten files", GIT_LAYOUT, async (t) => {
 
 test("typing checks the disk only until the rows are full", GIT_LAYOUT, async (t) => {
   // The listings are asked to check ranked paths on disk through an iterable that notes each path
-  // it hands out: Python counted the calls of `_locate`, one for each path checked.
+  // it hands out, one for each path checked.
   const checked: string[] = [];
   function* counting(relatives: Iterable<string>): Generator<string> {
     for (const relative of relatives) {
@@ -800,7 +798,7 @@ for (const [name, metadata] of [
 }
 
 test("typing resolves in the folder of the thread s own session", GIT_LAYOUT, async (t) => {
-  // D5: the channel was bound to another folder after the thread began.
+  // The channel was bound to another folder after the thread began.
   const world = openWorld(t);
   const project = projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -1086,9 +1084,8 @@ for (const value of ["../outside.txt", "link.txt", "dir-link/secret.txt", "/etc/
     const world = openWorld(t);
     const project = projectOf(world);
     await inAThread(world);
-    // Python's `tmp_path` held the secret beside the root: `../outside.txt` and
-    // `dir-link/secret.txt` then named nothing at all. Here both name a file that exists, so
-    // that only the rule keeps them from being shared.
+    // Both `../outside.txt` and `dir-link/secret.txt` name a file that exists, so that only the
+    // rule keeps them from being shared.
     const secret = put(world.tmpPath, "outside.txt");
     put(world.root, "outside.txt");
     put(world.tmpPath, "secret.txt");
@@ -1102,7 +1099,7 @@ for (const value of ["../outside.txt", "link.txt", "dir-link/secret.txt", "/etc/
 }
 
 test("open resolves in the folder of the thread s own session", GIT_LAYOUT, async (t) => {
-  // D5: the channel was bound to another folder after the thread began.
+  // The channel was bound to another folder after the thread began.
   const world = openWorld(t);
   const project = projectOf(world);
   await inAThread(world);

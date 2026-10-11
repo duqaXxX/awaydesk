@@ -1,7 +1,6 @@
 /**
  * An audio clip the owner sent: held until Slack has its transcript (`voice.ts`), then sent as
- * the message the owner would have typed. Port of `WaitingClip`, `take_clip`, `give_up`,
- * `send_clip` and `on_file_change` of `slack_app.py`.
+ * the message the owner would have typed.
  */
 import * as texts from "../../../core/texts.ts";
 import { fill } from "../../../core/texts.ts";
@@ -85,7 +84,8 @@ export class Clips {
     const waiting = this.clips.get(fileId);
     if (waiting === undefined) return;
     this.clips.delete(fileId);
-    // Python's `round`, half to even: 300 seconds are 5 minutes either way.
+    // Whole minutes: 300 seconds are 5 whichever way a tie rounds (`Math.round` goes up, Python's
+    // `round` to even).
     const minutes = Math.round(voice.WAIT_SECONDS / 60);
     await this.answers.tellOwner(
       waiting.channel,
@@ -114,7 +114,7 @@ export class Clips {
         );
         return;
       }
-      // Python's `decode("utf-8", "replace")`: a byte that is no UTF-8 becomes U+FFFD.
+      // A byte that is no UTF-8 becomes U+FFFD.
       heard = voice.vttText(new TextDecoder("utf-8").decode(body));
     }
     if (!heard) {
@@ -171,8 +171,8 @@ export class Clips {
   };
 
   /**
-   * Give every wait up without a word: the daemon is stopping. asyncio dropped a sleeping task
-   * with its loop; a timer of Node's keeps the process alive until it fires.
+   * Give every wait up without a word: the daemon is stopping. A timer of Node's keeps the
+   * process alive until it fires.
    */
   close(): void {
     for (const waiting of this.clips.values()) waiting.expiry?.cancel();

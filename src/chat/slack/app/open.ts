@@ -1,12 +1,10 @@
 /**
  * `!open`: a file of a session's folder shared into its thread, by name or through the picker's
- * modal. The logic is `openfile/`; these are its handlers. Port of `thread_folder`, `open_word`,
- * `found_files`, `open_file`, `update_modal`, `open_modal`, `on_open_choose`, `on_open_query` and
- * `on_open_submit` of `slack_app.py`.
+ * modal. The logic is `openfile/`; these are its handlers.
  *
- * Python made a task of the listing a click starts and cancelled it when the click was done.
- * Here the listing is a promise that began with the click and a signal that gives it up: a walk
- * or a git call in flight is never cut, the signal only stops what would follow it.
+ * The listing a click starts is a promise that began with the click, and a signal that gives it
+ * up when the click is done: a walk or a git call in flight is never cut, the signal only stops
+ * what would follow it.
  */
 import type { ThreadSession } from "../../../core/sessions/session.ts";
 import { Cancelled } from "../../../core/sessions/tasks.ts";
@@ -53,7 +51,7 @@ import {
   text,
 } from "./wire.ts";
 
-/** The words of a search: what was typed, stripped as Python strips, cut at `QUERY_LIMIT` characters. */
+/** The words of a search: what was typed, stripped (`text.ts`), cut at `QUERY_LIMIT` characters. */
 function searched(typed: string): string {
   return take(strip(typed), QUERY_LIMIT);
 }
@@ -255,9 +253,8 @@ export class Open {
   }
 
   /**
-   * `finding`'s answer when it has one within `seconds` of the clock, else null: Python's
-   * `asyncio.wait` with a timeout, which also takes a listing that had already ended when no
-   * time was left.
+   * `finding`'s answer when it has one within `seconds` of the clock, else null. A listing that
+   * had already ended when no time was left is taken too.
    */
   private async awaited(finding: Finding, seconds: number): Promise<Found | null> {
     if (seconds > 0 && finding.found === null) {

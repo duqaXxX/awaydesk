@@ -1,8 +1,7 @@
 /**
- * The Slack side: every inbound path, each checked on its own before it reaches a session. Port
- * of `build_app` in `slack_app.py`: the Bolt app, and one listener per inbound path (a message,
- * the `file_change` of a clip, a button, a select, a modal, a Home control). The app registers
- * no slash command.
+ * The Slack side: every inbound path, each checked on its own before it reaches a session. This
+ * builds the Bolt app, with one listener per inbound path (a message, the `file_change` of a
+ * clip, a button, a select, a modal, a Home control). The app registers no slash command.
  *
  * What was read in `@slack/bolt` 5.1.0 (`node_modules/@slack/bolt/dist/`), and what follows:
  *

@@ -1,4 +1,3 @@
-// Not in the Python suite: asyncio's own timeout had no tests there.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { TIMED_OUT, within } from "../../../../src/chat/slack/openfile/waiting.ts";

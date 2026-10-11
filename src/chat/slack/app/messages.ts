@@ -1,15 +1,12 @@
 /**
  * A message the owner wrote: a prompt for its thread's session, a word of the daemon's own, or
- * a command of Claude Code's. Port of `handle_message`, `handle_word`, `word_report`,
- * `old_folder_notice`, `submit_to_session`, `with_attachments`, `channel_status` and
- * `channel_status_row` of `slack_app.py`, with `slack_unescape`, `ago` and `is_clear`.
+ * a command of Claude Code's.
  *
- * Ordering. Python relied on `arrival_lock`, taken with no `await` after the checks, so that
- * prompts, messages with files and commands enter a thread's queue in the order they were sent
- * although downloads take a while. The same holds here by construction: from the moment the
+ * Ordering. Prompts, messages with files and commands enter a thread's queue in the order they
+ * were sent although downloads take a while. That holds by construction: from the moment the
  * checks of a message are over (`handleMessage` is called) to the moment its place in line is
- * taken (`Mutex.acquire` inside `arrival`), nothing is awaited unless Python awaited a call to
- * Slack there (the old-folder notice). The stretches are marked `(sync)`.
+ * taken (`Mutex.acquire` inside `arrival`), nothing is awaited except a call to Slack (the
+ * old-folder notice). The stretches are marked `(sync)`.
  */
 import type { ListedSession, PromptContent } from "../../../agent/seam.ts";
 import {
@@ -78,7 +75,7 @@ export function slackUnescape(sent: string): string {
     .replaceAll("&amp;", "&");
 }
 
-/** The first word of a passthrough, as typed: Python's `text.split(" ", 1)[0]`. */
+/** The first word of a passthrough, as typed: the text up to its first space. */
 function firstWord(command: Passthrough): string {
   return command.text.split(" ", 1)[0] ?? "";
 }
@@ -96,8 +93,8 @@ export function isClear(command: Passthrough, commands: ThreadSession["commands"
 type SlackFile = Readonly<Record<string, unknown>>;
 
 /**
- * The files a message carries. A `files` that is not a list of objects throws, as reading it did
- * in Python: such a message never becomes a prompt, and never a word either.
+ * The files a message carries. A `files` that is not a list of objects throws: such a message
+ * never becomes a prompt, and never a word either.
  */
 export function filesOf(event: Payload): SlackFile[] {
   const files = event.files;

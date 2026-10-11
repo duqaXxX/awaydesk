@@ -1,22 +1,19 @@
 /**
  * The harness of the session tests: a real `SessionManager` over a scripted agent back end and
- * the real Slack provider on `FakeSlack`. Port of `FakeClaudeClient` (`tests/fakes.py`) and of
- * `Harness` and `harness_for` (`tests/test_sessions.py`).
+ * the real Slack provider on `FakeSlack`.
  *
- * Python scripted the SDK's client with parsed messages. Here the fake stands at the agent seam,
- * and a script is made of the same recordings: each wire record goes through the session's own
- * `Translator` (the real one, as the live session does it), so a text streamed and then repeated
- * reaches the core once and a replayed prompt is `prompt_taken`. A script can also hold a
- * session event as it is, a request put to the handler the core passed to `start`, a hook's
- * run, and the end of the stream.
+ * The fake stands at the agent seam, and a script is made of recordings: each wire record goes
+ * through the session's own `Translator` (the real one, as the live session does it), so a text
+ * streamed and then repeated reaches the core once and a replayed prompt is `prompt_taken`. A
+ * script can also hold a session event as it is, a request put to the handler the core passed to
+ * `start`, a hook's run, and the end of the stream.
  *
- * `sdkMessages` gives a recording as Python's `sdk_messages` did, one item per message the
- * Python SDK parsed: it parsed no `command_lifecycle` and no `tool_progress` record (checked on
- * every recording, claude-agent-sdk 0.2.165), so an index into a Python test's list is the same
- * index here.
+ * `sdkMessages` gives a recording as one item per message the Python SDK parsed: it parsed no
+ * `command_lifecycle` and no `tool_progress` record (checked on every recording,
+ * claude-agent-sdk 0.2.165), so an index into the list is the message's index in that SDK's.
  *
  * Two clocks, both fake. `clock` is the sessions' own (`INJECTED_TURN_WAIT`, the idle close, the
- * drain's poll): Python's event loop, which its tests crossed by lowering the constants.
+ * drain's poll): what a test moves with `advance` to cross a wait of the sessions.
  * `slackClock` is the provider's (a reply's debounce and deadline, the status line's refresh).
  */
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
@@ -96,7 +93,7 @@ export type Batch = readonly Item[];
 // The records the Python SDK's parser gave no message for.
 const UNPARSED = new Set(["command_lifecycle", "tool_progress"]);
 
-/** A recording as Python's `sdk_messages` gave it: one item per message its SDK parsed. */
+/** A recording as one item per message the Python SDK parsed. */
 export function sdkMessages(name: string): Item[] {
   return sdkRecords(name)
     .filter((record) => !UNPARSED.has(String(record.type)))
@@ -108,7 +105,7 @@ export function recordOf(item: Item | undefined): JsonObject | null {
   return item !== undefined && "record" in item ? item.record : null;
 }
 
-/** Whether the item is a record of that type (`isinstance(m, ResultMessage)` is `"result"`). */
+/** Whether the item is a record of that type, and of that subtype when one is given. */
 export function isRecord(item: Item | undefined, type: string, subtype?: string): boolean {
   const record = recordOf(item);
   return (
@@ -116,17 +113,17 @@ export function isRecord(item: Item | undefined, type: string, subtype?: string)
   );
 }
 
-/** `isinstance(m, ResultMessage)`. */
+/** Whether the item is a result record. */
 export function isResult(item: Item | undefined): boolean {
   return isRecord(item, "result");
 }
 
-/** `isinstance(m, TaskStartedMessage)` and its siblings: a `system` record of that subtype. */
+/** Whether the item is a `system` record of that subtype. */
 export function isSystem(item: Item | undefined, subtype: string): boolean {
   return isRecord(item, "system", subtype);
 }
 
-/** The turns of a script: cut after each result, as Python's `split_turns` cut messages. */
+/** The turns of a script: cut after each result. */
 export function splitTurns(items: readonly Item[]): Item[][] {
   const turns: Item[][] = [[]];
   for (const item of items) {
@@ -150,8 +147,8 @@ export function event(sessionEvent: SessionEvent): Item {
   return { event: sessionEvent };
 }
 
-// The items Python's fake put a prompt's replay before: the first stream event, assistant, user
-// or result message of the turn.
+// The items a prompt's replay goes before: the first stream event, assistant, user or result
+// message of the turn.
 const WORDED_RECORDS = new Set(["stream_event", "assistant", "user", "result"]);
 const WORDED_EVENTS = new Set<SessionEvent["type"]>([
   "message_started",
@@ -170,19 +167,19 @@ function worded(item: Item): boolean {
   return "event" in item && WORDED_EVENTS.has(item.event.type);
 }
 
-/** What a scripted session is given: Python's keyword arguments of `FakeClaudeClient`. */
+/** What a scripted session is given. */
 export interface Script {
   readonly turns?: readonly Batch[];
   /** The answer to `info()`; the recorded `server-info.json`, started in `default`, when absent. */
   readonly info?: AgentInfo;
   readonly contextUsage?: ContextUsage;
-  /** `start` rejects with it (Python's `connect_error`). */
+  /** `start` rejects with it. */
   readonly startError?: Error;
   /** A start that waits for the test, as a CLI does while it starts. */
   readonly startGate?: AsyncEvent;
   readonly infoError?: Error;
   readonly contextUsageError?: Error;
-  /** `close` rejects with it (Python's `disconnect_error`). */
+  /** `close` rejects with it. */
   readonly closeError?: Error;
   /** A close that waits for the test, as a CLI takes real time to flush and exit after EOF. */
   readonly closeGate?: AsyncEvent;
@@ -191,9 +188,9 @@ export interface Script {
 const CLOSED = Symbol("closed");
 
 /**
- * A feed of batches for one reader: `asyncio.Queue`. A batch put while the reader waits reaches
- * it on the next turn of the event loop, as asyncio woke a waiting reader: what the test, or the
- * session that just sent a prompt, does next in the same step comes first.
+ * A feed of batches for one reader. A batch put while the reader waits reaches it on the next
+ * turn of the event loop (`setImmediate`): what the test, or the session that just sent a prompt,
+ * does next in the same step comes first.
  */
 class Feed {
   readonly #items: Array<Batch | typeof CLOSED> = [];
@@ -388,7 +385,7 @@ export async function anyRepository(directory: string): Promise<Repository | nul
 /** The back end of a harness: each `start` plays the next script. */
 export class FakeAgentBackend implements AgentBackend {
   capabilities: Capabilities = CAPABILITIES_FOR_TESTS;
-  /** Every session started, in order (Python's `h.clients`); one whose start failed is there too. */
+  /** Every session started, in order; one whose start failed is there too. */
   readonly sessions: FakeAgentSession[] = [];
   /** What `listSessions` answers for a folder. */
   listed: ListedSession[] = [];
@@ -505,7 +502,7 @@ export class SettledClock extends FakeClock {
 }
 
 export interface HarnessOptions {
-  /** The reply's debounce, in seconds on `slackClock` (Python's tests lowered `DEBOUNCE_SECONDS`). */
+  /** The reply's debounce, in seconds on `slackClock`. */
   readonly debounceSeconds?: number;
   readonly finalRetrySeconds?: number;
   readonly tasksKept?: number;
@@ -516,7 +513,7 @@ export interface HarnessOptions {
 
 export class Harness {
   readonly slack: FakeSlack;
-  /** A scratch folder, bound to `CHANNEL`: Python's `tmp_path`, with its symlinks resolved. */
+  /** A scratch folder, bound to `CHANNEL`, with its symlinks resolved. */
   readonly tmpPath: string;
   readonly state: StateStore;
   readonly approvals = new Approvals();
@@ -578,7 +575,7 @@ export class Harness {
     this.manager = new SessionManager(this.deps);
   }
 
-  /** Every agent session started, in order: Python's `h.clients`. */
+  /** Every agent session started, in order: the back end's `sessions`. */
   get clients(): FakeAgentSession[] {
     return this.backend.sessions;
   }
@@ -648,7 +645,7 @@ export class Harness {
 
   /**
    * Let what is ready run to its next wait: every promise callback, and every task that starts
-   * on a later turn of the event loop. Where a Python test slept a moment for the daemon to act.
+   * on a later turn of the event loop. What a test awaits for the daemon to have acted.
    * Real work the daemon started (a file read, the footer's `git`) is waited for too: its
    * answer comes from the operating system, not from a turn of the loop, so no number of turns
    * stands for it on a loaded machine.
@@ -661,7 +658,7 @@ export class Harness {
   }
 
   /**
-   * What a Python test slept through: what is ready runs, and Slack's clock moves on by
+   * A pause of `seconds` as the daemon sees it: what is ready runs, and Slack's clock moves on by
    * `seconds`, a hundredth at a time. The sessions' clock stays put. A step ends with the real
    * work it set going done (`SettledClock`), so a pause is never over before an end of turn
    * that was under way has landed: what a pause asserts afterwards is what it asserted when
@@ -675,9 +672,9 @@ export class Harness {
   }
 
   /**
-   * Wait for a condition on the fakes, as Python's `until` polled it: what is ready runs, and
-   * Slack's clock moves on a hundredth of a second at a time, for two seconds at most, so a
-   * reply's debounce passes as it did while Python polled. The sessions' clock stays put.
+   * Wait for a condition on the fakes by polling it: what is ready runs, and Slack's clock
+   * moves on a hundredth of a second at a time, for two seconds at most, so a reply's debounce
+   * passes while it polls. The sessions' clock stays put.
    * Each step also yields a moment of real time on top of the real work it waits for
    * (`SettledClock`): some of what a test waits for ends in real file reads and a `git`
    * subprocess, and a loaded machine must not use up the steps first.
@@ -693,8 +690,8 @@ export class Harness {
 }
 
 /**
- * A harness maker for one test, as the `harness_for` fixture was: each harness it made has its
- * manager closed and its folder removed when the test ends.
+ * A harness maker for one test: each harness it made has its manager closed and its folder
+ * removed when the test ends.
  */
 export function harnessFor(
   t: TestContext,
@@ -705,7 +702,7 @@ export function harnessFor(
   const tmpPath = realpathSync(mkdtempSync(join(tmpdir(), "awd-sessions-")));
   // The two "stop for the rest of the run" flags are the process's: each test starts clear.
   resetStatusFlags();
-  // The daemon's log stays out of the test report, as pytest kept it: a test that reads a line
+  // The daemon's log stays out of the test report: a test that reads a line
   // replaces the logger's method (`mock.method`), which this does not touch.
   const writer = setWriter(() => {});
   // A timer that keeps the loop alive for the test's duration: on Node 22 a test that awaits
@@ -718,8 +715,7 @@ export function harnessFor(
     rmSync(tmpPath, { recursive: true, force: true });
     setWriter(writer);
   });
-  // `tmpPath` is there before any harness, for a test that arranges the folder first (Python's
-  // `tmp_path` fixture, which `repo` and the harness shared).
+  // `tmpPath` is there before any harness, for a test that arranges the folder first.
   return Object.assign(
     (...scripts: Script[]) => {
       const harness = new Harness(slack, tmpPath, scripts, options);

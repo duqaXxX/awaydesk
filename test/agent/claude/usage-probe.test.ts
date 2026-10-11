@@ -1,7 +1,6 @@
 /**
- * The usage probe on a fake `query()`. The recorded `/usage` answer is `usage.jsonl`; the Python
- * test (`test_footer.py`) is the one with no answer, which monkeypatched `USAGE_TIMEOUT` to 50 ms
- * and here crosses the timeout on a `FakeClock`.
+ * The usage probe on a fake `query()`. The recorded `/usage` answer is `usage.jsonl`; the test
+ * with no answer crosses the timeout on a `FakeClock`.
  */
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -80,9 +79,9 @@ test("the probe takes no setting source of the owner's", LIMIT, async () => {
   await probe.close();
 });
 
-// Python's probe built a bare client: the folder and no setting sources, nothing else
-// (`UsageProbe.__init__` in `footer.py`). A session started like a thread's would be given the
-// permission to bypass and, when the owner enabled it, the Chrome flag.
+// The probe's session is a bare one (`startBare`): the folder and no setting sources, nothing
+// else. A session started like a thread's would be given the permission to bypass and, when the
+// owner enabled it, the Chrome flag.
 test(
   "the probe's session takes neither the bypass permission nor the Chrome flag",
   LIMIT,

@@ -652,8 +652,8 @@ export function loadSurface(path: string = SURFACE): Row[] {
  */
 export async function readReference(url: string = REFERENCE): Promise<string | null> {
   try {
-    // The site answers 403 to a client that does not name itself (measured 2026-10-07 for the
-    // Python reference): the probe names itself.
+    // The site answers 403 to a client that does not name itself (measured 2026-10-07 on the
+    // Python SDK reference): the probe names itself.
     const response = await fetch(url, {
       headers: { "User-Agent": "awaydesk-probe" },
       signal: AbortSignal.timeout(30_000),

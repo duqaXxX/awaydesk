@@ -1,7 +1,7 @@
 /**
  * A session's replies as native Slack streams: what starts one, what ends it, what cuts a turn
  * short, and what a failed end leaves behind. The sink's own behaviour is tested in
- * `test/chat/slack/reply/`; here the session drives it. Port of `tests/test_sessions_stream.py`.
+ * `test/chat/slack/reply/`; here the session drives it.
  */
 import assert from "node:assert/strict";
 import { mkdirSync, rmdirSync } from "node:fs";
@@ -43,7 +43,7 @@ import {
 
 const WRITES = ["chat.postMessage", "chat.startStream", "chat.appendStream", "chat.stopStream"];
 
-// Python's `fast` fixture: every test of this file runs with a short debounce.
+// Every test of this file runs with a short debounce.
 const FAST: HarnessOptions = { debounceSeconds: 0.01 };
 
 function harness(t: TestContext, scripts: Script[], options: HarnessOptions = {}): Harness {
@@ -414,8 +414,8 @@ test("a turn that fails before claude answers is a reply of its own", async (t) 
 
 // A final write that fails: no checkmark, the cross, and the persisted status kept for repair.
 
-// Python's `lose_stops`: every stop of a stream fails on the network, and the one retry of a
-// reply's end comes after `finalRetrySeconds` (the harness option).
+// Every stop of a stream fails on the network, and the one retry of a reply's end comes after
+// `finalRetrySeconds` (the harness option).
 function loseStops(h: Harness): void {
   h.slack.responses["chat.stopStream"] = networkDown();
 }
@@ -548,8 +548,8 @@ test("the status is persisted until the end lands", async (t) => {
   // after the end has landed.
   const h = harness(t, [{ turns: [sdkMessages("tools")] }]);
   const seen: Array<string | null> = [];
-  // Python wrapped `api_call`; the fake's scripted answer is called with the call's arguments at
-  // the same point.
+  // The fake's scripted answer is called with the call's arguments, and reads the thread's status
+  // at that point.
   h.slack.responses["chat.stopStream"] = (args) => {
     seen.push(thread(h).status);
     return { ok: true, channel: args.channel ?? null, ts: args.ts ?? null };
@@ -625,8 +625,7 @@ test("a close leaves no task waiting on a reply it could not end", async (t) => 
   });
   h.slack.responses["chat.stopStream"] = networkDown();
   const session = h.session();
-  // Python looked for a live `_await_landing` task; here each wait for a landing is counted in
-  // and out.
+  // Each wait for a landing is counted in and out.
   let waiting = 0;
   const original = inside(session).awaitLanding.bind(session);
   mock.method(inside(session), "awaitLanding", async (reply: Parameters<typeof original>[0]) => {
@@ -714,9 +713,8 @@ test("the thread status goes while an approval waits and comes back after it", a
   await h.until(() => pending(h.approvals).length > 0);
   await h.until(() => statuses(h).at(-1) === ""); // ✋: the session waits on the owner
   const waiting = statuses(h).length;
-  // Python slowed its fake Slack here, since its turn ended within one step of the event loop
-  // and took the status back before it was ever set. Here the status line's own task looks at
-  // the line one microtask after it changes, which the rest of the turn does not outrun.
+  // The status line's own task looks at the line one microtask after it changes, which the rest
+  // of the turn does not outrun, so Slack needs no delay here.
   approve(h);
   await turn.done.wait();
   await h.until(() => statuses(h).at(-1) === "");

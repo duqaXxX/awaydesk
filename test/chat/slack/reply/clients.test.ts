@@ -2,11 +2,7 @@
  * The retry policy of the two Slack clients, measured on the real `WebClient` of
  * `@slack/web-api` 8.2.0 with its `fetch` option replaced: what the library itself sends again,
  * and what `sharedClient` and `repliesClient` send again by the policy of `clients.ts`
- * (slack-sdk's handlers, as `make_clients` in `__main__.py` chose them), counted in requests.
- *
- * `the connection retry skips the calls that create a message` is the test of that name in
- * `tests/test_sinks.py`, which asked slack-sdk's retry handler; here the question is put to the
- * client. The rest have no Python test: Python's policy was slack-sdk's own code.
+ * (slack-sdk's handlers), counted in requests.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";

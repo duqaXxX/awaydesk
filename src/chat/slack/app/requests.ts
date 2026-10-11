@@ -1,9 +1,7 @@
 /**
  * The questions the daemon puts to the owner, and the clicks that answer them: a tool's
  * permission request and Claude's own questions (`core/requests.ts`), the same-folder hold and
- * the session setup (`core/hold.ts`). Port of `ask_owner`, `hold_before_sending`,
- * `setup_before_sending` and the `on_hold_decision`, `on_setup_*`, `on_decision` and
- * `on_question_*` listeners of `slack_app.py`.
+ * the session setup (`core/hold.ts`).
  */
 import type { KnownBlock, ModalView } from "@slack/web-api";
 import type { ModelInfo } from "../../../agent/seam.ts";

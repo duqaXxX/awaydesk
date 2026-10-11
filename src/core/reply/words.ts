@@ -29,7 +29,7 @@ export function splitLines(text: string): string[] {
 /** `value` on one line, its runs of whitespace as one space, cut with `…` past `limit` characters. */
 export function oneLine(value: string, limit: number): string {
   const text = spaced(value);
-  // Counted in code points, as Python's `len` counts: an emoji is one character.
+  // Counted in code points: an emoji is one character.
   const chars = Array.from(text);
   return chars.length <= limit ? text : `${chars.slice(0, limit - 1).join("")}…`;
 }

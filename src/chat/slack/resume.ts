@@ -76,7 +76,7 @@ function age(modifiedMs: number, now: Date): string {
     ["minute", 60],
   ] as const) {
     if (seconds >= length) {
-      // Python's `seconds // length`: the quotient rounded up by the division is taken back.
+      // The whole quotient: one that the division rounded up is taken back.
       let count = Math.floor(seconds / length);
       if (count * length > seconds) count -= 1;
       return `${count} ${unit}${count > 1 ? "s" : ""} ago`;

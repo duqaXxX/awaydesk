@@ -1,10 +1,10 @@
 /**
- * Port of `tests/test_previews.py`, in the file's order.
+ * The terminal's own words and previews for the few tools it shows that way.
  *
- * Python's `preview` read `UserMessage.tool_use_result` itself. Here the Claude back end reads
- * that shape into the seam's `FileChange` (`fileChange` in `src/agent/claude/translate.ts`) and
- * `preview` reads the change: a recorded result reaches a test through the translator, and a
- * result a Python test wrote by hand is that same object through `fileChange`.
+ * The Claude back end reads a tool result into the seam's `FileChange` (`fileChange` in
+ * `src/agent/claude/translate.ts`) and `preview` reads the change: a recorded result reaches a
+ * test through the translator, and a result written by hand is that same object through
+ * `fileChange`.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -196,8 +196,7 @@ test("a question s result alone gives no preview", () => {
   assert.ok(name === "AskUserQuestion" && preview(name, change, CWD) === null);
 });
 
-// Not in the Python file: what `preview` decides on the seam's `FileChange`, where Python
-// decided on the raw result.
+// What `preview` decides on the seam's `FileChange` itself.
 
 const EDITED: FileChange = {
   path: "/home/dev/project/notes.txt",
@@ -220,7 +219,7 @@ test("a file change under a tool with no preview falls back to the generic line"
 });
 
 test("an edit that created its file shows the hunks it holds, or nothing", () => {
-  // Python read `type: "create"` for a Write alone: under any other name the patch speaks.
+  // A created file's content is shown for a Write alone: under any other name the patch speaks.
   assert.equal(preview("Edit", CREATED, CWD), null);
   const shown = preview("Edit", { ...CREATED, hunks: EDITED.hunks }, CWD);
   assert.deepEqual(

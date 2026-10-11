@@ -320,8 +320,8 @@ test("a failed write keeps the previous file", (t) => {
   store.bind(CHANNEL, join(dir, "a"));
   const before = readFileSync(path, "utf8");
 
-  // The rename is the step that makes a write take effect: failing it is Python's `os.replace`
-  // monkeypatch.
+  // The rename (Python's `os.replace`) is the step that makes a write take effect: the test
+  // fails it.
   t.mock.method(fs, "renameSync", () => {
     throw new Error("disk full");
   });
@@ -640,7 +640,6 @@ for (const [keys, expected] of [
 }
 
 test("a written off reads as not on through bypass alone", () => {
-  // The old code looked at `bypass is True` and ignored every other key.
   const dir = scratch();
   const path = join(dir, "state.json");
   const store = new StateStore(path);
@@ -836,7 +835,7 @@ test("prune leaves alone the threads it is told to keep", () => {
   assert.equal(store.thread(CHANNEL, OTHER_THREAD_TS), null);
 });
 
-// The cases below have no Python test: they pin the bytes and the readers the port must keep.
+// The cases below pin the bytes the store writes and how it reads a file.
 
 // The bytes of `state.json` for the calls below, as the Python daemon wrote them (captured on
 // 2026-10-10): a file already on an owner's disk has this form, and the store keeps writing it.

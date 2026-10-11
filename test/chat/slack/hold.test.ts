@@ -23,7 +23,6 @@ test("the hold question names the link and carries the id on both buttons", () =
   assert.deepEqual([send.value, keep.value], ["hold-1", "hold-1"]);
 });
 
-// Python: `test_the_hold_question_s_buttons_answer_it_in_its_own_words` (tests/test_slack_app.py).
 test("the hold question s buttons answer it in its own words", () => {
   // Issue #76: `Continue` beside the shorter `Cancel` made the second look the lesser choice,
   // and a button's width is its text. One `primary` in the set, as the button reference asks.

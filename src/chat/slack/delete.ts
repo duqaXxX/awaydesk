@@ -76,7 +76,7 @@ function nextCursor(answer: unknown): string | null {
   return typeof cursor === "string" && cursor !== "" ? cursor : null;
 }
 
-/** A message's `ts`: its absence is as much a failure as a missing key was in Python. */
+/** A message's `ts`; a message without one is a failure. */
 function tsOf(message: Record<string, unknown>): string {
   if (message.ts === undefined) throw new Error("a message without a ts");
   return String(message.ts);

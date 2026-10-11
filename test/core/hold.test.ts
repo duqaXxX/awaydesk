@@ -1,5 +1,4 @@
-// No Python test exercised `hold.Holds` on its own (`tests/test_slack_app.py` reached it through
-// the handlers), so these are written for it directly, from `hold.py`'s docstrings.
+// `Holds` on its own, apart from the handlers that use it.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Holds } from "../../src/core/hold.ts";

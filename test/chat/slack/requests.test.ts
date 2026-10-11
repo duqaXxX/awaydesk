@@ -65,7 +65,7 @@ function permission(known: Partial<PermissionRequest> = {}): PermissionRequest {
   };
 }
 
-/** A question in the seam's shape, as the Python tests wrote the tool's input. */
+/** A question in the seam's shape. */
 function question(known: {
   question: string;
   header?: string;

@@ -1,31 +1,20 @@
 /**
  * The entry point, run whole on fakes: `run` over `FakeSlack`, the scripted agent back end of the
  * sessions harness, a fake clock, an emitter for the signals and a receiver that opens no socket.
- * Port of `tests/test_main.py`. Python waited on `asyncio.wait_for(run, timeout=1)` for a daemon
- * that never stops by itself; here a test waits for the receiver's start (the connection) and
- * stops the daemon with a signal. Nothing waits on the wall clock: the Home tab's debounce and
- * the cleanup's schedule are crossed by advancing `FakeClock`.
+ * A test waits for the receiver's start (the connection) and stops the daemon with a signal.
+ * Nothing waits on the wall clock: the Home tab's debounce and the cleanup's schedule are crossed
+ * by advancing `FakeClock`.
  *
- * Not ported, with the reason (the six tests of `_alive_sessions` and `_projects_dir`, which
- * moved to the Claude back end as `ClaudeBackend.aliveSessions`, and were ported where the
- * function now lives, `test/agent/claude/listing.test.ts` and `backend.test.ts`):
- * - `test_alive_sessions_reads_directory_sessions`: "the ids alive are the listed sessions and
- *   every transcript file there".
- * - `test_alive_sessions_keeps_a_transcript_list_sessions_filters_out`: the same test.
- * - `test_alive_sessions_cannot_tell_about_a_folder_it_cannot_read`: "a transcripts folder that
- *   cannot be read cannot tell".
- * - `test_alive_sessions_cannot_decide_a_long_folder_it_does_not_find`: the test of the long
- *   folder name's key, in the same file.
- * - `test_alive_sessions_decides_a_short_folder_it_does_not_find`: "a folder with no transcripts
- *   folder has the listing alone".
- * What `main.ts` owns of them, that the cleanup is given the back end's function, is the test
- * `prune uses alive sessions to drop a gone thread`.
+ * Which sessions are alive is the Claude back end's (`ClaudeBackend.aliveSessions`, tested in
+ * `test/agent/claude/listing.test.ts` and `backend.test.ts`); what `main.ts` owns of it, that the
+ * cleanup is given the back end's function, is the test `prune uses alive sessions to drop a
+ * gone thread`.
  *
- * Beyond the port, from the critical review of 2026-10-10: the daemon is built over one fake for
- * each Slack client it makes (`slack`, `replies`, `owner`), so a part wired to the wrong client or
- * token fails a test; a listener still in flight when the stop ends is held on the channel check
- * and let go after `run` returned; and what the process does with an exception or a rejection
- * nobody handled, and with an event loop that something still holds after the stop.
+ * From the critical review of 2026-10-10: the daemon is built over one fake for each Slack client
+ * it makes (`slack`, `replies`, `owner`), so a part wired to the wrong client or token fails a
+ * test; a listener still in flight when the stop ends is held on the channel check and let go
+ * after `run` returned; and what the process does with an exception or a rejection nobody
+ * handled, and with an event loop that something still holds after the stop.
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -643,7 +632,7 @@ test("only the reply client skips the connection retry of a post", async () => {
   assert.equal((await sent(1)) instanceof WebAPIRequestError, true);
 });
 
-// What `__main__.py` did without a test of its own: the stop, the process and the entry point.
+// The stop, the process and the entry point.
 
 test("a stop by SIGTERM lets running turns finish and SIGINT does not", async (t) => {
   const infos = written(t, logger, "info");
@@ -817,10 +806,9 @@ test("a rejection and an exception nobody handled are logged by name, and the ex
   assert.equal(stops, 1);
 });
 
-// S1: what the daemon does with an error nobody handled. Python logged it and went on, as
-// asyncio did with a task's exception. A rejected promise is the same thing here, a piece of
-// work that failed with nobody waiting for it, and the daemon logs it and goes on: Node only
-// ends the process for it when no listener is set. An uncaught exception leaves the process in
+// S1: what the daemon does with an error nobody handled. A rejected promise is a piece of work
+// that failed with nobody waiting for it, and the daemon logs it and goes on: Node only ends
+// the process for it when no listener is set. An uncaught exception leaves the process in
 // a state Node documents as unsafe to resume from, so it takes the path of a SIGINT and exits
 // 1: launchd starts a clean daemon and the crash repair runs.
 
@@ -1012,7 +1000,7 @@ test("a drain that ends first leaves no wait behind", async () => {
 });
 
 test("a signal before the drain starts is counted and does not cut it", async () => {
-  // Python cleared the stop event: a second signal during a long repair was lost.
+  // A second signal during a long repair must not be lost.
   const source = new EventEmitter();
   const stop = new StopSignals(source as SignalSource);
   source.emit("SIGTERM");

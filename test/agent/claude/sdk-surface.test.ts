@@ -3,13 +3,12 @@
  * declarations of the installed `@anthropic-ai/claude-agent-sdk` (`sdk.d.ts`): the map of what the
  * daemon depends on is only worth reading while both agree with it.
  *
- * The Python suite keeps `docs/sdk-surface.md` true with `probe/surface.py` and the interpreter's
- * `ast` and `typing`. Neither exists here and the compiler API is not a dependency, so the table
- * parser, the reading of the declarations and the check of the reference are the helpers below,
- * which move to the TypeScript probe when it has a `surface` module of its own. The declarations
- * are read as text: a declared type's block runs from its `declare` line to the `;` that closes it
- * at bracket depth zero (an interface or a class: to the `}` that does), with comments blanked and
- * string literals kept whole.
+ * The compiler API is not a dependency, so the table parser, the reading of the declarations and
+ * the check of the reference are the helpers below; `probe/surface.ts` carries the same readers
+ * for the probe's run against a release. The declarations are read as text: a declared type's
+ * block runs from its `declare` line to the `;` that closes it at bracket depth zero (an
+ * interface or a class: to the `}` that does), with comments blanked and string literals kept
+ * whole.
  */
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";

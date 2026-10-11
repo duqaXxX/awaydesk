@@ -1,6 +1,6 @@
 /**
- * The listing of a folder's sessions, their dates and the ids alive, from `test_resume.py`
- * (`by_last_activity`) and `__main__._alive_sessions`, which had no test of its own.
+ * The listing of a folder's sessions (`byLastActivity`), their dates and the ids alive
+ * (`aliveSessions`).
  *
  * The transcripts are written where Claude Code keeps them, under a `CLAUDE_CONFIG_DIR` of the
  * test, in the shape read from real transcripts (CLI 2.1.280). The folder's name in them is
@@ -92,7 +92,7 @@ function listed(id: string, hoursAgo: number): ListedSession {
   };
 }
 
-// The tests of test_resume.py that were left for this module.
+// Dating the sessions.
 
 test("a session s time is its last message not its file", LIMIT, async (t) => {
   const { config, project } = await workspace(t);
@@ -150,8 +150,6 @@ test("dates falling back to file times are logged", LIMIT, async (t) => {
   assert.equal(warnings.length, 1);
   assert.match(warnings[0] as string, /file times/);
 });
-
-// What the Python tests did not pin.
 
 test("a session with no stamp in its transcript keeps its file's time", LIMIT, async (t) => {
   const { config, project } = await workspace(t);
@@ -279,8 +277,7 @@ test("the projects directory is the config directory's, else the owner's home", 
 });
 
 // The review round of 2026-10-10: a transcript is a regular file, opened without following a link
-// and without waiting on a FIFO. Python's `_last_message_ms` used `path.open("rb")`, which follows
-// a symlink and blocks on a FIFO; the stricter read is a difference, not a port.
+// and without waiting on a FIFO. A plain open follows a symlink and blocks on a FIFO.
 
 const POSIX = { ...LIMIT, skip: process.platform === "win32" };
 const ENTRY = `${JSON.stringify({ type: "user", timestamp: "2026-09-25T10:00:00.000Z" })}\n`;

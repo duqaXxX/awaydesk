@@ -312,7 +312,7 @@ for (const entry of [".git", ".git/HEAD", ".git/config"]) {
 
 const ENTRIES = ["HEAD", "objects", "refs", "commondir"] as const;
 
-/** Python's `itertools.combinations` over `ENTRIES` for every size, in its order. */
+/** Every combination of `ENTRIES` of every size, in Python's `itertools.combinations` order. */
 function combinations(): (typeof ENTRIES)[number][][] {
   const found: (typeof ENTRIES)[number][][] = [];
   const pick = (size: number, from: number, chosen: (typeof ENTRIES)[number][]): void => {
@@ -930,7 +930,7 @@ test(
   "a dot dot after a symlink is resolved from where the symlink leads in a folder",
   POSIX,
   async () => {
-    // Python: False. The kernel and git resolve `link` first, so `T/link/..` is `evil`, not `T`.
+    // Untrusted: the kernel and git resolve `link` first, so `T/link/..` is `evil`, not `T`.
     const repo = gitDirAt(join(tmp, "T", ".git"));
     trust(home, [join(repo, "..")]);
     const deep = join(tmp, "evil", "deep");
@@ -946,7 +946,7 @@ test(
   "a dot dot after a symlink in a gitfile is resolved from where the symlink leads",
   POSIX,
   async () => {
-    // Python: None. The git dir is `out/outgit`, outside the session's folder.
+    // No repository: the git dir is `out/outgit`, outside the session's folder.
     const work = makeWork();
     mkdirSync(join(tmp, "out", "deep"), { recursive: true });
     mkdirSync(join(tmp, "out", "outgit"));
@@ -961,7 +961,7 @@ test(
   "a dot dot after a symlink in a commondir is resolved from where the symlink leads",
   POSIX,
   async () => {
-    // Python: None. The common dir is `out/common`, outside the session's folder.
+    // No repository: the common dir is `out/common`, outside the session's folder.
     const work = makeWork();
     const dotGit = gitDirAt(join(work, "x", ".git"));
     mkdirSync(join(tmp, "out", "deep"), { recursive: true });
@@ -977,7 +977,7 @@ test(
   "a dot dot after a symlink in a worktree s gitfile does not reach the main checkout",
   POSIX,
   async () => {
-    // Python: the key is `far/M`, untrusted: workspaceTrusted False and trustedRepository None.
+    // The key is `far/M`, untrusted: workspaceTrusted false and trustedRepository null.
     const main = join(tmp, "M");
     gitDirAt(join(main, ".git"));
     const worktree = join(tmp, "W");
@@ -999,7 +999,7 @@ test(
   "a gitfile with an invalid byte does not name the folder with a replacement character",
   POSIX,
   async () => {
-    // Python: False. `m\xff` is not `m\ufffd`; the bytes are kept apart, not replaced.
+    // Untrusted: `m\xff` is not `m\ufffd`; the bytes are kept apart, not replaced.
     const main = join(tmp, `m${"\ufffd"}`);
     gitDirAt(join(main, ".git"));
     const worktree = join(tmp, "W");
@@ -1022,7 +1022,7 @@ test(
   "a worktree registration with an invalid byte does not name the folder with a replacement character",
   POSIX,
   async () => {
-    // Python: False. `w\xfe/.git` is not `w\ufffd/.git`.
+    // Untrusted: `w\xfe/.git` is not `w\ufffd/.git`.
     const main = join(tmp, "M");
     gitDirAt(join(main, ".git"));
     const worktree = join(tmp, `w${"\ufffd"}`);
@@ -1039,7 +1039,7 @@ test(
 );
 
 test("a commondir with an invalid byte covers nothing", POSIX, async () => {
-  // No Python answer to match: it kept the bytes and named a path no folder of ours can have.
+  // The bytes are kept, so the commondir names a path no folder of ours can have.
   const work = makeWork();
   const dotGit = gitDirAt(join(work, "x", ".git"));
   mkdirSync(join(work, "x", `c${"\ufffd"}`));
@@ -1054,7 +1054,7 @@ test(
   "a recorded path with a lone surrogate does not stand for a folder with a replacement character",
   POSIX,
   async () => {
-    // Python: False. `x\ud800` cannot be encoded as a path, so it names no folder at all.
+    // Untrusted: `x\ud800` cannot be encoded as a path, so it names no folder at all.
     const folder = join(tmp, `x${"\ufffd"}`);
     mkdirSync(folder);
     writeFileSync(
@@ -1080,7 +1080,7 @@ test(
   "a session folder behind a very long chain of symlinks covers nothing, and does not reject",
   POSIX,
   async () => {
-    // Python followed 300 links and trusted; the 255-link cap here answers closed instead.
+    // 300 links are past the 255-link cap, which answers closed.
     const work = makeWork();
     const repo = gitInit(join(work, "app"));
     const head = chainTo(work, "c", 300);
@@ -1115,7 +1115,7 @@ test(
 );
 
 test("a gitfile path that ends in a space is not read without it", POSIX, async () => {
-  // Python: None. git strips line ends only, so `g ` (a symlink out) is the git dir, not `g`.
+  // No repository: git strips line ends only, so `g ` (a symlink out) is the git dir, not `g`.
   const work = makeWork();
   const x = join(work, "x");
   mkdirSync(x);
@@ -1127,7 +1127,7 @@ test("a gitfile path that ends in a space is not read without it", POSIX, async 
 });
 
 test("a commondir path that ends in a space is not read without it", POSIX, async () => {
-  // Python: None. `../.git ` leads to the symlink `.git ` out of the folder.
+  // No repository: `../.git ` leads to the symlink `.git ` out of the folder.
   const work = makeWork();
   const x = join(work, "x");
   const dotGit = gitDirAt(join(x, ".git"));
@@ -1138,8 +1138,8 @@ test("a commondir path that ends in a space is not read without it", POSIX, asyn
 });
 
 test("a file that grows after its size was read is read up to git s limit", POSIX, async () => {
-  // Python read up to GITFILE_BYTES whatever the size was: a prefix of the grown file names
-  // another path (`a/` for `a/b`).
+  // The read goes up to GITFILE_BYTES whatever size was read first: a prefix of the grown file
+  // names another path (`a/` for `a/b`).
   const work = makeWork();
   const x = join(work, "x");
   gitDirAt(join(x, "a", "b"));

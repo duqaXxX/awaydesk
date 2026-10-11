@@ -1,12 +1,11 @@
 /**
- * What stands for asyncio in the sessions: a task that can be cancelled, an event, a lock, a
+ * The primitives of the sessions: a task that can be cancelled, an event, a semaphore, a lock, a
  * queue, and a wait that a signal ends. The rule they serve is the header of `session.ts`.
  *
- * asyncio ran what became ready (a new task, the waiter of an event that was set) on a later
- * turn of its loop, once the code that made it ready had reached a real wait. A promise
- * callback runs sooner than that: at the next `await` of that code, whether or not the `await`
- * waits for anything. So a new task starts, and the waiters of an event wake, on the next turn
- * of the event loop (`setImmediate`), in the order they became ready.
+ * A promise callback runs at the next `await` of the code that made it ready, whether or not
+ * that `await` waits for anything. So a new task starts, and the waiters of an event wake, on
+ * the next turn of the event loop (`setImmediate`), in the order they became ready: the code
+ * that made them ready reaches its own next real wait first.
  */
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
@@ -37,7 +36,7 @@ function nextTurn(): Promise<void> {
   });
 }
 
-/** What a wait rejects with when its signal aborts: Python's `asyncio.CancelledError`. */
+/** What a wait rejects with when its signal aborts. */
 export class Cancelled extends Error {
   constructor() {
     super("cancelled");
@@ -47,7 +46,7 @@ export class Cancelled extends Error {
 
 /**
  * `promise`, for a caller that may stop waiting: rejects with the signal's reason when it aborts
- * first. The promise itself goes on, which is `asyncio.shield`: what it began runs to its end.
+ * first. The promise itself goes on: what it began runs to its end.
  */
 export function cancellable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (signal === undefined) return promise;
@@ -74,16 +73,14 @@ export function cancellable<T>(promise: Promise<T>, signal?: AbortSignal): Promi
 }
 
 /**
- * `asyncio.create_task`. The function starts on the next turn of the event loop, never inside
- * the call that made the task: asyncio ran a new task only once the code that created it had
- * yielded, and the sessions set state right after creating one. A task cancelled before it
- * started never runs. With `immediate`, the function has started running when the task is made,
- * which is the rule of the chat provider's passes (the header of `sinks.ts`).
+ * A task. The function starts on the next turn of the event loop, never inside the call that
+ * made the task, and the sessions set state right after creating one. A task cancelled before
+ * it started never runs. With `immediate`, the function has started running when the task is
+ * made, which is the rule of the chat provider's passes (the header of `sinks.ts`).
  * `cancel` aborts the task's signal with `Cancelled`; the function decides which of its waits
  * take it. A task that fails rejects `result()` and never surfaces as an unhandled rejection.
  * When nobody has asked for its result, the failure is logged by its name and by where it was
- * thrown: asyncio's `Task exception was never retrieved`, without which a task that broke
- * would leave no trace.
+ * thrown, so that a task that broke leaves a trace.
  */
 export class Task<T = void> {
   private readonly controller = new AbortController();
@@ -118,7 +115,7 @@ export class Task<T = void> {
     return this.controller.signal;
   }
 
-  /** Whether the function has returned or thrown: `asyncio.Task.done()`. */
+  /** Whether the function has returned or thrown. */
   get done(): boolean {
     return this.finished;
   }
@@ -143,10 +140,10 @@ export class Task<T = void> {
 }
 
 /**
- * `asyncio.Event`. `set` wakes its waiters on the next turn of the event loop: whoever set it
- * goes on to its own next real wait first, as under asyncio, so a waiter never sees the state of
- * the setter half-way through what it was doing. A waiter whose signal aborts leaves and rejects
- * with the signal's reason.
+ * An event. `set` wakes its waiters on the next turn of the event loop: whoever set it goes on
+ * to its own next real wait first, so a waiter never sees the state of the setter half-way
+ * through what it was doing. A waiter whose signal aborts leaves and rejects with the signal's
+ * reason.
  */
 export class Event {
   private value = false;
@@ -189,7 +186,7 @@ export class Event {
 }
 
 /**
- * `asyncio.Semaphore`: at most `limit` holders at once, the others served in the order they
+ * A counting gate: at most `limit` holders at once, the others served in the order they
  * came. A place given back goes straight to the first in line, so it is never free for a
  * newcomer to take ahead of a waiter.
  */
@@ -249,14 +246,14 @@ export class Semaphore {
   }
 }
 
-/** `asyncio.Lock`: a semaphore of one place. */
+/** A lock: a semaphore of one place. */
 export class Mutex extends Semaphore {
   constructor() {
     super(1);
   }
 }
 
-/** `asyncio.Queue`, unbounded, for one consumer. */
+/** A queue, unbounded, for one consumer. */
 export class Queue<T> {
   private readonly items: T[] = [];
   private readonly filled = new Event();

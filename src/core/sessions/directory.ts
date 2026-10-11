@@ -17,16 +17,14 @@ export async function checkDirectory(
 ): Promise<void> {
   // One stat and one directory open on a local folder, as a session start always made them.
   // A folder the daemon is not let into is unreadable at either: at the stat when a folder
-  // above it is closed, at the open when it is closed itself. Python's `is_dir` raised at the
-  // first, and the owner read the error's name where the second told him what to grant.
+  // above it is closed, at the open when it is closed itself. Both say `DirectoryUnreadable`.
   try {
     if (!(await stat(directory)).isDirectory()) throw new DirectoryMissing(directory);
     await (await opendir(directory)).close();
   } catch (error) {
     const code = errorCode(error);
-    // Python's `PermissionError` is these two.
     if (code === "EACCES" || code === "EPERM") throw new DirectoryUnreadable(directory);
-    // A path with a null in it is one Node refuses to look at: Python's `is_dir` said no.
+    // A path with a null in it is one Node refuses to look at: it names no folder.
     if (code !== undefined && (ABSENT.has(code) || code === "ERR_INVALID_ARG_VALUE")) {
       throw new DirectoryMissing(directory);
     }
@@ -46,7 +44,7 @@ export function resolveDirectory(raw: string, root: string): string | null {
   // to the owner (launchd starts it in `/`).
   const written = expandUser(raw);
   try {
-    // Joined as text, as Python's `root / raw` is: the disk follows a link before a `..`.
+    // Joined as text: the disk follows a link before a `..`.
     const path = resolvePath(isAbsolute(written) ? written : `${root}/${written}`);
     if (!statSync(path).isDirectory() || !under(path, root)) return null;
     // The kernel is asked too, since a session runs in the folder it reaches: whatever the

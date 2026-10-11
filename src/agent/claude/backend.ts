@@ -51,7 +51,7 @@ export class ClaudeBackend implements AgentBackend {
   /**
    * Starts a session for the daemon's own use, the usage probe's: the folder and no setting
    * source, without the permission to bypass and without the Chrome flag, which only a thread's
-   * session is given (Python's probe built a bare client). Fails as `start` does.
+   * session is given. Fails as `start` does.
    */
   async startBare(folder: string, requests: RequestHandler): Promise<AgentSession> {
     const session = new ClaudeSession(

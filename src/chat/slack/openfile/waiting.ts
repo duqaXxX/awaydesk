@@ -1,7 +1,5 @@
 /**
- * The waits `!open` is made of: a counting gate for git's turns and for one modal's updates, and
- * a time limit on the injected clock. Python's `asyncio.Semaphore`, `asyncio.Lock` and
- * `asyncio.timeout`.
+ * The time limit `!open` puts on a wait, on the injected clock.
  */
 import type { Clock } from "../../../clock.ts";
 

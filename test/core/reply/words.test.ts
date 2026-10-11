@@ -1,5 +1,5 @@
 /**
- * The cuts Python's runtime made for the reply's words: `str.split()`, `str.strip()` and
+ * The cuts of the reply's words, which follow Python's runtime: `str.split()`, `str.strip()` and
  * `str.splitlines()`. The expected values are CPython 3.12's.
  */
 import assert from "node:assert/strict";

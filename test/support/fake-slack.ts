@@ -1,9 +1,7 @@
 /**
  * The Slack test double: a real `WebClient` with the network replaced, and the fake clock.
- * Port of the Slack half of `tests/fakes.py`.
  *
- * Python's fake subclassed `AsyncWebClient` and overrode `api_call`. Here it subclasses
- * `WebClient` and overrides `apiCall`, which is the same funnel (verified in
+ * It subclasses `WebClient` and overrides `apiCall`, the funnel of every call (verified in
  * `@slack/web-api` 8.2.0, `dist/methods.js` and `dist/WebClient.js`): every bound method, such as
  * `client.chat.postMessage`, is `self.apiCall.bind(self, method)`, evaluated in the `Methods`
  * constructor against the instance's prototype chain, so an override on a subclass is the one
@@ -12,7 +10,7 @@
  * `files.uploadV2` is the exception: it is bound to `filesUploadV2` directly, which does its work
  * through `files.getUploadURLExternal` and `files.completeUploadExternal` (both `apiCall`) and
  * posts the bytes with `makeRequest`, which ends in the client's `fetch` option. The fake hands
- * the client its own `fetch` for that one step, which is what `_upload_file` was in Python.
+ * the client its own `fetch` for that one step.
  *
  * What `apiCalls` and the golden files hold is the call as it reaches the funnel, normalised:
  * - no `token` (a per-call credential, never part of the logical call);
@@ -97,12 +95,12 @@ function systemError(message: string, name: keyof typeof constants.errno): Error
   return Object.assign(new Error(message), { code: name, errno: -constants.errno[name] });
 }
 
-/** Slack applied the call, then the connection reset (Python: `aiohttp.ClientOSError(104, ...)`). */
+/** Slack applied the call, then the connection reset. */
 export function connectionReset(): WebAPIRequestError {
   return requestFailed(systemError("read ECONNRESET", "ECONNRESET"));
 }
 
-/** No route to Slack (Python: `aiohttp.ClientConnectionError("network down")`). */
+/** No route to Slack. */
 export function networkDown(): WebAPIRequestError {
   return requestFailed(systemError("connect ENETUNREACH", "ENETUNREACH"));
 }
@@ -124,7 +122,7 @@ export function httpError(status = 500, statusText = "Internal Server Error"): W
   return new WebAPIHTTPError(status, statusText, {}, "");
 }
 
-/** `asyncio.Event`: `wait` resolves once the event is set, at once when it already is. */
+/** A latch: `wait` resolves once the event is set, at once when it already is. */
 export class AsyncEvent {
   #isSet = false;
   #waiters: Array<() => void> = [];
@@ -160,7 +158,7 @@ function list(value: Json | undefined, what: string): Json[] {
   return value;
 }
 
-/** A list of objects, `[]` for a field that is absent (Python: `list(args.get(key) or [])`). */
+/** A list of objects, `[]` for a field that is absent. */
 function objects(value: Json | undefined, what: string): JsonObject[] {
   return value ? list(value, what).map((item) => object(item, what)) : [];
 }
@@ -176,7 +174,10 @@ function str(value: Json | undefined): string {
   return value === undefined ? "None" : String(value);
 }
 
-/** Python's `str.strip()`: its whitespace is not `String.prototype.trim`'s (it adds U+001C to U+001F and U+0085, and has no U+FEFF). */
+/**
+ * Python's `str.strip()`: its whitespace is not `String.prototype.trim`'s (it adds U+001C to
+ * U+001F and U+0085, and has no U+FEFF).
+ */
 function strip(text: string): string {
   const space = (char: string | undefined): boolean => {
     if (char === undefined) return false;
@@ -323,8 +324,8 @@ const GATE_DEFAULT = "chat.stopStream";
  * (`message_not_in_streaming_state`).
  */
 export class FakeSlack extends WebClient {
-  /** Every call that reached the funnel (Python: `calls`; `calls` is the client's own Web API
-   * namespace, `client.calls.add`). */
+  /** Every call that reached the funnel. Not named `calls`: that is the client's own Web API
+   * namespace (`client.calls.add`). */
   apiCalls: SlackCall[] = [];
   /** The ts of every chat.postMessage, in order. */
   postedTs: string[] = [];

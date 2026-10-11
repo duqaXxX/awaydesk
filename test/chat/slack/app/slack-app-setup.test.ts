@@ -1,28 +1,26 @@
 /**
  * The session setup (issue #74): model, effort and bypass, asked before a new session's first
- * prompt. Port of the section of `tests/test_slack_app.py` that opens with `# Session setup
- * (issue #74)`, in its order, through `a model change keeps a supported effort and the tick`. The
- * harness is `test/support/slack-app.ts`; the `manual` fixture is `manualWorld`.
+ * prompt. The harness is `test/support/slack-app.ts`; a world whose setups wait for Start is
+ * `manualWorld`.
  *
- * What stands for Python's patches and private members:
- * - `monkeypatch.setattr(FakeClaudeClient, "set_model" | "set_permission_mode", ...)` is
- *   `t.mock.method` on `FakeAgentSession.prototype`, which `t` restores.
- * - `native_bypass_folder` and `auto_mode_settings` are `world.permissionMode`.
- * - `_drop_client`, which a test calls to lose the client, and the `ThreadSession._drop_client`
- *   patch are the private `dropClient` (TypeScript `private` is compile-time only), reached by
- *   the cast in `Internals`.
- * - `session.update_limiter.acquire` is `world.limiter.acquire`, the same object the handlers
- *   and the session setup draw from.
- * - A `RuntimeError` or `OSError` raised by a patch is an `Error` of that name: a failure is
- *   told to the owner by its name.
+ * How a test changes or reads what the public API does not give:
+ * - `setModel` and `setEffort` of `FakeAgentSession.prototype` are replaced with `t.mock.method`,
+ *   which `t` restores.
+ * - `world.permissionMode` is the mode the process starts in, as the owner's own Claude Code
+ *   settings set it.
+ * - `dropClient`, which a test calls to lose the client and replaces on `ThreadSession`, is
+ *   private (TypeScript `private` is compile-time only), reached by the cast in `Internals`.
+ * - `world.limiter.acquire` is the limiter the handlers and the session setup draw from.
+ * - A `RuntimeError` or `OSError` raised by a replaced method is an `Error` of that name: a
+ *   failure is told to the owner by its name.
  *
  * The fake back end declares `liveEffort: true`, as the real one does: an effort chosen at Start
- * is set on the live session. Python's back end started a fresh client for it, and the tests that
- * read that second client run twice: under the Python name with `liveEffort` switched off on the
- * world's back end (Python's assertions), and under a name of their own with it on, asserting
- * that `setEffort` reached the live session and that no second one started. The tests that hold
- * Start between the effort and the prompt held the reconnect's start; with the effort set live
- * there is no reconnect, so their live variants hold `setEffort` instead.
+ * is set on the live session. A back end that changes an effort only through a fresh client is
+ * `withoutLiveEffort`, and the tests that read that second client run twice: with `liveEffort`
+ * switched off on the world's back end, and under a name of their own with it on, asserting that
+ * `setEffort` reached the live session and that no second one started. The tests that hold Start
+ * between the effort and the prompt hold the reconnect's start when it is off; with the effort
+ * set live there is no reconnect, so their live variants hold `setEffort` instead.
  */
 import assert from "node:assert/strict";
 import { join } from "node:path";
@@ -97,12 +95,12 @@ function internals(session: ThreadSession): Internals {
   return session as unknown as Internals;
 }
 
-/** Python's `RuntimeError` and `OSError` as the daemon names a failure to the owner. */
+/** An error with the given name, which is how the daemon names a failure to the owner. */
 function failure(name: string, message: string): Error {
   return Object.assign(new Error(message), { name });
 }
 
-/** A world whose back end changes an effort only through a fresh client, as Python's did. */
+/** A world whose back end changes an effort only through a fresh client. */
 function withoutLiveEffort(world: World): World {
   world.backend.capabilities = { ...world.backend.capabilities, liveEffort: false };
   return world;
@@ -377,8 +375,8 @@ test("a continue decided before the post returns still sends", async (t) => {
 
 /**
  * Start with an effort and the bypass box ticked, held in the window in which the answer is
- * applied but nothing is sent yet. Python held the reconnect's CLI start; with the effort set
- * live there is no reconnect, so `live` holds `setEffort` instead. Returns what opens the window.
+ * applied but nothing is sent yet. Held at the reconnect's CLI start; with the effort set live
+ * there is no reconnect, so `live` holds `setEffort` instead. Returns what opens the window.
  */
 async function startWithAGatedReconnect(
   t: TestContext,

@@ -1,16 +1,13 @@
 /**
- * Port of `tests/test_renderer.py`, in the file's order.
+ * The turn renderer on session events. A recording reaches it through the Claude back end's
+ * `Translator` (`test/support/replay.ts`), as in a live session. Where a case needs a message no
+ * recording holds:
  *
- * Python fed the renderer the SDK's parsed messages. The renderer now reads session events, so a
- * recording reaches it through the Claude back end's `Translator` (`test/support/replay.ts`), as
- * in a live session. Where a Python test built or altered a message by hand:
- *
- * - a message it built from a wire literal (`parse_message` of a stream event, of a whole
- *   assistant message, of a `compact_boundary`) is that same wire record, translated;
- * - a recorded message it altered on a field of the wire (an error message's content, a
- *   result's text or terminal reason) is the recorded wire record with that field altered,
- *   translated;
- * - a message it altered to see the renderer react (a tool's name, a task frame under another
+ * - a message built from a wire literal (a stream event, a whole assistant message, a
+ *   `compact_boundary`) is that wire record, translated;
+ * - a recorded message altered on a field of the wire (an error message's content, a result's
+ *   text or terminal reason) is the recorded wire record with that field altered, translated;
+ * - a message altered to see the renderer react (a tool's name, a task frame under another
  *   task's id) is the event, altered.
  */
 import assert from "node:assert/strict";
@@ -398,7 +395,7 @@ test("feed notice opens the reply", async () => {
 });
 
 // The compact_boundary payload of a /compact turn, as the bundled CLI 2.1.280 sent it
-// (recorded 2026-09-24 by actions/scripts/2026-09-24-compact-stream-probe.py; ids synthetic).
+// (recorded 2026-09-24; ids synthetic).
 const COMPACT_BOUNDARY = {
   type: "system",
   subtype: "compact_boundary",
@@ -873,8 +870,7 @@ test("a write cut short by a stop shows as stopped", async () => {
   );
 });
 
-// Not in the Python file: the helpers Python's tests reached only through a recording, and what
-// the session port relies on around a reply's end.
+// The renderer's helpers on their own, and what the session relies on around a reply's end.
 
 test("a result s summary is its first line that says something, on one line", () => {
   assert.equal(resultSummary("\n  \nfirst  line\nsecond"), "first line");

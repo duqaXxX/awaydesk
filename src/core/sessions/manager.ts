@@ -1,7 +1,7 @@
 /**
  * The live sessions, one per open thread, and what spans them: `!bind`, `!resume`, a thread's
- * release for its delete, and the drain of a stop. Port of `SessionManager` in `sessions.py`;
- * how its waits are said is the header of `session.ts`.
+ * release for its delete, and the drain of a stop. How its waits are made is the header of
+ * `session.ts`.
  */
 import type { ListedSession, Repository } from "../../agent/seam.ts";
 import { errorName } from "../../values.ts";
@@ -25,8 +25,8 @@ export class SessionManager {
   private readonly heldThreads = new Set<string>();
   /**
    * Set at the top of `closeAll`: a listener still in flight when a stop ends must not build a
-   * session nobody will close, nor write `state.json` after the lock was released (asyncio
-   * cancelled every listener with its loop; Node's keep running).
+   * session nobody will close, nor write `state.json` after the lock was released (Node's
+   * listeners keep running after a stop).
    */
   private closed = false;
   draining = false;

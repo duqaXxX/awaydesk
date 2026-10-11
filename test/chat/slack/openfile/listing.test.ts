@@ -522,8 +522,8 @@ test("a search says whether the listing it came from was cut", async () => {
 test("a search checks files only until the limit and counts by name past it", async () => {
   const plain = join(tmp.dir, "plain");
   writeAll(plain, ...Array.from({ length: 40 }, (_, i) => `part${String(i).padStart(2, "0")}.csv`));
-  // Python counted the calls of `_locate`; a path is checked as it is taken from the iterable
-  // `regularFiles` is given, so the paths taken are the paths checked.
+  // A path is checked as it is taken from the iterable `regularFiles` is given, so the paths
+  // taken are the paths checked.
   const checked: string[] = [];
   const counting: typeof regularFiles = (folder, relatives, limit) => {
     function* watched(): Generator<string> {

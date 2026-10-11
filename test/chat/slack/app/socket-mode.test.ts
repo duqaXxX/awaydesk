@@ -2,10 +2,9 @@
  * The Socket Mode connection the daemon listens on (`socketReceiver`), on the real
  * `@slack/bolt` 5.1.0 receiver and `@slack/socket-mode` 3.1.0 client with their network replaced.
  *
- * Not a port: Python's `slack_bolt` logged nothing of the sort. Two questions, answered here:
- * what the libraries write (nothing of their own text: a refusal's sentence, an error's message
- * and the WebSocket URL's ticket can all be in it), and how the daemon learns that the
- * connection is gone for good (it is not told: only an unhandled rejection shows it).
+ * Two questions: what the libraries write (nothing of their own text: a refusal's sentence, an
+ * error's message and the WebSocket URL's ticket can all be in it), and how the daemon learns that
+ * the connection is gone for good (it is not told: only an unhandled rejection shows it).
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

@@ -1,9 +1,9 @@
-/** The waits, the limits and the words of a session: Python's module constants, by their names. */
+/** The waits, the limits and the words of a session. */
 import type { SessionEventType } from "../../agent/seam.ts";
 import type { SessionStatus } from "../../chat/seam.ts";
 
 // The events that belong to a turn: the first one that arrives with no turn running starts one
-// (Python's `TURN_MESSAGES`: a stream event, an assistant or a user message, a result).
+// (a stream event, an assistant or a user message, a result).
 export const TURN_EVENTS: ReadonlySet<SessionEventType> = new Set([
   "message_started",
   "message_ended",
@@ -59,8 +59,8 @@ export const ASKED_LIMIT = 100;
 export const NOT_SENT_START = 60;
 // What the reader says ended the stream when the back end gave no reason of its own.
 export const PROCESS_EXITED = "the Claude Code process exited";
-// The root's status as `state.json` has held it since the Python daemon: the name of the
-// reaction that showed it. The session index and the crash repair read these words.
+// The root's status as `state.json` holds it, the way the Python daemon wrote it: the name of
+// the reaction that showed it. The session index and the crash repair read these words.
 export const STORED_STATUS: Readonly<Record<SessionStatus, string>> = {
   working: "hourglass_flowing_sand",
   waiting: "raised_hand",

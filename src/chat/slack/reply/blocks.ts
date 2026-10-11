@@ -1,7 +1,7 @@
 /**
  * The blocks and the stream chunks a reply is written with, and the limits they are held to.
  *
- * The shapes are the ones the Python daemon sent and the recordings read back; the pinned
+ * The shapes are the ones the recordings read back; the pinned
  * `@slack/types` 3.2.0 declares them as `MarkdownBlock`, `ContextBlock`, `DividerBlock`,
  * `TaskCardBlock`, `ContainerBlock`, `RichTextBlock` and the chunks of `AnyChunk`.
  */

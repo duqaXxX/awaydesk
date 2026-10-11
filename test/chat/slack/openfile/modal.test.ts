@@ -103,7 +103,7 @@ test("a group holds ten rows and skips the paths that cannot fit", () => {
 });
 
 test("names count code points where Python counted them", () => {
-  // Extra: an emoji is one character of the 75, and a cut never lands inside it.
+  // An emoji is one character of the 75, and a cut never lands inside it.
   const name = `${"😀".repeat(76)}.md`;
   const text = String(at(option(name), "text", "text"));
   assert.equal(Array.from(text).length, 75);

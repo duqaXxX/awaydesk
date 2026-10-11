@@ -21,7 +21,7 @@ import { errorName } from "../../values.ts";
 
 export const logger = getLogger("awaydesk.agent.claude.chrome");
 
-// Python read the record as strict UTF-8 and kept a BOM in the text, where `json.loads` refuses it.
+// Strict UTF-8, and a BOM stays in the text, where `JSON.parse` refuses it.
 const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 /**

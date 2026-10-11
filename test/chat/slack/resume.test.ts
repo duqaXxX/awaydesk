@@ -1,9 +1,6 @@
 /**
- * Port of the part of `tests/test_resume.py` whose subject is the picker's blocks and the
- * Resume button's value. Left to the Claude back end (they read Claude Code's transcript
- * files): `a_session_s_time_is_its_last_message_not_its_file`,
- * `dating_stops_once_the_rest_cannot_enter_the_list` and
- * `dates_falling_back_to_file_times_are_logged`.
+ * The Resume picker's blocks and the Resume button's value. How a session is dated from Claude
+ * Code's transcript files is tested with the Claude back end (`test/agent/claude/listing.test.ts`).
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -205,8 +202,8 @@ for (const [name, value] of [
   });
 }
 
-// Not in the Python file: the sizes and ages the picker writes, where Python's rounding and
-// floor division could differ from JavaScript's.
+// The sizes and ages the picker writes, where Python's rounding and floor division could differ
+// from JavaScript's.
 test("a size is written as the terminal writes it, a tie rounding to the even tenth", () => {
   const size = (bytes: number): string => {
     const [row] = rows(

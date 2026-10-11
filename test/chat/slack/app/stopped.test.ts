@@ -2,11 +2,10 @@
  * The app after the daemon stopped (`BuiltApp.close`, which the shutdown calls once the Socket
  * Mode connection is closed): a listener still in flight when the stop ends goes on at its next
  * await, and must do nothing the owner can see, call nothing in Slack and write nothing, since
- * the sessions are closed and the lock is released. Python had no such state: `asyncio.run`
- * cancelled every listener when `run()` returned.
+ * the sessions are closed and the lock is released.
  *
- * Not a port. The listeners are held where the reviewer held them: on the channel check
- * (`conversations.members`), which every inbound path runs after the owner check.
+ * The listeners are held on the channel check (`conversations.members`), which every inbound
+ * path runs after the owner check.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
