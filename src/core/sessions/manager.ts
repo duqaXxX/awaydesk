@@ -4,6 +4,7 @@
  * `session.ts`.
  */
 import type { ListedSession, Repository } from "../../agent/seam.ts";
+import type { ThreadRef } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
 import { bindableFolders } from "../folders.ts";
 import * as texts from "../texts.ts";
@@ -14,8 +15,8 @@ import { DirectoryUnavailable, SessionClosed } from "./errors.ts";
 import { logger, ThreadSession } from "./session.ts";
 import type { Event } from "./tasks.ts";
 
-function keyOf(channelId: string, threadTs: string): string {
-  return `${channelId}\n${threadTs}`;
+function keyOf(channelId: string, threadId: string): string {
+  return `${channelId}\n${threadId}`;
 }
 
 export class SessionManager {
@@ -40,11 +41,11 @@ export class SessionManager {
    * and its live session. Null when the channel is unbound; `SessionClosed` once a stop closed
    * the sessions, before anything is written.
    */
-  open(channelId: string, threadTs: string): ThreadSession | null {
+  open(channelId: string, threadId: string): ThreadSession | null {
     this.refuseWhenClosed();
     if (this.deps.state.channel(channelId) === null) return null;
-    const thread = this.deps.state.openThread(channelId, threadTs);
-    return this.session(channelId, threadTs, thread.directory);
+    const thread = this.deps.state.openThread(channelId, threadId);
+    return this.session(channelId, threadId, thread.directory);
   }
 
   /**
@@ -61,8 +62,8 @@ export class SessionManager {
    * word, a notice): the live session's activity line, which that post cleared, is set again.
    * Nothing for a thread with no live session: it shows none.
    */
-  wrote(channelId: string, threadTs: string): void {
-    this.sessions.get(keyOf(channelId, threadTs))?.threadWritten();
+  wrote(channelId: string, threadId: string): void {
+    this.sessions.get(keyOf(channelId, threadId))?.threadWritten();
   }
 
   /**
@@ -75,19 +76,19 @@ export class SessionManager {
    * await, however slow (a download, a slow call to the chat). Null for every thread once a stop
    * closed the sessions.
    */
-  get(channelId: string, threadTs: string): ThreadSession | null {
+  get(channelId: string, threadId: string): ThreadSession | null {
     if (this.closed) return null;
-    const thread = this.deps.state.thread(channelId, threadTs);
-    if (thread === null || this.heldThreads.has(keyOf(channelId, threadTs))) return null;
-    return this.session(channelId, threadTs, thread.directory);
+    const thread = this.deps.state.thread(channelId, threadId);
+    if (thread === null || this.heldThreads.has(keyOf(channelId, threadId))) return null;
+    return this.session(channelId, threadId, thread.directory);
   }
 
   private refuseWhenClosed(): void {
     if (this.closed) throw new SessionClosed();
   }
 
-  private session(channelId: string, threadTs: string, directory: string): ThreadSession {
-    const key = keyOf(channelId, threadTs);
+  private session(channelId: string, threadId: string, directory: string): ThreadSession {
+    const key = keyOf(channelId, threadId);
     let session = this.sessions.get(key) ?? null;
     let predecessor: Event | null = null;
     if (session?.closed) {
@@ -100,7 +101,7 @@ export class SessionManager {
       session = null;
     }
     if (session === null) {
-      const built = new ThreadSession(channelId, threadTs, directory, this.deps, { predecessor });
+      const built = new ThreadSession(channelId, threadId, directory, this.deps, { predecessor });
       built.draining = this.draining;
       built.onClosed = () => this.evictIfCurrent(key, built);
       this.sessions.set(key, built);
@@ -122,13 +123,13 @@ export class SessionManager {
   }
 
   /**
-   * The (channelId, threadTs) of every thread with a session object that is not closed: what
-   * the cleanup of `state.json` must not remove under a running session.
+   * Every thread with a session object that is not closed: what the cleanup of `state.json`
+   * must not remove under a running session.
    */
-  liveThreads(): Array<readonly [channelId: string, threadTs: string]> {
+  liveThreads(): ThreadRef[] {
     return [...this.sessions.values()]
       .filter((session) => !session.closed)
-      .map((session) => [session.channelId, session.threadTs] as const);
+      .map((session) => ({ channel: session.channelId, thread: session.threadId }));
   }
 
   /**
@@ -196,9 +197,9 @@ export class SessionManager {
    * is being deleted is told it holds no session. False once a stop closed the sessions: no
    * thread is held for a delete the stop would cut short.
    */
-  async release(channelId: string, threadTs: string): Promise<boolean> {
+  async release(channelId: string, threadId: string): Promise<boolean> {
     if (this.closed) return false;
-    const key = keyOf(channelId, threadTs);
+    const key = keyOf(channelId, threadId);
     const session = this.sessions.get(key);
     const inUse =
       session !== undefined && !session.closed && (session.waitingForOwner || !session.idle);
@@ -214,13 +215,13 @@ export class SessionManager {
   }
 
   /** Whether the thread is being deleted: it still has its entry, and takes no session. */
-  held(channelId: string, threadTs: string): boolean {
-    return this.heldThreads.has(keyOf(channelId, threadTs));
+  held(channelId: string, threadId: string): boolean {
+    return this.heldThreads.has(keyOf(channelId, threadId));
   }
 
   /** End the hold `release` put on a thread: its delete ended, either way. */
-  free(channelId: string, threadTs: string): void {
-    this.heldThreads.delete(keyOf(channelId, threadTs));
+  free(channelId: string, threadId: string): void {
+    this.heldThreads.delete(keyOf(channelId, threadId));
   }
 
   /**
@@ -241,19 +242,19 @@ export class SessionManager {
   }
 
   /**
-   * `!resume`: opens a thread at `threadTs` (the `!resume` message's own ts) in the channel's
+   * `!resume`: opens a thread at `threadId` (the `!resume` message's own ts) in the channel's
    * folder, already on `sessionId`. Null when the channel is unbound; `SessionClosed` once a
    * stop closed the sessions.
    */
   async resume(
     channelId: string,
-    threadTs: string,
+    threadId: string,
     sessionId: string,
   ): Promise<ThreadSession | null> {
     this.refuseWhenClosed();
     if (this.deps.state.channel(channelId) === null) return null;
-    const thread = this.deps.state.openThread(channelId, threadTs, sessionId);
-    return this.session(channelId, threadTs, thread.directory);
+    const thread = this.deps.state.openThread(channelId, threadId, sessionId);
+    return this.session(channelId, threadId, thread.directory);
   }
 
   /**
@@ -348,7 +349,7 @@ export class SessionManager {
       } catch (error) {
         // one session's failure must not skip the rest
         logger.error(
-          `could not close ${session.channelId}/${session.threadTs}: ${errorName(error)}`,
+          `could not close ${session.channelId}/${session.threadId}: ${errorName(error)}`,
         );
       }
     }

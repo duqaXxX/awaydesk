@@ -756,7 +756,7 @@ test("an api error is logged by category and thread never by its text", async (t
   const lines = logs.flat();
   const [line, ...others] = lines.filter((m) => m.includes("reported an error"));
   assert.equal(others.length, 0);
-  assert.ok(line?.endsWith(`${session.channelId}/${session.threadTs}: server_error`));
+  assert.ok(line?.endsWith(`${session.channelId}/${session.threadId}: server_error`));
   assert.ok(!lines.some((m) => m.includes(words)));
 });
 
@@ -3895,7 +3895,7 @@ test("the manager names the threads with a live session", async (t) => {
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
   assert.deepEqual(h.manager.liveThreads(), []);
   const session = h.session();
-  assert.deepEqual(h.manager.liveThreads(), [[CHANNEL, THREAD]]);
+  assert.deepEqual(h.manager.liveThreads(), [{ channel: CHANNEL, thread: THREAD }]);
   await session.close();
   assert.deepEqual(h.manager.liveThreads(), []); // a closed one is no longer in the way
 });

@@ -10,12 +10,12 @@ import fs, {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
+import type { ThreadRef } from "../../src/chat/seam.ts";
 import {
   channelRecord,
   parseThread,
   StateError,
   StateStore,
-  type ThreadKey,
   threadState,
   UnknownChannel,
 } from "../../src/core/state.ts";
@@ -181,7 +181,7 @@ test("holder finds a session across channels", () => {
   store.openThread(CHANNEL, THREAD_TS);
   store.openThread(OTHER_CHANNEL, OTHER_THREAD_TS);
   store.setSession(OTHER_CHANNEL, OTHER_THREAD_TS, SESSION);
-  assert.deepEqual(store.holder(SESSION), [OTHER_CHANNEL, OTHER_THREAD_TS]);
+  assert.deepEqual(store.holder(SESSION), { channel: OTHER_CHANNEL, thread: OTHER_THREAD_TS });
   assert.equal(store.holder("no-such-session"), null);
 });
 
@@ -739,7 +739,7 @@ test("threads lists every thread of every channel", () => {
 test("the observer hears what the session index shows and nothing else", () => {
   const dir = scratch();
   const store = new StateStore(join(dir, "state.json"));
-  const heard: (readonly ThreadKey[])[] = [];
+  const heard: (readonly ThreadRef[])[] = [];
   store.onSessionsChange = (changed) => heard.push(changed);
 
   store.bind(CHANNEL, join(dir, "project")); // a new channel is a new group on the page
@@ -752,9 +752,10 @@ test("the observer hears what the session index shows and nothing else", () => {
   store.setStatusPending(CHANNEL, THREAD_TS, null, "white_check_mark");
   assert.equal(heard.length, 6);
   // Each time, the thread the write touched and no other.
-  assert.deepEqual(heard[1], [[CHANNEL, THREAD_TS]]);
-  assert.deepEqual(heard[2], [[CHANNEL, OTHER_THREAD_TS]]);
-  for (const changed of heard.slice(3)) assert.deepEqual(changed, [[CHANNEL, THREAD_TS]]);
+  assert.deepEqual(heard[1], [{ channel: CHANNEL, thread: THREAD_TS }]);
+  assert.deepEqual(heard[2], [{ channel: CHANNEL, thread: OTHER_THREAD_TS }]);
+  for (const changed of heard.slice(3))
+    assert.deepEqual(changed, [{ channel: CHANNEL, thread: THREAD_TS }]);
 
   // What no row of the index shows: a reply's bookkeeping, a request, bypass, effort, a rebind.
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "1790549807.000001");
@@ -765,7 +766,7 @@ test("the observer hears what the session index shows and nothing else", () => {
   assert.equal(heard.length, 6);
 
   store.removeThread(CHANNEL, THREAD_TS);
-  assert.deepEqual(heard.slice(6), [[[CHANNEL, THREAD_TS]]]);
+  assert.deepEqual(heard.slice(6), [[{ channel: CHANNEL, thread: THREAD_TS }]]);
 });
 
 test("the observer hears a prune that removed something", () => {
@@ -773,7 +774,7 @@ test("the observer hears a prune that removed something", () => {
   const store = new StateStore(join(dir, "state.json"));
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD_TS, SESSION);
-  const heard: (readonly ThreadKey[])[] = [];
+  const heard: (readonly ThreadRef[])[] = [];
   store.onSessionsChange = (changed) => heard.push(changed);
 
   assert.equal(
@@ -785,7 +786,7 @@ test("the observer hears a prune that removed something", () => {
     store.prune(() => new Set(), Number(THREAD_TS)),
     1,
   );
-  assert.deepEqual(heard, [[[CHANNEL, THREAD_TS]]]);
+  assert.deepEqual(heard, [[{ channel: CHANNEL, thread: THREAD_TS }]]);
 });
 
 test("remove channel forgets the channel and its threads and says which", () => {
@@ -796,18 +797,18 @@ test("remove channel forgets the channel and its threads and says which", () => 
   store.bind(OTHER_CHANNEL, join(dir, "other"));
   store.openThread(CHANNEL, THREAD_TS, SESSION);
   store.openThread(OTHER_CHANNEL, OTHER_THREAD_TS);
-  const heard: (readonly ThreadKey[])[] = [];
+  const heard: (readonly ThreadRef[])[] = [];
   store.onSessionsChange = (changed) => heard.push(changed);
 
   store.removeChannel(CHANNEL);
   assert.deepEqual(store.channels(), [OTHER_CHANNEL]);
   assert.equal(store.thread(CHANNEL, THREAD_TS), null);
   assert.deepEqual(Object.keys(read(path).channels), [OTHER_CHANNEL]);
-  assert.deepEqual(heard, [[[CHANNEL, THREAD_TS]]]);
+  assert.deepEqual(heard, [[{ channel: CHANNEL, thread: THREAD_TS }]]);
   assert.deepEqual(new StateStore(path).channels(), [OTHER_CHANNEL]); // it stays forgotten after a restart
 
   store.removeChannel(CHANNEL); // not there any more: nothing written, nothing announced
-  assert.deepEqual(heard, [[[CHANNEL, THREAD_TS]]]);
+  assert.deepEqual(heard, [[{ channel: CHANNEL, thread: THREAD_TS }]]);
 });
 
 test("prune leaves alone the threads it is told to keep", () => {
@@ -819,16 +820,16 @@ test("prune leaves alone the threads it is told to keep", () => {
   store.openThread(CHANNEL, THREAD_TS, SESSION);
   store.openThread(CHANNEL, OTHER_THREAD_TS);
   const later = Number(OTHER_THREAD_TS) + 2 * 24 * 60 * 60;
-  const keep: ThreadKey[] = [
-    [CHANNEL, THREAD_TS],
-    [CHANNEL, OTHER_THREAD_TS],
+  const keep: ThreadRef[] = [
+    { channel: CHANNEL, thread: THREAD_TS },
+    { channel: CHANNEL, thread: OTHER_THREAD_TS },
   ];
   assert.equal(
     store.prune(() => new Set(), later, keep),
     0,
   );
   assert.equal(
-    store.prune(() => new Set(), later, [[CHANNEL, THREAD_TS]]),
+    store.prune(() => new Set(), later, [{ channel: CHANNEL, thread: THREAD_TS }]),
     1,
   );
   assert.notEqual(store.thread(CHANNEL, THREAD_TS), null);

@@ -66,7 +66,7 @@ export function answerOf(
 /** One request waiting for the owner. */
 export interface Pending {
   readonly channelId: string;
-  readonly threadTs: string;
+  readonly threadId: string;
   readonly title: string;
   /** The questions of a question request, or null for a permission request. */
   readonly questions: readonly Question[] | null;
@@ -90,7 +90,7 @@ export class Approvals {
   /** Starts waiting for `title`'s request; `questions` makes it a question. */
   open(
     channelId: string,
-    threadTs: string,
+    threadId: string,
     title: string,
     questions: readonly Question[] | null = null,
   ): [approvalId: string, pending: Pending] {
@@ -101,7 +101,7 @@ export class Approvals {
     });
     const pending: Pending = {
       channelId,
-      threadTs,
+      threadId,
       title,
       questions,
       decision,
@@ -120,14 +120,14 @@ export class Approvals {
   resolve(
     approvalId: string,
     channelId: string,
-    threadTs: string,
+    threadId: string,
     outcome: Outcome,
   ): Pending | null {
     const entry = this.entries.get(approvalId);
     if (
       entry === undefined ||
       entry.pending.channelId !== channelId ||
-      entry.pending.threadTs !== threadTs ||
+      entry.pending.threadId !== threadId ||
       entry.pending.decided
     ) {
       return null;
@@ -137,11 +137,11 @@ export class Approvals {
   }
 
   /** Denies every request still open in this thread, and returns them. */
-  denyAll(channelId: string, threadTs: string): Pending[] {
+  denyAll(channelId: string, threadId: string): Pending[] {
     const denied: Pending[] = [];
     for (const [approvalId, entry] of [...this.entries]) {
       const { pending } = entry;
-      if (pending.channelId === channelId && pending.threadTs === threadTs && !pending.decided) {
+      if (pending.channelId === channelId && pending.threadId === threadId && !pending.decided) {
         this.decide(approvalId, entry, DENY);
         denied.push(pending);
       }
@@ -155,10 +155,10 @@ export class Approvals {
    * cancelling its reader, since `denyAll`'s own list is empty by the time close reaches it
    * (issue #19 fix round item 8).
    */
-  pendingIn(channelId: string, threadTs: string): Pending[] {
+  pendingIn(channelId: string, threadId: string): Pending[] {
     return [...this.entries.values()]
       .map((entry) => entry.pending)
-      .filter((pending) => pending.channelId === channelId && pending.threadTs === threadTs);
+      .filter((pending) => pending.channelId === channelId && pending.threadId === threadId);
   }
 
   /**

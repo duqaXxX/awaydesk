@@ -20,6 +20,7 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { TestContext } from "node:test";
+import { NAME, WORDS } from "../../src/agent/claude/backend.ts";
 import { CAPABILITIES } from "../../src/agent/claude/capabilities.ts";
 import { postToolUseHookEvents, stopHookEvents } from "../../src/agent/claude/hooks.ts";
 import { agentInfo, contextUsage } from "../../src/agent/claude/info.ts";
@@ -384,6 +385,8 @@ export async function anyRepository(directory: string): Promise<Repository | nul
 
 /** The back end of a harness: each `start` plays the next script. */
 export class FakeAgentBackend implements AgentBackend {
+  readonly name = NAME;
+  readonly words = WORDS;
   capabilities: Capabilities = CAPABILITIES_FOR_TESTS;
   /** Every session started, in order; one whose start failed is there too. */
   readonly sessions: FakeAgentSession[] = [];
@@ -430,6 +433,8 @@ export class FakeAgentBackend implements AgentBackend {
   trustedRepository(folder: string, sessionFolder: string): Promise<Repository | null> {
     return this.repository(folder, sessionFolder);
   }
+
+  async close(): Promise<void> {}
 }
 
 // The Claude back end's capabilities, with the effort levels the seam asks a back end to name

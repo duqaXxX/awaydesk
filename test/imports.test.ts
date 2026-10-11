@@ -48,6 +48,12 @@ export function refusal(file: string, specifier: string): string | null {
   if (file.startsWith("chat/") && /^agent\/claude\//.test(target)) {
     return "the chat module never imports a back end";
   }
+  if (/^(agent|chat)\/seam\.ts$/.test(file) && target.startsWith("core/")) {
+    return "a seam imports nothing of the core";
+  }
+  if (file.startsWith("chat/") && target.startsWith("core/") && target !== "core/port.ts") {
+    return "a chat provider imports the core's port, and nothing else of the core";
+  }
   return null;
 }
 
@@ -85,6 +91,9 @@ test("the rule refuses a library outside its module", () => {
   assert.ok(refusal("core/reply/renderer.ts", "../../chat/slack/reply/sinks.ts"));
   assert.ok(refusal("agent/claude/session.ts", "../../core/state.ts"));
   assert.ok(refusal("chat/slack/app.ts", "../../agent/claude/session.ts"));
+  assert.ok(refusal("chat/slack/app.ts", "../../core/state.ts"));
+  assert.ok(refusal("chat/slack/home.ts", "../../core/port/home.ts"));
+  assert.ok(refusal("chat/seam.ts", "../core/port.ts"));
 });
 
 test("the rule lets each module import its own library and the seams", () => {
@@ -93,7 +102,7 @@ test("the rule lets each module import its own library and the seams", () => {
   assert.equal(refusal("core/sessions.ts", "../agent/seam.ts"), null);
   assert.equal(refusal("core/sessions.ts", "../chat/seam.ts"), null);
   assert.equal(refusal("chat/slack/requests.ts", "../../agent/seam.ts"), null);
-  assert.equal(refusal("chat/slack/app.ts", "../../core/state.ts"), null);
+  assert.equal(refusal("chat/slack/app.ts", "../../core/port.ts"), null);
   assert.equal(refusal("main.ts", "./agent/claude/backend.ts"), null);
   assert.equal(refusal("core/state.ts", "node:fs"), null);
 });

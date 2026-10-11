@@ -11,9 +11,10 @@
  * `StateStore.prune`'s. The chat provider supplies the lookup that turns Slack's answer into a
  * `ChannelAnswer`.
  */
+import type { ThreadRef } from "../chat/seam.ts";
 import { getLogger, type Logger } from "../log.ts";
 import { errorName } from "../values.ts";
-import type { StateStore, ThreadKey } from "./state.ts";
+import type { StateStore } from "./state.ts";
 
 export const logger = getLogger("awaydesk.core.cleanup");
 
@@ -32,10 +33,10 @@ export type ChannelAnswer = "gone" | "there" | "no answer";
 export type ChannelLookup = (channelId: string) => Promise<ChannelAnswer>;
 
 /**
- * The (channelId, threadTs) of every thread with a live session in the daemon, read at the moment
+ * The (channelId, threadId) of every thread with a live session in the daemon, read at the moment
  * it is needed: nothing of theirs is removed under them.
  */
-export type Live = () => Iterable<ThreadKey>;
+export type Live = () => Iterable<ThreadRef>;
 
 /** A folder's session ids, or null when it cannot tell. */
 export type Alive = (
@@ -90,7 +91,7 @@ export async function forgetGoneChannels(
     );
     return [];
   }
-  const busy = new Set([...live()].map(([channelId]) => channelId));
+  const busy = new Set([...live()].map((ref) => ref.channel));
   const forgotten: string[] = [];
   for (const channelId of gone) {
     const record = state.channel(channelId);

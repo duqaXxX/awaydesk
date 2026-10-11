@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import type { ListedSession } from "../../../src/agent/seam.ts";
+import type { ThreadRef } from "../../../src/chat/seam.ts";
 import {
   ALL,
   CHANNEL_ACTION,
@@ -687,8 +688,8 @@ function makeHome(w: World, sessions: Listing, extra: Partial<HomeOptions> = {})
  * again at the next publish. The debounced publish it asks for never fires here, since the
  * test publishes itself and never advances the clock. Returns what the state announced.
  */
-function toldByState(home: Home, state: StateStore): (readonly (readonly [string, string])[])[] {
-  const heard: (readonly (readonly [string, string])[])[] = [];
+function toldByState(home: Home, state: StateStore): (readonly ThreadRef[])[] {
+  const heard: (readonly ThreadRef[])[] = [];
   state.onSessionsChange = (changed) => {
     heard.push(changed);
     home.request(changed);

@@ -3,13 +3,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, beforeEach, test } from "node:test";
+import type { ThreadRef } from "../../src/chat/seam.ts";
 import {
   type ChannelAnswer,
   type ChannelLookup,
   clean,
   forgetGoneChannels,
 } from "../../src/core/cleanup.ts";
-import { StateStore, type ThreadKey } from "../../src/core/state.ts";
+import { StateStore } from "../../src/core/state.ts";
 import type { Logger } from "../../src/log.ts";
 
 const CHANNEL = "C000CHAN";
@@ -18,9 +19,9 @@ const OTHER_GONE = "C000GON2";
 const THREAD = "1789000000.000100";
 const GONE_THREAD = "1789000500.000100";
 const SESSION = "68da9311-0000-4000-8000-00000000000a";
-const NOBODY: readonly ThreadKey[] = [];
+const NOBODY: readonly ThreadRef[] = [];
 
-function nothingLive(): readonly ThreadKey[] {
+function nothingLive(): readonly ThreadRef[] {
   return NOBODY;
 }
 
@@ -139,7 +140,7 @@ for (const [label, failure] of [
 
 test("a channel with a live session is left for the next pass", async () => {
   const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });
-  const live: ThreadKey[] = [[GONE_CHANNEL, GONE_THREAD]];
+  const live: ThreadRef[] = [{ channel: GONE_CHANNEL, thread: GONE_THREAD }];
   assert.deepEqual(await forgetGoneChannels(lookup, state, () => live, log), []);
   assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
 });
@@ -173,7 +174,7 @@ test("clean forgets gone channels then prunes what is left", async () => {
 });
 
 test("clean keeps a thread with a live session", async () => {
-  const live: ThreadKey[] = [[CHANNEL, THREAD]];
+  const live: ThreadRef[] = [{ channel: CHANNEL, thread: THREAD }];
   await clean(channelsInSlack({}), state, {
     alive: () => new Set(),
     live: () => live,
@@ -204,7 +205,7 @@ test("clean goes on to prune when the channel check itself fails", async () => {
   const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });
   let reads = 0;
 
-  function live(): readonly ThreadKey[] {
+  function live(): readonly ThreadRef[] {
     reads += 1;
     if (reads === 1) throw new Error("unexpected");
     return NOBODY;

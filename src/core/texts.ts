@@ -1,4 +1,6 @@
-/** Every sentence the owner can read in Slack. English only; one place to review the wording. */
+/** Every sentence the owner can read in the chat. English only; one place to review the wording. */
+import type { AgentBackend } from "../agent/seam.ts";
+import type { ChatProvider } from "../chat/seam.ts";
 
 /**
  * Fills a template's `{name}` fields: every template below keeps its `{name}` fields as written,
@@ -10,6 +12,51 @@ export function fill(template: string, values: Readonly<Record<string, string | 
     if (value === undefined) throw new Error(`no value for the field {${name}}`);
     return String(value);
   });
+}
+
+/** The names a text takes from the agent and the chat the daemon runs with. */
+export interface Names {
+  /** The agent's name (`AgentBackend.name`). */
+  readonly agent: string;
+  /** Who writes the agent's replies (`AgentWords.author`). */
+  readonly author: string;
+  /** The command that opens the agent on the host (`AgentWords.command`). */
+  readonly cli: string;
+  /** The chat's name (`ChatProvider.name`). */
+  readonly chat: string;
+}
+
+/**
+ * A template that names the agent or the chat, with the fields `{agent}`, `{author}`, `{cli}`
+ * and `{chat}`. It is no string: nothing can show it before `named` filled the names in.
+ */
+export interface Named {
+  readonly template: string;
+}
+
+function naming(template: string): Named {
+  return Object.freeze({ template });
+}
+
+/** `text` with the names filled in; its other `{name}` fields are left for `fill`. */
+export function named(text: Named, names: Names): string {
+  return text.template.replace(
+    /\{(agent|author|cli|chat)\}/g,
+    (_field, name: keyof Names) => names[name],
+  );
+}
+
+/** The names of an agent and a chat, as the two modules give them. */
+export function namesOf(
+  agent: Pick<AgentBackend, "name" | "words">,
+  chat: Pick<ChatProvider, "name">,
+): Names {
+  return {
+    agent: agent.name,
+    author: agent.words.author,
+    cli: agent.words.command,
+    chat: chat.name,
+  };
 }
 
 export const UNBOUND =

@@ -6,6 +6,7 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import { dirname, join } from "node:path";
+import type { ThreadRef } from "../chat/seam.ts";
 import { getLogger } from "../log.ts";
 import { errorName } from "../values.ts";
 
@@ -15,14 +16,11 @@ export const logger = getLogger("awaydesk.core.state");
 // turn: `prune` drops it. A Slack `thread_ts` is the root message's epoch time in seconds.
 export const ONE_DAY = 24 * 60 * 60;
 
-/** A `(channelId, threadTs)` pair. */
-export type ThreadKey = readonly [channelId: string, threadTs: string];
-
 /**
  * What an observer is told after a write: the threads it touched, as a set (no order, no
  * repeats).
  */
-export type SessionsChange = (changed: readonly ThreadKey[]) => void;
+export type SessionsChange = (changed: readonly ThreadRef[]) => void;
 
 export interface ThreadState {
   /** The folder the thread was opened in. */
@@ -185,10 +183,10 @@ function parseV2(raw: Raw): Map<string, ChannelRecord> {
     const entry = asRaw(rawEntry, `channel ${channelId}`);
     const threads = new Map<string, ThreadState>();
     const rawThreads = Object.hasOwn(entry, "threads") ? entry.threads : {};
-    for (const [threadTs, rawThread] of Object.entries(
+    for (const [threadId, rawThread] of Object.entries(
       asRaw(rawThreads, `'threads' of ${channelId}`),
     )) {
-      threads.set(threadTs, parseThread(asRaw(rawThread, `thread ${threadTs}`)));
+      threads.set(threadId, parseThread(asRaw(rawThread, `thread ${threadId}`)));
     }
     channels.set(channelId, {
       directory: requiredString(entry, "directory"),
@@ -238,8 +236,8 @@ function dumpJson(data: unknown): string {
   );
 }
 
-function threadKey(channelId: string, threadTs: string): string {
-  return `${channelId}\0${threadTs}`;
+function threadKey(channelId: string, threadId: string): string {
+  return `${channelId}\0${threadId}`;
 }
 
 export interface StateStoreOptions {
@@ -254,7 +252,7 @@ export class StateStore {
   private channelsById: Map<string, ChannelRecord>;
   // Called after a write that changed which channels are bound, which threads exist, the
   // session one holds, or a root's reaction: what the session index is built from. It is
-  // given the (channelId, threadTs) of each thread the write touched. Never while loading.
+  // given the (channelId, threadId) of each thread the write touched. Never while loading.
   onSessionsChange: SessionsChange | null = null;
 
   constructor(path: string, options: StateStoreOptions = {}) {
@@ -272,16 +270,16 @@ export class StateStore {
     return [...this.channelsById.keys()];
   }
 
-  thread(channelId: string, threadTs: string): ThreadState | null {
-    return this.channelsById.get(channelId)?.threads.get(threadTs) ?? null;
+  thread(channelId: string, threadId: string): ThreadState | null {
+    return this.channelsById.get(channelId)?.threads.get(threadId) ?? null;
   }
 
-  /** Every (channelId, threadTs, thread), across all channels. */
+  /** Every (channelId, threadId, thread), across all channels. */
   threads(): [string, string, ThreadState][] {
     return [...this.channelsById].flatMap(([channelId, channel]) =>
-      [...channel.threads].map(([threadTs, thread]): [string, string, ThreadState] => [
+      [...channel.threads].map(([threadId, thread]): [string, string, ThreadState] => [
         channelId,
-        threadTs,
+        threadId,
         thread,
       ]),
     );
@@ -308,28 +306,32 @@ export class StateStore {
     if (channel === undefined) return;
     this.channelsById.delete(channelId);
     this.save();
-    this.announce([...channel.threads.keys()].map((threadTs): ThreadKey => [channelId, threadTs]));
+    this.announce(
+      [...channel.threads.keys()].map(
+        (threadId): ThreadRef => ({ channel: channelId, thread: threadId }),
+      ),
+    );
   }
 
   /**
    * Create a thread's entry with the channel's current folder, or return the existing one
    * unchanged. Throws `UnknownChannel` for a channel that has never been bound.
    */
-  openThread(channelId: string, threadTs: string, sessionId: string | null = null): ThreadState {
+  openThread(channelId: string, threadId: string, sessionId: string | null = null): ThreadState {
     const channel = this.channelsById.get(channelId);
     if (channel === undefined) throw new UnknownChannel(channelId);
-    const existing = channel.threads.get(threadTs);
+    const existing = channel.threads.get(threadId);
     if (existing !== undefined) return existing;
     const created = threadState(channel.directory, { sessionId });
-    this.replaceThreads(channelId, new Map([...channel.threads, [threadTs, created]]));
+    this.replaceThreads(channelId, new Map([...channel.threads, [threadId, created]]));
     return created;
   }
 
   /** Record a thread's session id; a no-op for a thread that does not exist. */
-  setSession(channelId: string, threadTs: string, sessionId: string | null): void {
-    const current = this.thread(channelId, threadTs);
+  setSession(channelId: string, threadId: string, sessionId: string | null): void {
+    const current = this.thread(channelId, threadId);
     if (current !== null && current.sessionId !== sessionId) {
-      this.setThread(channelId, threadTs, { ...current, sessionId });
+      this.setThread(channelId, threadId, { ...current, sessionId });
     }
   }
 
@@ -337,18 +339,18 @@ export class StateStore {
    * Record a thread's bypass choice (null: never chosen); a no-op for a thread that does not
    * exist.
    */
-  setBypass(channelId: string, threadTs: string, on: boolean | null): void {
-    const current = this.thread(channelId, threadTs);
+  setBypass(channelId: string, threadId: string, on: boolean | null): void {
+    const current = this.thread(channelId, threadId);
     if (current !== null && current.bypass !== on) {
-      this.setThread(channelId, threadTs, { ...current, bypass: on });
+      this.setThread(channelId, threadId, { ...current, bypass: on });
     }
   }
 
   /** Record the effort level `/effort` set for a thread; a no-op for an unknown thread. */
-  setEffort(channelId: string, threadTs: string, effort: string | null): void {
-    const current = this.thread(channelId, threadTs);
+  setEffort(channelId: string, threadId: string, effort: string | null): void {
+    const current = this.thread(channelId, threadId);
     if (current !== null && current.effort !== effort) {
-      this.setThread(channelId, threadTs, { ...current, effort });
+      this.setThread(channelId, threadId, { ...current, effort });
     }
   }
 
@@ -360,11 +362,11 @@ export class StateStore {
    */
   replaceOpenReply(
     channelId: string,
-    threadTs: string,
+    threadId: string,
     oldTs: string | null,
     newTs: string | null,
   ): void {
-    const current = this.thread(channelId, threadTs);
+    const current = this.thread(channelId, threadId);
     if (current === null) return;
     let replies = current.openReplies;
     if (oldTs !== null && replies.includes(oldTs)) replies = replies.filter((t) => t !== oldTs);
@@ -373,7 +375,7 @@ export class StateStore {
       replies.length !== current.openReplies.length ||
       replies.some((t, i) => t !== current.openReplies[i])
     ) {
-      this.setThread(channelId, threadTs, { ...current, openReplies: replies });
+      this.setThread(channelId, threadId, { ...current, openReplies: replies });
     }
   }
 
@@ -381,10 +383,10 @@ export class StateStore {
    * Record a request message still carrying buttons (crash repair); a no-op for a thread that
    * does not exist or already has it.
    */
-  addRequest(channelId: string, threadTs: string, messageTs: string): void {
-    const current = this.thread(channelId, threadTs);
+  addRequest(channelId: string, threadId: string, messageTs: string): void {
+    const current = this.thread(channelId, threadId);
     if (current !== null && !current.requests.includes(messageTs)) {
-      this.setThread(channelId, threadTs, {
+      this.setThread(channelId, threadId, {
         ...current,
         requests: [...current.requests, messageTs],
       });
@@ -395,11 +397,11 @@ export class StateStore {
    * Drop a decided or removed request from the list (crash repair); a no-op if it is not there,
    * including for a thread that does not exist.
    */
-  removeRequest(channelId: string, threadTs: string, messageTs: string): void {
-    const current = this.thread(channelId, threadTs);
+  removeRequest(channelId: string, threadId: string, messageTs: string): void {
+    const current = this.thread(channelId, threadId);
     if (current?.requests.includes(messageTs)) {
       const remaining = current.requests.filter((t) => t !== messageTs);
-      this.setThread(channelId, threadTs, { ...current, requests: remaining });
+      this.setThread(channelId, threadId, { ...current, requests: remaining });
     }
   }
 
@@ -411,18 +413,18 @@ export class StateStore {
    */
   setStatusPending(
     channelId: string,
-    threadTs: string,
+    threadId: string,
     name: string | null,
     ended: string | null = null,
   ): void {
-    const current = this.thread(channelId, threadTs);
+    const current = this.thread(channelId, threadId);
     if (current !== null && (current.status !== name || current.ended !== ended)) {
-      this.setThread(channelId, threadTs, { ...current, status: name, ended });
+      this.setThread(channelId, threadId, { ...current, status: name, ended });
     }
   }
 
   /**
-   * Every (channelId, threadTs, thread) whose crash-repair fields are not all empty: what a
+   * Every (channelId, threadId, thread) whose crash-repair fields are not all empty: what a
    * crashed daemon left open for startup repair to find.
    */
   repairsPending(): [string, string, ThreadState][] {
@@ -440,10 +442,10 @@ export class StateStore {
    */
   clearRepair(
     channelId: string,
-    threadTs: string,
+    threadId: string,
     { keepOpen = false }: { keepOpen?: boolean } = {},
   ): void {
-    const current = this.thread(channelId, threadTs);
+    const current = this.thread(channelId, threadId);
     if (current === null) return;
     const replies = keepOpen ? current.openReplies : [];
     const status = keepOpen ? current.status : null;
@@ -454,7 +456,7 @@ export class StateStore {
     ) {
       return;
     }
-    this.setThread(channelId, threadTs, {
+    this.setThread(channelId, threadId, {
       ...current,
       openReplies: replies,
       requests: [],
@@ -463,19 +465,19 @@ export class StateStore {
   }
 
   /** Drop a thread's entry; a no-op if it is not there. */
-  removeThread(channelId: string, threadTs: string): void {
+  removeThread(channelId: string, threadId: string): void {
     const channel = this.channelsById.get(channelId);
-    if (channel === undefined || !channel.threads.has(threadTs)) return;
+    if (channel === undefined || !channel.threads.has(threadId)) return;
     const remaining = new Map(channel.threads);
-    remaining.delete(threadTs);
+    remaining.delete(threadId);
     this.replaceThreads(channelId, remaining);
   }
 
-  /** The (channelId, threadTs) whose thread holds this session id, across all channels. */
-  holder(sessionId: string): ThreadKey | null {
+  /** The (channelId, threadId) whose thread holds this session id, across all channels. */
+  holder(sessionId: string): ThreadRef | null {
     for (const [channelId, channel] of this.channelsById) {
-      for (const [threadTs, thread] of channel.threads) {
-        if (thread.sessionId === sessionId) return [channelId, threadTs];
+      for (const [threadId, thread] of channel.threads) {
+        if (thread.sessionId === sessionId) return { channel: channelId, thread: threadId };
       }
     }
     return null;
@@ -498,24 +500,24 @@ export class StateStore {
    * Remove a thread whose session id is gone from its folder's sessions, and a no-session
    * thread whose root message is older than `ONE_DAY`. Calls `alive` once per distinct folder;
    * null means it cannot tell, and that folder's threads are kept. `keep` names the
-   * (channelId, threadTs) to leave alone whatever they look like: the threads with a live
+   * (channelId, threadId) to leave alone whatever they look like: the threads with a live
    * session, whose id may not be on disk yet. If `alive` throws, nothing is removed or written;
    * the caller decides what to do next. Returns how many entries were removed.
    */
   prune(
     alive: (directory: string) => Iterable<string> | null,
     now: number,
-    keep: Iterable<ThreadKey> = [],
+    keep: Iterable<ThreadRef> = [],
   ): number {
-    const kept = new Set([...keep].map(([channelId, threadTs]) => threadKey(channelId, threadTs)));
+    const kept = new Set([...keep].map((ref) => threadKey(ref.channel, ref.thread)));
     const aliveCache = new Map<string, ReadonlySet<string> | null>();
     const updated = new Map<string, ChannelRecord>();
     let removed = 0;
     for (const [channelId, channel] of this.channelsById) {
       const survivors = new Map<string, ThreadState>();
-      for (const [threadTs, thread] of channel.threads) {
-        if (kept.has(threadKey(channelId, threadTs))) {
-          survivors.set(threadTs, thread);
+      for (const [threadId, thread] of channel.threads) {
+        if (kept.has(threadKey(channelId, threadId))) {
+          survivors.set(threadId, thread);
           continue;
         }
         if (thread.sessionId !== null) {
@@ -528,11 +530,11 @@ export class StateStore {
             removed += 1;
             continue;
           }
-        } else if (now - rootTime(threadTs) > ONE_DAY) {
+        } else if (now - rootTime(threadId) > ONE_DAY) {
           removed += 1;
           continue;
         }
-        survivors.set(threadTs, thread);
+        survivors.set(threadId, thread);
       }
       updated.set(
         channelId,
@@ -540,11 +542,11 @@ export class StateStore {
       );
     }
     if (removed > 0) {
-      const gone: ThreadKey[] = [];
+      const gone: ThreadRef[] = [];
       for (const [channelId, channel] of this.channelsById) {
         const after = updated.get(channelId)?.threads;
-        for (const threadTs of channel.threads.keys()) {
-          if (!after?.has(threadTs)) gone.push([channelId, threadTs]);
+        for (const threadId of channel.threads.keys()) {
+          if (!after?.has(threadId)) gone.push({ channel: channelId, thread: threadId });
         }
       }
       this.channelsById = updated;
@@ -554,9 +556,9 @@ export class StateStore {
     return removed;
   }
 
-  private setThread(channelId: string, threadTs: string, updated: ThreadState): void {
+  private setThread(channelId: string, threadId: string, updated: ThreadState): void {
     const channel = this.channelsById.get(channelId) as ChannelRecord;
-    this.replaceThreads(channelId, new Map([...channel.threads, [threadTs, updated]]));
+    this.replaceThreads(channelId, new Map([...channel.threads, [threadId, updated]]));
   }
 
   private replaceThreads(channelId: string, threads: Map<string, ThreadState>): void {
@@ -565,15 +567,16 @@ export class StateStore {
     this.save();
     const before = shown(channel.threads);
     const after = shown(threads);
-    const changed: ThreadKey[] = [];
-    for (const threadTs of new Set([...before.keys(), ...after.keys()])) {
-      if (before.get(threadTs) !== after.get(threadTs)) changed.push([channelId, threadTs]);
+    const changed: ThreadRef[] = [];
+    for (const threadId of new Set([...before.keys(), ...after.keys()])) {
+      if (before.get(threadId) !== after.get(threadId))
+        changed.push({ channel: channelId, thread: threadId });
     }
     if (changed.length > 0) this.announce(changed);
   }
 
   /** The write is already on disk: an observer that fails must not fail its caller. */
-  private announce(changed: readonly ThreadKey[] = []): void {
+  private announce(changed: readonly ThreadRef[] = []): void {
     if (this.onSessionsChange === null) return;
     try {
       this.onSessionsChange(changed);
@@ -640,8 +643,8 @@ export class StateStore {
             directory: c.directory,
             notice_pending: c.noticePending,
             threads: Object.fromEntries(
-              [...c.threads].map(([threadTs, t]) => [
-                threadTs,
+              [...c.threads].map(([threadId, t]) => [
+                threadId,
                 {
                   directory: t.directory,
                   session_id: t.sessionId,
@@ -694,8 +697,8 @@ export class StateStore {
 }
 
 /** A thread's root time in epoch seconds; throws on a `thread_ts` that is no number, as `float()` did. */
-function rootTime(threadTs: string): number {
-  const seconds = threadTs.trim() === "" ? Number.NaN : Number(threadTs);
-  if (Number.isNaN(seconds)) throw new RangeError(`not a thread_ts: ${threadTs}`);
+function rootTime(threadId: string): number {
+  const seconds = threadId.trim() === "" ? Number.NaN : Number(threadId);
+  if (Number.isNaN(seconds)) throw new RangeError(`not a thread_ts: ${threadId}`);
   return seconds;
 }

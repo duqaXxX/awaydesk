@@ -127,14 +127,14 @@ function callOf(event: SessionEvent): string | null {
 
 export class ThreadSession {
   readonly channelId: string;
-  readonly threadTs: string;
+  readonly threadId: string;
   readonly directory: string;
   // Resolved once here, not by `SessionManager.workingIn` on every live session for every
   // message (`directory` never changes after this object is built: a rebind only takes effect
   // for a thread not open yet).
   private readonly resolved: string;
   private readonly deps: SessionDeps;
-  // One status on the session's root message, which `threadTs` always is, and the line under
+  // One status on the session's root message, which `threadId` always is, and the line under
   // the thread's last message (issues #83 and #95): both are the chat's to draw.
   private readonly thread: ThreadChat;
   // Set by `stop()` while it denies pending approvals, so `askOwner`'s own finally does not
@@ -284,17 +284,17 @@ export class ThreadSession {
 
   constructor(
     channelId: string,
-    threadTs: string,
+    threadId: string,
     directory: string,
     deps: SessionDeps,
     options: { readonly predecessor?: Event | null } = {},
   ) {
     this.channelId = channelId;
-    this.threadTs = threadTs;
+    this.threadId = threadId;
     this.directory = directory;
     this.resolved = resolvePath(directory);
     this.deps = deps;
-    this.thread = deps.chat.thread(channelId, threadTs);
+    this.thread = deps.chat.thread({ channel: channelId, thread: threadId });
     this.predecessor = options.predecessor ?? null;
     this.settled.set();
     this.nativeMode = deps.agent.capabilities.permissionModes.default;
@@ -302,7 +302,7 @@ export class ThreadSession {
   }
 
   private get where(): string {
-    return `${this.channelId}/${this.threadTs}`;
+    return `${this.channelId}/${this.threadId}`;
   }
 
   /** The agent's own name for the mode that skips permission requests; null when it has none. */
@@ -315,7 +315,7 @@ export class ThreadSession {
    * it): true on, false off, null never chosen.
    */
   get bypassChoice(): boolean | null {
-    return this.deps.state.thread(this.channelId, this.threadTs)?.bypass ?? null;
+    return this.deps.state.thread(this.channelId, this.threadId)?.bypass ?? null;
   }
 
   /**
@@ -531,9 +531,9 @@ export class ThreadSession {
    * still holds) otherwise.
    */
   private async reactAfterHold(): Promise<void> {
-    const stored = this.deps.state.thread(this.channelId, this.threadTs);
+    const stored = this.deps.state.thread(this.channelId, this.threadId);
     if (stored === null || stored.sessionId === null) {
-      this.deps.state.setStatusPending(this.channelId, this.threadTs, null);
+      this.deps.state.setStatusPending(this.channelId, this.threadId, null);
       await this.thread.clearStatus();
       return;
     }
@@ -566,7 +566,7 @@ export class ThreadSession {
    * tells the owner `Not sent.` once it wakes.
    */
   async cancelHold(): Promise<boolean> {
-    const pending = this.deps.holds.cancel(this.channelId, this.threadTs);
+    const pending = this.deps.holds.cancel(this.channelId, this.threadId);
     if (pending === null) return false;
     await this.deleteRequest(pending.messageTs);
     return true;
@@ -657,7 +657,7 @@ export class ThreadSession {
         // waiting for one that will not come. Only a SessionGone close also removes the
         // thread's own entry: that alone is what tells the two apart, since both leave the
         // session closed the same.
-        const gone = this.deps.state.thread(this.channelId, this.threadTs) === null;
+        const gone = this.deps.state.thread(this.channelId, this.threadId) === null;
         await this.fail(turn, gone ? texts.SESSION_GONE : texts.SESSION_CLOSED, { error: true });
         return turn;
       }
@@ -703,7 +703,7 @@ export class ThreadSession {
         checkDirectory(this.directory, (folder) => this.deps.agent.folderTrusted(folder)),
         signal,
       );
-      const stored = this.deps.state.thread(this.channelId, this.threadTs);
+      const stored = this.deps.state.thread(this.channelId, this.threadId);
       const sessionId = stored?.sessionId ?? null;
       const effort = stored?.effort ?? null;
       let client: AgentSession;
@@ -716,7 +716,7 @@ export class ThreadSession {
         // queued, or the next one taken by the worker) starts a second, unrecorded session in
         // its place: it fails the same way instead.
         logger.warning(`could not resume the stored session in ${this.where}`);
-        this.deps.state.removeThread(this.channelId, this.threadTs);
+        this.deps.state.removeThread(this.channelId, this.threadId);
         this.closedFlag = true;
         // No client was ever connected in this branch (`connect` rejected): nothing to wait
         // on, so the "fully closed" signal fires at once, same as `close()`'s tail.
@@ -828,7 +828,7 @@ export class ThreadSession {
     // The session closed while the mode was being set: the thread this would write to may
     // already be gone, so the switch is never recorded after the fact.
     if (this.closedFlag) throw new SessionClosed();
-    this.deps.state.setBypass(this.channelId, this.threadTs, on);
+    this.deps.state.setBypass(this.channelId, this.threadId, on);
   }
 
   /**
@@ -853,7 +853,7 @@ export class ThreadSession {
    * the setup again (after a cancelled setup or a hold's Cancel, nothing was sent).
    */
   get neverRan(): boolean {
-    const stored = this.deps.state.thread(this.channelId, this.threadTs);
+    const stored = this.deps.state.thread(this.channelId, this.threadId);
     return !this.submitted && (stored === null || stored.sessionId === null);
   }
 
@@ -886,8 +886,8 @@ export class ThreadSession {
       this.setupApplied = true;
       const effort = choice.effort === DEFAULT ? null : choice.effort;
       try {
-        this.deps.state.setEffort(this.channelId, this.threadTs, effort);
-        this.deps.state.setBypass(this.channelId, this.threadTs, choice.bypass);
+        this.deps.state.setEffort(this.channelId, this.threadId, effort);
+        this.deps.state.setBypass(this.channelId, this.threadId, choice.bypass);
         let client = await this.ensureConnected();
         if (effort !== this.clientEffort) {
           if (this.deps.agent.capabilities.liveEffort) await this.changeEffort(client, effort);
@@ -935,12 +935,12 @@ export class ThreadSession {
    * when there is nothing to undo.
    */
   async forgetSetup(): Promise<void> {
-    const stored = this.deps.state.thread(this.channelId, this.threadTs);
+    const stored = this.deps.state.thread(this.channelId, this.threadId);
     const left = stored !== null && (stored.effort !== null || stored.bypass !== null);
     if (!this.neverRan || !(this.setupApplied || left)) return;
     this.setupApplied = false;
-    this.deps.state.setEffort(this.channelId, this.threadTs, null);
-    this.deps.state.setBypass(this.channelId, this.threadTs, null);
+    this.deps.state.setEffort(this.channelId, this.threadId, null);
+    this.deps.state.setBypass(this.channelId, this.threadId, null);
     await this.dropClient();
   }
 
@@ -1006,7 +1006,7 @@ export class ThreadSession {
    */
   async stop(): Promise<boolean | null> {
     // (sync) With no hold open, nothing waits between the call and the checks below.
-    const hold = this.deps.holds.cancel(this.channelId, this.threadTs);
+    const hold = this.deps.holds.cancel(this.channelId, this.threadId);
     const held = hold !== null;
     if (hold !== null) await this.deleteRequest(hold.messageTs);
     const client = this.client;
@@ -1019,7 +1019,7 @@ export class ThreadSession {
       // skip that instead. `finish` or `abandon` clears it once this turn's own tail ends.
       this.interrupting = true;
       this.stopTail = this.stopTail ?? new Event();
-      for (const pending of this.deps.approvals.denyAll(this.channelId, this.threadTs)) {
+      for (const pending of this.deps.approvals.denyAll(this.channelId, this.threadId)) {
         await this.deleteRequest(pending.messageTs);
       }
       await client.interrupt();
@@ -1105,7 +1105,7 @@ export class ThreadSession {
     }
     const running = this.runningKindsOf();
     if (running) fields.push(texts.fill(texts.STATUS_BACKGROUND, { counts: running }));
-    const stored = this.deps.state.thread(this.channelId, this.threadTs);
+    const stored = this.deps.state.thread(this.channelId, this.threadId);
     const activity = this.busy
       ? texts.fill(texts.ACTIVITY_BUSY, { queued: this.queue.size })
       : texts.ACTIVITY_IDLE;
@@ -1164,7 +1164,7 @@ export class ThreadSession {
       // message must go either way. Deleting each message here does not depend on the handler
       // ever seeing a decision.
       const requestsToDelete = this.deps.approvals
-        .pendingIn(this.channelId, this.threadTs)
+        .pendingIn(this.channelId, this.threadId)
         .map((pending) => pending.messageTs);
       // The worker may hold the connect lock while the agent starts: cancelled first.
       await this.cancelTasks();
@@ -1177,7 +1177,7 @@ export class ThreadSession {
       } finally {
         release();
       }
-      this.deps.approvals.denyAll(this.channelId, this.threadTs);
+      this.deps.approvals.denyAll(this.channelId, this.threadId);
       // The denial above resolves each handler of a request, and each is awaited to its end.
       await Promise.allSettled([...this.asking]);
       for (const messageTs of requestsToDelete) await this.deleteRequest(messageTs);
@@ -1240,11 +1240,11 @@ export class ThreadSession {
       // still live in the chat when it ends, so this thread's fields end up empty either way.
       // Best-effort: a failed write here must never skip `doneClosing`/`onClosed`.
       try {
-        this.deps.state.clearRepair(this.channelId, this.threadTs, { keepOpen: lost });
+        this.deps.state.clearRepair(this.channelId, this.threadId, { keepOpen: lost });
         if (lost) {
           this.deps.state.setStatusPending(
             this.channelId,
-            this.threadTs,
+            this.threadId,
             STORED_STATUS.working,
             STORED_STATUS.error,
           );
@@ -1468,7 +1468,7 @@ export class ThreadSession {
         // still-running first turn is already this session id's holder and `!resume` cannot
         // put a second process on the same transcript.
         if (event.sessionId !== null) {
-          this.deps.state.setSession(this.channelId, this.threadTs, event.sessionId);
+          this.deps.state.setSession(this.channelId, this.threadId, event.sessionId);
         }
         break;
       case "mode_changed":
@@ -1749,7 +1749,7 @@ export class ThreadSession {
    */
   private async nothingReported(event: TurnEnded, signal?: AbortSignal): Promise<void> {
     if (event.sessionId) {
-      this.deps.state.setSession(this.channelId, this.threadTs, event.sessionId);
+      this.deps.state.setSession(this.channelId, this.threadId, event.sessionId);
     }
     this.reportOf = null;
     this.injectedExpected = false;
@@ -1844,7 +1844,7 @@ export class ThreadSession {
     const pending = state === "working" || state === "waiting";
     this.deps.state.setStatusPending(
       this.channelId,
-      this.threadTs,
+      this.threadId,
       pending ? STORED_STATUS[state] : null,
       pending ? null : STORED_STATUS[state],
     );
@@ -1855,11 +1855,11 @@ export class ThreadSession {
    * chat): kept as the ended status, which is what the session index shows.
    */
   private noteCrossOverStatus(): void {
-    const stored = this.deps.state.thread(this.channelId, this.threadTs);
+    const stored = this.deps.state.thread(this.channelId, this.threadId);
     if (stored !== null) {
       this.deps.state.setStatusPending(
         this.channelId,
-        this.threadTs,
+        this.threadId,
         stored.status,
         STORED_STATUS.error,
       );
@@ -2261,7 +2261,7 @@ export class ThreadSession {
    */
   private newReply(): Reply {
     const reply = this.thread.openReply((old, fresh) =>
-      this.deps.state.replaceOpenReply(this.channelId, this.threadTs, old, fresh),
+      this.deps.state.replaceOpenReply(this.channelId, this.threadId, old, fresh),
     );
     const previous = this.latest;
     this.latest = reply;
@@ -2313,7 +2313,7 @@ export class ThreadSession {
     const released = injected ? active.taken : [];
     try {
       if (result.sessionId) {
-        this.deps.state.setSession(this.channelId, this.threadTs, result.sessionId);
+        this.deps.state.setSession(this.channelId, this.threadId, result.sessionId);
       }
       const [changed, effort] = effortChange(result.finalText ?? "");
       if (changed) {
@@ -2327,7 +2327,7 @@ export class ThreadSession {
         if (effort !== null) {
           this.deps.state.setEffort(
             this.channelId,
-            this.threadTs,
+            this.threadId,
             effort === "auto" ? null : effort,
           );
         }
@@ -2547,7 +2547,7 @@ export class ThreadSession {
       (request.type === "question" ? request.toolName : taskTitle(request.toolName, request.input));
     const [approvalId, pending] = this.deps.approvals.open(
       this.channelId,
-      this.threadTs,
+      this.threadId,
       title,
       questions,
     );
@@ -2575,7 +2575,7 @@ export class ThreadSession {
         // the message is already live either way, so a failed write here is logged loudly
         // rather than left silently unrecorded.
         try {
-          this.deps.state.addRequest(this.channelId, this.threadTs, messageTs);
+          this.deps.state.addRequest(this.channelId, this.threadId, messageTs);
         } catch (error) {
           logger.error(
             `posted a request in ${this.where} that state.json could not record: ${errorName(error)}`,
@@ -2626,7 +2626,7 @@ export class ThreadSession {
     // Crash repair (issue #19): it carries no buttons now, so it leaves the tracked list.
     // Outside the try above: a failed write here must never delete a message just rewritten.
     try {
-      this.deps.state.removeRequest(this.channelId, this.threadTs, messageTs);
+      this.deps.state.removeRequest(this.channelId, this.threadId, messageTs);
     } catch (error) {
       logger.warning(
         `could not clear an answered request from state.json in ${this.where}: ${errorName(error)}`,
@@ -2667,7 +2667,7 @@ export class ThreadSession {
       // Crash repair (issue #19): the request is spoken for either way, so a startup repair
       // never retries a delete this call already made (or gave up on). Best-effort: a failed
       // write here must never surface past this point.
-      this.deps.state.removeRequest(this.channelId, this.threadTs, messageTs);
+      this.deps.state.removeRequest(this.channelId, this.threadId, messageTs);
     } catch (error) {
       logger.warning(
         `could not clear a deleted request from state.json in ${this.where}: ${errorName(error)}`,

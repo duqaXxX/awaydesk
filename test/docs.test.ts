@@ -12,6 +12,7 @@ import { features } from "../probe/features.ts";
 import { WORD } from "../src/core/commands.ts";
 import { REQUIRED } from "../src/core/config.ts";
 import { sdkJson } from "./support/fixtures.ts";
+import { blank } from "./support/source-scan.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
@@ -216,116 +217,6 @@ test("the readme states the version and the node the package declares", () => {
 // shape: Biome formats every file, so a top-level declaration starts at column 0, ends at the
 // next line that starts with `}`, and a member of a class, an interface or an object sits on a
 // line indented by two spaces.
-
-/** `source` with comments, string contents and regular expression bodies blanked to spaces. */
-function blank(source: string): string {
-  let out = "";
-  let i = 0;
-  const space = (ch: string): string => (ch === "\n" ? "\n" : " ");
-
-  function quoted(quote: string): void {
-    out += quote;
-    i += 1;
-    while (i < source.length && source.charAt(i) !== quote) {
-      if (source.charAt(i) === "\\") {
-        out += " ";
-        i += 1;
-      }
-      out += space(source.charAt(i));
-      i += 1;
-    }
-    out += quote;
-    i += 1;
-  }
-
-  function template(): void {
-    out += "`";
-    i += 1;
-    while (i < source.length && source.charAt(i) !== "`") {
-      if (source.charAt(i) === "\\") {
-        out += " ";
-        i += 1;
-        out += space(source.charAt(i));
-        i += 1;
-      } else if (source.charAt(i) === "$" && source.charAt(i + 1) === "{") {
-        out += "${";
-        i += 2;
-        code(true);
-      } else {
-        out += space(source.charAt(i));
-        i += 1;
-      }
-    }
-    out += "`";
-    i += 1;
-  }
-
-  function regex(): void {
-    out += "/";
-    i += 1;
-    let inClass = false;
-    while (i < source.length && (source.charAt(i) !== "/" || inClass)) {
-      const ch = source.charAt(i);
-      if (ch === "\\") {
-        out += " ";
-        i += 1;
-      } else if (ch === "[") inClass = true;
-      else if (ch === "]") inClass = false;
-      out += space(source.charAt(i));
-      i += 1;
-    }
-    out += "/";
-    i += 1;
-  }
-
-  // Code up to the end of the file, or, inside a template's `${`, up to its closing brace.
-  function code(nested: boolean): void {
-    let depth = 0;
-    let last = "";
-    while (i < source.length) {
-      const ch = source.charAt(i);
-      const after = source.charAt(i + 1);
-      if (ch === "/" && after === "/") {
-        while (i < source.length && source.charAt(i) !== "\n") {
-          out += " ";
-          i += 1;
-        }
-      } else if (ch === "/" && after === "*") {
-        const end = source.indexOf("*/", i + 2);
-        const stop = end < 0 ? source.length : end + 2;
-        for (; i < stop; i += 1) out += space(source.charAt(i));
-      } else if (ch === '"' || ch === "'") {
-        quoted(ch);
-        last = ch;
-      } else if (ch === "`") {
-        template();
-        last = ch;
-      } else if (
-        ch === "/" &&
-        (last === "" || "(,=:[!&|?{};+-*%<>~^".includes(last) || out.trimEnd().endsWith("return"))
-      ) {
-        regex();
-        last = ")";
-      } else {
-        if (ch === "{") depth += 1;
-        if (ch === "}") {
-          if (nested && depth === 0) {
-            out += "}";
-            i += 1;
-            return;
-          }
-          depth -= 1;
-        }
-        out += ch;
-        i += 1;
-        if (ch.trim() !== "") last = ch;
-      }
-    }
-  }
-
-  code(false);
-  return out;
-}
 
 /** What an export holds that can be named after a dot: null when it has no such members. */
 interface Declared {
