@@ -16,7 +16,9 @@ awaydesk runs Claude Code on the owner's machine on behalf of one Slack user. In
 - secrets (`.env` tokens) written anywhere other than `~/.config/awaydesk/.env`, or message
   content written to a log;
 - an approval request that shows the owner something other than what Approve lets run;
-- a session started in a folder the owner has not trusted in Claude Code.
+- a session started in a folder the owner has not trusted in Claude Code;
+- the daemon's own git (the footer, `!status`, `!open`) run in a repository the owner has not
+  trusted in Claude Code.
 
 Out of scope: what Claude Code does once the owner approves it, and whoever controls the owner's
 Slack account, who controls the machine by design. [docs/setup.md](docs/setup.md) lists the
