@@ -881,6 +881,25 @@ All notable changes to this project are documented here. The format follows
   2026-10-11: 238 files and 530.5 kB before, 126 files and 416.1 kB after, no `.map` file, and
   the three links resolve in the unpacked archive. `test/docs.test.ts` derives the shipped set from
   `files` and fails on a link out of it, and on a build that emits a source map.
+- Nine small residues of the Python translation and three failure paths that answered with the
+  wrong reason, none with a realistic failing input today (found by the review of 2026-10-11),
+  each fixed on its own commit. `read.realpathLoose` follows a dangling link to its target, as
+  Python's `os.path.realpath` does, where it returned the link. `home.ts` no longer calls its
+  search key (`toUpperCase().toLowerCase()`) Python's `str.casefold`. The detail of a failed
+  download is cut in characters (`attachments.failureDetail`, through `chars.take`), where
+  `.slice(0, 200)` could leave half a surrogate pair. A task type the agent reports is looked up
+  in `TASK_KINDS` only as an own entry (`constants.taskKind`), so `constructor` reads as the
+  unknown kind and no longer counts as `undefined`. Six sites trim with `text.strip` where the
+  Python code used `strip` or `lstrip` (`footer.ts` three, `ThreadSession.whoseTurn`,
+  `config.loadConfig`, `usage.parseReset`), which differ from `trim` on U+FEFF, U+001C to U+001F
+  and U+0085. The comment of `config.expandEnv` and `docs/setup.md` state where the `.env` syntax
+  (Node's `util.parseEnv`) differs from python-dotenv: 7 of 24 cases read differently (Node
+  26.5.1, python-dotenv 1.2.1, 2026-10-11), and a backslash inside quotes is kept as written.
+  `ThreadSession.ensureConnected` sends `default` to a thread whose stored choice is off when the
+  agent reports no permission mode, and logs that it reported none. `ThreadSession.stop` logs a
+  refused interrupt by the error's name and still stops the background tasks. `Open.openFile`
+  logs the error code of the cause when it answers that a path is not a file (`EACCES` for a file
+  the daemon may not read); the owner reads the same sentence as before.
 - A table's delimiter row in a reply is recognised in linear time (`markdown.markdownStarts`).
   One pattern read the whole row, and on a line of spaces around a single dash, under a line
   holding a `|`, it backtracked in cubic time: 200 ms at 800 spaces a side and 3.1 s at 2,000
