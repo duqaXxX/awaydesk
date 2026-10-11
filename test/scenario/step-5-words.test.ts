@@ -5,6 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { shellQuote } from "../../src/core/sessions/directory.ts";
 import * as texts from "../../src/core/texts.ts";
 import { fill, named } from "../../src/core/texts.ts";
 import { hold, say } from "../support/plain-agent.ts";
@@ -60,7 +61,8 @@ test("!status in the channel lists the folder and the live sessions, and in a th
       [
         fill(texts.STATUS, { directory: world.folder, session: id }),
         fill(texts.STATUS_TERMINAL, {
-          command: `\`cd ${world.folder} && plain --resume ${id}\``,
+          // The folder is quoted for a shell where it needs it, as a Windows path does.
+          command: `\`cd ${shellQuote(world.folder)} && plain --resume ${id}\``,
         }),
         fill(named(texts.STATUS_STATE, NAMES), {
           mode: "standard",

@@ -33,7 +33,7 @@ import {
   PlainStore,
   plainAgent,
 } from "../support/plain-agent.ts";
-import { realWorkDone, SettledClock } from "../support/sessions.ts";
+import { HELD_BY_A_RUNNING_DAEMON, realWorkDone, SettledClock } from "../support/sessions.ts";
 
 /** The names the registry holds the two modules under, and so the values of the `.env`. */
 export const AGENT_NAME = "plain";
@@ -304,7 +304,8 @@ export class World {
     for (let round = 0; round < 20; round += 1) {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
-    await realWorkDone();
+    // The daemon's lock stays open while it runs: it is not work to wait for.
+    await realWorkDone(this.running === null ? 0 : HELD_BY_A_RUNNING_DAEMON);
   }
 
   /** Settles until `done` holds; fails with `what` when it never does. */

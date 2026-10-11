@@ -486,15 +486,23 @@ const CALM_TURNS = 5;
 const REAL_WORK_LIMIT_MS = 10_000;
 
 /**
+ * What a running daemon keeps open for as long as it runs, and so is no work in flight: outside
+ * macOS its single-instance lock is a listening socket or pipe (`src/core/lock.ts`).
+ */
+export const HELD_BY_A_RUNNING_DAEMON = process.platform === "darwin" ? 0 : 1;
+
+/**
  * Wait until no real work started by the daemon is in flight (a file call, a `git` process): it
  * answers on the operating system's time, so under load it outlasts any fixed number of turns.
- * Returns at once when nothing is in flight.
+ * Returns at once when nothing is in flight. `held` counts what stays open on purpose while the
+ * caller's daemon runs (`HELD_BY_A_RUNNING_DAEMON`), which would otherwise be waited for until
+ * the limit, every time.
  */
-export async function realWorkDone(): Promise<void> {
+export async function realWorkDone(held = 0): Promise<void> {
   const deadline = Date.now() + REAL_WORK_LIMIT_MS;
   let calm = 0;
   while (calm < CALM_TURNS && Date.now() < deadline) {
-    if (realWorkInFlight() > AT_REST) {
+    if (realWorkInFlight() > AT_REST + held) {
       calm = 0;
       await new Promise<void>((resolve) => setTimeout(resolve, 1));
     } else {
