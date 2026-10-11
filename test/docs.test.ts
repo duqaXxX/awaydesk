@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { test } from "node:test";
 import { features } from "../probe/features.ts";
 import { WORD } from "../src/core/commands.ts";
@@ -213,7 +213,8 @@ test("the readme states the version and the node the package declares", () => {
 
 /** Whether `path` is one of the `files` entries of package.json or lies under a listed folder. */
 function shipped(path: string, files: string[]): boolean {
-  const rel = relative(ROOT, path);
+  // Forward slashes on every system: `files` is written with them.
+  const rel = relative(ROOT, path).split(sep).join("/");
   return (
     rel === "package.json" || files.some((entry) => rel === entry || rel.startsWith(`${entry}/`))
   );
