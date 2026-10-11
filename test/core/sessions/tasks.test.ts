@@ -1,7 +1,7 @@
-// Not in the Python suite: asyncio's own shield and its tasks had no tests there.
+// Not in the Python suite: asyncio's own shield, tasks, semaphore and lock had no tests there.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cancellable, Event, Task } from "../../../src/core/sessions/tasks.ts";
+import { cancellable, Event, Mutex, Semaphore, Task } from "../../../src/core/sessions/tasks.ts";
 import { setWriter } from "../../../src/log.ts";
 
 test("a wait that gives up leaves the promise it waited for running", async () => {
@@ -97,4 +97,52 @@ test("a task made to start at once has started when it is made, and another on t
   order.push("made");
   await Promise.all([now.settled(), later.settled()]);
   assert.deepEqual(order, ["at once", "made", "next turn"]);
+});
+
+test("a semaphore lets its limit of holders in and the next one in when a place is given back", async () => {
+  const gate = new Semaphore(2);
+  const order: string[] = [];
+  const hold = new Event();
+  const job = (name: string) =>
+    gate.run(async () => {
+      order.push(`${name} in`);
+      await hold.wait();
+      order.push(`${name} out`);
+    });
+  const jobs = [job("a"), job("b"), job("c")];
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(order, ["a in", "b in"]);
+  hold.set();
+  await Promise.all(jobs);
+  assert.deepEqual(order, ["a in", "b in", "a out", "b out", "c in", "c out"]);
+});
+
+test("a request that gives up while waiting for a turn leaves the queue", async () => {
+  const gate = new Semaphore(1);
+  const release = await gate.acquire();
+  const giving = new AbortController();
+  const waiting = gate.acquire(giving.signal);
+  const behind = gate.acquire();
+  giving.abort(new Error("gave up"));
+  await assert.rejects(waiting, /gave up/);
+  release();
+  await behind; // the turn went to the one behind, not to the one that left
+});
+
+test("a place given back twice is given back once", async () => {
+  // `Gate.release` counted every call: a second one let one holder too many in.
+  const lock = new Mutex();
+  const release = await lock.acquire();
+  release();
+  release();
+  const first = await lock.acquire();
+  let second = false;
+  void lock.acquire().then(() => {
+    second = true;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(second, false);
+  first();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(second, true);
 });

@@ -180,23 +180,28 @@ export class Event {
   }
 }
 
-/** `asyncio.Lock`: one holder at a time, the waiters served in the order they came. */
-export class Mutex {
-  private held = false;
+/**
+ * `asyncio.Semaphore`: at most `limit` holders at once, the others served in the order they
+ * came. A place given back goes straight to the first in line, so it is never free for a
+ * newcomer to take ahead of a waiter.
+ */
+export class Semaphore {
+  private free: number;
   private readonly waiters: Array<() => void> = [];
 
-  get locked(): boolean {
-    return this.held;
+  constructor(limit: number) {
+    this.free = limit;
   }
 
   /**
-   * Resolves with the function that releases the lock, once it is this caller's turn. A waiter
-   * whose signal aborts leaves the line and rejects with the signal's reason.
+   * Resolves with the function that gives the place back, once it is this caller's turn; calling
+   * that function twice gives back one place. A waiter whose signal aborts leaves the line and
+   * rejects with the signal's reason.
    */
   acquire(signal?: AbortSignal): Promise<() => void> {
     if (signal?.aborted) return Promise.reject(signal.reason);
-    if (!this.held) {
-      this.held = true;
+    if (this.free > 0) {
+      this.free -= 1;
       return Promise.resolve(this.releaser());
     }
     return new Promise((resolve, reject) => {
@@ -219,12 +224,27 @@ export class Mutex {
     return () => {
       if (released) return;
       released = true;
-      // Handed straight to the next in line: the lock is never free for a newcomer to take
-      // ahead of a waiter.
       const next = this.waiters.shift();
-      if (next === undefined) this.held = false;
+      if (next === undefined) this.free += 1;
       else next();
     };
+  }
+
+  /** `work` while holding a place, given back however `work` ends. */
+  async run<T>(work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    const release = await this.acquire(signal);
+    try {
+      return await work();
+    } finally {
+      release();
+    }
+  }
+}
+
+/** `asyncio.Lock`: a semaphore of one place. */
+export class Mutex extends Semaphore {
+  constructor() {
+    super(1);
   }
 }
 

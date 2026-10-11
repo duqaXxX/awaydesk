@@ -1,38 +1,8 @@
-// Not in the Python suite: asyncio's own semaphore, lock and timeout had no tests there.
+// Not in the Python suite: asyncio's own timeout had no tests there.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Gate, TIMED_OUT, within } from "../../../../src/chat/slack/openfile/waiting.ts";
+import { TIMED_OUT, within } from "../../../../src/chat/slack/openfile/waiting.ts";
 import { AsyncEvent, FakeClock } from "../../../support/fake-slack.ts";
-
-test("a gate lets its limit of holders in and the next one in when a turn is given back", async () => {
-  const gate = new Gate(2);
-  const order: string[] = [];
-  const hold = new AsyncEvent();
-  const job = (name: string) =>
-    gate.run(async () => {
-      order.push(`${name} in`);
-      await hold.wait();
-      order.push(`${name} out`);
-    });
-  const jobs = [job("a"), job("b"), job("c")];
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(order, ["a in", "b in"]);
-  hold.set();
-  await Promise.all(jobs);
-  assert.deepEqual(order, ["a in", "b in", "a out", "b out", "c in", "c out"]);
-});
-
-test("a request that gives up while waiting for a turn leaves the queue", async () => {
-  const gate = new Gate(1);
-  await gate.acquire();
-  const giving = new AbortController();
-  const waiting = gate.acquire(giving.signal);
-  const behind = gate.acquire();
-  giving.abort(new Error("gave up"));
-  await assert.rejects(waiting, /gave up/);
-  gate.release();
-  await behind; // the turn went to the one behind, not to the one that left
-});
 
 test("a time limit ends the work's wait when the clock passes it", async () => {
   const clock = new FakeClock();

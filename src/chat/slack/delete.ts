@@ -33,6 +33,7 @@
  * are gone, and a thread taken for a leftover would lose its root.
  */
 import type { WebClient } from "@slack/web-api";
+import { Mutex } from "../../core/sessions/tasks.ts";
 import type { StateStore } from "../../core/state.ts";
 import * as texts from "../../core/texts.ts";
 import { fill } from "../../core/texts.ts";
@@ -81,25 +82,6 @@ function tsOf(message: Record<string, unknown>): string {
   return String(message.ts);
 }
 
-/** `asyncio.Lock`: tasks run one after another, in the order they asked. */
-class OneAtATime {
-  #tail: Promise<void> = Promise.resolve();
-
-  async run<T>(task: () => Promise<T>): Promise<T> {
-    const before = this.#tail;
-    let release: () => void = () => {};
-    this.#tail = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    await before;
-    try {
-      return await task();
-    } finally {
-      release();
-    }
-  }
-}
-
 /** Deletes the threads the Home tab's Delete names, and cleans the channels it names. */
 export class ThreadDeleter {
   readonly #bot: WebClient;
@@ -111,7 +93,7 @@ export class ThreadDeleter {
   readonly #free: ThreadDeleterOptions["free"];
   // One thread at a time: two deletes at once would share Slack's rate limit, and each would
   // use up its retries on the other's calls.
-  readonly #oneAtATime = new OneAtATime();
+  readonly #oneAtATime = new Mutex();
 
   constructor(bot: WebClient, owner: WebClient, options: ThreadDeleterOptions) {
     this.#bot = bot;

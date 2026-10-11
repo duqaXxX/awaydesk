@@ -41,7 +41,7 @@
  *   awaited and its answer used, never cut short, and a cancelled publish never sends its page.
  * - `asyncio.create_task` of the debounced loop and of the retry is a `Task`; `asyncio.timeout`
  *   in `close` is a race against the clock's sleep that aborts the publish when the sleep wins.
- * - `asyncio.Semaphore` is the small `Semaphore` below.
+ * - `asyncio.Semaphore` is the sessions' `Semaphore`.
  * - Every wait goes through the injected `Clock`.
  */
 import { createHash } from "node:crypto";
@@ -49,7 +49,7 @@ import { WebAPIPlatformError, type WebClient } from "@slack/web-api";
 import type { ListedSession } from "../../agent/seam.ts";
 import { type Clock, systemClock } from "../../clock.ts";
 import { oneLine } from "../../core/reply/words.ts";
-import { Cancelled, Mutex } from "../../core/sessions/tasks.ts";
+import { Cancelled, Mutex, Semaphore } from "../../core/sessions/tasks.ts";
 import type { StateStore, ThreadKey } from "../../core/state.ts";
 import * as texts from "../../core/texts.ts";
 import { getLogger } from "../../log.ts";
@@ -705,31 +705,6 @@ class RootNotReturned extends Error {
   constructor() {
     super("the root is not among the messages");
     this.name = "RootNotReturned";
-  }
-}
-
-/** `asyncio.Semaphore`: at most `limit` holders, the waiters served in the order they came. */
-class Semaphore {
-  private free: number;
-  private readonly waiters: Array<() => void> = [];
-
-  constructor(limit: number) {
-    this.free = limit;
-  }
-
-  /** Resolves with the function that gives the place back, once there is one. */
-  async acquire(): Promise<() => void> {
-    if (this.free > 0) this.free -= 1;
-    else await new Promise<void>((resolve) => this.waiters.push(resolve));
-    let released = false;
-    return () => {
-      if (released) return;
-      released = true;
-      // Handed straight to the next in line.
-      const next = this.waiters.shift();
-      if (next === undefined) this.free += 1;
-      else next();
-    };
   }
 }
 

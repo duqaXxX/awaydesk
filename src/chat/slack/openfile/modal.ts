@@ -4,13 +4,13 @@
  */
 import { createHash } from "node:crypto";
 import type { KnownBlock, ModalView, Option } from "@slack/web-api";
+import { Semaphore } from "../../../core/sessions/tasks.ts";
 import * as texts from "../../../core/texts.ts";
 import { fill } from "../../../core/texts.ts";
 import { isRecord } from "../../../values.ts";
 import { contextBlock, plainTextObject } from "../reply/blocks.ts";
 import { len, take } from "../reply/chars.ts";
 import { shownAsWritten } from "../reply/escape.ts";
-import { Gate } from "./waiting.ts";
 
 // The button that opens the picker's modal (in the `!open` message and in the one of several
 // matches), the modal's callback id, and the ids of its two input blocks. Slack keeps the state
@@ -356,7 +356,7 @@ export function modalView(
 export class ModalUpdates {
   readonly #limit: number;
   readonly #newest = new Map<string, number>();
-  readonly #locks = new Map<string, Gate>();
+  readonly #locks = new Map<string, Semaphore>();
   readonly #gone = new Set<string>();
 
   constructor(limit: number = MODALS_KEPT) {
@@ -382,11 +382,11 @@ export class ModalUpdates {
   }
 
   /** The view's lock, one holder at a time; a forgotten view gets a lock that is kept nowhere. */
-  lock(viewId: string): Gate {
-    if (this.#gone.has(viewId)) return new Gate(1);
+  lock(viewId: string): Semaphore {
+    if (this.#gone.has(viewId)) return new Semaphore(1);
     let held = this.#locks.get(viewId);
     if (held === undefined) {
-      held = new Gate(1);
+      held = new Semaphore(1);
       this.#locks.set(viewId, held);
     }
     return held;

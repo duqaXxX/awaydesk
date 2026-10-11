@@ -6,10 +6,11 @@
 import type { Repository } from "../../../agent/seam.ts";
 import { type Clock, monotonicClock } from "../../../clock.ts";
 import { GIT_TIMEOUT, runGit } from "../../../core/footer.ts";
+import { Semaphore } from "../../../core/sessions/tasks.ts";
 import { strip } from "../../../text.ts";
 import { len } from "../reply/chars.ts";
 import { GIT_CHAINS, relation, scoped, under } from "./listing.ts";
-import { Gate, TIMED_OUT, within } from "./waiting.ts";
+import { TIMED_OUT, within } from "./waiting.ts";
 
 // Python's `^(\d+)(?:\.\d+)?$`: `\d` is any decimal digit there and `$` also matches before a
 // final newline.
@@ -156,7 +157,7 @@ export async function changedIn(
   const clock = options.clock ?? monotonicClock;
   const start = options.start ?? startCommit;
   const since = options.since ?? changedSince;
-  const gate = new Gate(options.chains ?? GIT_CHAINS);
+  const gate = new Semaphore(options.chains ?? GIT_CHAINS);
 
   // The turn is waited for outside the time limit: that is git's own.
   const changed = (repository: Repository): Promise<string[]> =>

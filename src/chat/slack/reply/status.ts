@@ -16,7 +16,7 @@
  *   be interrupted, so a cancel lands when the call in flight is back, never in the middle of it.
  *   `ThreadStatus` gives its own task an `AbortController` that `close` aborts, with the same
  *   rule: the call in flight is awaited and its answer used.
- * - `asyncio.Lock` is a small FIFO lock whose wait the signal can leave.
+ * - `asyncio.Lock` is the sessions' `Mutex`, whose wait the signal can leave.
  * - `asyncio.Event` plus `wait_for(event.wait(), delay)` is a wake flag with one waiter, raced
  *   against `clock.sleep(delay)`; the clock is a parameter, in seconds.
  * - `asyncio.create_task` starts its coroutine on the next turn of the loop, so the code that
@@ -27,6 +27,7 @@
  */
 import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
+import { Mutex } from "../../../core/sessions/tasks.ts";
 import * as texts from "../../../core/texts.ts";
 import { getLogger, type Logger } from "../../../log.ts";
 import { describe } from "./errors.ts";
@@ -64,38 +65,6 @@ export function resetStatusFlags(): void {
   refusedStatus = false;
 }
 
-/** `asyncio.Lock`: first come, first served; a waiter can leave through its signal. */
-class Lock {
-  #held = false;
-  #queue: Array<() => void> = [];
-
-  acquire(signal?: AbortSignal): Promise<void> {
-    signal?.throwIfAborted();
-    if (!this.#held) {
-      this.#held = true;
-      return Promise.resolve();
-    }
-    return new Promise((resolve, reject) => {
-      const grant = () => {
-        signal?.removeEventListener("abort", leave);
-        resolve();
-      };
-      const leave = () => {
-        this.#queue = this.#queue.filter((waiter) => waiter !== grant);
-        reject(signal?.reason);
-      };
-      this.#queue.push(grant);
-      signal?.addEventListener("abort", leave, { once: true });
-    });
-  }
-
-  release(): void {
-    const next = this.#queue.shift();
-    if (next === undefined) this.#held = false;
-    else next(); // the lock passes to the next waiter without being free in between
-  }
-}
-
 export interface StatusReactionOptions {
   readonly channel: string;
   readonly rootTs: string;
@@ -125,7 +94,7 @@ export class StatusReaction {
   readonly #channel: string;
   readonly #rootTs: string;
   readonly #log: Logger;
-  readonly #lock = new Lock();
+  readonly #lock = new Mutex();
   #current: Status | null = null;
   // What `show` or `clear` was asked for last, set before any call: it differs from
   // `#current` while a change is on its way, and after one that never finished.
@@ -150,7 +119,7 @@ export class StatusReaction {
   async show(state: Status, signal?: AbortSignal): Promise<void> {
     if (missingScope) return;
     this.#wanted = state;
-    await this.#lock.acquire(signal);
+    const release = await this.#lock.acquire(signal);
     try {
       if (state === this.#current) return;
       const previous = this.#current;
@@ -181,7 +150,7 @@ export class StatusReaction {
       }
       this.#current = state;
     } finally {
-      this.#lock.release();
+      release();
     }
   }
 
@@ -191,13 +160,13 @@ export class StatusReaction {
    */
   async clear(): Promise<void> {
     this.#wanted = null;
-    await this.#lock.acquire();
+    const release = await this.#lock.acquire();
     try {
       if (this.#current === null) return;
       await this.#remove(this.#current);
       this.#current = null;
     } finally {
-      this.#lock.release();
+      release();
     }
   }
 

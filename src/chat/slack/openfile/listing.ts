@@ -33,14 +33,14 @@ import type { Repository } from "../../../agent/seam.ts";
 import { type Clock, monotonicClock } from "../../../clock.ts";
 import { foldersWithin } from "../../../core/folders.ts";
 import { runGit } from "../../../core/footer.ts";
-import { cancellable } from "../../../core/sessions/tasks.ts";
+import { cancellable, Semaphore } from "../../../core/sessions/tasks.ts";
 import { getLogger } from "../../../log.ts";
 import { compareCodePoints } from "../../../text.ts";
 import { len } from "../reply/chars.ts";
 import { describe } from "../reply/errors.ts";
 import { relativeTo } from "./paths.ts";
 import { realpathLoose, regularFiles } from "./read.ts";
-import { Gate, TIMED_OUT, within } from "./waiting.ts";
+import { TIMED_OUT, within } from "./waiting.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.openfile");
 
@@ -239,18 +239,13 @@ export async function folderFiles(
   const list = options.list ?? projectFiles;
   const deadline = clock.time() + budget;
   const real = await realpathLoose(folder);
-  const gate = new Gate(options.chains ?? GIT_CHAINS);
+  const gate = new Semaphore(options.chains ?? GIT_CHAINS);
 
   const listed = async (repository: Repository): Promise<[string[], boolean]> => {
     // Waiting for a turn is part of the budget: it is the listing's own.
-    const found = await within(clock, budget, async (signal) => {
-      await gate.acquire(signal);
-      try {
-        return await list(repository, folder, signal);
-      } finally {
-        gate.release();
-      }
-    });
+    const found = await within(clock, budget, (signal) =>
+      gate.run(() => list(repository, folder, signal), signal),
+    );
     if (found === TIMED_OUT) return [[], false];
     return [found ?? [], found !== null];
   };
