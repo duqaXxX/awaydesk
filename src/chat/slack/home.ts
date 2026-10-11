@@ -46,7 +46,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { WebAPIPlatformError, type WebClient } from "@slack/web-api";
+import type { WebClient } from "@slack/web-api";
 import type { ListedSession } from "../../agent/seam.ts";
 import { type Clock, systemClock } from "../../clock.ts";
 import {
@@ -63,7 +63,7 @@ import { getLogger } from "../../log.ts";
 import type { ThreadRef } from "../seam.ts";
 import { contextBlock, plainTextObject } from "./reply/blocks.ts";
 import { take } from "./reply/chars.ts";
-import { describe } from "./reply/errors.ts";
+import { describe, gone } from "./reply/errors.ts";
 import { mrkdwnEscape, shownAsWritten } from "./reply/escape.ts";
 import { Status } from "./reply/status.ts";
 import { Task } from "./reply/tasks.ts";
@@ -83,13 +83,6 @@ export const CLOSE_SECONDS = 10.0;
 // How many threads Slack is asked about at once on the first publish of a run.
 export const THREADS_AT_ONCE = 8;
 export const NOT_ENABLED = "not_enabled";
-// What Slack answers about a channel or a message it no longer has: the only refusals the page
-// takes as final. Any other failure (a rate limit, a server error, the network) is no answer.
-export const GONE: ReadonlySet<string> = new Set([
-  "channel_not_found",
-  "message_not_found",
-  "thread_not_found",
-]);
 // How long after a page that lacked an answer the next one is tried.
 export const RETRY_SECONDS = 60.0;
 // A select menu holds 100 options (select menu reference): "All channels" and 99 channels.
@@ -684,11 +677,6 @@ export function homeView(
   for (const cards of wanted.values()) wantedCards += cards.length;
   if (shown < wantedCards) blocks.push(context(texts.fill(slackTexts.HOME_MORE, { rows: shown })));
   return { type: "home", blocks };
-}
-
-/** Whether Slack answered that the channel or the message is not there any more. */
-function gone(error: unknown): boolean {
-  return error instanceof WebAPIPlatformError && GONE.has(describe(error));
 }
 
 /** A root that `conversations.replies` did not return among its messages. */

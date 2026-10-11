@@ -286,7 +286,6 @@ class Stage {
       settingsSources: [],
       model: PROBE_MODEL,
       effort: null,
-      permissionMode: null,
       ...over,
     };
   }

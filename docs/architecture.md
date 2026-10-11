@@ -489,10 +489,13 @@ On start, before the chat's connection opens, `repair.repair` (a flow of the cor
 seam) repairs every thread `state.json` still shows as left open. For each open reply it calls
 `ThreadChat.endReply` with `texts.STOPPED_BEFORE_ANSWER`, which ends the reply where it stands; it
 withdraws each stale request (`ThreadChat.withdraw`) and, for a root left working or waiting, asks
-for the error status (`ThreadChat.showStatus`), only where the chat has `reactions`. Each field is
-cleared once its own repair has been attempted, successfully or not (a failed `state.json` write
-here is logged and swallowed, never left to break startup), so a second start never retries what an
-earlier one gave up on; one thread's failure is logged and does not stop the others.
+for the error status (`ThreadChat.showStatus`), only where the chat has `reactions`. Each of the
+three calls answers whether the chat did it. An entry is cleared when its repair was made or the
+chat said its message is gone, and stays when the chat did not make it, so the next start asks
+again: a chat that keeps refusing is asked once at every start, for as long as the thread is in
+`state.json`. A status the chat did not show keeps its word for the next start beside the error
+one as `ended`, which is what a list of the sessions reads first. A failed `state.json` write here is logged and swallowed, never left to break
+startup, and one thread's failure is logged and does not stop the others.
 
 The Slack provider's `endReply` (`src/chat/slack/repair.ts`) stops the message's stream
 (`chat.stopStream`; `message_not_in_streaming_state` means Slack closed it already, at 5 minutes,
@@ -503,7 +506,12 @@ as a context block, or, at Slack's 50-block cap, added to the last context block
 stop is the one notification the reply owes, and the edit never notifies; nothing is posted. A
 message that cannot be read back, or is gone, is left as it is. Its `withdraw` deletes the message
 (`message_not_found` counts as done) and `showStatus` goes through the same `StatusReaction` a live
-session uses.
+session uses. Each of the three answers false when Slack did not do it and the message is still
+there: a read or a rewrite that failed, a delete or a `reactions.add` that failed. A stop that
+failed is not one of them, since Slack ends a stream itself and the rewrite says the rest. Slack
+answering `channel_not_found`, `message_not_found` or `thread_not_found` (`errors.GONE`) says the
+message is gone, which counts as done. A reply that already carries the note in a context block is
+left as it is: a rewrite whose answer was lost may have landed.
 
 `lock.singleInstance` takes the lock by the mechanism of the platform, and a second process fails to
 start with `AlreadyRunning`. macOS is the only supported host.
@@ -662,9 +670,9 @@ left unfinished does not hide the next turn's text.
 
 | Event | Made from | What the owner sees |
 |---|---|---|
-| `text_delta` with no parent call | a `stream_event` of type `content_block_delta` carrying a `text_delta` | the text, as it is written |
+| `text_delta` | a top-level `stream_event` of type `content_block_delta` carrying a `text_delta`; a subagent's gives none | the text, as it is written |
 | none | a top-level text block in an `assistant` record whose message id a `message_start` announced | nothing more: the same text already arrived as deltas |
-| `text` | the same in an `assistant` record whose message id no `message_start` announced | the text, where it arrives, a paragraph apart from text before it (note 1) |
+| `text` | the same in a top-level `assistant` record whose message id no `message_start` announced; a subagent's gives none | the text, where it arrives, a paragraph apart from text before it (note 1) |
 | `call_started` with no parent call | a `tool_use` or `server_tool_use` block | a new tool line, in progress, titled `Name: first string argument` |
 | the same with `parentCallId` set, from the record's `parent_tool_use_id` (a subagent, or a skill run in a forked context) | the same blocks | the parent's line counts the subagent's calls and holds its latest ones (note 2) |
 | `call_ended` for a line | a `tool_result` or `advisor_tool_result` block | the line completes, or shows an error with the output's first line when `isError`; a line whose task already ended as stopped keeps `Stopped` |
@@ -685,7 +693,7 @@ Notes on the table:
    to the row above, and so is every such message at the top level while a streamed one has had no
    `message_stop`, or once a `message_start` named no id. A subagent's reply arrives the same way,
    as one whole `assistant` record with `parent_tool_use_id` and no stream event (measured:
-   "Subagent reply is one record"); the renderer shows no text of a subagent.
+   "Subagent reply is one record"); the back end emits no text of a subagent.
 2. The count reads `Agent: review · 12 calls`. While the subagent runs, its line holds its latest
    calls (`renderer.CHILD_LINES`) as the card's `details`; a streamed card is sent each of them once
    and keeps them all, since a stream only adds to a card's text. The line becomes a task's line: it
@@ -1325,7 +1333,11 @@ closed when the start returns (`ThreadSession.connect`).
   says how to grant access.
 - If the Claude Code process exits or its stream fails, the back end ends the session's events with
   `process_lost`, whose reason is its own words for a process that exited or the name of the
-  failure, never its message. The requests the thread had open are denied and their messages
+  failure, never its message. The SDK throws a plain `Error` for a process that ended, so the back
+  end names it by the start of that message, as the SDK's troubleshooting page says to:
+  `ProcessExited` for an exit with a status other than 0, `ProcessKilled` for a signal,
+  `ErrorResult` for an error result reported before the exit. A start or a request the SDK
+  rejects with one of those errors fails under the same name (`ProcessLostError`). The requests the thread had open are denied and their messages
   deleted, as a close does it (`ThreadSession.settleRequests`), so none keeps buttons nobody can
   answer and the session stops counting as waiting for the owner: the idle close can fire and
   `!stop` has nothing left to deny. The open reply ends with an error line, every waiting message
@@ -1488,7 +1500,7 @@ closed when the start returns (`ThreadSession.connect`).
   `summary`, which already reads `Background command "..." completed (exit code 0)`, or
   `Agent "<description>" finished` built from the task's `task_started` event, since an agent's
   `summary` is its result; plus the duration when the notification's `usage` reports `duration_ms`
-  (`constants.TASK_KINDS`, `constants.SUMMARY_IS_END_LINE`). No new message follows for it; only
+  (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; only
   when the reply it would render into is no longer tracked (a restart or an idle close dropped it)
   does the report get a reply of its own. The next queued message waits for it to finish.
   `texts.BACKGROUND_NOTICE` opens it only when no task end was seen. When a message was already sent
@@ -1507,9 +1519,9 @@ closed when the start returns (`ThreadSession.connect`).
   reply. A background subagent's own calls (a `parentCallId` pointing at a line of an ended turn) go
   under its line the same way and never open a reply. A notification for such a task still makes the
   next queued message wait for the turn Claude Code starts to report it.
-- What is still running is counted by each task's type as Claude Code names it
-  (`constants.TASK_KINDS`; a type not listed counts as a task) and said once, on the last line of
-  the thread. When the thread's latest reply has ended, the counts close its footer
+- What is still running is counted by each task's `kind`, which the back end sets from the type
+  Claude Code names (`constants.TASK_WORDS`; the kind `other` counts as a task) and said once, on
+  the last line of the thread. When the thread's latest reply has ended, the counts close its footer
   (`⏳ 1 shell · 1 agent`); a new reply takes them over and the previous one drops them, keeping its
   footer. When the latest reply is still open for its own task, and so has no footer yet, the
   thread's status line says them (`1 shell · 1 agent still running`). The two never show together,
@@ -1589,7 +1601,7 @@ link is kept per thread with that `ts` and asked again only when the `ts` change
 one call. It carries a query (`?thread_ts=…&cid=…`), written into the page with `&` escaped as
 mrkdwn takes it. `home.THREADS_AT_ONCE` threads are asked about at a time.
 
-Only three answers are final, the ones in `home.GONE`: `channel_not_found`, `message_not_found` and
+Only three answers are final, the ones in `errors.GONE`: `channel_not_found`, `message_not_found` and
 `thread_not_found`. The channel or the thread is then left out, a thread until a state write touches
 it again and a channel for the rest of the run. Any other failure (a rate limit, a server error, the
 network, a root in a shape that cannot be read) is no answer: nothing is kept from it, what was read

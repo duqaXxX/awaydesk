@@ -8,7 +8,6 @@
  * seam's events, and as the calls of the permission callback and of the two hooks the daemon
  * registers. A task of its own (`#pump`) reads that stream.
  */
-import { randomUUID } from "node:crypto";
 import {
   type EffortLevel,
   type HookCallback,
@@ -30,30 +29,53 @@ import {
   type SessionEvent,
   type StartOptions,
 } from "../seam.ts";
+import { CAPABILITIES } from "./capabilities.ts";
 import { postToolUseHookEvents, stopHookEvents } from "./hooks.ts";
 import { agentInfo, contextUsage as contextUsageOf } from "./info.ts";
 import { userMessage } from "./prompt.ts";
 import { permissionResult, questionResult, toRequest } from "./requests.ts";
 import { Translator } from "./translate.ts";
-import { words } from "./wire.ts";
 
 export const logger = getLogger("awaydesk.agent.claude.session");
 
-// The levels Claude Code takes (`EffortLevel` of the SDK): anything else is dropped with a
-// warning at the start and refused when the owner asks for it.
-const EFFORT_LEVELS: ReadonlySet<string> = new Set(["low", "medium", "high", "xhigh", "max"]);
-const PERMISSION_MODES: ReadonlySet<string> = new Set([
-  "default",
-  "acceptEdits",
-  "bypassPermissions",
-  "plan",
-  "dontAsk",
-  "auto",
-]);
 // The reason given when the stream ends without an exception.
 const PROCESS_EXITED = "the Claude Code process exited";
-// What a call is told when nobody could be asked about it. The daemon's own text for it
-// (`APPROVAL_UNPOSTED`) is passed to the constructor: this layer does not import `src/core/`.
+// How the SDK says the process ended, and the name each way is given (issue #238). It throws a
+// plain `Error` for these, with no class and no code to tell them by, and its troubleshooting
+// page says to match on the message (code.claude.com/docs/en/agent-sdk/troubleshooting, read
+// 2026-10-11): a nonzero exit, a signal, and an error result the CLI reported before it exited.
+// Only the start of the message is read; what follows is the CLI's own words.
+const LOST_PROCESS: readonly (readonly [start: string, name: string])[] = [
+  ["Claude Code process exited with code ", "ProcessExited"],
+  ["Claude Code process terminated by signal ", "ProcessKilled"],
+  ["Claude Code returned an error result: ", "ErrorResult"],
+];
+
+/**
+ * The name of a failure of the SDK: `errorName`, except for an error that names itself no more
+ * than `Error` and whose message starts as one of `LOST_PROCESS`.
+ */
+function lostName(error: unknown): string {
+  const name = errorName(error);
+  if (name !== "Error" || !(error instanceof Error)) return name;
+  return LOST_PROCESS.find(([start]) => error.message.startsWith(start))?.[1] ?? name;
+}
+
+/** A Claude Code process that ended, named for how it did; the SDK's own error is its cause. */
+export class ProcessLostError extends Error {
+  constructor(name: string, cause: unknown) {
+    super("the Claude Code process ended", { cause });
+    this.name = name;
+  }
+}
+
+/** `error` as it leaves this class: under its name when it says the process ended, else itself. */
+function underItsName(error: unknown): unknown {
+  const name = lostName(error);
+  return name === errorName(error) ? error : new ProcessLostError(name, error);
+}
+// What a call is told when nobody could be asked about it. This layer does not import
+// `src/core/`, so the core's own text for it (`APPROVAL_UNPOSTED`) is not reused.
 const REQUEST_UNSHOWN = "awaydesk could not show this request in Slack, so nobody approved it.";
 
 /** The members of the SDK's `Query` this class calls: a test passes a fake that has these. */
@@ -136,8 +158,25 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
   }
 }
 
-function effortOf(level: string | null): EffortLevel | undefined {
-  return level !== null && EFFORT_LEVELS.has(level) ? (level as EffortLevel) : undefined;
+// The modes Claude Code takes (`PermissionMode` of the SDK). More than the three roles
+// `CAPABILITIES` declares: the core hands back the mode a session started in, which the owner's
+// own settings choose (`acceptEdits`, `plan`, `dontAsk`), when a bypass is switched off.
+const PERMISSION_MODES: ReadonlySet<string> = new Set([
+  "default",
+  "acceptEdits",
+  "bypassPermissions",
+  "plan",
+  "dontAsk",
+  "auto",
+]);
+
+// A level outside what `CAPABILITIES` declares, or a mode Claude Code does not take, is refused
+// (the seam's contract).
+function effortOf(level: string): EffortLevel {
+  if (!CAPABILITIES.effortLevels.includes(level)) {
+    throw new RangeError(`unknown effort level: ${level}`);
+  }
+  return level as EffortLevel;
 }
 
 function modeOf(mode: PermissionMode): SdkPermissionMode {
@@ -152,7 +191,6 @@ export class ClaudeSession implements AgentSession {
   readonly #queue = new AsyncQueue<SessionEvent>();
   readonly #input = new AsyncQueue<SDKUserMessage>();
   readonly #query: QueryHandle;
-  readonly #unshownMessage: string;
   readonly #finished: Promise<void>;
   #closing = false;
   #ended = false;
@@ -165,10 +203,8 @@ export class ClaudeSession implements AgentSession {
     config: SessionConfig,
     requests: RequestHandler,
     queryFunction: QueryFunction = sdkQuery,
-    unshownMessage: string = REQUEST_UNSHOWN,
   ) {
     this.#config = config;
-    this.#unshownMessage = unshownMessage;
     this.events = this.#queue;
     this.#query = queryFunction({
       prompt: this.#input,
@@ -178,7 +214,7 @@ export class ClaudeSession implements AgentSession {
   }
 
   #options(requests: RequestHandler): Options {
-    const { folder, resume, model, effort, permissionMode, chrome } = this.#config;
+    const { folder, resume, model, effort, chrome } = this.#config;
     // Makes bypass possible, not active: `setPermissionMode` switches it on the live session.
     // `replay-user-messages` (CLI reference): Claude Code re-emits each prompt with the uuid the
     // daemon sent it under, which tells a prompt it took into a running turn from one that waits
@@ -186,18 +222,13 @@ export class ClaudeSession implements AgentSession {
     // only: here `--chrome` is what connects Claude Code's Chrome integration.
     const extraArgs: Record<string, string | null> = { "replay-user-messages": null };
     if (chrome) extraArgs.chrome = null;
-    const validEffort = effortOf(effort);
-    if (effort !== null && validEffort === undefined) {
-      logger.warning("dropped an unrecognized effort level");
-    }
     return {
       cwd: folder,
       ...(resume !== null && { resume }),
       // The effort `/effort` set does not survive a resume (measured 2026-09-28), so the daemon
       // keeps it per thread and passes it back here.
-      ...(validEffort !== undefined && { effort: validEffort }),
+      ...(effort !== null && { effort: effortOf(effort) }),
       ...(model !== null && { model }),
-      ...(permissionMode !== null && { permissionMode: modeOf(permissionMode) }),
       settingSources: [...this.#config.settingsSources],
       includePartialMessages: true,
       ...(!this.#config.bare && { allowDangerouslySkipPermissions: true }),
@@ -208,19 +239,14 @@ export class ClaudeSession implements AgentSession {
         // asked about is refused here, and only the error's name is kept: its message may quote
         // the tool's input.
         try {
-          const request = toRequest(
-            words(context.requestId) ?? randomUUID(),
-            toolName,
-            input,
-            context,
-          );
+          const request = toRequest(toolName, input, context);
           if (request.type === "question") {
             return questionResult(await requests.question(request), input);
           }
           return permissionResult(await requests.permission(request), input);
         } catch (error) {
           logger.error(`could not ask the owner about a call: ${errorName(error)}`);
-          return { behavior: "deny", message: this.#unshownMessage };
+          return { behavior: "deny", message: REQUEST_UNSHOWN };
         }
       },
       // The Stop hook's input carries the effort level Claude Code runs at: the footer's only
@@ -259,7 +285,7 @@ export class ClaudeSession implements AgentSession {
         }
       }
     } catch (error) {
-      reason = errorName(error);
+      reason = lostName(error);
     }
     this.#ended = true;
     if (!this.#closing) {
@@ -289,7 +315,19 @@ export class ClaudeSession implements AgentSession {
       await this.close();
       if (this.#config.resume !== null && this.#startRefused)
         throw new ResumeRefused({ cause: error });
-      throw error;
+      throw underItsName(error);
+    }
+  }
+
+  /**
+   * Asks the query. The SDK rejects a request with the error that ended the process, when it
+   * did: that one leaves under its name, as the stream's own end does.
+   */
+  async #ask<T>(request: () => Promise<T>): Promise<T> {
+    try {
+      return await request();
+    } catch (error) {
+      throw underItsName(error);
     }
   }
 
@@ -301,19 +339,19 @@ export class ClaudeSession implements AgentSession {
   }
 
   async interrupt(): Promise<void> {
-    await this.#query.interrupt();
+    await this.#ask(() => this.#query.interrupt());
   }
 
   async stopTask(taskId: string): Promise<void> {
-    await this.#query.stopTask(taskId);
+    await this.#ask(() => this.#query.stopTask(taskId));
   }
 
   async setPermissionMode(mode: PermissionMode): Promise<void> {
-    await this.#query.setPermissionMode(modeOf(mode));
+    await this.#ask(() => this.#query.setPermissionMode(modeOf(mode)));
   }
 
   async setModel(model: string | null): Promise<void> {
-    await this.#query.setModel(model ?? undefined);
+    await this.#ask(() => this.#query.setModel(model ?? undefined));
   }
 
   /**
@@ -321,14 +359,12 @@ export class ClaudeSession implements AgentSession {
    * 28 ms in the back end's own live check, both on 2026-10-10.
    */
   async setEffort(level: string | null): Promise<void> {
-    if (level !== null && effortOf(level) === undefined) {
-      throw new RangeError(`unknown effort level: ${level}`);
-    }
-    await this.#query.applyFlagSettings({ effortLevel: effortOf(level) ?? null });
+    const effortLevel = level === null ? null : effortOf(level);
+    await this.#ask(() => this.#query.applyFlagSettings({ effortLevel }));
   }
 
   async contextUsage(): Promise<ContextUsage> {
-    return contextUsageOf(await this.#query.getContextUsage());
+    return contextUsageOf(await this.#ask(() => this.#query.getContextUsage()));
   }
 
   /**
@@ -336,7 +372,7 @@ export class ClaudeSession implements AgentSession {
    * session started in (measured 2026-10-10 on SDK 0.3.296): nothing else is asked.
    */
   async info(): Promise<AgentInfo> {
-    return agentInfo(await this.#query.initializationResult());
+    return agentInfo(await this.#ask(() => this.#query.initializationResult()));
   }
 
   /**

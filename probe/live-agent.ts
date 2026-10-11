@@ -147,7 +147,6 @@ function options(directory: string, resume: string | null = null): StartOptions 
     settingsSources: [],
     model: MODEL,
     effort: null,
-    permissionMode: null,
   };
 }
 

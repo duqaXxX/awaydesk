@@ -14,7 +14,8 @@
  */
 import type { SessionEvent } from "../../src/agent/seam.ts";
 import type { Preview, TaskStatus, TaskUpdate } from "../../src/chat/seam.ts";
-import { ReplySink, UpdateLimiter } from "../../src/chat/slack/reply/sinks.ts";
+import { UpdateLimiter } from "../../src/chat/slack/reply/limiter.ts";
+import { ReplySink } from "../../src/chat/slack/reply/sinks.ts";
 import { type Sink, TurnRenderer } from "../../src/core/reply/renderer.ts";
 import { BOT, CHANNEL, FakeClock, FakeSlack, OWNER, TEAM, THREAD } from "./fake-slack.ts";
 import type { Json, JsonObject } from "./fixtures.ts";

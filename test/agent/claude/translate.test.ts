@@ -216,13 +216,10 @@ test("an origin of the owner's own is the owner's turn", () => {
 
 test("a streamed message gives its start, its text as it is written and its end", () => {
   const made = perRecord("clear");
-  const id = "msg_011CfaHYNurMQWkVVn2RLXQw";
-  assert.deepEqual(made[2], [{ type: "message_started", messageId: id, parentCallId: null }]);
-  assert.deepEqual(made[9], [{ type: "text_started", messageId: id, parentCallId: null }]);
-  assert.deepEqual(made[10], [
-    { type: "text_delta", messageId: id, text: "ok", parentCallId: null },
-  ]);
-  assert.deepEqual(made[14], [{ type: "message_ended", messageId: id, parentCallId: null }]);
+  assert.deepEqual(made[2], [{ type: "message_started", parentCallId: null }]);
+  assert.deepEqual(made[9], [{ type: "text_started" }]);
+  assert.deepEqual(made[10], [{ type: "text_delta", text: "ok" }]);
+  assert.deepEqual(made[14], [{ type: "message_ended", parentCallId: null }]);
   // Thinking, the signature of a block and a block's end show nothing.
   for (const index of [3, 5, 6, 7, 8, 12, 13]) assert.deepEqual(made[index], [], `record ${index}`);
 });
@@ -247,8 +244,6 @@ test("a text no stream announced arrives whole", () => {
   const made = perRecord("usage");
   assert.equal(made[1]?.length, 1);
   const [whole] = of(made[1] ?? [], "text");
-  assert.equal(whole?.messageId, "05598563-bf5a-470b-a6b9-17e5aa13b82d");
-  assert.equal(whole?.parentCallId, null);
   assert.ok(whole?.text.startsWith("You are currently using your subscription"));
   assert.equal(whole?.text, whole?.text.trim());
 });
@@ -258,9 +253,7 @@ test("a command's own output comes whole before the streamed text of its turn", 
   const written = all.filter((event) => event.type === "text" || event.type === "text_delta");
   assert.deepEqual(written[0], {
     type: "text",
-    messageId: "f253d2e7-39dc-4042-9737-175c37c817d3",
     text: "Goal set: Reply with the single word tick once in each turn, until you have said it three times in total. Never use a tool.",
-    parentCallId: null,
   });
   assert.deepEqual(
     written.slice(1).map((event) => (event.type === "text_delta" ? event.text : null)),
@@ -319,7 +312,7 @@ test("a whole text is held back once a stream named no message", () => {
   const start = record("clear", 2);
   const unnamed = { ...start, event: { type: "message_start", message: {} } };
   assert.deepEqual(translator.translate(unnamed), [
-    { type: "message_started", messageId: null, parentCallId: null },
+    { type: "message_started", parentCallId: null },
   ]);
   translator.translate(record("clear", 14));
   assert.deepEqual(translator.translate(record("usage", 1)), []);
@@ -340,16 +333,9 @@ test("a message with no words gives no text", () => {
   assert.deepEqual(translator.translate({ ...blank, message }), []);
 });
 
-test("a subagent's text arrives whole under the call that runs it", () => {
+test("a subagent's text, which arrives whole, is left out", () => {
   const made = perRecord("subagent");
-  assert.deepEqual(made[76], [
-    {
-      type: "text",
-      messageId: "msg_011CfaHEeQFrp2bisgSqtfX6",
-      text: "The current working directory is empty except for a single file:\n\n**Files and directories present:**\n- `notes.txt` (6 bytes, regular file)\n\nThat's the only item in `/home/dev/project`.",
-      parentCallId: "toolu_013vuT1tVKbAduiW9vAf1YWk",
-    },
-  ]);
+  assert.deepEqual(made[76], []);
 });
 
 test("a text reaches the core once, streamed or whole and never both", () => {
@@ -357,18 +343,25 @@ test("a text reaches the core once, streamed or whole and never both", () => {
     const wire = sdkRecords(name);
     const made = perRecord(name);
     // Each stretch between two ends of turn: the synthetic recordings reuse a message id.
-    let streamed = new Set<string | null>();
+    let streamed = new Set<string>();
     let whole = new Set<string>();
+    let writing: string | null = null; // the id the last top-level `message_start` announced
     made.forEach((group, index) => {
+      const entry = wire[index];
+      const inner = entry?.type === "stream_event" ? (entry.event as JsonObject) : null;
+      if (inner?.type === "message_start" && !entry?.parent_tool_use_id) {
+        writing = ((inner.message as JsonObject | undefined)?.id as string | undefined) ?? null;
+      }
       for (const event of group) {
-        if (event.type === "text_delta") streamed.add(event.messageId);
+        if (event.type === "text_delta" && writing !== null) streamed.add(writing);
         if (event.type === "text") {
-          assert.ok(!whole.has(event.messageId), `${name} record ${index}: whole twice`);
-          assert.ok(!streamed.has(event.messageId), `${name} record ${index}: streamed and whole`);
-          whole.add(event.messageId);
+          const id = String((entry?.message as JsonObject | undefined)?.id);
+          assert.ok(!whole.has(id), `${name} record ${index}: whole twice`);
+          assert.ok(!streamed.has(id), `${name} record ${index}: streamed and whole`);
+          whole.add(id);
         }
       }
-      if (wire[index]?.type === "result") {
+      if (entry?.type === "result") {
         streamed = new Set();
         whole = new Set();
       }
@@ -847,7 +840,7 @@ test("a compaction on request starts, ends and then says what it saved", () => {
   const made = perRecord("compact").slice(73, 77);
   assert.deepEqual(made, [
     [{ type: "compaction_started" }],
-    [{ type: "compaction_ended", result: "success" }],
+    [{ type: "compaction_ended" }],
     [
       {
         type: "session_started",
@@ -910,9 +903,7 @@ test("a compaction starts once however often the agent says it is compacting", (
   const compacting = record("compact", 73);
   assert.deepEqual(translator.translate(compacting), [{ type: "compaction_started" }]);
   assert.deepEqual(translator.translate(compacting), []);
-  assert.deepEqual(translator.translate(record("compact", 74)), [
-    { type: "compaction_ended", result: "success" },
-  ]);
+  assert.deepEqual(translator.translate(record("compact", 74)), [{ type: "compaction_ended" }]);
   assert.deepEqual(translator.translate(record("compact", 74)), []);
 });
 
@@ -922,18 +913,14 @@ test("a permission mode report does not end a compaction", () => {
   assert.deepEqual(translator.translate(record("permission-mode-status", 0)), [
     { type: "mode_changed", mode: "bypassPermissions" },
   ]);
-  assert.deepEqual(translator.translate(record("compact", 74)), [
-    { type: "compaction_ended", result: "success" },
-  ]);
+  assert.deepEqual(translator.translate(record("compact", 74)), [{ type: "compaction_ended" }]);
 });
 
-test("a status of another kind ends a compaction with no result", () => {
+test("a status of another kind ends a compaction", () => {
   const translator = new Translator();
   translator.translate(record("compact", 73));
   assert.equal(record("compact", 1).status, "requesting");
-  assert.deepEqual(translator.translate(record("compact", 1)), [
-    { type: "compaction_ended", result: null },
-  ]);
+  assert.deepEqual(translator.translate(record("compact", 1)), [{ type: "compaction_ended" }]);
 });
 
 test("a turn's end leaves no compaction behind", () => {

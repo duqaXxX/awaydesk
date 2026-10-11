@@ -127,7 +127,6 @@ test("a session started the ordinary way still carries both", LIMIT, async (t) =
       settingsSources: [],
       model: null,
       effort: null,
-      permissionMode: null,
     },
     {
       permission: async () => ({ allow: false, message: "" }),

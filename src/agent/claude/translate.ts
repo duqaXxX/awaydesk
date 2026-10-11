@@ -51,8 +51,8 @@ interface Memory {
   readonly sent: Set<string>;
   /** The ids of the messages a `message_start` announced: their text is written from its deltas. */
   readonly streamed: Set<string>;
-  /** The message each stream is writing, by the call it runs under (null: the top level). */
-  readonly open: Map<string | null, string | null>;
+  /** The top-level stream is writing a message. */
+  open: boolean;
   /** A top-level `message_start` carried no id: the ids tell nothing. */
   unnamed: boolean;
   compacting: boolean;
@@ -85,35 +85,32 @@ function messageStart(memory: Memory, record: WireRecord): SessionEvent[] {
   const event = isRecord(record.event) ? record.event : {};
   const messageId = isRecord(event.message) ? string(event.message.id) : null;
   const parentCallId = parentOf(record);
-  memory.open.set(parentCallId, messageId);
+  if (parentCallId === null) memory.open = true;
   if (messageId !== null) memory.streamed.add(messageId);
   else if (parentCallId === null) memory.unnamed = true;
-  return [{ type: "message_started", messageId, parentCallId }];
+  return [{ type: "message_started", parentCallId }];
 }
 
 function messageStop(memory: Memory, record: WireRecord): SessionEvent[] {
   const parentCallId = parentOf(record);
-  const messageId = memory.open.get(parentCallId) ?? null;
-  memory.open.delete(parentCallId);
-  return [{ type: "message_ended", messageId, parentCallId }];
+  if (parentCallId === null) memory.open = false;
+  return [{ type: "message_ended", parentCallId }];
 }
 
-function contentBlockStart(memory: Memory, record: WireRecord): SessionEvent[] {
+// A subagent's text never reaches a reply, so no text event carries a parent call.
+function contentBlockStart(_memory: Memory, record: WireRecord): SessionEvent[] {
   const event = isRecord(record.event) ? record.event : {};
   if (!isRecord(event.content_block) || event.content_block.type !== "text") return [];
-  const parentCallId = parentOf(record);
-  return [{ type: "text_started", messageId: memory.open.get(parentCallId) ?? null, parentCallId }];
+  if (parentOf(record) !== null) return [];
+  return [{ type: "text_started" }];
 }
 
-function contentBlockDelta(memory: Memory, record: WireRecord): SessionEvent[] {
+function contentBlockDelta(_memory: Memory, record: WireRecord): SessionEvent[] {
   const event = isRecord(record.event) ? record.event : {};
   if (!isRecord(event.delta) || event.delta.type !== "text_delta") return [];
   const text = words(event.delta.text);
-  if (text === null) return [];
-  const parentCallId = parentOf(record);
-  return [
-    { type: "text_delta", messageId: memory.open.get(parentCallId) ?? null, text, parentCallId },
-  ];
+  if (text === null || parentOf(record) !== null) return [];
+  return [{ type: "text_delta", text }];
 }
 
 // Messages.
@@ -133,9 +130,8 @@ function wordsOf(blocks: readonly WireRecord[]): string {
  * while a streamed message is unfinished (its text may be this one's, sent again whole after a
  * failed stream, which no recording shows) or once a stream named no id.
  */
-function unannounced(memory: Memory, messageId: string | null, parentCallId: string | null) {
-  if (messageId === null || memory.streamed.has(messageId)) return false;
-  return parentCallId !== null || (!memory.open.has(null) && !memory.unnamed);
+function unannounced(memory: Memory, messageId: string) {
+  return !memory.streamed.has(messageId) && !memory.open && !memory.unnamed;
 }
 
 function callStarted(block: WireRecord, parentCallId: string | null): SessionEvent[] {
@@ -197,10 +193,15 @@ function assistant(memory: Memory, record: WireRecord): SessionEvent[] {
   }
   const events: SessionEvent[] = [];
   const messageId = string(message.id);
-  if (text !== "" && messageId !== null && unannounced(memory, messageId, parentCallId)) {
+  if (
+    text !== "" &&
+    parentCallId === null &&
+    messageId !== null &&
+    unannounced(memory, messageId)
+  ) {
     // Text no stream event announced is a command's own output (`Goal set: …` before a goal's
-    // first inner turn, recorded: `goal.jsonl`), or a subagent's, which does not stream.
-    events.push({ type: "text", messageId, text, parentCallId });
+    // first inner turn, recorded: `goal.jsonl`). A subagent's is left out: no reply shows it.
+    events.push({ type: "text", text });
   }
   for (const block of blocks) {
     if (block.type === "tool_use" || block.type === "server_tool_use") {
@@ -320,11 +321,7 @@ function status(memory: Memory, record: WireRecord): SessionEvent[] {
     (memory.compacting && reported === null && !Object.hasOwn(record, "compact_result"));
   if (compacting !== memory.compacting) {
     memory.compacting = compacting;
-    events.push(
-      compacting
-        ? { type: "compaction_started" }
-        : { type: "compaction_ended", result: string(record.compact_result) },
-    );
+    events.push(compacting ? { type: "compaction_started" } : { type: "compaction_ended" });
   }
   return events;
 }
@@ -429,7 +426,7 @@ function result(memory: Memory, record: WireRecord): SessionEvent[] {
   // The stream's memory is a turn's: an interrupted stream has no `message_stop`, and the next
   // turn must not read as still inside it.
   memory.streamed.clear();
-  memory.open.clear();
+  memory.open = false;
   memory.unnamed = false;
   memory.compacting = false;
   // Claude Code started the turn itself (a task notification, say) when the origin names
@@ -507,7 +504,7 @@ export class Translator {
   readonly #memory: Memory = {
     sent: new Set(),
     streamed: new Set(),
-    open: new Map(),
+    open: false,
     unnamed: false,
     compacting: false,
   };

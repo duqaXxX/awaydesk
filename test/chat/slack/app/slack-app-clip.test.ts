@@ -10,7 +10,7 @@
  */
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
-import { logger } from "../../../../src/chat/slack/app/app.ts";
+import { logger } from "../../../../src/chat/slack/app/answers.ts";
 import { DownloadFailed } from "../../../../src/chat/slack/attachments.ts";
 import { HOLD_CONTINUE } from "../../../../src/chat/slack/hold.ts";
 import { SETUP_MODEL, SETUP_START } from "../../../../src/chat/slack/setup.ts";

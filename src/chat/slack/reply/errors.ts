@@ -81,6 +81,20 @@ export function describeRefusal(error: unknown): string {
   return words;
 }
 
+// What Slack answers about a channel or a message it no longer has: the only refusals taken as
+// final by the Home tab and by the crash repair. Any other failure (a rate limit, a server
+// error, the network) is no answer.
+export const GONE: ReadonlySet<string> = new Set([
+  "channel_not_found",
+  "message_not_found",
+  "thread_not_found",
+]);
+
+/** Whether Slack answered that the channel or the message is not there any more. */
+export function gone(error: unknown): boolean {
+  return error instanceof WebAPIPlatformError && GONE.has(describe(error));
+}
+
 /**
  * Whether a failed call may have been applied: Slack answering with an error says it was not
  * (an error code, a rate limit, an HTTP status), anything else (a reset, a timeout) says nothing.
@@ -96,13 +110,14 @@ export function unknownOutcome(error: unknown): boolean {
 /**
  * Delete a request (an approval, a question, a hold) once it is decided or stale:
  * `message_not_found` counts as done, as everywhere else this project deletes one. Shared by the
- * session, the handlers and the crash repair, so the one behaviour lives in one place.
+ * session, the handlers and the crash repair, so the one behaviour lives in one place. False
+ * when Slack did not delete it and did not say it is gone.
  */
 export async function deleteRequest(
   slack: WebClient,
   request: { readonly channel: string; readonly ts: string },
   options: { readonly logger?: Logger; readonly now?: () => number } = {},
-): Promise<void> {
+): Promise<boolean> {
   const log = options.logger ?? logger;
   const { channel, ts } = request;
   try {
@@ -110,7 +125,7 @@ export async function deleteRequest(
   } catch (error) {
     if (describe(error) !== "message_not_found") {
       log.warning(`could not remove a request in ${channel}: ${describe(error)}`);
-      return;
+      return false;
     }
   }
   // Issue #71: a message ts is its post time in epoch seconds, so the age of a request when it
@@ -122,4 +137,5 @@ export async function deleteRequest(
       ? "age unknown"
       : `${(now - posted).toFixed(1)}s after it was posted`;
   log.info(`removed a request in ${channel}: message ${ts}, ${age}`);
+  return true;
 }

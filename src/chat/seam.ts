@@ -182,8 +182,9 @@ export interface ThreadChat {
   /**
    * Shows the session's status on the thread's root. Changes are made in the order asked; with
    * a `signal`, rejects with its reason when it aborts, and the change may be left half made.
+   * False when the chat did not make the change and the root does not show `status`.
    */
-  showStatus(status: SessionStatus, signal?: AbortSignal): Promise<void>;
+  showStatus(status: SessionStatus, signal?: AbortSignal): Promise<boolean>;
   /** Leaves the root with no status of this session. */
   clearStatus(): Promise<void>;
   /** Brings the root to the status asked for last: for whoever aborted a change on its way. */
@@ -210,8 +211,11 @@ export interface ThreadChat {
    * shows it; rejects with `ChatError` when it could not be shown.
    */
   ask(requestId: string, request: OwnerRequest, title: string): Promise<MessageId>;
-  /** Removes a request that was decided or is stale; one already gone counts as removed. */
-  withdraw(request: MessageId): Promise<void>;
+  /**
+   * Removes a request that was decided or is stale; one already gone counts as removed. False
+   * when the chat did not remove it and it still shows.
+   */
+  withdraw(request: MessageId): Promise<boolean>;
   /**
    * Rewrites an answered question into the record of its answers, with nothing left to press.
    * Rejects with `ChatError` when the chat refuses the rewrite.
@@ -248,9 +252,10 @@ export interface ThreadChat {
   link(label: string, markup: Markup): Promise<string | null>;
   /**
    * A reply a stop left unfinished, of a daemon that is gone: ended where it stands, with
-   * `note` as its last line. Never rejects; a message already gone counts as ended.
+   * `note` as its last line. Never rejects; a message already gone counts as ended. False when
+   * the chat did not write the line and the reply is still there without it.
    */
-  endReply(reply: MessageId, note: string): Promise<void>;
+  endReply(reply: MessageId, note: string): Promise<boolean>;
   /** The session closed: the activity line is cleared, and nothing is left running. */
   close(): Promise<void>;
 }

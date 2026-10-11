@@ -122,10 +122,9 @@ export interface ChatConformanceOptions {
 const OWN_WORDS = "please build the module";
 const FOLDER = "/work/notes";
 
-function permission(requestId: string): OwnerRequest {
+function permission(): OwnerRequest {
   return {
     type: "permission",
-    requestId,
     callId: "call-1",
     toolName: "Bash",
     input: { command: "ls" },
@@ -144,10 +143,9 @@ const QUESTION: Question = {
   ],
 };
 
-function question(requestId: string): OwnerRequest {
+function question(): OwnerRequest {
   return {
     type: "question",
-    requestId,
     callId: "call-2",
     toolName: "AskUserQuestion",
     title: null,
@@ -543,29 +541,27 @@ export function chatConformance(
           const shown = s.rig.read(s.ref).find((m) => m.id === id);
           assert.ok(shown, "the request is shown in the thread");
           assert.ok(shown.pressable, "and has a control to press");
-          await thread.withdraw(id);
+          assert.equal(await thread.withdraw(id), true);
           assert.equal(
             s.rig.read(s.ref).some((m) => m.id === id),
             false,
             "the request is no longer shown",
           );
-          await thread.withdraw(id); // one already gone counts as removed
+          assert.equal(await thread.withdraw(id), true); // one already gone counts as removed
         });
       }
 
       check("ask rejects with ChatError when it could not show the request", async (s) => {
         s.rig.refuseWrites();
         await assert.rejects(
-          s.provider
-            .thread(s.ref)
-            .ask("request-refused", permission("request-refused"), "A request"),
+          s.provider.thread(s.ref).ask("request-refused", permission(), "A request"),
           ChatError,
         );
       });
 
       check("keepAnswers leaves the record of the answers and nothing to press", async (s) => {
         const thread = s.provider.thread(s.ref);
-        const id = await thread.ask("request-answered", question("request-answered"), "A question");
+        const id = await thread.ask("request-answered", question(), "A question");
         await thread.keepAnswers(id, [QUESTION], { [QUESTION.text]: "blue" });
         const shown = s.rig.read(s.ref).find((m) => m.id === id);
         assert.ok(shown, "the record stays in the thread");
@@ -670,11 +666,13 @@ export function chatConformance(
         await reply.settle();
         await s.rig.settle();
         assert.ok(open, "told of the message");
-        await s.provider.thread(s.ref).endReply(open, "Stopped before the end");
+        assert.equal(await s.provider.thread(s.ref).endReply(open, "Stopped before the end"), true);
         const shown = s.rig.read(s.ref).filter((m) => m.id === open);
         assert.equal(shown.length, 1);
         assert.match(shown[0]?.text ?? "", /Stopped before the end/);
         await s.provider.thread(s.ref).endReply(open, "Stopped before the end"); // twice is fine
+        // One already gone counts as ended.
+        assert.equal(await s.provider.thread(s.ref).endReply("no-such-message", "Stopped"), true);
       });
 
       check("keeps what the reply showed when endReply ends it", async (s) => {
@@ -704,8 +702,8 @@ export function chatConformance(
     describe("what a capability adds", () => {
       gated("shows a status and takes it away", "reactions", async ({ provider, ref }) => {
         const thread = provider.thread(ref);
-        await thread.showStatus("working");
-        await thread.showStatus("done");
+        assert.equal(await thread.showStatus("working"), true);
+        assert.equal(await thread.showStatus("done"), true);
         await thread.settleStatus();
         await thread.clearStatus();
       });
@@ -821,7 +819,7 @@ export function chatConformance(
 
       inbound("the owner's skip of a question arrives as null answers", async (s) => {
         const thread = s.provider.thread(s.ref);
-        const request = question("request-skipped");
+        const request = question();
         const message = await thread.ask("request-skipped", request, "A question");
         const skip: OwnerAnswer = { type: "question", answers: null };
         await s.rig.owner.answers(
@@ -836,7 +834,7 @@ export function chatConformance(
 
       inbound("the owner's denial of a permission arrives as a denial", async (s) => {
         const thread = s.provider.thread(s.ref);
-        const request = permission("request-denied");
+        const request = permission();
         const message = await thread.ask("request-denied", request, "A permission");
         const deny: OwnerAnswer = { type: "permission", allow: false };
         await s.rig.owner.answers(
@@ -896,7 +894,7 @@ export function chatConformance(
       inbound("nothing arrives after stop", async (s) => {
         const thread = s.provider.thread(s.ref);
         const requestId = "request-late";
-        const request = permission(requestId);
+        const request = permission();
         const message = await thread.ask(requestId, request, "A permission");
         const channel = s.provider.channel(s.rig.channel);
         await channel.offer(FOLDERS, "Pick a folder to bind");

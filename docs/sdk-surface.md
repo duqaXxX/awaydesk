@@ -102,7 +102,6 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Options` | `hooks` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `includePartialMessages` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `model` | option | session.ts: ClaudeSession.#options | reference | none |
-| `Options` | `permissionMode` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `resume` | option | session.ts: ClaudeSession.#options | reference | P7 |
 | `Options` | `settingSources` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `stderr` | option | session.ts: ClaudeSession.#options | reference | none |
@@ -128,7 +127,6 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `BaseHookInput` | `effort` | field | hooks.ts: stopHookEvents | reference | none |
 | `BaseHookInput.effort` | `level` | field | hooks.ts: stopHookEvents | package | none |
 | `CanUseTool` | `description` | field | requests.ts: toRequest, CallContext | package | none |
-| `CanUseTool` | `requestId` | field | session.ts: ClaudeSession.#options | reference | none |
 | `CanUseTool` | `title` | field | requests.ts: toRequest, CallContext | package | none |
 | `CanUseTool` | `toolUseID` | field | requests.ts: toRequest, CallContext | reference | none |
 | `ModelInfo` | `description` | field | info.ts: modelOf | reference | none |
@@ -249,11 +247,11 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKUserMessage.tool_use_result.structuredPatch[]` | `newStart` | key | translate.ts: hunkOf | measured | none |
 | `SDKUserMessage.tool_use_result.structuredPatch[]` | `oldStart` | key | translate.ts: hunkOf | measured | none |
 | `CanUseTool.toolName` | `"AskUserQuestion"` | value | requests.ts: QUESTION_TOOL | measured | none |
-| `EffortLevel` | `"high"` | value | session.ts: EFFORT_LEVELS | package | none |
-| `EffortLevel` | `"low"` | value | session.ts: EFFORT_LEVELS | package | none |
-| `EffortLevel` | `"max"` | value | session.ts: EFFORT_LEVELS | package | none |
-| `EffortLevel` | `"medium"` | value | session.ts: EFFORT_LEVELS | package | none |
-| `EffortLevel` | `"xhigh"` | value | session.ts: EFFORT_LEVELS | package | none |
+| `EffortLevel` | `"high"` | value | capabilities.ts: CAPABILITIES | package | none |
+| `EffortLevel` | `"low"` | value | capabilities.ts: CAPABILITIES | package | none |
+| `EffortLevel` | `"max"` | value | capabilities.ts: CAPABILITIES | package | none |
+| `EffortLevel` | `"medium"` | value | capabilities.ts: CAPABILITIES | package | none |
+| `EffortLevel` | `"xhigh"` | value | capabilities.ts: CAPABILITIES | package | none |
 | `HookEvent` | `"PostToolUse"` | value | session.ts: ClaudeSession.#options | reference | none |
 | `HookEvent` | `"Stop"` | value | session.ts: ClaudeSession.#options | reference | none |
 | `PermissionMode` | `"acceptEdits"` | value | session.ts: PERMISSION_MODES | reference | none |
@@ -361,6 +359,13 @@ no check covers them here.
   `sdk.d.ts` 0.3.296: of the 23 kinds they hold, `command_lifecycle` is in no declaration and 10
   others carry fields that the declaration of their type lacks (`thinking_display` on three stream
   events, `user_message_uuids` on `status`, `logical_parent_uuid` on `compact_boundary`, and more).
+- `ClaudeSession` names a process that ended by the start of the message of the plain `Error`
+  the SDK throws, from its stream, its start or a request: `Claude Code process exited with code `,
+  `Claude Code process terminated by signal ` and `Claude Code returned an error result: `. The package declares no class, field or
+  value for these; the three messages are in the troubleshooting page of the SDK
+  (`code.claude.com/docs/en/agent-sdk/troubleshooting`, read 2026-10-11), which says to match on
+  the message. A release that words one differently gives the name `Error` again, and no check
+  here says so.
 - The rows under `SDKPartialAssistantMessage.event` are events of the Claude API, typed by
   `BetaRawMessageStreamEvent` of `@anthropic-ai/sdk` 0.133.0, which `sdk.d.ts` imports and does not
   declare. The same holds for the rows under `SDKAssistantMessage.message` and

@@ -1,5 +1,5 @@
 /** The waits, the limits and the words of a session. */
-import type { SessionEventType } from "../../agent/seam.ts";
+import type { SessionEventType, TaskKind } from "../../agent/seam.ts";
 import type { SessionStatus } from "../../chat/seam.ts";
 import { Named } from "../texts.ts";
 
@@ -28,26 +28,21 @@ export const INJECTED_TURN_WAIT = 30.0;
 // How long the answer to `!stop` waits for the reply it cut short to end. An interrupted turn
 // ends within a second or two; a final write that is retried takes ten.
 export const STOP_TAIL_WAIT = 15.0;
-// Each task type (measured on Claude Code 2.1.280: `local_bash` for a background command,
-// `local_agent` for a subagent) as the footer counts it and as its end line names it, the way
-// the terminal prints `Agent "..." finished`. A type not listed counts and reads as a task, so a
-// new kind shows with no change.
-export const TASK_KINDS: Readonly<Record<string, readonly [counted: string, named: string]>> = {
-  local_bash: ["shell", "Background command"],
-  local_agent: ["agent", "Agent"],
+// Each kind of task as the footer counts it and as its end line names it, the way the terminal
+// prints `Agent "..." finished`. The agent decides which kind a task is (`task_started.kind`): a
+// kind it does not name arrives as `other`, which counts and reads as a task, so a new one shows
+// with no change.
+export const TASK_WORDS: Readonly<Record<TaskKind, readonly [counted: string, named: string]>> = {
+  command: ["shell", "Background command"],
+  subagent: ["agent", "Agent"],
+  other: ["task", "Task"],
 };
-export const UNKNOWN_KIND: readonly [counted: string, named: string] = ["task", "Task"];
-/** The kind of a task type the agent reported: an own entry of TASK_KINDS, else UNKNOWN_KIND. */
-export function taskKind(taskType: string): readonly [counted: string, named: string] {
-  // `Object.hasOwn`: `constructor` and `toString` are no kind, whatever the agent calls its task.
-  return (Object.hasOwn(TASK_KINDS, taskType) ? TASK_KINDS[taskType] : undefined) ?? UNKNOWN_KIND;
-}
-// Tasks whose type and description the session keeps. A task can end with a terminal
+// Tasks whose kind and description the session keeps. A task can end with a terminal
 // `task_updated` and no notification (SDK docstring), so past this many the oldest are dropped.
 export const TASKS_KEPT = 200;
-// The task types whose notification summary is already the terminal's end line (measured: a
+// The kinds whose notification summary is already the terminal's end line (measured: a
 // command's reads `Background command "..." completed (exit code 0)`; an agent's is its result).
-export const SUMMARY_IS_END_LINE: ReadonlySet<string> = new Set(["local_bash"]);
+export const SUMMARY_IS_END_LINE: ReadonlySet<TaskKind> = new Set<TaskKind>(["command"]);
 // Tasks whose reply the session remembers. An ended task stays a while, since an agent can
 // report again after its notification; past this many, the oldest ended ones are forgotten.
 export const TASK_REPLIES_KEPT = 100;

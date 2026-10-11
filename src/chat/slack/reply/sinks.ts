@@ -101,15 +101,6 @@ import type { Limiter } from "./limiter.ts";
 import { bannerText, markdownBlocks, markdownCut, plainWords } from "./markdown.ts";
 import { Task } from "./tasks.ts";
 
-export * from "../../../clock.ts";
-export { Cancelled, cancellable, Mutex } from "../../../core/port.ts";
-export * from "./blocks.ts";
-export * from "./clients.ts";
-export * from "./errors.ts";
-export * from "./limiter.ts";
-export * from "./markdown.ts";
-export { Task } from "./tasks.ts";
-
 export const DEBOUNCE_SECONDS = 1.0;
 // The final write has no next rewrite to fix it: one that fails for any reason but its content
 // is tried once more after this pause.
@@ -193,14 +184,6 @@ export class Tool {
    */
   get cardless(): boolean {
     return !this.carded;
-  }
-
-  /**
-   * What follows the tool's card: the terminal's preview of a call that ended well, cut into
-   * pieces that fit a message each. None until the call ends, and for any other call.
-   */
-  pieces(): readonly string[] {
-    return this.shownPieces;
   }
 
   /** Piece `piece` (1 is the first). */
@@ -364,10 +347,8 @@ class Message {
   // An append whose outcome is unknown: the stream is no longer told anything, it is stopped
   // and the message goes on by update, from the model.
   blind = false;
-  // Its stream was refused as too long (`refused`), and an update refused in turn left it
-  // showing less than the model (`short`), until an update passes: while a message is short
-  // the reply's end has not landed.
-  refused = false;
+  // An update refused in turn left it showing less than the model (`short`), until an update
+  // passes: while a message is short the reply's end has not landed.
   short = false;
   /** When its stream started, by the clock: a stream is over at 5 minutes. */
   started = 0;
@@ -697,7 +678,7 @@ export class ReplySink implements Sink {
     // The end is its own task, shielded from the caller: a caller that stops waiting while Slack
     // takes the write (a timer, a turn starting, a shutdown) must not leave `landed` unresolved
     // with no retry, which no later `closeOut` could repair.
-    this.ending = new Task((ending) => this.endOut(ending));
+    this.ending = new Task(() => this.endOut());
     return cancellable(this.ending.result(), signal);
   }
 
@@ -705,10 +686,10 @@ export class ReplySink implements Sink {
    * The end's first flush: whatever happens, `landed` resolves (an end that began always does),
    * with the retry when Slack refused the write.
    */
-  private async endOut(signal: AbortSignal): Promise<boolean> {
+  private async endOut(): Promise<boolean> {
     let ok: boolean;
     try {
-      ok = await cancellable(this.flush(), signal);
+      ok = await this.flush();
     } catch (error) {
       this.resolve(false);
       throw error;
@@ -1730,7 +1711,6 @@ export class ReplySink implements Sink {
             `cards ${cards}, card text sent ${message.cardText} and ${planCardText(plan)} more ` +
             "in this append: the stream is stopped and the message goes on by update",
         );
-        message.refused = true;
         if ((await this.stop(message, null, null)) === "failed") return [false, null];
         return this.updateStep(message, null, true);
       }

@@ -88,7 +88,6 @@ async function settle(clock: FakeClock): Promise<void> {
 
 const PERMISSION: PermissionRequest = {
   type: "permission",
-  requestId: "request-1",
   callId: "toolu_1",
   toolName: "Bash",
   input: { command: "ls <here> & there" },
@@ -98,7 +97,6 @@ const PERMISSION: PermissionRequest = {
 
 const QUESTION: QuestionRequest = {
   type: "question",
-  requestId: "request-2",
   callId: "toolu_2",
   toolName: "AskUserQuestion",
   title: null,

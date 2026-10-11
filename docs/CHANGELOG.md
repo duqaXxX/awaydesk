@@ -311,6 +311,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The agent seam and the Slack provider lose what nothing read. In the seam: `requestId` on
+  `PermissionRequest` and `QuestionRequest`, `StartOptions.permissionMode`, `messageId` on the
+  message and text events, `compaction_ended.result`, and `parentCallId` on the three text events
+  (the translator now drops a subagent's text at the source, where the renderer used to). The
+  back end drops `EFFORT_LEVELS` (a level is checked against `CAPABILITIES`), the branch that
+  logged an unrecognized effort level at a start (the core already logs it, and the back end now
+  refuses one), and the `unshownMessage` argument of `ClaudeSession`. `PERMISSION_MODES` stays: it
+  holds the six modes of Claude Code, three more than the capabilities declare, and a bypass
+  switched off hands back the one a session started in. The core counts and
+  words a task by the `kind` of `task_started` (`constants.TASK_WORDS`), no longer by Claude
+  Code's task types; what the owner reads is unchanged. In the Slack provider the re-exports at
+  the end of `sinks.ts` and of `app.ts`, `Tool.pieces`, `Message.refused` and the signal of
+  `endOut` are gone, and the rows of `docs/sdk-surface.md` for `Options.permissionMode` and
+  `CanUseTool.requestId` follow.
+
 - The docs say what the code does where they said otherwise. `docs/sdk-surface.md`: the probe
   (`probe/surface.ts`, `node probe/main.ts --surface`) reads the published reference and checks
   the table, and the table gains the six `SDKSessionInfo` fields `info.ts` reads.
@@ -877,6 +892,30 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A Claude Code process that ended is named for how it ended: the owner reads
+  ``Claude Code reported an error: `ProcessExited` `` for an exit with a status other than 0,
+  `ProcessKilled` for a signal and `ErrorResult` for an error result reported before the exit
+  (issue #238). `@anthropic-ai/claude-agent-sdk` 0.3.296 throws a plain `Error` for the three,
+  with no class and no code, so the name was `Error`. The back end reads the start of the
+  message, which is what the SDK's troubleshooting page prescribes (read 2026-10-11); the rest of
+  the message still reaches no log line and no reply. The same holds for a start and for a
+  request the SDK rejects with one of those errors. Not run against a real process that died:
+  which message a request on a dead process is rejected with is not measured.
+- The crash repair keeps in `state.json` what the chat did not repair, and the next start asks
+  again (issue #264). `repair.repair` cleared each of a thread's three fields once its repair had
+  been attempted, successfully or not: with Slack answering HTTP 503 to every call of one start,
+  the reply kept its open stream, the request its buttons and the root its status for good, and
+  the second start made no call (reproduced with the fake Slack client, 2026-10-11). An entry is
+  now cleared when its repair was made or the chat said its message is gone. For that the chat
+  seam's `ThreadChat.endReply`, `ThreadChat.withdraw` and `ThreadChat.showStatus` answer a
+  boolean, false when the chat did not do it and the message is still there, as
+  `ChannelChat.withdraw` already did. With Slack, `channel_not_found`, `message_not_found` and
+  `thread_not_found` (`errors.GONE`, which the Home tab already read) say the message is gone; a
+  reply that already carries the stopped line is not rewritten a second time; and a root whose
+  status could not be shown is recorded as ended in error meanwhile, so the Home tab does not
+  list the session as running. A repair Slack refuses every time (a rewrite it answers
+  `invalid_blocks` to, a `reactions.add` with the scope missing) is asked once at every start and
+  logged, until the thread leaves `state.json`. Not run against Slack.
 - A call Slack answers with HTTP 500 or 503 (`clients.SERVER_ERROR_STATUSES`) is sent again
   once, after the pause and under the rule of a call that failed on the connection: every method
   on `clients.sharedClient`, every method but `clients.CREATING_METHODS` on

@@ -1068,9 +1068,9 @@ test("without native streaming a text of several pieces is one write", async () 
 test("without native streaming a text waits for its end, and a notice does not reorder it", async () => {
   const sink = new OrderedSink();
   const renderer = new TurnRenderer<string>(sink, NAMES, null, false);
-  await renderer.feed({ type: "text_started", messageId: "m", parentCallId: null });
-  await renderer.feed({ type: "text_delta", messageId: "m", text: "Hello ", parentCallId: null });
-  await renderer.feed({ type: "text_delta", messageId: "m", text: "there", parentCallId: null });
+  await renderer.feed({ type: "text_started" });
+  await renderer.feed({ type: "text_delta", text: "Hello " });
+  await renderer.feed({ type: "text_delta", text: "there" });
   assert.deepEqual(sink.log, [], "nothing is handed over while the text is being written");
   await renderer.feedError("what a restart dropped");
   assert.deepEqual(sink.log, [
@@ -1082,8 +1082,8 @@ test("without native streaming a text waits for its end, and a notice does not r
 test("without native streaming the last text is handed over when the reply closes", async () => {
   const sink = new OrderedSink();
   const renderer = new TurnRenderer<string>(sink, NAMES, null, false);
-  await renderer.feed({ type: "text_started", messageId: "m", parentCallId: null });
-  await renderer.feed({ type: "text_delta", messageId: "m", text: "done", parentCallId: null });
+  await renderer.feed({ type: "text_started" });
+  await renderer.feed({ type: "text_delta", text: "done" });
   await renderer.close(null);
   assert.deepEqual(sink.log, [["text", "done"]]);
   assert.notEqual(sink.finished, null);

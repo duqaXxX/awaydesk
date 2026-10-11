@@ -30,9 +30,8 @@ test("a tool's call that asks is a permission request for that call", () => {
     displayName: "Bash",
     suggestions: [],
   };
-  assert.deepEqual(toRequest("request-1", "Bash", BASH, context), {
+  assert.deepEqual(toRequest("Bash", BASH, context), {
     type: "permission",
-    requestId: "request-1",
     callId: "toolu_000",
     toolName: "Bash",
     input: BASH,
@@ -43,7 +42,7 @@ test("a tool's call that asks is a permission request for that call", () => {
 
 test("the agent's own sentence for a request crosses when it writes one", () => {
   const context = { toolUseID: "toolu_000", title: "Claude wants to print ok" };
-  const request = toRequest("request-1", "Bash", BASH, context);
+  const request = toRequest("Bash", BASH, context);
   assert.equal(request.type, "permission");
   assert.deepEqual(request.type === "permission" ? [request.title, request.description] : null, [
     "Claude wants to print ok",
@@ -54,9 +53,8 @@ test("the agent's own sentence for a request crosses when it writes one", () => 
 test("a question is a question request, each question with its options", () => {
   const input = ASK.input as JsonObject;
   assert.equal(ASK.tool_name, QUESTION_TOOL);
-  assert.deepEqual(toRequest("request-2", QUESTION_TOOL, input, { toolUseID: "toolu_000" }), {
+  assert.deepEqual(toRequest(QUESTION_TOOL, input, { toolUseID: "toolu_000" }), {
     type: "question",
-    requestId: "request-2",
     callId: "toolu_000",
     toolName: QUESTION_TOOL,
     title: null,
@@ -86,7 +84,7 @@ test("a question is a question request, each question with its options", () => {
 test("an option's preview crosses with it", () => {
   const input = ASK_PREVIEW.input as JsonObject;
   const context = { toolUseID: ASK_PREVIEW.tool_use_id as string };
-  const request = toRequest("request-3", QUESTION_TOOL, input, context);
+  const request = toRequest(QUESTION_TOOL, input, context);
   assert.equal(request.type, "question");
   if (request.type !== "question") return;
   assert.equal(request.callId, "toolu_01DRb6mwGd2AsnBb1YjRS282");
@@ -105,7 +103,7 @@ test("an option's preview crosses with it", () => {
 
 test("a question with no header and an option with no description still cross", () => {
   const input = { questions: [{ question: "Go on?", options: [{ label: "Yes" }] }] };
-  const request = toRequest("request-4", QUESTION_TOOL, input, { toolUseID: "toolu_000" });
+  const request = toRequest(QUESTION_TOOL, input, { toolUseID: "toolu_000" });
   assert.deepEqual(request.type === "question" ? request.questions : null, [
     {
       header: "",
@@ -129,21 +127,21 @@ test("a question tool's call with no question to show is a permission request", 
   ];
   for (const questions of shapes) {
     const input = { questions };
-    const request = toRequest("request-5", QUESTION_TOOL, input, { toolUseID: "toolu_000" });
+    const request = toRequest(QUESTION_TOOL, input, { toolUseID: "toolu_000" });
     assert.equal(request.type, "permission", JSON.stringify(questions));
     assert.deepEqual(request.type === "permission" ? request.input : null, input);
   }
 });
 
 test("another tool's questions are its input and nothing more", () => {
-  const request = toRequest("request-6", "Survey", ASK.input as JsonObject, {
+  const request = toRequest("Survey", ASK.input as JsonObject, {
     toolUseID: "toolu_000",
   });
   assert.equal(request.type, "permission");
 });
 
 test("a call that names itself with nothing has no call id", () => {
-  const request = toRequest("request-7", "Bash", BASH, { toolUseID: "" });
+  const request = toRequest("Bash", BASH, { toolUseID: "" });
   assert.equal(request.callId, null);
 });
 

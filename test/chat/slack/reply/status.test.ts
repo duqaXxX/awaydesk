@@ -142,7 +142,7 @@ test("concurrent show calls end on the last state", async () => {
  */
 async function abortWhileAddIsOut(
   slack: FakeSlack,
-  start: (signal: AbortSignal) => Promise<void>,
+  start: (signal: AbortSignal) => Promise<unknown>,
 ): Promise<unknown> {
   const hold = new AsyncEvent();
   slack.gate = hold;
@@ -233,14 +233,25 @@ test("a fresh instance s second show removes only its own previous", async () =>
 
 test("a failed add leaves current unchanged so the next show retries", async () => {
   const slack = new FakeSlack();
-  slack.responses["reactions.add"] = rejected("channel_not_found");
+  slack.responses["reactions.add"] = rejected("internal_error");
   const sr = reaction(slack, new Lines());
-  await sr.show(Status.WORKING);
+  assert.equal(await sr.show(Status.WORKING), false); // what a caller that must know reads
   assert.equal(sr.current, null);
   assert.deepEqual(slack.callsTo("reactions.remove"), []); // no previous reaction to strip: add lost
   delete slack.responses["reactions.add"];
-  await sr.show(Status.WORKING); // retried, not skipped as "no change"
+  assert.equal(await sr.show(Status.WORKING), true); // retried, not skipped as "no change"
   assert.equal(sr.current, Status.WORKING);
+  assert.equal(await sr.show(Status.WORKING), true); // already there: no call, and still true
+});
+
+test("a root Slack no longer has is not one to ask about again", async () => {
+  for (const code of ["message_not_found", "channel_not_found", "thread_not_found"]) {
+    const slack = new FakeSlack();
+    slack.responses["reactions.add"] = rejected(code);
+    const sr = reaction(slack, new Lines());
+    assert.equal(await sr.show(Status.ERROR), true, code);
+    assert.equal(sr.current, null, code); // nothing was shown all the same
+  }
 });
 
 test("current reflects the last state shown successfully", async () => {

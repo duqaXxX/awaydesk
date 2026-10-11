@@ -158,19 +158,16 @@ export class TurnRenderer<Footer = FooterFields> {
       case "text_started":
         // Two texts with no card between them (a goal's inner turns, a Stop hook that
         // continues the turn) would run together: the break waits for the first piece, so a
-        // text that stays empty adds none. A subagent's text never reaches the reply.
-        if (event.parentCallId === null) {
-          await this.#handOver(); // the text before this one has ended
-          this.#breakDue = this.#afterText;
-        }
+        // text that stays empty adds none.
+        await this.#handOver(); // the text before this one has ended
+        this.#breakDue = this.#afterText;
         break;
-      case "text_delta":
-        if (event.parentCallId === null) {
-          const broken = this.#breakDue;
-          this.#breakDue = false;
-          await this.#text(broken ? `\n\n${event.text}` : event.text, { piece: true });
-        }
+      case "text_delta": {
+        const broken = this.#breakDue;
+        this.#breakDue = false;
+        await this.#text(broken ? `\n\n${event.text}` : event.text, { piece: true });
         break;
+      }
       case "message_ended":
         if (event.parentCallId === null) await this.#handOver();
         break;
@@ -178,9 +175,7 @@ export class TurnRenderer<Footer = FooterFields> {
         // Text that came whole is a command's own output (`Goal set: …` before a goal's first
         // inner turn): like a text that follows another, it needs a break only when text is
         // the last thing written.
-        if (event.parentCallId === null) {
-          await this.#text((this.#afterText ? "\n\n" : "") + event.text);
-        }
+        await this.#text((this.#afterText ? "\n\n" : "") + event.text);
         break;
       case "agent_error":
         await this.#failed(event);

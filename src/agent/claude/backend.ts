@@ -83,7 +83,6 @@ export class ClaudeBackend implements AgentBackend {
         settingsSources: [],
         model: null,
         effort: null,
-        permissionMode: null,
         chrome: false,
         bare: true,
       },

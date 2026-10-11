@@ -21,7 +21,8 @@ import {
   stripNewlines,
   take,
 } from "../../../../src/chat/slack/reply/chars.ts";
-import { ReplySink, UpdateLimiter } from "../../../../src/chat/slack/reply/sinks.ts";
+import { UpdateLimiter } from "../../../../src/chat/slack/reply/limiter.ts";
+import { ReplySink } from "../../../../src/chat/slack/reply/sinks.ts";
 import { oneLine } from "../../../../src/core/reply/words.ts";
 import {
   BOT,

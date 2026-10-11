@@ -46,7 +46,6 @@ const CONFIG: SessionConfig = {
   settingsSources: ["user", "project", "local"],
   model: null,
   effort: null,
-  permissionMode: null,
   chrome: false,
 };
 const PROMPT: Prompt = { id: "00000000-0000-4000-8000-0000000000b1", content: "Say ok" };
@@ -159,7 +158,7 @@ test(
   },
 );
 
-test("a resumed session passes the stored id, effort, model and mode", LIMIT, async (t) => {
+test("a resumed session passes the stored id, effort and model", LIMIT, async (t) => {
   const { query } = await started(
     t,
     {},
@@ -167,14 +166,12 @@ test("a resumed session passes the stored id, effort, model and mode", LIMIT, as
       resume: "68da9311-0000-4000-8000-0000000000aa",
       effort: "high",
       model: "haiku",
-      permissionMode: "bypassPermissions",
     },
   );
   const { options } = query;
   assert.equal(options.resume, "68da9311-0000-4000-8000-0000000000aa");
   assert.equal(options.effort, "high");
   assert.equal(options.model, "haiku");
-  assert.equal(options.permissionMode, "bypassPermissions");
 });
 
 test("the settings sources are those the seam gives", LIMIT, async (t) => {
@@ -185,14 +182,6 @@ test("the settings sources are those the seam gives", LIMIT, async (t) => {
 test("Chrome adds its flag to the extra arguments, and nothing else", LIMIT, async (t) => {
   const { query } = await started(t, {}, { chrome: true });
   assert.deepEqual(query.options.extraArgs, { "replay-user-messages": null, chrome: null });
-});
-
-test("an effort level Claude Code does not know is dropped with a warning", LIMIT, async (t) => {
-  const warnings: string[] = [];
-  t.mock.method(logger, "warning", (message: string) => warnings.push(message));
-  const { query } = await started(t, {}, { effort: "turbo" });
-  assert.equal("effort" in query.options, false);
-  assert.deepEqual(warnings, ["dropped an unrecognized effort level"]);
 });
 
 test("the process's stderr is counted and never logged", LIMIT, async (t) => {
@@ -270,7 +259,6 @@ test("a permission request reaches the handler and an allow is passed on", LIMIT
       toolName: "Bash",
       input: BASH,
       toolUseID: "toolu_000",
-      requestId: "request-1",
       description: "Print ok",
     }),
     ...TOOLS.slice(FIRST_CALL + 1),
@@ -281,7 +269,6 @@ test("a permission request reaches the handler and an allow is passed on", LIMIT
   assert.deepEqual(handler.asked, [
     {
       type: "permission",
-      requestId: "request-1",
       callId: "toolu_000",
       toolName: "Bash",
       input: BASH,
@@ -433,22 +420,6 @@ test("a question the owner skips is a deny with what the agent is told", LIMIT, 
   ]);
 });
 
-test("a request with no request id of its own gets one", LIMIT, async (t) => {
-  const handler = handlerOf();
-  const call = ask({ toolName: "Bash", input: BASH });
-  const bare = { ask: { ...call.ask, requestId: "" } };
-  const { session, events } = await started(
-    t,
-    { turns: [[...TOOLS.slice(0, 2), bare, ...TOOLS.slice(-1)]] },
-    {},
-    handler,
-  );
-  await session.send(PROMPT);
-  await until(events, "turn_ended");
-  const [request] = handler.asked;
-  assert.ok(request !== undefined && request.requestId !== "");
-});
-
 // The review round of 2026-10-10: a request that cannot be answered is a deny, never a rejection.
 // SDK 0.3.296 answers a callback that rejects with a `control_response` of subtype `error`
 // (`handleControlRequest`, sdk.mjs), which is not a deny.
@@ -528,29 +499,6 @@ test("a question whose input cannot be read is a deny", LIMIT, async (t) => {
   assert.deepEqual(errors, ["could not ask the owner about a call: TypeError"]);
 });
 
-test(
-  "the deny message of a request that could not be shown is the session's option",
-  LIMIT,
-  async (t) => {
-    t.mock.method(logger, "error", () => undefined);
-    const sdk = new FakeSdk({
-      turns: [[...TOOLS.slice(0, 2), ask({ toolName: "Bash", input: BASH }), ...TOOLS.slice(-1)]],
-    });
-    const handler: RequestHandler = {
-      permission: async () => {
-        throw new Error("down");
-      },
-      question: async () => ({ answered: false, message: "" }),
-    };
-    const session = new ClaudeSession(CONFIG, handler, sdk.query, "Nobody saw it.");
-    t.after(() => session.close());
-    await session.ready();
-    await session.send(PROMPT);
-    await until(session.events[Symbol.asyncIterator](), "turn_ended");
-    assert.deepEqual(sdk.only.permissionResults, [{ behavior: "deny", message: "Nobody saw it." }]);
-  },
-);
-
 // Hooks.
 
 test(
@@ -609,6 +557,64 @@ test("a stream that throws gives process_lost with the error's name", LIMIT, asy
   // The name, never the message.
   assert.deepEqual(errors, ["session stopped: ProcessExitError"]);
 });
+
+// The three messages the SDK's troubleshooting page gives for a process that ended, each with
+// what follows it there: the CLI's stderr, or its error report.
+for (const [message, name] of [
+  ["Claude Code process exited with code 1. stderr: a secret sentence", "ProcessExited"],
+  ["Claude Code process exited with code 137", "ProcessExited"],
+  ["Claude Code process terminated by signal SIGKILL. stderr: a secret sentence", "ProcessKilled"],
+  ["Claude Code returned an error result: a secret sentence", "ErrorResult"],
+] as const) {
+  test(
+    `a process the SDK reports as a plain error is named for how it ended [${message.slice(0, 44)}]`,
+    LIMIT,
+    async (t) => {
+      // Issue #238: the SDK gives these no class and no code, so the owner read `Error`.
+      const errors: string[] = [];
+      t.mock.method(logger, "error", (line: string) => errors.push(line));
+      const { session, events } = await started(t, { turns: [[fail(new Error(message))]] });
+      await session.send(PROMPT);
+      const seen = await until(events, "process_lost");
+      assert.deepEqual(seen.at(-1), { type: "process_lost", reason: name });
+      // The name, never the message.
+      assert.deepEqual(errors, [`session stopped: ${name}`]);
+    },
+  );
+}
+
+test(
+  "a plain error with other words, and a named one with these words, keep their own name",
+  LIMIT,
+  async (t) => {
+    t.mock.method(logger, "error", () => {});
+    const other = await started(t, {
+      turns: [[fail(new Error("Cannot write to terminated process"))]],
+    });
+    await other.session.send(PROMPT);
+    assert.deepEqual((await until(other.events, "process_lost")).at(-1), {
+      type: "process_lost",
+      reason: "Error",
+    });
+    const inside = await started(t, {
+      turns: [[fail(new Error("it said: Claude Code process exited with code 1"))]],
+    });
+    await inside.session.send(PROMPT);
+    assert.deepEqual((await until(inside.events, "process_lost")).at(-1), {
+      type: "process_lost",
+      reason: "Error",
+    });
+    const named = Object.assign(new Error("Claude Code process exited with code 1"), {
+      name: "AbortError",
+    });
+    const own = await started(t, { turns: [[fail(named)]] });
+    await own.session.send(PROMPT);
+    assert.deepEqual((await until(own.events, "process_lost")).at(-1), {
+      type: "process_lost",
+      reason: "AbortError",
+    });
+  },
+);
 
 test("a session that was closed gives no process_lost", LIMIT, async (t) => {
   const { session, events, query } = await started(t, { turns: [TOOLS.slice(0, 3)] });
@@ -709,6 +715,22 @@ test("a command Claude Code refuses rejects with its error", LIMIT, async (t) =>
   await assert.rejects(session.setPermissionMode("auto"), (error) => error === refusal);
 });
 
+test(
+  "a mode the owner's settings start a session in is taken, and an unknown one refused",
+  LIMIT,
+  async (t) => {
+    // A bypass switched off hands back the mode the session started in, which is none of the
+    // three roles the capabilities declare when the owner's `defaultMode` says so.
+    const { session, query } = await started(t);
+    for (const mode of ["acceptEdits", "plan", "dontAsk"]) await session.setPermissionMode(mode);
+    assert.deepEqual(
+      query.calls.map((call) => (call.method === "setPermissionMode" ? call.mode : null)),
+      ["acceptEdits", "plan", "dontAsk"],
+    );
+    await assert.rejects(session.setPermissionMode("anything"), RangeError);
+  },
+);
+
 test("the context usage is the model and the share of its window in use", LIMIT, async (t) => {
   const { session, query } = await started(t);
   assert.deepEqual(await session.contextUsage(), {
@@ -767,9 +789,45 @@ test("a start that fails with no session to resume rethrows the failure", LIMIT,
     start: [{ ...refusal, is_error: true }, fail(failure)],
   });
   const session = new ClaudeSession(CONFIG, handlerOf(), sdk.query);
-  await assert.rejects(session.ready(), (error) => error === failure);
+  // Issue #238: under the name of how the process ended, the SDK's error as its cause.
+  await assert.rejects(
+    session.ready(),
+    (error) => error instanceof Error && error.name === "ErrorResult" && error.cause === failure,
+  );
   assert.equal(sdk.only.closed, true);
 });
+
+test("a start that fails with other words rethrows the failure itself", LIMIT, async () => {
+  const failure = new Error("Claude Code executable not found at /nowhere");
+  const sdk = new FakeSdk({ initError: failure, start: [fail(failure)] });
+  const session = new ClaudeSession(CONFIG, handlerOf(), sdk.query);
+  await assert.rejects(session.ready(), (error) => error === failure);
+});
+
+test(
+  "a request the SDK rejects because the process ended fails under that name",
+  LIMIT,
+  async (t) => {
+    // Not measured on a real process: which message a request on a dead process is rejected with.
+    const failure = new Error("Claude Code process exited with code 1. stderr: a secret sentence");
+    const { session } = await started(t, {
+      rejects: { setModel: failure, interrupt: failure, getContextUsage: failure },
+    });
+    for (const request of [
+      () => session.setModel("haiku"),
+      () => session.interrupt(),
+      () => session.contextUsage(),
+    ]) {
+      await assert.rejects(request(), (error) => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.name, "ProcessExited");
+        assert.equal(error.message.includes("secret"), false);
+        assert.equal(error.cause, failure);
+        return true;
+      });
+    }
+  },
+);
 
 test(
   "a resume that fails to start with no error result is not a refused resume",

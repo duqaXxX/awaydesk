@@ -25,7 +25,6 @@ const START: StartOptions = {
   settingsSources: ["user", "project", "local"],
   model: null,
   effort: null,
-  permissionMode: null,
 };
 const NO_REQUESTS: RequestHandler = {
   permission: async () => ({ allow: true }),

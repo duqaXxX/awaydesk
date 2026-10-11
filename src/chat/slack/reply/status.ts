@@ -28,7 +28,7 @@ import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
 import { Mutex, texts } from "../../../core/port.ts";
 import { getLogger, type Logger } from "../../../log.ts";
-import { describe } from "./errors.ts";
+import { describe, gone } from "./errors.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.reply.status");
 
@@ -113,18 +113,24 @@ export class StatusReaction {
     return this.#current;
   }
 
-  /** Shows `state`; with a `signal`, rejects with its reason if it aborts (see the file header). */
-  async show(state: Status, signal?: AbortSignal): Promise<void> {
-    if (missingScope) return;
+  /**
+   * Shows `state`. False when the root is there and does not carry it: after an add that
+   * failed, and once no instance calls Slack for reactions. A root Slack no longer has (`GONE`)
+   * has nothing left to show, and answers true. With a `signal`, rejects with its reason if it
+   * aborts (see the file header).
+   */
+  async show(state: Status, signal?: AbortSignal): Promise<boolean> {
+    if (missingScope) return false;
     this.#wanted = state;
     const release = await this.#lock.acquire(signal);
     try {
-      if (state === this.#current) return;
+      if (state === this.#current) return true;
       const previous = this.#current;
       try {
         const added = await this.#add(state);
         signal?.throwIfAborted();
-        if (!added) return; // `#current` stays as it was: the next `show` retries the add
+        // `#current` stays as it was: the next `show` retries the add
+        if (added !== "added") return added === "gone";
         if (previous !== null) {
           await this.#remove(previous);
           signal?.throwIfAborted();
@@ -147,6 +153,7 @@ export class StatusReaction {
         throw error;
       }
       this.#current = state;
+      return true;
     } finally {
       release();
     }
@@ -178,8 +185,11 @@ export class StatusReaction {
     else await this.show(this.#wanted);
   }
 
-  /** Whether the root now carries `state`: true on success or `already_reacted`. */
-  async #add(state: Status): Promise<boolean> {
+  /**
+   * Whether the root now carries `state` (on success or `already_reacted`), is no longer in
+   * Slack, or neither.
+   */
+  async #add(state: Status): Promise<"added" | "gone" | "failed"> {
     try {
       await this.#slack.reactions.add({
         channel: this.#channel,
@@ -188,14 +198,14 @@ export class StatusReaction {
       });
     } catch (error) {
       const code = describe(error);
-      if (code === "already_reacted") return true;
+      if (code === "already_reacted") return "added";
       if (code === "missing_scope") this.#noteMissingScope();
       else {
         this.#log.warning(`reactions.add failed on ${this.#channel}/${this.#rootTs}: ${code}`);
       }
-      return false;
+      return gone(error) ? "gone" : "failed";
     }
-    return true;
+    return "added";
   }
 
   async #remove(state: Status): Promise<void> {
