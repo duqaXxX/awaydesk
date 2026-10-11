@@ -35,9 +35,20 @@
  *   frame is sent, and `@slack/socket-mode` 3.1.0 ends it only when its own ping goes
  *   unanswered (measured on 2026-10-10: 5.9 seconds after the stop, three times out of three).
  *   In that time the lock is already free, and launchd, which sees a live job, starts nothing.
- *   A stop that a failure asked for and that has not returned after `FAILURE_STOP_SECONDS` ends
- *   the process with 1 on a timer that does not keep it alive (`deferred`): a shutdown stuck on
- *   a connection would leave the daemon deaf.
+ *   A shutdown that completes no step for `SHUTDOWN_LIMIT_SECONDS` ends the process with 1 on
+ *   a timer that does not keep it alive (`deferred`): a shutdown stuck on a connection, or on a
+ *   start of the agent that a word of the daemon made and that never answers (`!status`, the
+ *   setup of a thread: `ThreadSession.close` waits for it), would leave the daemon deaf, still
+ *   holding the single-instance lock, with nobody to Ctrl-C it. For a stop that a signal asked
+ *   for, the limit starts once the drain is over (the drain's own wait is
+ *   `DRAIN_LIMIT_SECONDS`, never shortened) and runs from the last step that completed: each
+ *   step of the shutdown, and each session `SessionManager.closeAll` has closed, reports through
+ *   `RunOptions.shutdownProgress`, since a shutdown with many replies to end takes longer than
+ *   the limit and is not stuck. For a stop that a failure asked for, one deadline runs from the
+ *   failure and no step moves it; a failure during a signal's shutdown replaces the deadline of
+ *   progress with that one. What an end by the limit leaves is ended by the next start's repair:
+ *   the replies still open, the status of the threads. The note that lists the prompts that
+ *   were not sent lives in memory only and is not written.
  * - The entry point. `import.meta.main` (Node 22.18, `@since v22.18.0` in `@types/node`, and
  *   run on 22.23 and 26.5) is true only for the module the process started with, a symlink in
  *   `node_modules/.bin` included: Node runs the real path. Comparing `process.argv[1]` with
@@ -73,9 +84,10 @@ export const logger = getLogger("awaydesk.main");
 // `kickstart -k`) kills the process after ExitTimeOut, which launchd caps at 60 seconds.
 export const DRAIN_LIMIT_SECONDS = 1740;
 
-// How long the stop that a failure asked for may take before `main` ends the process with 1: a
-// stop that hangs on a connection or a child leaves the daemon deaf, with nobody to Ctrl-C it.
-export const FAILURE_STOP_SECONDS = 30;
+// How long a shutdown may go without completing a step before `main` ends the process with 1: one
+// that hangs on a connection, a child or a start of the agent leaves the daemon deaf, with nobody
+// to Ctrl-C it. For a failure's stop it is the whole stop, from the failure.
+export const SHUTDOWN_LIMIT_SECONDS = 30;
 
 /** `action` after `seconds`, on a timer that does not keep the process alive. */
 export function deferred(seconds: number, action: () => void): NodeJS.Timeout {
@@ -111,6 +123,11 @@ export interface RunOptions {
    * a SIGINT does, and `run` answers 1.
    */
   readonly failure?: AbortSignal;
+  /**
+   * Called when the shutdown begins (after the drain of a signal's stop, if it had one) and each
+   * time a step of it completes: a step of the shutdown, a session closed.
+   */
+  readonly shutdownProgress?: () => void;
   /** Every wait of the daemon; the system clock for wall time and the monotonic one for pauses. */
   readonly clock?: Clock;
   /** `process`. */
@@ -124,8 +141,11 @@ export interface MainOptions extends RunOptions {
   readonly exit?: (code: number) => void;
   /** `process`. */
   readonly process?: ProcessEvents;
-  /** Runs an action after the seconds given, on a timer that does not keep the process alive. */
-  readonly later?: (seconds: number, action: () => void) => unknown;
+  /**
+   * Runs an action after the seconds given, on a timer that does not keep the process alive.
+   * Returns what cancels it.
+   */
+  readonly later?: (seconds: number, action: () => void) => () => void;
 }
 
 /**
@@ -226,13 +246,17 @@ export class StopSignals {
   }
 }
 
-/** Runs one step of the shutdown; a step that fails is logged by its name, never skips the rest. */
-async function step(name: string, work: () => unknown): Promise<void> {
+/**
+ * Runs one step of the shutdown, then reports it done; a step that fails is logged by its name,
+ * never skips the rest.
+ */
+async function step(name: string, work: () => unknown, done: () => void): Promise<void> {
   try {
     await work();
   } catch (error) {
     logger.error(`shutdown: could not ${name}: ${errorName(error)}`);
   }
+  done();
 }
 
 /**
@@ -355,20 +379,26 @@ export async function run(options: RunOptions = {}): Promise<number> {
       }
     } finally {
       logger.info("shutting down");
+      const progress = options.shutdownProgress ?? (() => {});
+      progress();
       cleaning.abort();
-      if (cleaned !== null) await step("stop the cleanup", () => cleaned);
+      if (cleaned !== null) await step("stop the cleanup", () => cleaned, progress);
       // The connection, and the clips' waits, whose timers would keep the process alive.
-      await step("stop the chat", async () => {
-        try {
-          await chat.stop();
-        } finally {
-          stopping.abort();
-        }
-      });
-      await step("close the sessions", () => sessions.closeAll());
+      await step(
+        "stop the chat",
+        async () => {
+          try {
+            await chat.stop();
+          } finally {
+            stopping.abort();
+          }
+        },
+        progress,
+      );
+      await step("close the sessions", () => sessions.closeAll(progress), progress);
       // After the sessions: the page shows them as this stop left them.
-      await step("close the chat", () => chat.close());
-      await step("close the agent", () => backend.close());
+      await step("close the chat", () => chat.close(), progress);
+      await step("close the agent", () => backend.close(), progress);
       clearInterval(keepAlive);
     }
   } finally {
@@ -399,18 +429,36 @@ export function installProcessHandlers(events: ProcessEvents, stop: () => void):
 /** The entry point: runs the daemon, then ends the process: 0 after a stop, 1 after a failure. */
 export async function main(options: MainOptions = {}): Promise<void> {
   const exit = options.exit ?? ((code: number) => process.exit(code));
-  const later = options.later ?? deferred;
+  const later =
+    options.later ??
+    ((seconds, action) => {
+      const timer = deferred(seconds, action);
+      return () => clearTimeout(timer);
+    });
   const failure = new AbortController();
+  // One deadline at a time. A failure's is fixed: armed at the failure, replacing any other, and
+  // never moved. A signal's moves at every report of progress, so that it ends only a shutdown
+  // that completes no step for `SHUTDOWN_LIMIT_SECONDS`.
+  let cancel: (() => void) | null = null;
+  let fixed = false;
+  const arm = (): void => {
+    cancel?.();
+    cancel = later(SHUTDOWN_LIMIT_SECONDS, () => {
+      logger.error("the shutdown did not finish: ending the process");
+      exit(1);
+    });
+  };
   installProcessHandlers(options.process ?? process, () => {
     if (failure.signal.aborted) return;
     failure.abort();
-    later(FAILURE_STOP_SECONDS, () => {
-      logger.error("the stop after a failure did not finish: ending the process");
-      exit(1);
-    });
+    fixed = true;
+    arm();
   });
+  const progress = (): void => {
+    if (!fixed) arm();
+  };
   try {
-    const code = await run({ ...options, failure: failure.signal });
+    const code = await run({ ...options, failure: failure.signal, shutdownProgress: progress });
     // At once: the Socket Mode connection outlives the stop (see the header).
     exit(code);
   } catch (error) {

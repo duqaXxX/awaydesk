@@ -386,9 +386,21 @@ its Claude Code process would keep Node alive after the lock was released. Once 
 returned, `main.main` ends the process with the code `run` gave. Node would otherwise stay alive
 while anything holds its event loop, and the Socket Mode connection does after every stop:
 `@slack/socket-mode` 3.1.0 closed its WebSocket 5.9 seconds after the stop in each of three runs
-on 2026-10-10, with the lock already free. A stop that a failure asked for and that has not
-returned after `main.FAILURE_STOP_SECONDS` ends the process with 1, on a timer that does not keep
-it alive (`main.deferred`). After `bootout` launchd kills the daemon once the LaunchAgent's `ExitTimeOut`
+on 2026-10-10, with the lock already free. A shutdown that completes
+no step for `main.SHUTDOWN_LIMIT_SECONDS` ends the process with 1, on a timer that does not keep it
+alive (`main.deferred`). For a signal's stop the limit starts once the drain is over, so the drain
+keeps its own limit, and it runs from the last step that completed: `main.run` reports through
+`RunOptions.shutdownProgress` when the shutdown begins, after each of its steps and after each
+session `SessionManager.closeAll` has closed, and `main.main` arms the timer again at each report.
+A shutdown with many replies to end takes longer than the limit (each costs two acquires of the
+shared update limiter, 1.5 seconds a token past a burst of 5: 20 sessions took 53 seconds on
+the fake clock) and is not cut. A start of the agent that a word of the daemon made (`!status`, the
+setup of a thread) and that does not answer completes no step: `ThreadSession.close` waits for it
+and does not abandon it, so the process ends 30 seconds after the last step. What that end leaves
+is ended by the next start's repair, the replies still open and the status of the threads; the
+note of the prompts that were not sent lives in memory only and is not written. A stop that a
+failure asked for has one deadline, 30 seconds from the failure, that no step moves; a failure
+during a signal's shutdown replaces the deadline of progress with that one. After `bootout` launchd kills the daemon once the LaunchAgent's `ExitTimeOut`
 passes (60 seconds at most), whatever the drain is doing. `SIGINT` skips the drain: from a terminal
 it also reaches the Claude Code processes, which share the daemon's process group. A signal that
 arrives before the daemon waits for one, during a repair for instance, is kept and starts the stop
@@ -1464,7 +1476,10 @@ closed when the start returns (`ThreadSession.connect`).
   name that call), starts no turn. The session id is stored as soon as a `session_started` event
   reports it, and again on each `turn_ended` (so `/clear`, which starts a new session, is recorded);
   on `turn_ended` the footer is built and the reply closed. The turn stays active until the reply is
-  closed.
+  closed. A close that does not drain (`SIGINT`, a second signal, the drain's limit) cancels the
+  reader: when that comes before the reply was closed out, `ThreadSession.finish` leaves the turn
+  active and unsettled (`ThreadSession.cutBeforeClose`), so that `ThreadSession.abandon` ends the
+  reply as it ends one cut short, with the line, the stream's stop and the root's status.
 - A background task that finishes between turns sends its notification while the session is idle,
   then Claude Code starts a turn of its own to report it. That turn renders into the reply that
   started the task (the held-open reply: `ThreadSession.openingTarget`, keyed by the task id through

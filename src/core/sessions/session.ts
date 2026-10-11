@@ -1790,9 +1790,12 @@ export class ThreadSession {
       try {
         turnStopped = await this.finish(active, event, signal);
       } finally {
-        this.active = null;
-        this.compacting = false;
-        this.showThreadStatus(); // whichever way it ended, `!stop` included
+        // A turn cut before its reply closed stays the active one, for `abandon` to end.
+        if (!active.cut) {
+          this.active = null;
+          this.compacting = false;
+          this.showThreadStatus(); // whichever way it ended, `!stop` included
+        }
       }
       // Checked only now, with the turn no longer active: `finish` alone still reads busy.
       if (!turnStopped) await this.reactDoneIfIdle(signal);
@@ -2229,7 +2232,7 @@ export class ThreadSession {
     // (sync) The turn is the active one before its first write: every `await` below yields, and
     // a turn already out of `sent` and not yet active would read as idle to a drain, a `!stop`
     // or a timer.
-    const active: ActiveTurn = { turn, renderer, taken: [] };
+    const active: ActiveTurn = { turn, renderer, taken: [], cut: false };
     this.active = active;
     if (opening !== null) await renderer.feedNotice(opening);
     if (this.notice !== null) {
@@ -2550,14 +2553,32 @@ export class ThreadSession {
       // other, the footer on its stream's stop, and never waits on a task it may still owe
       // (`force`: `!stop` never does).
       await this.closeReply(active.renderer, footer, { force: stopped, signal });
+    } catch (error) {
+      active.cut = this.cutBeforeClose(active, error);
+      throw error;
     } finally {
-      this.settle(active.turn, result, released);
-      // A report turn's own reply is `closeReply`'s concern above; this catches every other
-      // reply a joint one left stranded.
-      await this.sweepClosedOut(live(signal));
-      this.stopTailEnded();
+      // Not settled when the cancel came before the reply closed: the turn stays active and
+      // `abandon` ends the reply and releases the turn, as for a close while the turn runs.
+      if (!active.cut) {
+        this.settle(active.turn, result, released);
+        // A report turn's own reply is `closeReply`'s concern above; this catches every other
+        // reply a joint one left stranded.
+        await this.sweepClosedOut(live(signal));
+        this.stopTailEnded();
+      }
     }
     return stopped;
+  }
+
+  /**
+   * Whether `error` is the cancel of the reader by a close (`closedFlag` is set before `close`
+   * cancels it) before the turn's reply was closed out. `dropClient` cancels the reader too, and
+   * leaves nothing to end the turn: it settles as for any other error. A reply whose end was
+   * asked for is `close`'s to settle, so a cancel after that point keeps the turn ending as any
+   * other.
+   */
+  private cutBeforeClose(active: ActiveTurn, error: unknown): boolean {
+    return error instanceof Cancelled && this.closedFlag && !active.renderer.closedOut;
   }
 
   /**

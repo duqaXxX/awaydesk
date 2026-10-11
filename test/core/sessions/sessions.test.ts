@@ -2756,6 +2756,132 @@ test("a stop waits for the reply s final write", async (t) => {
   assert.equal(h.slack.callsTo("chat.stopStream").length, 1); // the reply has ended, footer and all
 });
 
+/**
+ * A tools turn whose reply is open, closed by `session.close()` (a stop that does not drain)
+ * either while the turn runs or inside the turn's end, with the footer's first value held. The
+ * stream's stops and the reply's last text are what the owner sees.
+ */
+async function closedAround(t: TestContext, ending: boolean) {
+  const messages = sdkMessages("tools");
+  const result = at(messages, -1);
+  const h = harnessFor(t)({ turns: [messages.slice(0, -1)] });
+  const session = h.session();
+  const turn = await session.submit("first");
+  await h.until(() => h.clients.length > 0 && h.clients[0]?.queries.join() === "first");
+  const client = at(h.clients, 0);
+  const footerRead = new AsyncEvent();
+  let reading = false;
+  const original = client.contextUsage.bind(client);
+  client.contextUsage = async () => {
+    reading = true;
+    await footerRead.wait();
+    return original();
+  };
+  await h.until(() => h.slack.streamTs.length > 0);
+  if (ending) {
+    client.inject([result]);
+    await h.until(() => reading); // the reader is inside `finish`, waiting for the footer
+  }
+  await session.close();
+  footerRead.set();
+  await h.idle();
+  return { h, turn };
+}
+
+for (const ending of [false, true]) {
+  test(`a close ${ending ? "while the turn's end is being written" : "while the turn runs"} stops the reply's stream and says awaydesk stopped`, async (t) => {
+    const { h, turn } = await closedAround(t, ending);
+    assert.equal(h.slack.callsTo("chat.stopStream").length, 1);
+    assert.equal(
+      h
+        .replies()
+        .filter((reply) =>
+          reply.includes(texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN })),
+        ).length,
+      1,
+    );
+    assert.deepEqual(thread(h).openReplies, []);
+    assert.ok(turn.done.isSet);
+  });
+}
+
+test("a reader cancelled while the session is not closing settles the turn it was ending", async (t) => {
+  // `dropClient` cancels the reader too (a reconnect): only a close hands the turn to `abandon`.
+  const messages = sdkMessages("tools");
+  const h = harnessFor(t)({ turns: [messages.slice(0, -1)] });
+  const session = h.session();
+  const turn = await session.submit("first");
+  await h.until(() => h.clients.length > 0 && h.clients[0]?.queries.join() === "first");
+  const client = at(h.clients, 0);
+  const footerRead = new AsyncEvent();
+  let reading = false;
+  client.contextUsage = async () => {
+    reading = true;
+    await footerRead.wait();
+    return { model: null, percentage: null };
+  };
+  await h.until(() => h.slack.streamTs.length > 0);
+  client.inject([at(messages, -1)]);
+  await h.until(() => reading);
+  await inside(session).dropClient();
+  assert.ok(turn.done.isSet);
+  assert.equal(inside(session).active, null);
+  footerRead.set();
+  await h.idle();
+  const ended = texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN });
+  assert.ok(!h.replies().some((reply) => reply.includes(ended)));
+});
+
+test("a close that cancels the sweep after a turn ended normally finds no turn to abandon", async (t) => {
+  // The turn's reply stays open for a task it started (`stillOwed`), so `finish` returns with the
+  // reply not closed out; the sweep in its `finally` is then cancelled by the close. The turn was
+  // settled by then: it is not the active one when `close` reaches `abandon`, which would end its
+  // reply as one cut short.
+  const [first] = splitBackground();
+  const h = harnessFor(t)({ turns: [first] });
+  const session = h.session();
+  const sweeping = new AsyncEvent();
+  const original = inside(session).sweepClosedOut.bind(session);
+  t.mock.method(inside(session), "sweepClosedOut", async (signal?: AbortSignal) => {
+    if (sweeping.isSet() || signal === undefined) return original(signal);
+    sweeping.set();
+    await new Promise<void>((_, reject) =>
+      signal.addEventListener("abort", () => reject(signal.reason)),
+    );
+  });
+  let activeAtAbandon: unknown = "abandon was not called";
+  const abandon = inside(session).abandon.bind(session);
+  t.mock.method(inside(session), "abandon", (...args: Parameters<typeof abandon>) => {
+    activeAtAbandon = inside(session).active;
+    return abandon(...args);
+  });
+  const turn = await session.submit("start it");
+  await h.until(() => sweeping.isSet());
+  await session.close();
+  assert.ok(turn.done.isSet);
+  assert.equal(activeAtAbandon, null);
+});
+
+test("a close after the turn's reply was closed leaves that reply as it ended", async (t) => {
+  const messages = sdkMessages("tools");
+  const h = harnessFor(t)({ turns: [messages.slice(0, -1)] });
+  const session = h.session();
+  const turn = await session.submit("first");
+  await h.until(() => h.clients.length > 0 && h.clients[0]?.queries.join() === "first");
+  await h.until(() => h.slack.streamTs.length > 0);
+  const gate = armGate(h); // the reply's final write is in flight
+  at(h.clients, 0).inject([at(messages, -1)]);
+  await h.slack.gated.wait();
+  const closing = session.close();
+  await h.until(() => session.closed);
+  openGate(h, gate);
+  await closing;
+  assert.equal(h.slack.callsTo("chat.stopStream").length, 1);
+  const ended = texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN });
+  assert.ok(!h.replies().some((reply) => reply.includes(ended)));
+  assert.ok(turn.done.isSet);
+});
+
 for (const bypass of [true, false]) {
   test(`a stop posts nothing in a thread that has nothing running [${bypass ? "True" : "False"}]`, async (t) => {
     // Bypass outlives a restart, so nothing is said about it: a message would only notify.

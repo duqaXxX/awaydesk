@@ -28,6 +28,11 @@ export interface ActiveTurn {
   readonly renderer: TurnRenderer;
   /** Prompts whose replay arrived while this turn ran: the agent took them into it. */
   readonly taken: Turn[];
+  /**
+   * Set by `ThreadSession.finish` when a close cancelled it before the reply was closed out: the
+   * turn is then left unsettled, for `abandon` to end.
+   */
+  cut: boolean;
 }
 
 /** The owner's question on one line, as a note about a message that was not sent quotes it. */
