@@ -9,6 +9,7 @@ import { test } from "node:test";
 import {
   type FetchFunction,
   LogLevel,
+  WebAPIHTTPError,
   WebAPIPlatformError,
   WebAPIRateLimitedError,
   WebAPIRequestError,
@@ -28,7 +29,7 @@ import { UPLOAD_DONE, UPLOAD_URL } from "../../../support/fake-slack.ts";
 type FetchResponse = Awaited<ReturnType<FetchFunction>>;
 
 /** What Slack, or the network, does to one request. */
-type Step = "reset" | "timeout" | "429" | "500" | "refused" | "ok";
+type Step = "reset" | "timeout" | "429" | "500" | "502" | "503" | "504" | "refused" | "ok";
 
 /** The method a request went to: the last part of its URL. */
 function methodOf(url: string | URL): string {
@@ -70,7 +71,7 @@ function network(requests: string[], ...steps: Step[]): FetchFunction {
       throw new TypeError("fetch failed", { cause });
     }
     if (step === "429") return respond(url, 429, "", "30");
-    if (step === "500") return respond(url, 500, "oops");
+    if (step !== "ok") return respond(url, Number(step), "oops");
     return respond(url, 200, JSON.stringify({ ok: true }));
   };
 }
@@ -253,7 +254,81 @@ test("a retry of either kind spends the one budget of the call", async () => {
   assert.deepEqual(clock.slept, [0.5, 30, 30]);
 });
 
-test("a call Slack refused, a timeout and an HTTP error are never sent again", async () => {
+test("a call Slack answered with HTTP 500 or 503 is sent again once, after a pause", async () => {
+  // Issue #265: one HTTP 503 on a `reactions.add` left the root's reaction as it was until the
+  // session's next change. slack-sdk's `ServerErrorRetryHandler` names the two statuses.
+  for (const step of ["500", "503"] as const) {
+    for (const make of [replies, shared]) {
+      const requests: string[] = [];
+      const clock = new Pauses();
+      const result = await make(network(requests, step, "ok"), clock).apiCall("reactions.add", {});
+      assert.equal(result.ok, true, step);
+      assert.deepEqual(requests, ["reactions.add", "reactions.add"], step);
+      // The pause of a connection retry: 0.5 * 2 ** 0 seconds, plus a jitter.
+      assert.deepEqual(clock.slept, [0.5], step);
+    }
+  }
+  const twice: string[] = [];
+  const failure = await shared(network(twice, "503"))
+    .apiCall("reactions.remove", {})
+    .catch((error: unknown) => error);
+  assert.ok(failure instanceof WebAPIHTTPError);
+  assert.equal(describe(failure), "http_503");
+  assert.deepEqual(twice, ["reactions.remove", "reactions.remove"]);
+});
+
+test("the retry of a server error skips the calls that create a message, as the connection one does", async () => {
+  // A 500 says no more than a reset does about whether Slack applied the call.
+  const methods = ["chat.update", ...CREATING_METHODS];
+  const sentOnce: string[] = [];
+  const client = replies(network(sentOnce, "500"));
+  for (const method of methods) await assert.rejects(client.apiCall(method, {}), WebAPIHTTPError);
+  assert.deepEqual(
+    sentOnce,
+    methods.flatMap((method) =>
+      CREATING_METHODS.includes(method as never) ? [method] : [method, method],
+    ),
+  );
+  const sentAgain: string[] = [];
+  const every = shared(network(sentAgain, "500"));
+  for (const method of methods) await assert.rejects(every.apiCall(method, {}), WebAPIHTTPError);
+  assert.deepEqual(
+    sentAgain,
+    methods.flatMap((method) => [method, method]),
+  );
+});
+
+test("a server error and a connection failure spend the one retry between them", async () => {
+  const afterServerError: string[] = [];
+  await assert.rejects(
+    shared(network(afterServerError, "503", "reset", "ok")).apiCall("chat.update", {}),
+    WebAPIRequestError,
+  );
+  assert.equal(afterServerError.length, 2);
+  const afterReset: string[] = [];
+  await assert.rejects(
+    shared(network(afterReset, "reset", "503", "ok")).apiCall("chat.update", {}),
+    WebAPIHTTPError,
+  );
+  assert.equal(afterReset.length, 2);
+  // A rate limit retry is still allowed after it, and none of its own after a rate limit.
+  const thenRateLimited: string[] = [];
+  const clock = new Pauses();
+  const result = await shared(network(thenRateLimited, "503", "429", "ok"), clock).apiCall(
+    "chat.update",
+    {},
+  );
+  assert.equal(result.ok, true);
+  assert.deepEqual(clock.slept, [0.5, 30]);
+  const afterRateLimit: string[] = [];
+  await assert.rejects(
+    shared(network(afterRateLimit, "429", "503", "ok")).apiCall("chat.update", {}),
+    WebAPIHTTPError,
+  );
+  assert.equal(afterRateLimit.length, 2);
+});
+
+test("a call Slack refused, a timeout and any other HTTP error are never sent again", async () => {
   const refused: string[] = [];
   const failure = await replies(refusing(refused))
     .apiCall("chat.update", {})
@@ -261,7 +336,7 @@ test("a call Slack refused, a timeout and an HTTP error are never sent again", a
   assert.ok(failure instanceof WebAPIPlatformError);
   assert.equal(describe(failure), "channel_not_found");
   assert.deepEqual(refused, ["chat.update"]);
-  for (const step of ["timeout", "500"] as const) {
+  for (const step of ["timeout", "502", "504"] as const) {
     for (const make of [replies, shared]) {
       const requests: string[] = [];
       await assert.rejects(make(network(requests, step)).apiCall("chat.update", {}));
