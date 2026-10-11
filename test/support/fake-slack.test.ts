@@ -13,12 +13,14 @@ import {
   WebClient,
 } from "@slack/web-api";
 import {
+  AsyncEvent,
   BOT,
   CHANNEL,
   connectionReset,
   FakeClock,
   FakeSlack,
   httpError,
+  networkDown,
   rateLimited,
   rejected,
   SlowAfterApply,
@@ -521,4 +523,45 @@ test("a stream that expired reads back its blocks like one that was stopped", as
   await slack.apiCall("chat.startStream", START);
   slack.expire("1790000000.000001");
   assert.equal((await readBlocks(slack, "1790000000.000001")).length, 1);
+});
+
+test("a scripted sequence answers once each and repeats its last", async () => {
+  const slack = new FakeSlack();
+  slack.responses["chat.stopStream"] = [networkDown(), { ok: true, n: 2 }, { ok: true, n: 3 }];
+  await assert.rejects(slack.chat.stopStream({ channel: CHANNEL, ts: "1.1" }), WebAPIRequestError);
+  const answers = [];
+  for (let i = 0; i < 3; i += 1) {
+    answers.push(
+      ((await slack.chat.stopStream({ channel: CHANNEL, ts: "1.1" })) as unknown as JsonObject).n,
+    );
+  }
+  assert.deepEqual(answers, [2, 3, 3]);
+});
+
+test("a method with no answer scripted answers ok", async () => {
+  const slack = new FakeSlack();
+  const answer = await slack.views.publish({
+    user_id: "U000ALICE",
+    view: { type: "home", blocks: [] },
+  });
+  assert.equal(answer.ok, true);
+});
+
+test("a gate holds one method until the event is set, and says that a call arrived", async () => {
+  const slack = new FakeSlack();
+  slack.gate = new AsyncEvent();
+  slack.gateMethod = "chat.postMessage";
+  const held = slack.chat.postMessage({ channel: CHANNEL, text: "a" });
+  await slack.gated.wait();
+  await slack.auth.test();
+  assert.deepEqual(
+    slack.apiCalls.map((call) => call.method),
+    ["auth.test"],
+  );
+  slack.gate.set();
+  await held;
+  assert.deepEqual(
+    slack.apiCalls.map((call) => call.method),
+    ["auth.test", "chat.postMessage"],
+  );
 });
