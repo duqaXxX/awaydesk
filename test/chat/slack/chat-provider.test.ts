@@ -11,8 +11,8 @@ import type { Receiver } from "@slack/bolt";
 import type { ChatInbound } from "../../../src/chat/seam.ts";
 import { ChannelGuard } from "../../../src/chat/slack/app/guards.ts";
 import { resetStatusFlags } from "../../../src/chat/slack/reply/status.ts";
+import * as slackTexts from "../../../src/chat/slack/texts.ts";
 import { SlackChat } from "../../../src/chat/slack/thread.ts";
-import * as texts from "../../../src/core/texts.ts";
 import { AGENT, CHANNEL, rejected, THREAD } from "../../support/fake-slack.ts";
 import { worldOf } from "../../support/slack-app.ts";
 import { madeChat } from "../../support/slack-chat.ts";
@@ -237,7 +237,7 @@ test("openFile shares a file of the folder into the thread, or offers the picker
   world.slack.apiCalls.length = 0;
   await chat.openFile(ref, folder, "");
   const [picker] = world.slack.callsTo("chat.postMessage");
-  assert.ok(picker && picker.text === texts.OPEN_FALLBACK && picker.thread_ts === THREAD);
+  assert.ok(picker && picker.text === slackTexts.OPEN_FALLBACK && picker.thread_ts === THREAD);
   await chat.stop();
 });
 

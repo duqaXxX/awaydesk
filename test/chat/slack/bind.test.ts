@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
 import { BIND_ACTION, type BindBlock, bindBlocks } from "../../../src/chat/slack/bind.ts";
+import * as slackTexts from "../../../src/chat/slack/texts.ts";
 import { FOLDER_ROWS } from "../../../src/core/folders.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { fill, named } from "../../../src/core/texts.ts";
@@ -26,7 +27,7 @@ test("each folder is a row with a bind button the current one marked", () => {
   assert.equal(firstText(blocks[0]), fill(named(texts.BIND_LIST, NAMES), { root: ROOT }));
   const [first, second] = rows(blocks);
   assert.ok(first && second);
-  assert.equal(first.text.text, `\`a\`${texts.BIND_CURRENT}`);
+  assert.equal(first.text.text, `\`a\`${slackTexts.BIND_CURRENT}`);
   assert.ok(!("accessory" in first));
   assert.equal(second.text.text, "`b/c&amp;d`");
   assert.equal(second.accessory?.action_id, BIND_ACTION);
@@ -40,7 +41,7 @@ test("more folders than rows says how to reach the others", () => {
   );
   const blocks = bindBlocks(ROOT, folders, null, NAMES);
   assert.equal(rows(blocks).length, FOLDER_ROWS);
-  assert.equal(firstText(blocks.at(-1)), fill(texts.BIND_MORE, { rows: FOLDER_ROWS }));
+  assert.equal(firstText(blocks.at(-1)), fill(slackTexts.BIND_MORE, { rows: FOLDER_ROWS }));
 });
 
 test("no trusted folder says how to trust one", () => {

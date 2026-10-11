@@ -14,6 +14,7 @@ import {
   summaryOf,
   texts,
 } from "../../core/port.ts";
+import * as slackTexts from "./texts.ts";
 
 export const SETUP_BLOCK = "setup"; // the one `actions` block that holds every control
 export const SETUP_MODEL = "setup_model";
@@ -55,7 +56,7 @@ function modelOptions(models: readonly ModelInfo[]): Block[] {
 
 function effortOptions(models: readonly ModelInfo[], model: string): Block[] {
   return [DEFAULT, ...effortLevels(models, model)].map((level) =>
-    option(texts.fill(texts.SETUP_EFFORT_OPTION, { level }), level),
+    option(texts.fill(slackTexts.SETUP_EFFORT_OPTION, { level }), level),
   );
 }
 
@@ -88,9 +89,9 @@ export function setupBlocks(
     elements.push(select(SETUP_MODEL, modelOptions(models), choice.model));
   }
   elements.push(select(SETUP_EFFORT, effortOptions(models, choice.model), choice.effort));
-  const bypass = option(texts.SETUP_BYPASS_OPTION, BYPASS_ON, {
+  const bypass = option(slackTexts.SETUP_BYPASS_OPTION, BYPASS_ON, {
     type: "mrkdwn",
-    text: texts.SETUP_BYPASS_DESCRIPTION,
+    text: slackTexts.SETUP_BYPASS_DESCRIPTION,
   });
   const checkboxes: Block = { type: "checkboxes", action_id: SETUP_BYPASS, options: [bypass] };
   if (choice.bypass) checkboxes.initial_options = [bypass];
@@ -100,10 +101,10 @@ export function setupBlocks(
     action_id: SETUP_START,
     value: setupId,
     style: "primary",
-    text: { type: "plain_text", text: texts.SETUP_START_BUTTON },
+    text: { type: "plain_text", text: slackTexts.SETUP_START_BUTTON },
   });
   return [
-    { type: "section", text: { type: "mrkdwn", text: texts.SETUP_HEADER } },
+    { type: "section", text: { type: "mrkdwn", text: slackTexts.SETUP_HEADER } },
     { type: "actions", block_id: SETUP_BLOCK, elements },
   ];
 }
@@ -136,9 +137,9 @@ export function readChoice(values: unknown, models: readonly ModelInfo[]): Choic
 /** The one line that replaces the controls once the owner pressed Start. */
 export function summary(models: readonly ModelInfo[], choice: Choice): string {
   const data: Summary = summaryOf(models, choice);
-  return texts.fill(texts.SETUP_SUMMARY, {
+  return texts.fill(slackTexts.SETUP_SUMMARY, {
     model: data.model,
-    effort: data.effort ?? texts.SETUP_EFFORT_DEFAULT,
+    effort: data.effort ?? slackTexts.SETUP_EFFORT_DEFAULT,
     bypass: data.bypass ? "on" : "off",
   });
 }

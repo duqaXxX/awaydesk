@@ -40,6 +40,7 @@ import type {
 import { ResumeRefused } from "../src/agent/seam.ts";
 import { promptFor } from "../src/chat/slack/attachments.ts";
 import { resumeBlocks } from "../src/chat/slack/resume.ts";
+import * as slackTexts from "../src/chat/slack/texts.ts";
 import { gitState } from "../src/core/footer.ts";
 import { preview } from "../src/core/reply/previews.ts";
 import * as texts from "../src/core/texts.ts";
@@ -568,7 +569,9 @@ async function resume(s: Stage, word: string, sessionId: string | null): Promise
   const held = listed.length - free.length;
   const picker = JSON.stringify(resumeBlocks(s.workdir, free, held, new Date(), RESUME_THREAD));
   const countedLine =
-    held === 1 ? texts.RESUME_OPEN_ONE : texts.fill(texts.RESUME_OPEN_MANY, { count: held });
+    held === 1
+      ? slackTexts.RESUME_OPEN_ONE
+      : texts.fill(slackTexts.RESUME_OPEN_MANY, { count: held });
   const known = listed.some((entry) => entry.id === sessionId);
   const inPicker =
     held >= 1 && picker.includes(countedLine) && !picker.includes(sessionId.slice(0, 8));

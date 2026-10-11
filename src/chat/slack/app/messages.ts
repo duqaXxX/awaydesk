@@ -42,6 +42,7 @@ import {
 import { describe } from "../reply/errors.ts";
 import { markdownEscape, mrkdwnEscape } from "../reply/escape.ts";
 import { TITLE_LIMIT } from "../resume.ts";
+import * as slackTexts from "../texts.ts";
 import { type Answers, type AppParts, isCancelled, logger, type Report } from "./answers.ts";
 import type { Open } from "./open.ts";
 import type { Requests } from "./requests.ts";
@@ -413,7 +414,7 @@ export class Messages {
       await this.answers.tellOwner(
         channel,
         threadTs,
-        fill(named(texts.UPLOAD_FAILED, this.parts.names), { name, reason }),
+        fill(named(slackTexts.UPLOAD_FAILED, this.parts.names), { name, reason }),
       );
     };
 
@@ -444,7 +445,7 @@ export class Messages {
       if (outcome.reason instanceof DownloadFailed) {
         await refuse(
           files[index] as SlackFile,
-          fill(texts.UPLOAD_DOWNLOAD, { error: outcome.reason.message }),
+          fill(slackTexts.UPLOAD_DOWNLOAD, { error: outcome.reason.message }),
         );
         return null;
       }

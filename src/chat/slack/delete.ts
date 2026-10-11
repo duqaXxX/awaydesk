@@ -34,10 +34,11 @@
  */
 
 import type { WebClient } from "@slack/web-api";
-import { fill, Mutex, type Names, named, type StatePort, texts } from "../../core/port.ts";
+import { fill, Mutex, type Names, named, type StatePort } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import { isRecord } from "../../values.ts";
 import { describe } from "./reply/errors.ts";
+import * as slackTexts from "./texts.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.delete");
 
@@ -130,16 +131,16 @@ export class ThreadDeleter {
       // From here until `free`, the thread is held: a message sent in it while its messages go
       // finds no session, and none is rebuilt from the entry `state.json` still has
       // (`SessionManager.release`).
-      if (!(await this.#release(channelId, threadTs))) return texts.HOME_DELETE_BUSY;
+      if (!(await this.#release(channelId, threadTs))) return slackTexts.HOME_DELETE_BUSY;
       const refused = await this.#empty(channelId, threadTs);
       if (refused > 0) {
         // The root stays while a reply does, so the thread can still be opened.
-        return fill(named(texts.HOME_DELETE_REFUSED, this.#names()), { count: refused });
+        return fill(named(slackTexts.HOME_DELETE_REFUSED, this.#names()), { count: refused });
       }
       this.#state.removeThread(channelId, threadTs);
     } catch (error) {
       logger.warning(`could not delete ${channelId}/${threadTs}: ${describe(error)}`);
-      return fill(texts.HOME_DELETE_FAILED, { error: describe(error) });
+      return fill(slackTexts.HOME_DELETE_FAILED, { error: describe(error) });
     } finally {
       this.#free(channelId, threadTs);
     }
@@ -209,11 +210,11 @@ export class ThreadDeleter {
         }
       } catch (error) {
         logger.warning(`could not clean up ${channelId}: ${describe(error)}`);
-        return fill(texts.HOME_CLEAN_FAILED, { error: describe(error) });
+        return fill(slackTexts.HOME_CLEAN_FAILED, { error: describe(error) });
       }
       logger.info(`cleaned up ${channelId}: ${loose.size} messages, ${refused} refused`);
       return refused > 0
-        ? fill(named(texts.HOME_CLEAN_REFUSED, this.#names()), { count: refused })
+        ? fill(named(slackTexts.HOME_CLEAN_REFUSED, this.#names()), { count: refused })
         : null;
     });
   }

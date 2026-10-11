@@ -8,6 +8,7 @@ import { FOLDER_ROWS, fill, type Names, named, texts } from "../../core/port.ts"
 import { compareCodePoints } from "../../text.ts";
 import { type ContextBlock, contextBlock } from "./reply/blocks.ts";
 import { shownAsWritten } from "./reply/escape.ts";
+import * as slackTexts from "./texts.ts";
 
 export const BIND_ACTION = "folder_bind";
 
@@ -56,7 +57,7 @@ function row(root: string, index: number, folder: string, current: boolean): Fol
     block_id: `folder-${index}`,
     text: {
       type: "mrkdwn",
-      text: `\`${shownAsWritten(shown)}\`${current ? texts.BIND_CURRENT : ""}`,
+      text: `\`${shownAsWritten(shown)}\`${current ? slackTexts.BIND_CURRENT : ""}`,
     },
   };
   if (!current) {
@@ -64,7 +65,7 @@ function row(root: string, index: number, folder: string, current: boolean): Fol
       type: "button",
       action_id: BIND_ACTION,
       value: shown,
-      text: { type: "plain_text", text: texts.BIND_BUTTON },
+      text: { type: "plain_text", text: slackTexts.BIND_BUTTON },
     };
   }
   return block;
@@ -88,7 +89,7 @@ export function bindBlocks(
       row(root, i, folder, current !== null && samePath(folder, current)),
     ),
     ...(folders.length > FOLDER_ROWS
-      ? [contextBlock(fill(texts.BIND_MORE, { rows: FOLDER_ROWS }))]
+      ? [contextBlock(fill(slackTexts.BIND_MORE, { rows: FOLDER_ROWS }))]
       : []),
   ];
 }

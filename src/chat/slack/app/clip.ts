@@ -8,6 +8,7 @@ import { DownloadFailed } from "../attachments.ts";
 import { describe } from "../reply/errors.ts";
 import { mrkdwnEscape } from "../reply/escape.ts";
 import { Task } from "../reply/tasks.ts";
+import * as slackTexts from "../texts.ts";
 import * as voice from "../voice.ts";
 import { type Answers, type AppParts, isCancelled, logger } from "./answers.ts";
 import { isOwner } from "./guards.ts";
@@ -55,7 +56,7 @@ export class Clips {
       await this.answers.tellOwner(
         channel,
         threadTs,
-        named(texts.CLIP_NOT_YOURS, this.parts.names),
+        named(slackTexts.CLIP_NOT_YOURS, this.parts.names),
       );
       return;
     }
@@ -80,7 +81,11 @@ export class Clips {
     this.clips.get(fileId)?.expiry?.cancel();
     waiting.expiry = new Task((signal) => this.giveUp(fileId, signal));
     this.clips.set(fileId, waiting);
-    await this.answers.tellOwner(channel, threadTs, named(texts.CLIP_WAITING, this.parts.names));
+    await this.answers.tellOwner(
+      channel,
+      threadTs,
+      named(slackTexts.CLIP_WAITING, this.parts.names),
+    );
   }
 
   private async giveUp(fileId: string, signal: AbortSignal): Promise<void> {
@@ -96,7 +101,7 @@ export class Clips {
     await this.answers.tellOwner(
       waiting.channel,
       waiting.threadTs,
-      fill(named(texts.CLIP_NOT_SENT, this.parts.names), { minutes }),
+      fill(named(slackTexts.CLIP_NOT_SENT, this.parts.names), { minutes }),
     );
   }
 
@@ -116,7 +121,7 @@ export class Clips {
         await this.answers.tellOwner(
           waiting.channel,
           waiting.threadTs,
-          fill(named(texts.CLIP_UNREADABLE, this.parts.names), {
+          fill(named(slackTexts.CLIP_UNREADABLE, this.parts.names), {
             reason: mrkdwnEscape(error.message),
           }),
         );
@@ -129,7 +134,7 @@ export class Clips {
       await this.answers.tellOwner(
         waiting.channel,
         waiting.threadTs,
-        named(texts.CLIP_EMPTY, this.parts.names),
+        named(slackTexts.CLIP_EMPTY, this.parts.names),
       );
       return;
     }
@@ -175,7 +180,7 @@ export class Clips {
       await this.answers.tellOwner(
         waiting.channel,
         waiting.threadTs,
-        named(texts.CLIP_NOT_YOURS, this.parts.names),
+        named(slackTexts.CLIP_NOT_YOURS, this.parts.names),
       );
       return;
     }

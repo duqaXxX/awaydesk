@@ -35,6 +35,7 @@ import {
   questionView,
 } from "../requests.ts";
 import { readChoice, setupBlocks, summary as setupSummary } from "../setup.ts";
+import * as slackTexts from "../texts.ts";
 import { type Answers, type AppParts, isCancelled, logger } from "./answers.ts";
 import { interactionActor, isOwner } from "./guards.ts";
 import {
@@ -444,7 +445,7 @@ export class Requests {
     } catch (error) {
       if (isCancelled(error)) throw error;
       // an expired trigger_id, say: the turn must not wait unseen
-      const message = fill(texts.QUESTION_NOT_OPENED, { error: describe(error) });
+      const message = fill(slackTexts.QUESTION_NOT_OPENED, { error: describe(error) });
       await this.answers.tellOwner(channel, threadTs, message);
     }
   };
@@ -487,7 +488,7 @@ export class Requests {
     if (!isAnswered(draft, questions, draft.active)) {
       await ack({
         response_action: "errors",
-        errors: { [`q${draft.active}`]: texts.QUESTION_MISSING },
+        errors: { [`q${draft.active}`]: slackTexts.QUESTION_MISSING },
       });
       return;
     }

@@ -1,4 +1,5 @@
 import { texts } from "../../core/port.ts";
+import * as slackTexts from "./texts.ts";
 /** The same-folder hold's question as Slack blocks. */
 
 export const HOLD_CONTINUE = "hold_continue";
@@ -24,13 +25,13 @@ export function holdBlocks(holdId: string, link: string): Record<string, unknown
           action_id: HOLD_CONTINUE,
           value: holdId,
           style: "primary",
-          text: { type: "plain_text", text: texts.HOLD_CONTINUE_BUTTON },
+          text: { type: "plain_text", text: slackTexts.HOLD_CONTINUE_BUTTON },
         },
         {
           type: "button",
           action_id: HOLD_CANCEL,
           value: holdId,
-          text: { type: "plain_text", text: texts.HOLD_CANCEL_BUTTON },
+          text: { type: "plain_text", text: slackTexts.HOLD_CANCEL_BUTTON },
         },
       ],
     },

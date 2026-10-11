@@ -12,6 +12,7 @@ import {
   setupBlocks,
   summary,
 } from "../../../src/chat/slack/setup.ts";
+import * as slackTexts from "../../../src/chat/slack/texts.ts";
 import { type Choice, DEFAULT, DEFAULT_CHOICE, effortLevels } from "../../../src/core/setup.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { sdkJson } from "../../support/fixtures.ts";
@@ -137,7 +138,7 @@ test("the bypass checkbox starts unchecked and keeps a tick", () => {
   );
   assert.deepEqual(ticked.options[0].description, {
     type: "mrkdwn",
-    text: texts.SETUP_BYPASS_DESCRIPTION,
+    text: slackTexts.SETUP_BYPASS_DESCRIPTION,
   });
 });
 
@@ -175,7 +176,7 @@ test("a model the cli did not list reads as default", () => {
 test("the summary names the model by its display name", () => {
   assert.equal(
     summary(MODELS, { model: "opus", effort: "high", bypass: true }),
-    texts.fill(texts.SETUP_SUMMARY, { model: "Opus 5.5", effort: "high", bypass: "on" }),
+    texts.fill(slackTexts.SETUP_SUMMARY, { model: "Opus 5.5", effort: "high", bypass: "on" }),
   );
   assert.ok(summary(MODELS, DEFAULT_CHOICE).endsWith("Effort: Default · Bypass: off"));
 });

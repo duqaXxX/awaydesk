@@ -15,6 +15,7 @@ import { oneLine, texts } from "../../core/port.ts";
 import { type ContextBlock, contextBlock } from "./reply/blocks.ts";
 import { take } from "./reply/chars.ts";
 import { shownAsWritten } from "./reply/escape.ts";
+import * as slackTexts from "./texts.ts";
 
 export const RESUME_ROWS = 20;
 export const RESUME_ACTION = "session_resume";
@@ -123,7 +124,7 @@ function row(session: ListedSession, now: Date, threadTs: string): ResumeRow {
       type: "button",
       action_id: RESUME_ACTION,
       value: resumeValue(session.id, threadTs),
-      text: { type: "plain_text", text: texts.RESUME_BUTTON },
+      text: { type: "plain_text", text: slackTexts.RESUME_BUTTON },
     },
   };
 }
@@ -145,11 +146,11 @@ export function resumeBlocks(
   // The list's own lines are the daemon's notices, small and grey; the rows keep their button.
   const shown = shownAsWritten(directory);
   let held: ContextBlock[] = [];
-  if (openElsewhere === 1) held = [contextBlock(texts.RESUME_OPEN_ONE)];
+  if (openElsewhere === 1) held = [contextBlock(slackTexts.RESUME_OPEN_ONE)];
   else if (openElsewhere)
-    held = [contextBlock(texts.fill(texts.RESUME_OPEN_MANY, { count: openElsewhere }))];
+    held = [contextBlock(texts.fill(slackTexts.RESUME_OPEN_MANY, { count: openElsewhere }))];
   if (sessions.length === 0) {
-    const empty = held.length > 0 ? texts.RESUME_NONE_LEFT : texts.RESUME_EMPTY;
+    const empty = held.length > 0 ? slackTexts.RESUME_NONE_LEFT : slackTexts.RESUME_EMPTY;
     return [contextBlock(texts.fill(empty, { directory: shown })), ...held];
   }
   const blocks: ResumeBlock[] = [
@@ -157,7 +158,7 @@ export function resumeBlocks(
     ...sessions.slice(0, RESUME_ROWS).map((s) => row(s, now, threadTs)),
   ];
   if (sessions.length > RESUME_ROWS) {
-    blocks.push(contextBlock(texts.fill(texts.RESUME_MORE, { rows: RESUME_ROWS })));
+    blocks.push(contextBlock(texts.fill(slackTexts.RESUME_MORE, { rows: RESUME_ROWS })));
   }
   return [...blocks, ...held];
 }

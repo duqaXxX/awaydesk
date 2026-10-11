@@ -32,6 +32,7 @@ import { deleteRequest, describe } from "../reply/errors.ts";
 import { markdownEscape, mrkdwnEscape } from "../reply/escape.ts";
 import type { Limiter } from "../reply/limiter.ts";
 import { TITLE_LIMIT } from "../resume.ts";
+import * as slackTexts from "../texts.ts";
 import type { SlackChat, SlackThread } from "../thread.ts";
 import { type ChannelGuard, type Identity, isOwner } from "./guards.ts";
 
@@ -259,7 +260,7 @@ export class Answers {
     if (reason !== null) {
       // For the owner alone, even from a top-level message: a channel the guard refuses may
       // hold people who must not read the bot's words.
-      await this.tellOwner(channel, threadTs, fill(texts.CHANNEL_REFUSED, { reason }));
+      await this.tellOwner(channel, threadTs, fill(slackTexts.CHANNEL_REFUSED, { reason }));
       return false;
     }
     return true;

@@ -36,6 +36,7 @@ import {
 import { take } from "../reply/chars.ts";
 import { describe } from "../reply/errors.ts";
 import { shownAsWritten } from "../reply/escape.ts";
+import * as slackTexts from "../texts.ts";
 import { type Answers, type AppParts, isCancelled, logger } from "./answers.ts";
 import { interactionActor, isOwner } from "./guards.ts";
 import {
@@ -89,7 +90,7 @@ export class Open {
    */
   async openWord(channel: string, threadTs: string, folder: string, words: string): Promise<void> {
     if (!words) {
-      await this.answers.deliver(channel, threadTs, texts.OPEN_FALLBACK, pickerBlocks(), {
+      await this.answers.deliver(channel, threadTs, slackTexts.OPEN_FALLBACK, pickerBlocks(), {
         ephemeral: false,
       });
       return;
@@ -102,7 +103,7 @@ export class Open {
     const [only] = found.paths;
     if (only === undefined) {
       const shown = shownAsWritten(words);
-      const noMatch = found.complete ? texts.OPEN_NO_MATCH : texts.OPEN_NO_MATCH_PARTIAL;
+      const noMatch = found.complete ? slackTexts.OPEN_NO_MATCH : slackTexts.OPEN_NO_MATCH_PARTIAL;
       await this.answers.tellOwner(channel, threadTs, fill(noMatch, { words: shown }));
     } else if (found.paths.length === 1 && found.complete) {
       await this.openFile(channel, threadTs, folder, only);
@@ -110,7 +111,7 @@ export class Open {
       await this.answers.deliver(
         channel,
         threadTs,
-        texts.OPEN_FALLBACK,
+        slackTexts.OPEN_FALLBACK,
         matchesBlocks(words, found.paths, found.complete),
         { ephemeral: false },
       );
@@ -172,7 +173,7 @@ export class Open {
         await this.answers.tellOwner(
           channel,
           threadTs,
-          fill(texts.OPEN_NOT_A_FILE, { path: shown }),
+          fill(slackTexts.OPEN_NOT_A_FILE, { path: shown }),
         );
         return;
       }
@@ -180,7 +181,7 @@ export class Open {
         await this.answers.tellOwner(
           channel,
           threadTs,
-          fill(named(texts.OPEN_TOO_LARGE, this.parts.names), { path: shown }),
+          fill(named(slackTexts.OPEN_TOO_LARGE, this.parts.names), { path: shown }),
         );
         return;
       }
@@ -188,7 +189,7 @@ export class Open {
     }
     if (content.length === 0) {
       // Refused here, not left to whatever Slack answers to an upload of length 0.
-      await this.answers.tellOwner(channel, threadTs, fill(texts.OPEN_EMPTY, { path: shown }));
+      await this.answers.tellOwner(channel, threadTs, fill(slackTexts.OPEN_EMPTY, { path: shown }));
       return;
     }
     if (this.answers.stopped) return;
@@ -200,10 +201,10 @@ export class Open {
       // Slack's own code, never the file or its path.
       logger.warning(`could not share a file in ${channel}: ${code}`);
       let told: string;
-      if (code === "missing_scope") told = texts.OPEN_NO_SCOPE;
+      if (code === "missing_scope") told = slackTexts.OPEN_NO_SCOPE;
       else if (code === "snippet_too_large")
-        told = fill(named(texts.OPEN_TOO_LARGE, this.parts.names), { path: shown });
-      else told = fill(texts.OPEN_FAILED, { path: shown, error: code });
+        told = fill(named(slackTexts.OPEN_TOO_LARGE, this.parts.names), { path: shown });
+      else told = fill(slackTexts.OPEN_FAILED, { path: shown, error: code });
       await this.answers.tellOwner(channel, threadTs, told);
       return;
     }
@@ -299,7 +300,7 @@ export class Open {
     } catch (error) {
       if (isCancelled(error)) throw error;
       // an expired trigger_id, say
-      const message = fill(texts.OPEN_FORM_NOT_OPENED, { error: describe(error) });
+      const message = fill(slackTexts.OPEN_FORM_NOT_OPENED, { error: describe(error) });
       await this.answers.tellOwner(channel, threadTs, message);
       return;
     }
@@ -430,7 +431,7 @@ export class Open {
       const rows = choiceBlock(view);
       const block =
         rows !== null && typeof rows.block_id === "string" ? rows.block_id : QUERY_BLOCK;
-      await ack({ response_action: "errors", errors: { [block]: texts.OPEN_NONE_CHOSEN } });
+      await ack({ response_action: "errors", errors: { [block]: slackTexts.OPEN_NONE_CHOSEN } });
       return;
     }
     await ack();

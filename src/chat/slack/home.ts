@@ -68,6 +68,7 @@ import { mrkdwnEscape, shownAsWritten } from "./reply/escape.ts";
 import { Status } from "./reply/status.ts";
 import { Task } from "./reply/tasks.ts";
 import { ID_SHOWN, TITLE_LIMIT } from "./resume.ts";
+import * as slackTexts from "./texts.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.home");
 
@@ -125,10 +126,10 @@ export const OPTION_TEXT = 75;
 
 // The reaction names a session can show and their words, in the order the status menu lists.
 const WORDS: ReadonlyMap<string, string> = new Map<string, string>([
-  [Status.WAITING, texts.HOME_WAITING],
-  [Status.WORKING, texts.HOME_WORKING],
-  [Status.DONE, texts.HOME_ENDED],
-  [Status.ERROR, texts.HOME_ERROR],
+  [Status.WAITING, slackTexts.HOME_WAITING],
+  [Status.WORKING, slackTexts.HOME_WORKING],
+  [Status.DONE, slackTexts.HOME_ENDED],
+  [Status.ERROR, slackTexts.HOME_ERROR],
 ]);
 // A session in one of these states is not offered for deleting: its thread is in use.
 const IN_USE: ReadonlySet<string> = new Set([Status.WAITING, Status.WORKING]);
@@ -144,11 +145,11 @@ const REACH: ReadonlyMap<string, number> = new Map<string, number>([
   [LAST_30, 30 * 86400],
 ]);
 const DATES: ReadonlyMap<string, string> = new Map<string, string>([
-  [LAST_48, texts.HOME_LAST_48],
-  [TODAY, texts.HOME_TODAY],
-  [YESTERDAY, texts.HOME_YESTERDAY],
-  [LAST_7, texts.HOME_LAST_7],
-  [LAST_30, texts.HOME_LAST_30],
+  [LAST_48, slackTexts.HOME_LAST_48],
+  [TODAY, slackTexts.HOME_TODAY],
+  [YESTERDAY, slackTexts.HOME_YESTERDAY],
+  [LAST_7, slackTexts.HOME_LAST_7],
+  [LAST_30, slackTexts.HOME_LAST_30],
 ]);
 
 /** A block of the page. */
@@ -363,7 +364,7 @@ function controlsOf(channels: ReadonlyMap<string, string>, chosen: HomeFilter): 
   const search: Block = {
     type: "plain_text_input",
     action_id: SEARCH_ACTION,
-    placeholder: { type: "plain_text", text: texts.HOME_SEARCH_HINT },
+    placeholder: { type: "plain_text", text: slackTexts.HOME_SEARCH_HINT },
     dispatch_action_config: { trigger_actions_on: ["on_enter_pressed"] },
   };
   if (chosen.search) search.initial_value = chosen.search;
@@ -375,7 +376,7 @@ function controlsOf(channels: ReadonlyMap<string, string>, chosen: HomeFilter): 
         select(
           CHANNEL_ACTION,
           [
-            [texts.HOME_ALL_CHANNELS, ALL],
+            [slackTexts.HOME_ALL_CHANNELS, ALL],
             ...[...channels]
               .slice(0, CHANNEL_OPTIONS)
               .map(([id, name]): [string, string] => [oneLine(name, OPTION_TEXT), id]),
@@ -385,7 +386,7 @@ function controlsOf(channels: ReadonlyMap<string, string>, chosen: HomeFilter): 
         select(
           STATUS_ACTION,
           [
-            [texts.HOME_ALL_STATUSES, ALL],
+            [slackTexts.HOME_ALL_STATUSES, ALL],
             ...[...WORDS].map(([name, word]): [string, string] => [capitalize(word), name]),
           ],
           chosen.status,
@@ -394,7 +395,7 @@ function controlsOf(channels: ReadonlyMap<string, string>, chosen: HomeFilter): 
           DATE_ACTION,
           [
             ...[...DATES].map(([key, text]): [string, string] => [text, key]),
-            [texts.HOME_ANY_TIME, ALL],
+            [slackTexts.HOME_ANY_TIME, ALL],
           ],
           chosen.date,
         ),
@@ -404,7 +405,7 @@ function controlsOf(channels: ReadonlyMap<string, string>, chosen: HomeFilter): 
       type: "input",
       block_id: `${SEARCH_BLOCK}:${mark}`,
       dispatch_action: true,
-      label: { type: "plain_text", text: texts.HOME_SEARCH_LABEL },
+      label: { type: "plain_text", text: slackTexts.HOME_SEARCH_LABEL },
       element: search,
     },
   ];
@@ -426,14 +427,14 @@ function context(text: string): Block {
 
 function deletingLine(count: number, names: Names): string {
   return count === 1
-    ? named(texts.HOME_DELETING_ONE, names)
-    : texts.fill(named(texts.HOME_DELETING_MANY, names), { count });
+    ? named(slackTexts.HOME_DELETING_ONE, names)
+    : texts.fill(named(slackTexts.HOME_DELETING_MANY, names), { count });
 }
 
 function cleaningLine(count: number, names: Names): string {
   return count === 1
-    ? named(texts.HOME_CLEANING_ONE, names)
-    : texts.fill(named(texts.HOME_CLEANING_MANY, names), { count });
+    ? named(slackTexts.HOME_CLEANING_ONE, names)
+    : texts.fill(named(slackTexts.HOME_CLEANING_MANY, names), { count });
 }
 
 /**
@@ -441,12 +442,12 @@ function cleaningLine(count: number, names: Names): string {
  * block holds no button (context block reference), so the line is a section then.
  */
 function header(time: string, editing: boolean, canEdit: boolean): Block {
-  const text = texts.fill(texts.HOME_HEADER, { time });
+  const text = texts.fill(slackTexts.HOME_HEADER, { time });
   if (!canEdit) return context(text);
   const button: Block = {
     type: "button",
     action_id: EDIT_ACTION,
-    text: plainTextObject(editing ? texts.HOME_DONE : texts.HOME_EDIT),
+    text: plainTextObject(editing ? slackTexts.HOME_DONE : slackTexts.HOME_EDIT),
     value: editing ? EDIT_OFF : EDIT_ON,
   };
   if (editing) button.style = "primary";
@@ -455,19 +456,20 @@ function header(time: string, editing: boolean, canEdit: boolean): Block {
 
 /** A channel's Clean up, with a confirmation dialog that says what it deletes. */
 function cleanButton(channelId: string, channelName: string): Block {
-  const room = CONFIRM_TEXT - Array.from(texts.fill(texts.HOME_CLEAN_TEXT, { channel: "" })).length;
+  const room =
+    CONFIRM_TEXT - Array.from(texts.fill(slackTexts.HOME_CLEAN_TEXT, { channel: "" })).length;
   return {
     type: "button",
     action_id: CLEAN_ACTION,
-    text: plainTextObject(texts.HOME_CLEAN),
+    text: plainTextObject(slackTexts.HOME_CLEAN),
     value: channelId,
     confirm: {
-      title: plainTextObject(texts.HOME_CLEAN_TITLE),
+      title: plainTextObject(slackTexts.HOME_CLEAN_TITLE),
       text: plainTextObject(
-        texts.fill(texts.HOME_CLEAN_TEXT, { channel: oneLine(channelName, room) }),
+        texts.fill(slackTexts.HOME_CLEAN_TEXT, { channel: oneLine(channelName, room) }),
       ),
-      confirm: plainTextObject(texts.HOME_CLEAN_CONFIRM),
-      deny: plainTextObject(texts.HOME_DELETE_DENY),
+      confirm: plainTextObject(slackTexts.HOME_CLEAN_CONFIRM),
+      deny: plainTextObject(slackTexts.HOME_DELETE_DENY),
       style: "danger",
     },
   };
@@ -489,15 +491,15 @@ interface ChannelHeaderOptions {
 function channelHeader(teamId: string, channelId: string, options: ChannelHeaderOptions): Block {
   const { editing, deleting = 0, name = "", canClean = false, cleaning = false } = options;
   let text = `*<#${channelId}>*`;
-  if (cleaning) text += `   ${texts.HOME_CHANNEL_CLEANING}`;
-  if (deleting === 1) text += `   ${texts.HOME_CHANNEL_DELETING_ONE}`;
+  if (cleaning) text += `   ${slackTexts.HOME_CHANNEL_CLEANING}`;
+  if (deleting === 1) text += `   ${slackTexts.HOME_CHANNEL_DELETING_ONE}`;
   else if (deleting) {
-    text += `   ${texts.fill(texts.HOME_CHANNEL_DELETING_MANY, { count: deleting })}`;
+    text += `   ${texts.fill(slackTexts.HOME_CHANNEL_DELETING_MANY, { count: deleting })}`;
   }
   const head: Block = { type: "section", text: { type: "mrkdwn", text } };
   if (!editing) {
     head.accessory = linkButton(
-      texts.HOME_NEW_THREAD,
+      slackTexts.HOME_NEW_THREAD,
       `slack://channel?team=${teamId}&id=${channelId}`,
       NEW_THREAD_ACTION,
     );
@@ -509,8 +511,8 @@ function channelHeader(teamId: string, channelId: string, options: ChannelHeader
 
 function repliesOf(row: HomeRow): string {
   return row.replies === 1
-    ? texts.HOME_REPLY
-    : texts.fill(texts.HOME_REPLIES, { count: row.replies });
+    ? slackTexts.HOME_REPLY
+    : texts.fill(slackTexts.HOME_REPLIES, { count: row.replies });
 }
 
 /**
@@ -519,8 +521,8 @@ function repliesOf(row: HomeRow): string {
  */
 function deleteButton(row: HomeRow, channelName: string, names: Names): Block {
   const replies = repliesOf(row);
-  const naming = row.replies ? texts.HOME_DELETE_NAMED : texts.HOME_DELETE_NAMED_BARE;
-  const warning = named(texts.HOME_DELETE_TEXT, names);
+  const naming = row.replies ? slackTexts.HOME_DELETE_NAMED : slackTexts.HOME_DELETE_NAMED_BARE;
+  const warning = named(slackTexts.HOME_DELETE_TEXT, names);
   let room = CONFIRM_TEXT - Array.from(warning).length;
   room -= Array.from(texts.fill(naming, { title: "", channel: channelName, replies })).length;
   const title = oneLine(row.title, Math.max(room, 1));
@@ -528,13 +530,13 @@ function deleteButton(row: HomeRow, channelName: string, names: Names): Block {
     type: "button",
     action_id: DELETE_ACTION,
     style: "danger",
-    text: plainTextObject(texts.HOME_DELETE),
+    text: plainTextObject(slackTexts.HOME_DELETE),
     value: `${row.channelId}:${row.threadTs}`,
     confirm: {
-      title: plainTextObject(texts.HOME_DELETE_TITLE),
+      title: plainTextObject(slackTexts.HOME_DELETE_TITLE),
       text: plainTextObject(texts.fill(naming, { title, channel: channelName, replies }) + warning),
-      confirm: plainTextObject(texts.HOME_DELETE_CONFIRM),
-      deny: plainTextObject(texts.HOME_DELETE_DENY),
+      confirm: plainTextObject(slackTexts.HOME_DELETE_CONFIRM),
+      deny: plainTextObject(slackTexts.HOME_DELETE_DENY),
       style: "danger",
     },
   };
@@ -543,9 +545,9 @@ function deleteButton(row: HomeRow, channelName: string, names: Names): Block {
 function card(row: HomeRow, channelName: string, editing: boolean, names: Names): Block[] {
   const icon = row.status ? `:${row.status}:  ` : "";
   const title = shownAsWritten(oneLine(row.title, TITLE_LIMIT));
-  const when = row.replies ? texts.HOME_LAST_REPLY : texts.HOME_STARTED;
+  const when = row.replies ? slackTexts.HOME_LAST_REPLY : slackTexts.HOME_STARTED;
   let word: string | null = null;
-  if (row.deleting) word = texts.HOME_DELETING;
+  if (row.deleting) word = slackTexts.HOME_DELETING;
   else if (row.status) word = WORDS.get(row.status) ?? null;
   const details = [
     word,
@@ -554,7 +556,7 @@ function card(row: HomeRow, channelName: string, editing: boolean, names: Names)
     // Open is a link in the small line, not a button: a button sits at the far right of the
     // title's row, and a row that carries one cannot be small (the maintainer, 2026-10-01).
     // A reply's permalink carries a query (`?thread_ts=…&cid=…`), and mrkdwn reads `&` as markup.
-    `<${mrkdwnEscape(row.permalink)}|${texts.HOME_OPEN}>`,
+    `<${mrkdwnEscape(row.permalink)}|${slackTexts.HOME_OPEN}>`,
   ];
   const head = section(`${icon}*${title}*`);
   if (editing && !row.deleting && !(row.status !== null && IN_USE.has(row.status))) {
@@ -604,7 +606,8 @@ export function homeView(
     ...(cleaning.size > 0 ? [section(cleaningLine(cleaning.size, names))] : []),
     ...[...(options.notices ?? [])].slice(0, NOTICES_SHOWN).map(context),
   ];
-  if (channels.size === 0) return { type: "home", blocks: [...blocks, context(texts.HOME_EMPTY)] };
+  if (channels.size === 0)
+    return { type: "home", blocks: [...blocks, context(slackTexts.HOME_EMPTY)] };
   const groups = new Map<string, HomeRow[]>();
   const group = (channelId: string): HomeRow[] => {
     let found = groups.get(channelId);
@@ -621,7 +624,7 @@ export function homeView(
   else if (!narrowed(chosen)) {
     for (const channelId of channels.keys()) group(channelId);
   }
-  if (groups.size === 0) blocks.push(context(texts.HOME_NO_MATCH));
+  if (groups.size === 0) blocks.push(context(slackTexts.HOME_NO_MATCH));
   const withSessions = new Set(rows.map((row) => row.channelId));
   // Counted over every session of the channel, shown or not, whatever the filters.
   const going = new Map<string, number>();
@@ -658,14 +661,14 @@ export function homeView(
     if (found.length === 0) {
       // A channel with sessions, none of them in the period or under the filters.
       const hidden = withSessions.has(channelId);
-      blocks.push(context(hidden ? texts.HOME_NO_MATCH : texts.HOME_NO_SESSIONS));
+      blocks.push(context(hidden ? slackTexts.HOME_NO_MATCH : slackTexts.HOME_NO_SESSIONS));
     } else if (found.length > cards.length) {
       const showAll = {
         type: "button",
         action_id: SHOW_ALL_ACTION,
         text: {
           type: "plain_text",
-          text: texts.fill(texts.HOME_SHOW_ALL, { count: found.length }),
+          text: texts.fill(slackTexts.HOME_SHOW_ALL, { count: found.length }),
         },
         value: channelId,
       };
@@ -675,7 +678,7 @@ export function homeView(
   // Said only when a session is left out: channels with none can fall off the end unsaid.
   let wantedCards = 0;
   for (const cards of wanted.values()) wantedCards += cards.length;
-  if (shown < wantedCards) blocks.push(context(texts.fill(texts.HOME_MORE, { rows: shown })));
+  if (shown < wantedCards) blocks.push(context(texts.fill(slackTexts.HOME_MORE, { rows: shown })));
   return { type: "home", blocks };
 }
 
@@ -1065,7 +1068,7 @@ export class Home {
         threadTs,
         title:
           titles.get(sessionId) ||
-          texts.fill(texts.HOME_UNTITLED, { id: take(sessionId, ID_SHOWN) }),
+          texts.fill(slackTexts.HOME_UNTITLED, { id: take(sessionId, ID_SHOWN) }),
         // ❌ over a kept ⏳ or ✋ (an answer that never reached Slack) shows ❌. A thread that
         // ended before the daemon kept its reaction shows the root's.
         status: thread.ended || thread.status || facts.reaction,

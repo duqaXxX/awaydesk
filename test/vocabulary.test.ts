@@ -57,9 +57,7 @@ test("the scan finds a word in an identifier and in a string, and not in a comme
   assert.deepEqual(named('const url = "https://example.test"; // claude'), []);
 });
 
-test("no source file outside the two modules and the registry names an agent or a chat", {
-  skip: "stage 3 enables it, once every flow and every text has moved",
-}, () => {
+test("no source file outside the two modules and the registry names an agent or a chat", () => {
   const found: string[] = [];
   for (const path of sources(SRC)) {
     const file = relative(SRC, path).split(sep).join("/");

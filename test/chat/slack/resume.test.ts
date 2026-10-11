@@ -12,6 +12,7 @@ import {
   resumeBlocks,
   resumeValue,
 } from "../../../src/chat/slack/resume.ts";
+import * as slackTexts from "../../../src/chat/slack/texts.ts";
 import * as texts from "../../../src/core/texts.ts";
 
 // A Slack block read in a test, whatever its type.
@@ -69,25 +70,28 @@ test("each session is a row with the picker s columns and a button", () => {
   assert.equal(button.action_id, "session_resume");
   // The list is a top-level post: the button names the thread the session is resumed into.
   assert.equal(button.value, `68da9311-0000-4000-8000-000000000001@${THREAD}`);
-  assert.equal(button.text.text, texts.RESUME_BUTTON);
+  assert.equal(button.text.text, slackTexts.RESUME_BUTTON);
 });
 
 test("sessions open in a thread are counted under the list", () => {
   const sessions = [info("68da9311-0000-4000-8000-000000000001", "Now", 0.1)];
   const blocks = blocksOf(DIRECTORY, sessions, 3, NOW, THREAD);
   assert.equal(rows(blocks).length, 1); // the rows are the sessions that can be resumed
-  assert.equal(blocks.at(-1)?.elements[0].text, texts.fill(texts.RESUME_OPEN_MANY, { count: 3 }));
+  assert.equal(
+    blocks.at(-1)?.elements[0].text,
+    texts.fill(slackTexts.RESUME_OPEN_MANY, { count: 3 }),
+  );
   const one = blocksOf(DIRECTORY, sessions, 1, NOW, THREAD);
-  assert.equal(one.at(-1)?.elements[0].text, texts.RESUME_OPEN_ONE);
+  assert.equal(one.at(-1)?.elements[0].text, slackTexts.RESUME_OPEN_ONE);
 });
 
 test("a folder whose sessions are all open says there is none to resume", () => {
   const [first, second] = blocksOf(DIRECTORY, [], 2, NOW, THREAD) as [Json, Json];
   assert.equal(
     first.elements[0].text,
-    texts.fill(texts.RESUME_NONE_LEFT, { directory: "/srv/dev/app" }),
+    texts.fill(slackTexts.RESUME_NONE_LEFT, { directory: "/srv/dev/app" }),
   );
-  assert.equal(second.elements[0].text, texts.fill(texts.RESUME_OPEN_MANY, { count: 2 }));
+  assert.equal(second.elements[0].text, texts.fill(slackTexts.RESUME_OPEN_MANY, { count: 2 }));
 });
 
 test("a free row carries no link", () => {
@@ -120,10 +124,12 @@ test("only the newest sessions are listed", () => {
   assert.ok(first?.[0].endsWith("000000000000"));
   assert.equal(
     blocks.at(-1)?.elements[0].text,
-    texts.fill(texts.RESUME_MORE, { rows: RESUME_ROWS }),
+    texts.fill(slackTexts.RESUME_MORE, { rows: RESUME_ROWS }),
   );
   // An untitled session has no title to type: `!resume <id>` reaches it when its id is known.
-  assert.ok(texts.RESUME_MORE.includes("!resume <id>") && texts.RESUME_MORE.includes("<title>"));
+  assert.ok(
+    slackTexts.RESUME_MORE.includes("!resume <id>") && slackTexts.RESUME_MORE.includes("<title>"),
+  );
 });
 
 test("no more line when every session fits", () => {
@@ -145,7 +151,7 @@ test("no session yet says so", () => {
   const blocks = blocksOf(DIRECTORY, [], 0, NOW, THREAD);
   assert.equal(
     blocks[0]?.elements[0].text,
-    texts.fill(texts.RESUME_EMPTY, { directory: "/srv/dev/app" }),
+    texts.fill(slackTexts.RESUME_EMPTY, { directory: "/srv/dev/app" }),
   );
   assert.deepEqual(rows(blocks), []);
 });

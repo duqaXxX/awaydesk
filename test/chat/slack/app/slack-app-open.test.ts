@@ -35,6 +35,7 @@ import {
   Target,
 } from "../../../../src/chat/slack/openfile/modal.ts";
 import { regularFiles } from "../../../../src/chat/slack/openfile/read.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import * as texts from "../../../../src/core/texts.ts";
 import { fill, named } from "../../../../src/core/texts.ts";
 import {
@@ -275,7 +276,7 @@ test("a session that changed nothing gets the line that says to type", GIT_LAYOU
   await world.dispatch(chooseClick());
   await world.settle();
   assert.deepEqual(modal.rows(), []);
-  assert.deepEqual(modal.labels(), [texts.OPEN_TYPE_A_NAME]);
+  assert.deepEqual(modal.labels(), [slackTexts.OPEN_TYPE_A_NAME]);
 });
 
 test(
@@ -326,7 +327,7 @@ test("a folder that is not a repository has no changed files", async (t) => {
   await world.dispatch(chooseClick());
   await world.settle();
   assert.ok(modal.rows().length === 0);
-  assert.deepEqual(modal.labels(), [texts.OPEN_TYPE_A_NAME]);
+  assert.deepEqual(modal.labels(), [slackTexts.OPEN_TYPE_A_NAME]);
 });
 
 test("the repositories of a folder are looked up once for a short while", GIT_LAYOUT, async (t) => {
@@ -419,7 +420,7 @@ test("more than ten matches list ten and say so", GIT_LAYOUT, async (t) => {
   assert.equal(modal.rows().length, 10);
   assert.deepEqual(modal.labels(), [
     "130 files match",
-    fill(texts.OPEN_MATCHES_CAPPED, { shown: 10, count: 130 }),
+    fill(slackTexts.OPEN_MATCHES_CAPPED, { shown: 10, count: 130 }),
   ]);
 });
 
@@ -436,7 +437,7 @@ test("a listing that comes late fills the modal after it opens", GIT_LAYOUT, asy
   await world.dispatch(chooseClick("parser"));
   await world.appClock.advance(OPEN_WAIT);
   await world.idle();
-  assert.deepEqual(modal.labels(), [texts.OPEN_LOADING]);
+  assert.deepEqual(modal.labels(), [slackTexts.OPEN_LOADING]);
   assert.equal(modal.written.length, 0);
   assert.equal(modal.view.blocks[0].element.initial_value, "parser");
   release.set();
@@ -496,7 +497,7 @@ test("the files are listed while the channel is checked", GIT_LAYOUT, async (t) 
   await world.settle();
   assert.deepEqual(modal.rows(), []); // nothing changed in this session
   const asked = only(calls(world, "views.open"));
-  assert.deepEqual(modal.labels(), [texts.OPEN_TYPE_A_NAME]);
+  assert.deepEqual(modal.labels(), [slackTexts.OPEN_TYPE_A_NAME]);
   assert.ok(asked.trigger_id);
 });
 
@@ -547,7 +548,7 @@ test("a form that cannot open tells the owner of the picker", GIT_LAYOUT, async 
   await world.dispatch(chooseClick());
   await world.settle();
   assert.deepEqual(world.ephemerals(), [
-    fill(texts.OPEN_FORM_NOT_OPENED, { error: "expired_trigger_id" }),
+    fill(slackTexts.OPEN_FORM_NOT_OPENED, { error: "expired_trigger_id" }),
   ]);
 });
 
@@ -590,7 +591,7 @@ test("the button in a refused channel opens nothing", GIT_LAYOUT, async (t) => {
   await world.dispatch(chooseClick());
   assert.deepEqual(calls(world, "views.open"), []);
   assert.deepEqual(world.ephemerals(), [
-    fill(texts.CHANNEL_REFUSED, { reason: texts.REASON_MEMBERS }),
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
   ]);
 });
 
@@ -684,7 +685,7 @@ test("typing checks the disk only until the rows are full", GIT_LAYOUT, async (t
   // The count is the matches by name once ten files are there to show.
   assert.deepEqual(modal.labels(), [
     "300 files match",
-    fill(texts.OPEN_MATCHES_CAPPED, { shown: 10, count: 300 }),
+    fill(slackTexts.OPEN_MATCHES_CAPPED, { shown: 10, count: 300 }),
   ]);
 });
 
@@ -975,7 +976,7 @@ test(
     );
     assert.deepEqual(response.body, {
       response_action: "errors",
-      errors: { [rowsBlock]: texts.OPEN_NONE_CHOSEN },
+      errors: { [rowsBlock]: slackTexts.OPEN_NONE_CHOSEN },
     });
     assert.deepEqual(opened(world), []);
     // The answer is the first thing sent, and nothing is sent after it.
@@ -994,7 +995,7 @@ test(
     const response = await world.dispatch(submitted(null, { blocks }));
     assert.deepEqual(response.body, {
       response_action: "errors",
-      errors: { [QUERY_BLOCK]: texts.OPEN_NONE_CHOSEN },
+      errors: { [QUERY_BLOCK]: slackTexts.OPEN_NONE_CHOSEN },
     });
     assert.deepEqual(opened(world), []);
   },
@@ -1020,7 +1021,7 @@ test("a row chosen before the rows changed is never opened", GIT_LAYOUT, async (
     const response = await world.dispatch(submitted("old.py", { rows: now, under }));
     assert.deepEqual(response.body, {
       response_action: "errors",
-      errors: { [nowId]: texts.OPEN_NONE_CHOSEN },
+      errors: { [nowId]: slackTexts.OPEN_NONE_CHOSEN },
     });
     assert.ok(opened(world).length === 0 && world.slack.apiCalls.length === before);
   }
@@ -1073,7 +1074,7 @@ test("open in a refused channel shares nothing", GIT_LAYOUT, async (t) => {
   await world.dispatch(submitted("a.py"));
   assert.deepEqual(opened(world), []);
   assert.deepEqual(world.ephemerals(), [
-    fill(texts.CHANNEL_REFUSED, { reason: texts.REASON_MEMBERS }),
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
   ]);
 });
 
@@ -1095,7 +1096,7 @@ for (const value of ["../outside.txt", "link.txt", "dir-link/secret.txt", "/etc/
     mkdirSync(join(project, "docs"));
     await world.dispatch(submitted(value));
     assert.ok(opened(world).length === 0 && world.slack.uploaded.length === 0);
-    assert.deepEqual(world.ephemerals(), [fill(texts.OPEN_NOT_A_FILE, { path: value })]);
+    assert.deepEqual(world.ephemerals(), [fill(slackTexts.OPEN_NOT_A_FILE, { path: value })]);
   });
 }
 
@@ -1182,7 +1183,7 @@ test(
     const project = projectOf(world);
     await inAThread(world);
     await askedOpen(world, "!open zzz");
-    assert.deepEqual(world.ephemerals(), [fill(texts.OPEN_NO_MATCH, { words: "zzz" })]);
+    assert.deepEqual(world.ephemerals(), [fill(slackTexts.OPEN_NO_MATCH, { words: "zzz" })]);
     put(project, "src/zzz-made-since.py");
     await askedOpen(world, "!open zzz");
     const done = only(opened(world));
@@ -1211,7 +1212,7 @@ test("a name that matches nothing in a listing that was cut says so", async (t) 
   await askedOpen(world, "!open nothing-like-it");
   assert.deepEqual(opened(world), []);
   assert.deepEqual(world.ephemerals(), [
-    fill(texts.OPEN_NO_MATCH_PARTIAL, { words: "nothing-like-it" }),
+    fill(slackTexts.OPEN_NO_MATCH_PARTIAL, { words: "nothing-like-it" }),
   ]);
 });
 
@@ -1223,8 +1224,8 @@ test("the only match of a listing that was cut is not opened on its own", async 
   assert.deepEqual(opened(world), []);
   const post = only(pickerPosts(world));
   const [section, actions, context] = post.blocks as [Body, Body, Body];
-  assert.equal(section.text.text, fill(texts.OPEN_MATCHES_ONE, { words: "one" }));
-  assert.equal(context.elements[0].text, texts.OPEN_PARTIAL);
+  assert.equal(section.text.text, fill(slackTexts.OPEN_MATCHES_ONE, { words: "one" }));
+  assert.equal(context.elements[0].text, slackTexts.OPEN_PARTIAL);
   assert.equal(actions.elements[0].value, "one");
 });
 
@@ -1235,11 +1236,11 @@ test("a listing that was cut is said in the modal too", async (t) => {
   put(join(world.root, "app"), "a/one.py");
   await world.dispatch(typing("zzz", 1790000100.0));
   await world.settle();
-  assert.deepEqual(modal.labels(), ["0 files match", texts.OPEN_PARTIAL]);
+  assert.deepEqual(modal.labels(), ["0 files match", slackTexts.OPEN_PARTIAL]);
   await world.dispatch(typing("one", 1790000101.0));
   await world.settle();
   assert.deepEqual(modal.rows(), ["a/one.py"]);
-  assert.deepEqual(modal.labels(), ["1 file matches", texts.OPEN_PARTIAL]);
+  assert.deepEqual(modal.labels(), ["1 file matches", slackTexts.OPEN_PARTIAL]);
 });
 
 test("a name that matches nothing says so", GIT_LAYOUT, async (t) => {
@@ -1248,7 +1249,9 @@ test("a name that matches nothing says so", GIT_LAYOUT, async (t) => {
   await inAThread(world);
   await askedOpen(world, "!open nothing-like-it");
   assert.deepEqual(opened(world), []);
-  assert.deepEqual(world.ephemerals(), [fill(texts.OPEN_NO_MATCH, { words: "nothing-like-it" })]);
+  assert.deepEqual(world.ephemerals(), [
+    fill(slackTexts.OPEN_NO_MATCH, { words: "nothing-like-it" }),
+  ]);
 });
 
 test("a file over one megabyte is refused", GIT_LAYOUT, async (t) => {
@@ -1259,7 +1262,7 @@ test("a file over one megabyte is refused", GIT_LAYOUT, async (t) => {
   await askedOpen(world, "!open big.log");
   assert.deepEqual(calls(world, "files.getUploadURLExternal"), []);
   assert.deepEqual(world.ephemerals(), [
-    fill(named(texts.OPEN_TOO_LARGE, NAMES), { path: "big.log" }),
+    fill(named(slackTexts.OPEN_TOO_LARGE, NAMES), { path: "big.log" }),
   ]);
 });
 
@@ -1271,13 +1274,13 @@ test("an empty file is refused before anything is uploaded", GIT_LAYOUT, async (
   await askedOpen(world, "!open empty.txt");
   assert.deepEqual(calls(world, "files.getUploadURLExternal"), []);
   assert.deepEqual(world.slack.uploaded, []);
-  assert.deepEqual(world.ephemerals(), [fill(texts.OPEN_EMPTY, { path: "empty.txt" })]);
+  assert.deepEqual(world.ephemerals(), [fill(slackTexts.OPEN_EMPTY, { path: "empty.txt" })]);
   // Chosen in the modal it is the same file, with the same answer.
   await world.dispatch(submitted("empty.txt"));
   assert.deepEqual(world.slack.uploaded, []);
   assert.deepEqual(
     world.ephemerals(),
-    Array(2).fill(fill(texts.OPEN_EMPTY, { path: "empty.txt" })),
+    Array(2).fill(fill(slackTexts.OPEN_EMPTY, { path: "empty.txt" })),
   );
 });
 
@@ -1288,9 +1291,9 @@ test("without the files write scope the owner is told what to do", GIT_LAYOUT, a
   put(project, "a.md");
   world.slack.responses["files.getUploadURLExternal"] = { ok: false, error: "missing_scope" };
   await askedOpen(world, "!open a.md");
-  assert.deepEqual(world.ephemerals(), [texts.OPEN_NO_SCOPE]);
-  assert.ok(texts.OPEN_NO_SCOPE.includes("files:write"));
-  assert.ok(texts.OPEN_NO_SCOPE.includes("slack-app-manifest.json"));
+  assert.deepEqual(world.ephemerals(), [slackTexts.OPEN_NO_SCOPE]);
+  assert.ok(slackTexts.OPEN_NO_SCOPE.includes("files:write"));
+  assert.ok(slackTexts.OPEN_NO_SCOPE.includes("slack-app-manifest.json"));
 });
 
 test("another slack failure names its code and no file content", GIT_LAYOUT, async (t) => {
@@ -1301,7 +1304,7 @@ test("another slack failure names its code and no file content", GIT_LAYOUT, asy
   world.slack.responses["files.completeUploadExternal"] = { ok: false, error: "ratelimited" };
   await askedOpen(world, "!open a.md");
   assert.deepEqual(world.ephemerals(), [
-    fill(texts.OPEN_FAILED, { path: "a.md", error: "ratelimited" }),
+    fill(slackTexts.OPEN_FAILED, { path: "a.md", error: "ratelimited" }),
   ]);
 });
 

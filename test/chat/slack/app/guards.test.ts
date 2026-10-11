@@ -9,7 +9,7 @@ import {
   messageActor,
   type Payload,
 } from "../../../../src/chat/slack/app/guards.ts";
-import * as texts from "../../../../src/core/texts.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import {
   BOT,
   CHANNEL,
@@ -94,12 +94,12 @@ test("private channel with owner and bot is allowed", async () => {
 });
 
 const FLAG_CASES: Array<[string, Payload, string]> = [
-  ["is_private false", { is_private: false }, texts.REASON_NOT_PRIVATE],
-  ["is_ext_shared", { is_ext_shared: true }, texts.REASON_SHARED],
-  ["is_shared", { is_shared: true }, texts.REASON_SHARED],
-  ["is_org_shared", { is_org_shared: true }, texts.REASON_SHARED],
-  ["is_mpim", { is_mpim: true }, texts.REASON_NOT_PRIVATE],
-  ["is_im", { is_im: true }, texts.REASON_NOT_PRIVATE],
+  ["is_private false", { is_private: false }, slackTexts.REASON_NOT_PRIVATE],
+  ["is_ext_shared", { is_ext_shared: true }, slackTexts.REASON_SHARED],
+  ["is_shared", { is_shared: true }, slackTexts.REASON_SHARED],
+  ["is_org_shared", { is_org_shared: true }, slackTexts.REASON_SHARED],
+  ["is_mpim", { is_mpim: true }, slackTexts.REASON_NOT_PRIVATE],
+  ["is_im", { is_im: true }, slackTexts.REASON_NOT_PRIVATE],
 ];
 
 for (const [label, flags, reason] of FLAG_CASES) {
@@ -113,13 +113,13 @@ for (const [label, flags, reason] of FLAG_CASES) {
 test("a third member is refused", async () => {
   const slack = new FakeSlack();
   slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
-  assert.equal(await new ChannelGuard(slack, IDENTITY).refusal(CHANNEL), texts.REASON_MEMBERS);
+  assert.equal(await new ChannelGuard(slack, IDENTITY).refusal(CHANNEL), slackTexts.REASON_MEMBERS);
 });
 
 test("a missing owner is refused", async () => {
   const slack = new FakeSlack();
   slack.responses["conversations.members"] = { ok: true, members: [BOT] };
-  assert.equal(await new ChannelGuard(slack, IDENTITY).refusal(CHANNEL), texts.REASON_MEMBERS);
+  assert.equal(await new ChannelGuard(slack, IDENTITY).refusal(CHANNEL), slackTexts.REASON_MEMBERS);
 });
 
 test("a paginated member list is refused", async () => {
@@ -129,7 +129,7 @@ test("a paginated member list is refused", async () => {
     members: [OWNER, BOT],
     response_metadata: { next_cursor: "abc" },
   };
-  assert.equal(await new ChannelGuard(slack, IDENTITY).refusal(CHANNEL), texts.REASON_MEMBERS);
+  assert.equal(await new ChannelGuard(slack, IDENTITY).refusal(CHANNEL), slackTexts.REASON_MEMBERS);
 });
 
 /** A logger that keeps its lines, so the log stays out of the test output. */
@@ -144,7 +144,7 @@ test("an unreadable channel is refused", async () => {
   const log = kept();
   assert.equal(
     await new ChannelGuard(slack, IDENTITY, log).refusal(CHANNEL),
-    texts.REASON_UNREADABLE,
+    slackTexts.REASON_UNREADABLE,
   );
   // The log names Slack's error code and the channel, nothing else.
   assert.deepEqual(log.lines, [`could not read channel ${CHANNEL}: channel_not_found`]);
@@ -155,7 +155,7 @@ test("the guard asks slack every time", async () => {
   const guard = new ChannelGuard(slack, IDENTITY);
   await guard.refusal(CHANNEL);
   slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
-  assert.equal(await guard.refusal(CHANNEL), texts.REASON_MEMBERS);
+  assert.equal(await guard.refusal(CHANNEL), slackTexts.REASON_MEMBERS);
 });
 
 test("a network failure reading the channel is a refusal", async () => {
@@ -164,7 +164,7 @@ test("a network failure reading the channel is a refusal", async () => {
   const log = kept();
   assert.equal(
     await new ChannelGuard(slack, IDENTITY, log).refusal(CHANNEL),
-    texts.REASON_UNREADABLE,
+    slackTexts.REASON_UNREADABLE,
   );
   // Named as every other line of the log names a call that never reached Slack: by its cause.
   assert.deepEqual(log.lines, [`could not read channel ${CHANNEL}: ENETUNREACH`]);
@@ -427,7 +427,7 @@ for (const [value, raw, truthy] of FLAG_VALUES) {
     test(`a channel flag is read by Python truthiness [${flag} ${value}]`, async () => {
       const slack = new FakeSlack();
       slack.responses["conversations.info"] = channelInfo({ [flag]: raw });
-      const expected = truthy ? texts.REASON_NOT_PRIVATE : null;
+      const expected = truthy ? slackTexts.REASON_NOT_PRIVATE : null;
       assert.equal(await new ChannelGuard(slack, IDENTITY).refusal(CHANNEL), expected);
     });
   }
@@ -435,7 +435,7 @@ for (const [value, raw, truthy] of FLAG_VALUES) {
   test(`a channel flag is read by Python truthiness [is_private ${value}]`, async () => {
     const slack = new FakeSlack();
     slack.responses["conversations.info"] = channelInfo({ is_private: raw });
-    const expected = truthy ? null : texts.REASON_NOT_PRIVATE;
+    const expected = truthy ? null : slackTexts.REASON_NOT_PRIVATE;
     assert.equal(await new ChannelGuard(slack, IDENTITY).refusal(CHANNEL), expected);
   });
 
@@ -443,7 +443,7 @@ for (const [value, raw, truthy] of FLAG_VALUES) {
     test(`a channel flag is read by Python truthiness [${flag} ${value}]`, async () => {
       const slack = new FakeSlack();
       slack.responses["conversations.info"] = channelInfo({ [flag]: raw });
-      const expected = truthy ? texts.REASON_SHARED : null;
+      const expected = truthy ? slackTexts.REASON_SHARED : null;
       assert.equal(await new ChannelGuard(slack, IDENTITY).refusal(CHANNEL), expected);
     });
   }
@@ -455,7 +455,7 @@ for (const [value, raw, truthy] of FLAG_VALUES) {
       members: [OWNER, BOT],
       response_metadata: { next_cursor: raw as JsonObject[string] },
     };
-    const expected = truthy ? texts.REASON_MEMBERS : null;
+    const expected = truthy ? slackTexts.REASON_MEMBERS : null;
     assert.equal(await new ChannelGuard(slack, IDENTITY).refusal(CHANNEL), expected);
   });
 }

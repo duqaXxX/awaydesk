@@ -111,4 +111,4 @@ export type { Choice, Summary } from "./setup.ts";
 export { choiceOf, DEFAULT, DEFAULT_CHOICE, effortLevels, summaryOf } from "./setup.ts";
 export type { Names } from "./texts.ts";
 export * as texts from "./texts.ts";
-export { fill, NESTED, named } from "./texts.ts";
+export { fill, Named, NESTED, named } from "./texts.ts";

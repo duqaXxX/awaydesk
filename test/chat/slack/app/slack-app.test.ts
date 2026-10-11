@@ -36,6 +36,7 @@ import {
   newDraft,
   SECTION_LIMIT,
 } from "../../../../src/chat/slack/requests.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import { STOP_TAIL_WAIT } from "../../../../src/core/sessions/constants.ts";
 import type { ThreadSession } from "../../../../src/core/sessions/session.ts";
 import * as texts from "../../../../src/core/texts.ts";
@@ -252,7 +253,7 @@ test("a refused channel tells only the owner", async (t) => {
   await world.dispatch(message());
   assert.deepEqual(world.queries(), []);
   assert.deepEqual(world.ephemerals(), [
-    fill(texts.CHANNEL_REFUSED, { reason: texts.REASON_MEMBERS }),
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
   ]);
   const refusals = world.slack.callsTo("chat.postEphemeral") as Body[];
   assert.equal(refusals.length, 1);
@@ -392,7 +393,7 @@ test("a daemon word in a dead thread acts as top level", async (t) => {
   assert.ok(!("thread_ts" in post)); // answered in the channel, like a top-level `!bind`
   const blocks = post.blocks as Body[];
   const rows: string[] = blocks.filter((b) => b.type === "section").map((b) => b.text.text);
-  assert.ok(rows.some((row) => row.startsWith("`app`") && row.includes(texts.BIND_CURRENT)));
+  assert.ok(rows.some((row) => row.startsWith("`app`") && row.includes(slackTexts.BIND_CURRENT)));
   const values = blocks.filter((b) => "accessory" in b).map((b) => b.accessory.value);
   assert.deepEqual(values, ["."]); // the current folder ("app") shows with no button
 });
@@ -1002,7 +1003,7 @@ test("submit with the open question unanswered shows an error", async (t) => {
   const response = await world.dispatch(formBody("view_submission", draft, {}));
   assert.deepEqual(response.body, {
     response_action: "errors",
-    errors: { q0: texts.QUESTION_MISSING },
+    errors: { q0: slackTexts.QUESTION_MISSING },
   });
   assert.ok(!pending.decided);
 });
@@ -1080,7 +1081,7 @@ test("a form that cannot open tells the owner", async (t) => {
   body.trigger_id = "0000000000.0000000000.fake";
   await world.dispatch(body);
   assert.deepEqual(world.ephemerals(), [
-    fill(texts.QUESTION_NOT_OPENED, { error: "expired_trigger_id" }),
+    fill(slackTexts.QUESTION_NOT_OPENED, { error: "expired_trigger_id" }),
   ]);
 });
 
@@ -1292,7 +1293,7 @@ test("the list counts a session held elsewhere and gives it no row", async (t) =
   const blocks = (world.slack.callsTo("chat.postMessage").at(-1) as Body).blocks as Body[];
   const rows = blocks.filter((b) => b.block_id).map((b) => b.block_id);
   assert.deepEqual(rows, [`session-${SESSION_A}`]); // the rows are the sessions that can be resumed
-  assert.equal(blocks.at(-1)?.elements[0].text, texts.RESUME_OPEN_ONE);
+  assert.equal(blocks.at(-1)?.elements[0].text, slackTexts.RESUME_OPEN_ONE);
   assert.deepEqual(world.slack.callsTo("chat.getPermalink"), []); // no row links to a thread
 });
 
@@ -1686,9 +1687,9 @@ test("a file reaches claude as a path to its saved copy", async (t) => {
 test("a refused file sends nothing and says why", async (t) => {
   const world = worldOf(t);
   await world.dispatch(sharedFile("image", { mimetype: "image/heic" }));
-  const reason = fill(namedText(texts.UPLOAD_IMAGE_TYPE, NAMES), { mimetype: "image/heic" });
+  const reason = fill(namedText(slackTexts.UPLOAD_IMAGE_TYPE, NAMES), { mimetype: "image/heic" });
   assert.deepEqual(world.ephemerals(), [
-    fill(namedText(texts.UPLOAD_FAILED, NAMES), { name: "photo.png", reason }),
+    fill(namedText(slackTexts.UPLOAD_FAILED, NAMES), { name: "photo.png", reason }),
   ]);
   assert.deepEqual(world.queries(), []);
 });
@@ -1698,9 +1699,9 @@ test("a failed download sends nothing and says why", async (t) => {
   const body = sharedFile("image");
   world.downloads.set(body.event.files[0].url_private_download, new DownloadFailed("HTTP 404"));
   await world.dispatch(body);
-  const reason = fill(texts.UPLOAD_DOWNLOAD, { error: "HTTP 404" });
+  const reason = fill(slackTexts.UPLOAD_DOWNLOAD, { error: "HTTP 404" });
   assert.deepEqual(world.ephemerals(), [
-    fill(namedText(texts.UPLOAD_FAILED, NAMES), { name: "photo.png", reason }),
+    fill(namedText(slackTexts.UPLOAD_FAILED, NAMES), { name: "photo.png", reason }),
   ]);
   assert.deepEqual(world.queries(), []);
 });
@@ -1730,9 +1731,9 @@ test("a file on another host is never downloaded", async (t) => {
   await world.dispatch(sharedFile("image", { url_private_download: "https://evil.example/x.png" }));
   assert.deepEqual(world.fetched, []);
   assert.deepEqual(world.ephemerals(), [
-    fill(namedText(texts.UPLOAD_FAILED, NAMES), {
+    fill(namedText(slackTexts.UPLOAD_FAILED, NAMES), {
       name: "photo.png",
-      reason: texts.UPLOAD_NOT_SHARED,
+      reason: slackTexts.UPLOAD_NOT_SHARED,
     }),
   ]);
 });
@@ -1795,7 +1796,7 @@ test("too many images send nothing and download nothing", async (t) => {
   assert.deepEqual(world.fetched, []);
   assert.deepEqual(world.queries(), []);
   assert.deepEqual(world.ephemerals(), [
-    fill(namedText(texts.UPLOAD_TOO_MANY, NAMES), { count: 6, limit: 5 }),
+    fill(namedText(slackTexts.UPLOAD_TOO_MANY, NAMES), { count: 6, limit: 5 }),
   ]);
 });
 

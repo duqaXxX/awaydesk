@@ -33,7 +33,7 @@ import {
   SETUP_MODEL,
   SETUP_START,
 } from "../../../../src/chat/slack/setup.ts";
-import * as texts from "../../../../src/core/texts.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import { fill, named } from "../../../../src/core/texts.ts";
 import { BOT, CHANNEL, OTHER_TEAM, OWNER, STRANGER, THREAD } from "../../../support/fake-slack.ts";
 import { NAMES } from "../../../support/names.ts";
@@ -407,7 +407,7 @@ test("view question_form: the form of a channel the guard refuses resolves nothi
   assert.equal(pending.decided, false);
   assert.equal(
     world.ephemerals().at(-1),
-    fill(texts.CHANNEL_REFUSED, { reason: texts.REASON_MEMBERS }),
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
   );
 });
 
@@ -423,7 +423,7 @@ test("event file_change: a clip whose channel the guard now refuses is never sen
   assert.deepEqual(world.clients, []);
   assert.equal(
     world.ephemerals().at(-1),
-    fill(texts.CHANNEL_REFUSED, { reason: texts.REASON_MEMBERS }),
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
   );
 });
 
@@ -451,7 +451,7 @@ for (const [who, fields] of [
     await world.settle();
     assert.deepEqual(world.queries(), []);
     assert.deepEqual(world.clients, []);
-    assert.equal(world.ephemerals().at(-1), named(texts.CLIP_NOT_YOURS, NAMES));
+    assert.equal(world.ephemerals().at(-1), named(slackTexts.CLIP_NOT_YOURS, NAMES));
   });
 }
 

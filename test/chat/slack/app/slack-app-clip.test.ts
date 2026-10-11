@@ -12,6 +12,7 @@ import { logger } from "../../../../src/chat/slack/app/app.ts";
 import { DownloadFailed } from "../../../../src/chat/slack/attachments.ts";
 import { HOLD_CONTINUE } from "../../../../src/chat/slack/hold.ts";
 import { SETUP_MODEL, SETUP_START } from "../../../../src/chat/slack/setup.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import * as voice from "../../../../src/chat/slack/voice.ts";
 import * as texts from "../../../../src/core/texts.ts";
 import { fill, named } from "../../../../src/core/texts.ts";
@@ -173,7 +174,7 @@ test("a clip waits for its transcript and is sent when slack has it", async (t) 
   const world = worldOf(t);
   await world.dispatch(clipMessage(false));
   assert.deepEqual(world.queries(), []);
-  assert.deepEqual(ownerWasTold(world), [named(texts.CLIP_WAITING, NAMES)]);
+  assert.deepEqual(ownerWasTold(world), [named(slackTexts.CLIP_WAITING, NAMES)]);
   // Slack sends the event while it still writes the transcript, then again when it is done.
   clipInfo(world, { transcription: { status: "processing" } });
   await world.dispatch(recorded("event_callback-file_change"));
@@ -202,8 +203,8 @@ for (const [index, other] of [{ user: STRANGER }, { user_team: OTHER_TEAM }].ent
     await world.dispatch(recorded("event_callback-file_change"));
     assert.deepEqual(world.queries(), []);
     assert.deepEqual(ownerWasTold(world), [
-      named(texts.CLIP_WAITING, NAMES),
-      named(texts.CLIP_NOT_YOURS, NAMES),
+      named(slackTexts.CLIP_WAITING, NAMES),
+      named(slackTexts.CLIP_NOT_YOURS, NAMES),
     ]);
   });
 }
@@ -212,7 +213,7 @@ test("a file somebody else uploaded is refused when it comes", async (t) => {
   const world = worldOf(t);
   await world.dispatch(clipMessage(true, { user: STRANGER }));
   assert.deepEqual(world.queries(), []);
-  assert.deepEqual(ownerWasTold(world), [named(texts.CLIP_NOT_YOURS, NAMES)]);
+  assert.deepEqual(ownerWasTold(world), [named(slackTexts.CLIP_NOT_YOURS, NAMES)]);
 });
 
 test("what slack heard is never a word of the daemon", async (t) => {
@@ -248,7 +249,7 @@ test("a clip where a message would be refused does not wait", async (t) => {
 
 test("the same clip sent again waits once", async (t) => {
   const world = worldOf(t);
-  const notSent = fill(named(texts.CLIP_NOT_SENT, NAMES), {
+  const notSent = fill(named(slackTexts.CLIP_NOT_SENT, NAMES), {
     minutes: Math.round(voice.WAIT_SECONDS / 60),
   });
   await world.dispatch(clipMessage(false));
@@ -262,7 +263,7 @@ test("the same clip sent again waits once", async (t) => {
 });
 
 test("the owner is told the real wait", () => {
-  const told = fill(named(texts.CLIP_NOT_SENT, NAMES), {
+  const told = fill(named(slackTexts.CLIP_NOT_SENT, NAMES), {
     minutes: Math.round(voice.WAIT_SECONDS / 60),
   });
   assert.ok(told.includes("after 5 minutes"));
@@ -298,9 +299,9 @@ test("a transcript that cannot be read or is empty sends nothing", async (t) => 
   await world.dispatch(clipMessage(true, { transcription: { status: "complete" } }));
   assert.deepEqual(world.queries(), []);
   assert.deepEqual(ownerWasTold(world), [
-    named(texts.CLIP_WAITING, NAMES),
-    fill(named(texts.CLIP_UNREADABLE, NAMES), { reason: "HTTP 404" }),
-    named(texts.CLIP_EMPTY, NAMES),
+    named(slackTexts.CLIP_WAITING, NAMES),
+    fill(named(slackTexts.CLIP_UNREADABLE, NAMES), { reason: "HTTP 404" }),
+    named(slackTexts.CLIP_EMPTY, NAMES),
   ]);
 });
 
@@ -309,8 +310,8 @@ test("a clip with no transcript in time is given up", async (t) => {
   await world.dispatch(clipMessage(false));
   await world.appClock.advance(voice.WAIT_SECONDS);
   assert.deepEqual(ownerWasTold(world), [
-    named(texts.CLIP_WAITING, NAMES),
-    fill(named(texts.CLIP_NOT_SENT, NAMES), { minutes: Math.round(voice.WAIT_SECONDS / 60) }),
+    named(slackTexts.CLIP_WAITING, NAMES),
+    fill(named(slackTexts.CLIP_NOT_SENT, NAMES), { minutes: Math.round(voice.WAIT_SECONDS / 60) }),
   ]);
   clipInfo(world);
   await world.dispatch(recorded("event_callback-file_change"));
