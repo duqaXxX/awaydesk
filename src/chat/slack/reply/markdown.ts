@@ -189,8 +189,23 @@ export function bannerText(paragraph: string, options: { limit?: number } = {}):
   return out.join("");
 }
 
-const LABELLED = /<[^|>]*\|([^>]*)>/g;
+// A `<` with what follows it up to the next `|` or `>`, and the label when a `|...>` comes
+// next. The stretch with no label is matched too, so that the search goes on after it: no `<`
+// inside it opens a link either, since it would stop at the same `|` or `>`.
+const LABELLED = /<[^|>]*(?:\|([^>]*)>)?/g;
 const WORDS = new RegExp(`${WORD}+`, "gu");
+
+/**
+ * `text` with each `<target|label>` replaced by its label: what `/<[^|>]*\|([^>]*)>/g` and
+ * `"$1"` give, in a time linear in the text (issue #241: that pattern starts again at every `<`
+ * of a run, and reads to the end each time). A link ends at a `>`, so the text after the last
+ * one is left unread, and every `|` in what is read has a `>` after it.
+ */
+function labelsOnly(text: string): string {
+  const end = text.lastIndexOf(">") + 1;
+  const read = text.slice(0, end).replace(LABELLED, (whole, label?: string) => label ?? whole);
+  return read + text.slice(end);
+}
 
 /**
  * The words of a text with the markup, the punctuation and the spacing gone: what two
@@ -198,6 +213,6 @@ const WORDS = new RegExp(`${WORD}+`, "gu");
  * for `**b**`, `<url|label>` for a link, `•` for a bullet) have in common.
  */
 export function plainWords(text: string): string {
-  const words = stripMarkdown(text.replace(LABELLED, "$1")).match(WORDS) ?? [];
+  const words = stripMarkdown(labelsOnly(text)).match(WORDS) ?? [];
   return words.join(" ").toLowerCase();
 }
