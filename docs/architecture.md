@@ -1325,19 +1325,20 @@ closed when the start returns (`ThreadSession.connect`).
   levels to offer when it lists none, whether a bypass mode is offered, and what the controls show
   at first. The Slack provider draws it as one message in the thread (`setup.setupBlocks`): a
   header (`texts.SETUP_HEADER`) and one `actions` block (block_id `setup`, one row that Slack wraps
-  on a narrow screen) holding the four controls. A Model select lists the
+  on a narrow screen) holding the controls the request offers. A Model select lists the
   CLI's own models (the models of `AgentSession.info`, kept as `ThreadSession.models` and stored
   with the pending setup, so a click reads its choice against the list the message was built from),
   each option showing the model's `displayName` and, under it, the CLI's own `description` (cut to
   Slack's 75 characters, left out when the entry has none); the select is left out when the agent
   lists no model. An Effort select offers `Effort: default` (which passes nothing) and
   `Effort: <level>` for the chosen model's `supportedEffortLevels`, or for the agent's own
-  `effortLevels` when it lists no model. A Bypass checkbox is shown only when the agent has a
-  bypass mode, and is ticked when the folder's own Claude Code settings start the process in
+  `effortLevels` when it lists no model (left out when the agent has none either). A Bypass
+  checkbox is shown only when the request offers a bypass mode, and is ticked when the folder's own Claude Code settings start the process in
   bypassPermissions, so unticking is an explicit off, with `!bypass off`'s semantics. Start carries the setup id. `state.values` is keyed
   by that block_id, then by each control's action_id (`setup.readSelection`). Changing the model
   rewrites the message (`chat.update`, which never notifies, and is skipped once the setup is
-  decided) with the new model's levels. Start reads every control from the click's `state.values`
+  decided) with the new model's levels, drawn from what the request said (`SlackChat.drawnSetup`,
+  kept for the last 64 setups posted). Start reads every control from the click's `state.values`
   (`setup.readSelection`) into the selection of an `OwnerAnswer`, the core reads that against the
   models, efforts and bypass the request offered (`setup.chosen`), and `ThreadSession.applySetup` applies it, and Start is authoritative:
   effort and bypass are written from the choice whatever `state.json` held (a restart can have left

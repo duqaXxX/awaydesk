@@ -51,7 +51,7 @@ import type { Limiter } from "./reply/limiter.ts";
 import { ReplySink } from "./reply/sinks.ts";
 import { Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
 import { answeredBlocks, approvalBlocks, questionBlocks } from "./requests.ts";
-import { setupBlocks } from "./setup.ts";
+import { type SetupDraw, setupBlocks } from "./setup.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.thread");
 
@@ -181,6 +181,11 @@ export class SlackChat implements ChatProvider {
     return this.named;
   }
 
+  /** What the setup posted for `requestId` said to draw, or undefined when it is no longer kept. */
+  drawnSetup(requestId: string): SetupDraw | undefined {
+    return drawnSetups.get(this.options)?.get(requestId);
+  }
+
   thread(ref: ThreadRef): SlackThread {
     return new SlackThread(ref.channel, ref.thread, this.options, () => this.names(), this.stopped);
   }
@@ -282,6 +287,12 @@ export class SlackChat implements ChatProvider {
 // nothing.
 const WITHDRAWN_KEPT = 64;
 const withdrawn = new WeakMap<SlackChatOptions, Set<string>>();
+
+// What the setups posted lately said to draw, by request id, per provider. A click that only
+// redraws a setup (a model picked) draws the message again from this, since the hold it finds
+// keeps the model list alone.
+const SETUPS_KEPT = 64;
+const drawnSetups = new WeakMap<SlackChatOptions, Map<string, SetupDraw>>();
 
 export class SlackThread implements ThreadChat {
   private readonly channel: string;
@@ -403,7 +414,8 @@ export class SlackThread implements ThreadChat {
         blocks = holdBlocks(requestId, request.link);
         break;
       case "setup":
-        blocks = setupBlocks(requestId, request.models, request.selection);
+        this.noteSetup(requestId, request);
+        blocks = setupBlocks(requestId, request, request.selection);
         break;
     }
     let ts: unknown;
@@ -466,6 +478,18 @@ export class SlackThread implements ThreadChat {
         blocks: [contextBlock(noticeText(text))],
       });
     });
+  }
+
+  private noteSetup(requestId: string, request: SetupDraw): void {
+    const kept = drawnSetups.get(this.options) ?? new Map<string, SetupDraw>();
+    drawnSetups.set(this.options, kept);
+    const { models, efforts, bypassOffered } = request;
+    kept.set(requestId, { models, efforts, bypassOffered });
+    // Only a setup that is waiting right now can be redrawn: the oldest go.
+    for (const old of kept.keys()) {
+      if (kept.size <= SETUPS_KEPT) break;
+      kept.delete(old);
+    }
   }
 
   private noteWithdrawn(message: MessageId): void {

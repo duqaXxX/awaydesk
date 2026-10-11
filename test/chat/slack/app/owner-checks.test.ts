@@ -151,8 +151,23 @@ const CASES: readonly Case[] = [
     listener: `action ${SETUP_MODEL}`,
     arrange: async (world, sender) => {
       const [setupId] = world.holds.open(CHANNEL, CLICK_THREAD, []);
+      // Posted through the provider, which keeps what the setup said to draw for a redraw.
+      const shownAt = await world.chat.thread({ channel: CHANNEL, thread: CLICK_THREAD }).ask(
+        setupId,
+        {
+          type: "setup",
+          requestId: setupId,
+          models: [],
+          efforts: [],
+          bypassOffered: true,
+          selection: { model: "default", effort: "default", bypass: false },
+        },
+        "Set up this session",
+      );
       const body = sentBy(click(SETUP_MODEL, "opus"), sender);
-      world.holds.posted(setupId, body.message.ts);
+      world.slack.apiCalls = []; // the post is the arrangement, not what the payload did
+      body.message.ts = shownAt;
+      world.holds.posted(setupId, shownAt);
       body.state = { values: setupState("opus") };
       return { body, acted: () => world.slack.callsTo("chat.update").length > 0 };
     },

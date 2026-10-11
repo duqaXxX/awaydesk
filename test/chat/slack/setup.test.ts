@@ -4,11 +4,13 @@ import { agentInfo } from "../../../src/agent/claude/info.ts";
 import type { ModelInfo } from "../../../src/agent/seam.ts";
 import {
   readChoice,
+  readSelection,
   SETUP_BLOCK,
   SETUP_BYPASS,
   SETUP_EFFORT,
   SETUP_MODEL,
   SETUP_START,
+  type SetupDraw,
   setupBlocks,
 } from "../../../src/chat/slack/setup.ts";
 import * as slackTexts from "../../../src/chat/slack/texts.ts";
@@ -23,6 +25,14 @@ const MODELS: readonly ModelInfo[] = agentInfo(sdkJson("server-info")).models;
 
 // biome-ignore lint/suspicious/noExplicitAny: a Slack payload read in a test
 type Json = Record<string, any>;
+
+/** What the core's request says to draw, for `models`: an agent with a bypass mode and no efforts of its own. */
+function drawn(
+  models: readonly ModelInfo[],
+  rest: { readonly efforts?: readonly string[]; readonly bypassOffered?: boolean } = {},
+): SetupDraw {
+  return { models, efforts: [], bypassOffered: true, ...rest };
+}
 
 function choice(known: Partial<Choice> = {}): Choice {
   return { ...DEFAULT_CHOICE, ...known };
@@ -60,7 +70,7 @@ function controls(blocks: Json[]): Record<string, Json> {
 }
 
 test("the message opens with one header and one row of controls", () => {
-  const blocks = setupBlocks("id", MODELS, DEFAULT_CHOICE);
+  const blocks = setupBlocks("id", drawn(MODELS), DEFAULT_CHOICE);
   assert.deepEqual(
     blocks.map((b) => b.type),
     ["section", "actions"],
@@ -75,7 +85,7 @@ test("the message opens with one header and one row of controls", () => {
 });
 
 test("the model select lists the cli s models in order with default first", () => {
-  const select = controls(setupBlocks("id", MODELS, DEFAULT_CHOICE))[SETUP_MODEL] as Json;
+  const select = controls(setupBlocks("id", drawn(MODELS), DEFAULT_CHOICE))[SETUP_MODEL] as Json;
   assert.deepEqual(
     select.options.map((o: Json) => o.value),
     MODELS.map((m) => m.value),
@@ -85,7 +95,7 @@ test("the model select lists the cli s models in order with default first", () =
 });
 
 test("a model option carries the cli s description cut to 75", () => {
-  const select = controls(setupBlocks("id", MODELS, DEFAULT_CHOICE))[SETUP_MODEL] as Json;
+  const select = controls(setupBlocks("id", drawn(MODELS), DEFAULT_CHOICE))[SETUP_MODEL] as Json;
   const first = select.options[0];
   assert.deepEqual(first.description, {
     type: "plain_text",
@@ -99,15 +109,15 @@ test("a model option carries the cli s description cut to 75", () => {
     supportedEffortLevels: [],
   });
   const long = [model("x".repeat(200))];
-  const option = controls(setupBlocks("id", long, DEFAULT_CHOICE))[SETUP_MODEL]?.options[0];
+  const option = controls(setupBlocks("id", drawn(long), DEFAULT_CHOICE))[SETUP_MODEL]?.options[0];
   assert.equal(option.description.text.length, 75);
   const bare = [model(null)];
-  const plain = controls(setupBlocks("id", bare, DEFAULT_CHOICE))[SETUP_MODEL]?.options[0];
+  const plain = controls(setupBlocks("id", drawn(bare), DEFAULT_CHOICE))[SETUP_MODEL]?.options[0];
   assert.ok(!("description" in plain));
 });
 
 test("the effort select is default then the model s levels", () => {
-  const select = controls(setupBlocks("id", MODELS, DEFAULT_CHOICE))[SETUP_EFFORT] as Json;
+  const select = controls(setupBlocks("id", drawn(MODELS), DEFAULT_CHOICE))[SETUP_EFFORT] as Json;
   const options: Json[] = select.options;
   assert.deepEqual(
     options.map((o) => o.value),
@@ -118,7 +128,7 @@ test("the effort select is default then the model s levels", () => {
 });
 
 test("a model without effort offers only default", () => {
-  const found = controls(setupBlocks("id", MODELS, choice({ model: "haiku" })));
+  const found = controls(setupBlocks("id", drawn(MODELS), choice({ model: "haiku" })));
   assert.deepEqual(
     (found[SETUP_EFFORT] as Json).options.map((o: Json) => o.value),
     [DEFAULT],
@@ -127,9 +137,9 @@ test("a model without effort offers only default", () => {
 });
 
 test("the bypass checkbox starts unchecked and keeps a tick", () => {
-  const unticked = controls(setupBlocks("id", MODELS, DEFAULT_CHOICE))[SETUP_BYPASS] as Json;
+  const unticked = controls(setupBlocks("id", drawn(MODELS), DEFAULT_CHOICE))[SETUP_BYPASS] as Json;
   assert.ok(!("initial_options" in unticked));
-  const ticked = controls(setupBlocks("id", MODELS, choice({ bypass: true })))[
+  const ticked = controls(setupBlocks("id", drawn(MODELS), choice({ bypass: true })))[
     SETUP_BYPASS
   ] as Json;
   assert.deepEqual(
@@ -143,13 +153,65 @@ test("the bypass checkbox starts unchecked and keeps a tick", () => {
 });
 
 test("start carries the setup id and is primary", () => {
-  const button = controls(setupBlocks("the-id", MODELS, DEFAULT_CHOICE))[SETUP_START] as Json;
+  const button = controls(setupBlocks("the-id", drawn(MODELS), DEFAULT_CHOICE))[
+    SETUP_START
+  ] as Json;
   assert.deepEqual([button.value, button.style], ["the-id", "primary"]);
 });
 
 test("no listed model leaves the model select out", () => {
-  const blocks = setupBlocks("id", [], DEFAULT_CHOICE);
+  const blocks = setupBlocks("id", drawn([], { efforts: ["brief"] }), DEFAULT_CHOICE);
   assert.deepEqual(Object.keys(controls(blocks)), [SETUP_EFFORT, SETUP_BYPASS, SETUP_START]);
+});
+
+test("a request that offers no bypass draws no Bypass checkbox", () => {
+  const found = controls(
+    setupBlocks("id", drawn(MODELS, { bypassOffered: false }), DEFAULT_CHOICE),
+  );
+  assert.deepEqual(Object.keys(found), [SETUP_MODEL, SETUP_EFFORT, SETUP_START]);
+});
+
+test("a ticked bypass in the selection draws no checkbox when none is offered", () => {
+  const found = controls(
+    setupBlocks("id", drawn(MODELS, { bypassOffered: false }), choice({ bypass: true })),
+  );
+  assert.ok(!(SETUP_BYPASS in found));
+});
+
+test("no model and no efforts leave the Effort control out", () => {
+  const found = controls(setupBlocks("id", drawn([]), DEFAULT_CHOICE));
+  assert.deepEqual(Object.keys(found), [SETUP_BYPASS, SETUP_START]);
+});
+
+test("with no model the Effort control lists the request's efforts", () => {
+  const found = controls(
+    setupBlocks("id", drawn([], { efforts: ["brief", "full"] }), choice({ effort: "full" })),
+  );
+  assert.deepEqual(Object.keys(found), [SETUP_EFFORT, SETUP_BYPASS, SETUP_START]);
+  const select = found[SETUP_EFFORT] as Json;
+  assert.deepEqual(
+    select.options.map((o: Json) => o.value),
+    [DEFAULT, "brief", "full"],
+  );
+  assert.equal(select.options[1].text.text, "Effort: brief");
+  assert.equal(select.initial_option.value, "full");
+});
+
+test("the efforts of a request are not drawn when it lists models", () => {
+  const found = controls(setupBlocks("id", drawn(MODELS, { efforts: ["brief"] }), DEFAULT_CHOICE));
+  const values = (found[SETUP_EFFORT] as Json).options.map((o: Json) => o.value);
+  assert.ok(!values.includes("brief"));
+});
+
+test("with no model, no efforts and no bypass the row holds Start alone", () => {
+  const found = controls(setupBlocks("id", drawn([], { bypassOffered: false }), DEFAULT_CHOICE));
+  assert.deepEqual(Object.keys(found), [SETUP_START]);
+});
+
+test("a form without the controls the request left out reads as defaults", () => {
+  const values = { [SETUP_BLOCK]: { [SETUP_START]: { type: "button" } } };
+  assert.deepEqual(readSelection(values), { model: DEFAULT, effort: DEFAULT, bypass: false });
+  assert.deepEqual(readChoice(values, []), DEFAULT_CHOICE);
 });
 
 test("an untouched form reads as all defaults", () => {
