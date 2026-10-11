@@ -820,6 +820,18 @@ All notable changes to this project are documented here. The format follows
   at start and every 6 hours found no session alive, logged `pruned 1 stale thread(s)` at INFO
   and removed every thread of the folder, which then could not resume (measured 2026-10-11, Node
   26.5.1). The pass now keeps them.
+- The write of the root's status to `state.json` is best-effort (`ThreadSession.recordStatus`,
+  used by `noteStatus`, `noteCrossOverStatus` and the status a hold restores), as the writes of
+  the requests and of the clearing at a close already were. When `state.json` could not be
+  written (a read-only configuration folder, a full disk) the throw reached the session: `close`
+  left before `doneClosing`, so `SessionManager.closeAll` waited forever and `run` never returned,
+  with the chat stopped and the lock held; `submit` queued the turn and told the owner it had
+  failed, and in a session with no worker the turn went out first with the next message; an
+  approval was opened with no message posted. A failed write is now logged once as `could not
+  record the root's status in state.json` with the error's name, and the session goes on. With
+  the configuration folder read-only, `run` stayed running after one hour of the daemon's clock
+  before the change and returns 0 after it (measured 2026-10-11). Found by the review of
+  2026-10-11.
 - A table's delimiter row in a reply is recognised in linear time (`markdown.markdownStarts`).
   One pattern read the whole row, and on a line of spaces around a single dash, under a line
   holding a `|`, it backtracked in cubic time: 200 ms at 800 spaces a side and 3.1 s at 2,000

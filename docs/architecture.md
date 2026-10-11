@@ -447,6 +447,15 @@ clears all three for its thread once it is done, whatever the fields looked like
 open replies and the status stay, with `ended` set to ❌, so the next start's repair closes the reply
 and says so. Otherwise only a crash leaves them set.
 
+The writes of these fields are best-effort: a write that fails (a folder that cannot be
+written, a full disk) is caught, logged as one line naming the error and no content, and the
+session goes on. `ThreadSession` does that for the status (`ThreadSession.recordStatus`, which
+`noteStatus`, `noteCrossOverStatus` and the status restored after a hold go through), for the
+requests and for the clearing at a close; the reply sink does it for the open replies. So a
+prompt still reaches the agent, a permission request is still posted and a close still ends.
+`StateStore` keeps its map ahead of the file after a failed write, until a write succeeds; a
+crash in that time leaves repair less to find.
+
 On start, before the chat's connection opens, `repair.repair` (a flow of the core, over the chat
 seam) repairs every thread `state.json` still shows as left open. For each open reply it calls
 `ThreadChat.endReply` with `texts.STOPPED_BEFORE_ANSWER`, which ends the reply where it stands; it

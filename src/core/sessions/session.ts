@@ -559,7 +559,9 @@ export class ThreadSession {
   private async reactAfterHold(): Promise<void> {
     const stored = this.deps.state.thread(this.channelId, this.threadId);
     if (stored === null || stored.sessionId === null) {
-      this.deps.state.setStatusPending(this.channelId, this.threadId, null);
+      this.recordStatus(() =>
+        this.deps.state.setStatusPending(this.channelId, this.threadId, null),
+      );
       if (this.reacts) await this.thread.clearStatus();
       return;
     }
@@ -1953,12 +1955,30 @@ export class ThreadSession {
    */
   private noteStatus(state: SessionStatus): void {
     const pending = state === "working" || state === "waiting";
-    this.deps.state.setStatusPending(
-      this.channelId,
-      this.threadId,
-      pending ? STORED_STATUS[state] : null,
-      pending ? null : STORED_STATUS[state],
+    this.recordStatus(() =>
+      this.deps.state.setStatusPending(
+        this.channelId,
+        this.threadId,
+        pending ? STORED_STATUS[state] : null,
+        pending ? null : STORED_STATUS[state],
+      ),
     );
+  }
+
+  /**
+   * Run a write of the root's status to `state.json`. Best-effort, like the other crash-repair
+   * writes: a failed one (a folder that cannot be written, a full disk) is logged by the
+   * error's name and the session goes on, since the status is bookkeeping for a repair that
+   * may never be needed and must not fail a prompt, an approval or a close.
+   */
+  private recordStatus(write: () => void): void {
+    try {
+      write();
+    } catch (error) {
+      logger.warning(
+        `could not record the root's status in state.json for ${this.where}: ${errorName(error)}`,
+      );
+    }
   }
 
   /**
@@ -1968,11 +1988,13 @@ export class ThreadSession {
   private noteCrossOverStatus(): void {
     const stored = this.deps.state.thread(this.channelId, this.threadId);
     if (stored !== null) {
-      this.deps.state.setStatusPending(
-        this.channelId,
-        this.threadId,
-        stored.status,
-        STORED_STATUS.error,
+      this.recordStatus(() =>
+        this.deps.state.setStatusPending(
+          this.channelId,
+          this.threadId,
+          stored.status,
+          STORED_STATUS.error,
+        ),
       );
     }
   }
