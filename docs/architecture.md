@@ -233,9 +233,12 @@ plain agent, `test/conformance/chat.ts` against the Slack provider (over its fak
 memory chat. The plain agent (`test/support/plain-agent.ts`) declares few capabilities: no
 subagents, background tasks, compaction, usage limits, model list, bypass mode or record of trust,
 and one permission mode. The memory chat (`test/support/memory-chat.ts`) declares none. A scenario under
-`test/scenario/` runs the daemon with the two selected by name. Two checks of the chat suite are
-marked `todo` for the Slack provider: the fake workspace keeps no blocks of a stopped stream, and
-the Slack sink folds a run of calls itself.
+`test/scenario/` runs the daemon with the two selected by name. One check of the chat suite is
+marked `todo` for the Slack provider: that `ThreadChat.endReply` keeps what the reply showed. The
+fake workspace keeps no blocks of a stopped stream, so the check cannot read them back; the
+tests of the provider's own `endReply` cover it with a recorded read. One test of the scenario is
+marked `todo` too: `!guide` shows one text, written for an agent with models, bypass and
+commands and a chat with buttons, a form and a file viewer, whatever the two modules declare.
 
 Not tested: a module other than these. No second real agent or chat ships, and the seams were
 shaped on the two test modules, so a first real one may need a seam change. With Claude and Slack

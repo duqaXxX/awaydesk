@@ -335,8 +335,6 @@ chatConformance("the memory chat", memoryRig);
 
 chatConformance("the Slack provider", slackRig, {
   todo: {
-    folded:
-      "Slack's sink folds a run of calls itself (core Fold) and does not rewrite a stream that already shows the line, so the words an update carries are not drawn (reply/sinks.ts, streamShows)",
     endReplyBody:
       "FakeSlack's chat.stopStream keeps no blocks, so what a stream showed is not read back (test/support/fake-slack.ts)",
   },

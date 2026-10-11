@@ -290,3 +290,17 @@ test("!resume lists the folder's sessions, a pick resumes one in a thread and th
   assert.deepEqual(world.prompts(), ["carry on"]);
   await world.finish();
 });
+
+test("!guide describes only what this agent and this chat can serve", {
+  todo: "the guide is one text written for an agent with models, bypass and commands and a chat with buttons, a form and a file viewer (GUIDE in src/core/texts.ts): saying less of it is a text the owner approves",
+}, async (t) => {
+  const world = World.make(t);
+  await world.start();
+  await world.owner.says(world.channel, "!guide");
+  const guide = channelLines(world).at(-1)?.[1] ?? "";
+  // No bypass mode, no file upload, no model list: the guide names none of them.
+  assert.ok(!/bypass/i.test(guide), "the guide names bypass");
+  assert.ok(!guide.includes("`!open`"), "the guide names !open");
+  assert.ok(!/\*\*Model\*\*/.test(guide), "the guide names the model");
+  await world.finish();
+});

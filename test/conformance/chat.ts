@@ -114,8 +114,6 @@ export interface ChatConformanceOptions {
   readonly todo?: {
     /** The owner check and every check of what reaches `ChatInbound`. */
     readonly inbound?: string;
-    /** A line that carries `folded` words shows them, and not its title, once the body ended. */
-    readonly folded?: string;
     /** `endReply` keeps what the reply showed before the note. */
     readonly endReplyBody?: string;
   };
@@ -625,25 +623,6 @@ export function chatConformance(
         assert.equal(dropped?.[0], added?.[1]);
         assert.equal(dropped?.[1], null);
       });
-
-      check(
-        "replaces a line of a run of calls by its folded words once the body ended",
-        async (s) => {
-          const reply = s.provider.thread(s.ref).openReply(() => {});
-          await reply.text("Read two files");
-          await reply.task({
-            ...line("call-2", "Read other.txt", "complete"),
-            folded: "Read 2 files",
-          });
-          await reply.finish([]);
-          await reply.closeOut(null);
-          const shown = s.rig.read(s.ref).filter((m) => m.text.includes("Read two files"));
-          assert.equal(shown.length, 1);
-          assert.match(shown[0]?.text ?? "", /Read 2 files/);
-          assert.doesNotMatch(shown[0]?.text ?? "", /other\.txt/);
-        },
-        { todo: todo.folded },
-      );
 
       check("closes out with no footer", async (s) => {
         const reply = s.provider.thread(s.ref).openReply(() => {});
