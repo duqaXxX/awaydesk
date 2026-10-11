@@ -42,7 +42,9 @@ export const SLACK_BLOCKS = 50;
  * the cap the line goes into the last context block (the footer), or is left out if there is
  * none; a block that holds content is never replaced. A failed read or a message already gone
  * is logged and left alone: never replaced with a shorter form that would lose its content.
- * `note` is the line that says it stopped. Never rejects.
+ * `note` is the line that says it stopped. Never rejects. False when the message is there and
+ * was not rewritten (a failed read, a failed rewrite), so the caller can ask again; a stop that
+ * failed is not a reason to, since Slack ends a stream itself and the rewrite says the rest.
  */
 export async function endReply(
   slack: WebClient,
@@ -50,7 +52,7 @@ export async function endReply(
   place: { readonly channel: string; readonly threadTs: string },
   messageTs: string,
   note: string,
-): Promise<void> {
+): Promise<boolean> {
   const { channel: channelId, threadTs } = place;
   try {
     await slack.chat.stopStream({ channel: channelId, ts: messageTs });
@@ -69,13 +71,13 @@ export async function endReply(
     logger.warning(
       `could not read a crashed reply's message in ${channelId}/${threadTs}: ${describe(error)}`,
     );
-    return;
+    return false;
   }
   const messages = records(isRecord(answer) ? answer.messages : undefined);
   const message = messages.find((found) => String(found.ts) === messageTs);
   if (message === undefined) {
     logger.info(`a crashed reply's message is gone in ${channelId}/${threadTs}`);
-    return;
+    return true;
   }
   let blocks: Block[] = records(message.blocks).map((block) =>
     block.type === "task_card" && RUNNING_CARD.includes(String(block.status))
@@ -97,7 +99,9 @@ export async function endReply(
     logger.warning(
       `could not rewrite a crashed reply in ${channelId}/${threadTs}: ${describe(error)}`,
     );
+    return false;
   }
+  return true;
 }
 
 /**

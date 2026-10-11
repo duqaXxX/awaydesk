@@ -359,7 +359,7 @@ export class SlackThread implements ThreadChat {
     });
   }
 
-  showStatus(status: SessionStatus, signal?: AbortSignal): Promise<void> {
+  showStatus(status: SessionStatus, signal?: AbortSignal): Promise<boolean> {
     return this.reaction.show(REACTIONS[status], signal);
   }
 
@@ -440,10 +440,10 @@ export class SlackThread implements ThreadChat {
     return ts;
   }
 
-  async withdraw(request: MessageId): Promise<void> {
+  async withdraw(request: MessageId): Promise<boolean> {
     // (sync) Noted before the first await: a rewrite waiting for the budget sees it.
     this.noteWithdrawn(request);
-    await deleteRequest(this.slack, { channel: this.channel, ts: request });
+    return await deleteRequest(this.slack, { channel: this.channel, ts: request });
   }
 
   async keepAnswers(
@@ -569,7 +569,7 @@ export class SlackThread implements ThreadChat {
     return markup === "notice" ? `<${permalink}|${label}>` : `[${label}](${permalink})`;
   }
 
-  endReply(reply: MessageId, note: string): Promise<void> {
+  endReply(reply: MessageId, note: string): Promise<boolean> {
     return endReply(this.slack, this.options.limiter, this.place, reply, note);
   }
 

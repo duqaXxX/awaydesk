@@ -489,10 +489,12 @@ On start, before the chat's connection opens, `repair.repair` (a flow of the cor
 seam) repairs every thread `state.json` still shows as left open. For each open reply it calls
 `ThreadChat.endReply` with `texts.STOPPED_BEFORE_ANSWER`, which ends the reply where it stands; it
 withdraws each stale request (`ThreadChat.withdraw`) and, for a root left working or waiting, asks
-for the error status (`ThreadChat.showStatus`), only where the chat has `reactions`. Each field is
-cleared once its own repair has been attempted, successfully or not (a failed `state.json` write
-here is logged and swallowed, never left to break startup), so a second start never retries what an
-earlier one gave up on; one thread's failure is logged and does not stop the others.
+for the error status (`ThreadChat.showStatus`), only where the chat has `reactions`. Each of the
+three calls answers whether the chat did it. An entry is cleared when its repair was made or the
+chat said its message is gone, and stays when the chat did not make it, so the next start asks
+again: a chat that keeps refusing is asked once at every start, for as long as the thread is in
+`state.json`. A failed `state.json` write here is logged and swallowed, never left to break
+startup, and one thread's failure is logged and does not stop the others.
 
 The Slack provider's `endReply` (`src/chat/slack/repair.ts`) stops the message's stream
 (`chat.stopStream`; `message_not_in_streaming_state` means Slack closed it already, at 5 minutes,
@@ -503,7 +505,10 @@ as a context block, or, at Slack's 50-block cap, added to the last context block
 stop is the one notification the reply owes, and the edit never notifies; nothing is posted. A
 message that cannot be read back, or is gone, is left as it is. Its `withdraw` deletes the message
 (`message_not_found` counts as done) and `showStatus` goes through the same `StatusReaction` a live
-session uses.
+session uses. Each of the three answers false when Slack did not do it and the message is still
+there: a read or a rewrite that failed, a delete that failed for another reason than the message
+being gone, a `reactions.add` that failed. A stop that failed is not one of them, since Slack ends
+a stream itself and the rewrite says the rest.
 
 `lock.singleInstance` takes the lock by the mechanism of the platform, and a second process fails to
 start with `AlreadyRunning`. macOS is the only supported host.

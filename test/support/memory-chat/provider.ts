@@ -221,8 +221,9 @@ class MemoryThread implements ThreadChat {
     return new MemoryReply(this.#room, this.#ref, onOpenMessage);
   }
 
-  async showStatus(status: SessionStatus): Promise<void> {
+  async showStatus(status: SessionStatus): Promise<boolean> {
     this.#room.stray(`showStatus ${status}`);
+    return true;
   }
 
   async clearStatus(): Promise<void> {
@@ -249,8 +250,9 @@ class MemoryThread implements ThreadChat {
     return message.id;
   }
 
-  async withdraw(request: MessageId): Promise<void> {
+  async withdraw(request: MessageId): Promise<boolean> {
     this.#room.remove(request);
+    return true;
   }
 
   async keepAnswers(
@@ -281,15 +283,17 @@ class MemoryThread implements ThreadChat {
     return null;
   }
 
-  async endReply(reply: MessageId, note: string): Promise<void> {
+  async endReply(reply: MessageId, note: string): Promise<boolean> {
     const message = this.#room.message(reply);
-    if (message === null) return;
+    if (message === null) return true;
     try {
       this.#room.edit(message, `${message.text}\n${note}`);
       message.unfinished = false;
     } catch (error) {
       if (!(error instanceof ChatError)) throw error;
+      return false;
     }
+    return true;
   }
 
   async close(): Promise<void> {}

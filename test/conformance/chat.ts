@@ -543,13 +543,13 @@ export function chatConformance(
           const shown = s.rig.read(s.ref).find((m) => m.id === id);
           assert.ok(shown, "the request is shown in the thread");
           assert.ok(shown.pressable, "and has a control to press");
-          await thread.withdraw(id);
+          assert.equal(await thread.withdraw(id), true);
           assert.equal(
             s.rig.read(s.ref).some((m) => m.id === id),
             false,
             "the request is no longer shown",
           );
-          await thread.withdraw(id); // one already gone counts as removed
+          assert.equal(await thread.withdraw(id), true); // one already gone counts as removed
         });
       }
 
@@ -670,11 +670,13 @@ export function chatConformance(
         await reply.settle();
         await s.rig.settle();
         assert.ok(open, "told of the message");
-        await s.provider.thread(s.ref).endReply(open, "Stopped before the end");
+        assert.equal(await s.provider.thread(s.ref).endReply(open, "Stopped before the end"), true);
         const shown = s.rig.read(s.ref).filter((m) => m.id === open);
         assert.equal(shown.length, 1);
         assert.match(shown[0]?.text ?? "", /Stopped before the end/);
         await s.provider.thread(s.ref).endReply(open, "Stopped before the end"); // twice is fine
+        // One already gone counts as ended.
+        assert.equal(await s.provider.thread(s.ref).endReply("no-such-message", "Stopped"), true);
       });
 
       check("keeps what the reply showed when endReply ends it", async (s) => {
@@ -704,8 +706,8 @@ export function chatConformance(
     describe("what a capability adds", () => {
       gated("shows a status and takes it away", "reactions", async ({ provider, ref }) => {
         const thread = provider.thread(ref);
-        await thread.showStatus("working");
-        await thread.showStatus("done");
+        assert.equal(await thread.showStatus("working"), true);
+        assert.equal(await thread.showStatus("done"), true);
         await thread.settleStatus();
         await thread.clearStatus();
       });

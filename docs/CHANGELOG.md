@@ -877,6 +877,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The crash repair keeps in `state.json` what the chat did not repair, and the next start asks
+  again (issue #264). `repair.repair` cleared each of a thread's three fields once its repair had
+  been attempted, successfully or not: with Slack answering HTTP 503 to every call of one start,
+  the reply kept its open stream, the request its buttons and the root its status for good, and
+  the second start made no call (reproduced with the fake Slack client, 2026-10-11). An entry is
+  now cleared when its repair was made or the chat said its message is gone. For that the chat
+  seam's `ThreadChat.endReply`, `ThreadChat.withdraw` and `ThreadChat.showStatus` answer a
+  boolean, false when the chat did not do it and the message is still there, as
+  `ChannelChat.withdraw` already did. A repair Slack refuses every time (a rewrite it answers
+  `invalid_blocks` to, a `reactions.add` with the scope missing) is asked once at every start and
+  logged, until the thread leaves `state.json`. Not run against Slack.
 - `listing.aliveSessions` answers "cannot tell" (null) when the `stat` of a folder's transcripts
   directory fails for any reason but the directory not being there (`ENOENT`, `ENOTDIR`). The
   check turned every failed `stat` into "not there" and returned the SDK's listing alone, which

@@ -16,6 +16,7 @@ import {
   BOT,
   CHANNEL,
   FakeSlack,
+  httpError,
   OTHER_THREAD,
   OWNER,
   rejected,
@@ -157,6 +158,8 @@ test("a stop that fails is logged and the rewrite is still tried", async (t) => 
   await repairCrash(slack, state, new UpdateLimiter());
   assert.ok(warnings.join("\n").includes("could not stop"));
   assert.equal(slack.callsTo("chat.update").length, 1);
+  // The rewrite landed, and Slack ends a stream itself: nothing is left for another start.
+  assert.deepEqual(thread(state).openReplies, []);
 });
 
 async function repairedBlocks(
@@ -218,13 +221,86 @@ test("a deleted reply message is left alone and the field still clears", async (
   assert.deepEqual(thread(state).openReplies, []);
 });
 
-test("a failed read leaves the message untouched and still clears the field", async () => {
+test("a failed read leaves the message untouched and keeps the field for the next start", async () => {
   const { state, slack } = makeState();
   slack.responses["conversations.replies"] = new Error("network down");
   state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
   await repairCrash(slack, state, new UpdateLimiter());
   assert.deepEqual(slack.callsTo("chat.update"), []);
+  assert.deepEqual(thread(state).openReplies, ["1790000000.000001"]);
+});
+
+test("a rewrite Slack refuses keeps the field for the next start", async () => {
+  const { state, slack } = makeState();
+  slack.responses["conversations.replies"] = {
+    ok: true,
+    messages: [{ ts: "1790000000.000001", blocks: [] }],
+  };
+  slack.responses["chat.update"] = rejected("invalid_blocks");
+  state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
+  await repairCrash(slack, state, new UpdateLimiter());
+  assert.deepEqual(thread(state).openReplies, ["1790000000.000001"]);
+});
+
+test("a start Slack did not serve leaves the repair to the next one", async (t) => {
+  // Issue #264: every call of the repair answered HTTP 503, the three fields were cleared all
+  // the same, and the second start made no call: the stream stayed open, the request kept its
+  // buttons and the root its status.
+  resetStatusFlags();
+  const { state, slack } = makeState();
+  t.mock.method(logger, "warning", () => {});
+  state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002");
+  state.setStatusPending(CHANNEL, THREAD, Status.WAITING);
+  for (const method of [
+    "chat.stopStream",
+    "conversations.replies",
+    "chat.delete",
+    "reactions.add",
+  ]) {
+    slack.responses[method] = httpError(503, "Service Unavailable");
+  }
+  await repairCrash(slack, state, new UpdateLimiter());
+  assert.deepEqual(thread(state).openReplies, ["1790000000.000001"]);
+  assert.deepEqual(thread(state).requests, ["1790000000.000002"]);
+  assert.equal(thread(state).status, Status.WAITING);
+  assert.equal(thread(state).ended, null);
+
+  const served = new FakeSlack();
+  served.responses["conversations.replies"] = {
+    ok: true,
+    messages: [{ ts: "1790000000.000001", blocks: [] }],
+  };
+  await repairCrash(served, state, new UpdateLimiter());
+  const [update] = served.callsTo("chat.update");
+  assert.ok(update);
+  assert.deepEqual(blocksOf(update), [STOPPED_BLOCK]);
+  assert.deepEqual(
+    served.callsTo("chat.delete").map((call) => call.ts),
+    ["1790000000.000002"],
+  );
+  assert.deepEqual(
+    served.callsTo("reactions.add").map((call) => call.name),
+    [Status.ERROR],
+  );
   assert.deepEqual(thread(state).openReplies, []);
+  assert.deepEqual(thread(state).requests, []);
+  assert.equal(thread(state).status, null);
+  assert.equal(thread(state).ended, Status.ERROR);
+
+  const third = new FakeSlack();
+  await repairCrash(third, state, new UpdateLimiter());
+  assert.deepEqual(third.apiCalls, []);
+});
+
+test("a request Slack did not delete stays for the next start, beside one it did", async (t) => {
+  const { state, slack } = makeState();
+  t.mock.method(logger, "warning", () => {});
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000003");
+  slack.responses["chat.delete"] = [rejected("internal_error"), { ok: true }];
+  await repairCrash(slack, state, new UpdateLimiter());
+  assert.deepEqual(thread(state).requests, ["1790000000.000002"]);
 });
 
 test("more than one open reply in a thread are all repaired", async () => {
@@ -284,7 +360,7 @@ test("one threads failure does not stop the others", async () => {
   state.setStatusPending(CHANNEL, OTHER_THREAD, Status.WORKING);
   slack.responses["conversations.replies"] = new Error("boom");
   await repairCrash(slack, state, new UpdateLimiter());
-  assert.deepEqual(thread(state).openReplies, []);
+  assert.deepEqual(thread(state).openReplies, ["1790000000.000001"]);
   assert.equal(thread(state, OTHER_THREAD).status, null);
   const added = slack.callsTo("reactions.add").map((call) => call.name);
   assert.deepEqual(added, [Status.ERROR]);

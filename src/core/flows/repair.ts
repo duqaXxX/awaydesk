@@ -4,7 +4,8 @@
  * status a turn mid-flight left on its thread's root. Runs once on start, right after the chat
  * is built and before its connection opens (a provider's own client works without it) and
  * before the state is pruned (a pruned thread's leftovers must still be repaired); a graceful
- * stop clears these same fields itself, so a second start finds nothing to do.
+ * stop clears these same fields itself, so a second start finds nothing to do. What the chat
+ * did not repair stays in the state, and the next start asks again (issue #264).
  */
 import type { ChatProvider, ThreadChat } from "../../chat/seam.ts";
 import { getLogger } from "../../log.ts";
@@ -23,25 +24,30 @@ export type RepairState = Pick<
 
 /**
  * Repair every thread `state` still shows as left open. One thread's failure (a deleted
- * message, a chat error) is logged and does not stop the others; each of a thread's three
- * fields is cleared once its own repair has been attempted, successfully or not, so a second
- * start never retries what this one already gave up on.
+ * message, a chat error) is logged and does not stop the others. An entry of a thread's three
+ * fields is cleared when the chat repaired it or said its message is gone, and kept when the
+ * chat did not: the next start asks again, once, and so does every start after it for as long
+ * as the chat keeps refusing and the thread is in the state.
  */
 export async function repair(chat: ChatProvider, state: RepairState): Promise<void> {
   for (const [channelId, threadId, thread] of state.repairsPending()) {
     try {
       const chatThread = chat.thread({ channel: channelId, thread: threadId });
       for (const messageId of thread.openReplies) {
-        await chatThread.endReply(messageId, texts.STOPPED_BEFORE_ANSWER);
-        safe(() => state.replaceOpenReply(channelId, threadId, messageId, null));
+        if (await chatThread.endReply(messageId, texts.STOPPED_BEFORE_ANSWER)) {
+          safe(() => state.replaceOpenReply(channelId, threadId, messageId, null));
+        } else left(channelId, threadId, "a reply");
       }
       for (const messageId of thread.requests) {
-        await chatThread.withdraw(messageId);
-        safe(() => state.removeRequest(channelId, threadId, messageId));
+        if (await chatThread.withdraw(messageId)) {
+          safe(() => state.removeRequest(channelId, threadId, messageId));
+        } else left(channelId, threadId, "a request");
       }
       if (thread.status !== null) {
         const ended = await repairStatus(chat, chatThread, thread.status);
-        safe(() => state.setStatusPending(channelId, threadId, null, ended));
+        if (ended !== undefined) {
+          safe(() => state.setStatusPending(channelId, threadId, null, ended));
+        } else left(channelId, threadId, "the status");
       }
     } catch (error) {
       logger.error(
@@ -49,6 +55,13 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
       );
     }
   }
+}
+
+/** One line for what stays in the state for the next start: ids and the kind only. */
+function left(channelId: string, threadId: string, what: string): void {
+  logger.warning(
+    `${what} of ${channelId}/${threadId} was not repaired: the next start tries again`,
+  );
 }
 
 /**
@@ -69,14 +82,14 @@ function safe(write: () => void): void {
  * own (issue #19 fix round item 9): its first status also strips every other stray status
  * from the root, which is strictly more thorough than removing just the one name the state
  * recorded. Returns the stored word for the status asked for, the thread's ended one from now
- * on; null for a word that is neither.
+ * on; null for a word that is neither; undefined when the chat did not show it.
  */
 async function repairStatus(
   chat: ChatProvider,
   thread: Pick<ThreadChat, "showStatus">,
   stored: string,
-): Promise<string | null> {
+): Promise<string | null | undefined> {
   if (stored !== STORED_STATUS.working && stored !== STORED_STATUS.waiting) return null;
-  if (chat.capabilities.reactions) await thread.showStatus("error");
+  if (chat.capabilities.reactions && !(await thread.showStatus("error"))) return undefined;
   return STORED_STATUS.error;
 }

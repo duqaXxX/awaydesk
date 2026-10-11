@@ -142,7 +142,7 @@ test("concurrent show calls end on the last state", async () => {
  */
 async function abortWhileAddIsOut(
   slack: FakeSlack,
-  start: (signal: AbortSignal) => Promise<void>,
+  start: (signal: AbortSignal) => Promise<unknown>,
 ): Promise<unknown> {
   const hold = new AsyncEvent();
   slack.gate = hold;
@@ -235,12 +235,13 @@ test("a failed add leaves current unchanged so the next show retries", async () 
   const slack = new FakeSlack();
   slack.responses["reactions.add"] = rejected("channel_not_found");
   const sr = reaction(slack, new Lines());
-  await sr.show(Status.WORKING);
+  assert.equal(await sr.show(Status.WORKING), false); // what a caller that must know reads
   assert.equal(sr.current, null);
   assert.deepEqual(slack.callsTo("reactions.remove"), []); // no previous reaction to strip: add lost
   delete slack.responses["reactions.add"];
-  await sr.show(Status.WORKING); // retried, not skipped as "no change"
+  assert.equal(await sr.show(Status.WORKING), true); // retried, not skipped as "no change"
   assert.equal(sr.current, Status.WORKING);
+  assert.equal(await sr.show(Status.WORKING), true); // already there: no call, and still true
 });
 
 test("current reflects the last state shown successfully", async () => {
