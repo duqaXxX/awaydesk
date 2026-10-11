@@ -58,6 +58,10 @@ export function preview(file: object): string | null {
   return typeof found.content === "string" ? strip(found.content) : null;
 }
 
+// A tag of a WebVTT cue: from `<` to the next `>`, across line ends, or to the end of the cue when
+// nothing closes it (WebVTT 1, the cue text tokenizer).
+const TAG = /<[^>]*(?:>|$)/g;
+
 /**
  * The words of a WebVTT transcript as Slack writes it: a `WEBVTT` header, then cues of a timing
  * line and text lines, the first of which can open with `- `. One line of text, without the tags
@@ -72,8 +76,11 @@ export function vttText(body: string): string {
       .filter((line) => line !== "");
     const timing = lines.findIndex((line) => line.includes("-->"));
     if (timing === -1) continue; // the header, or a note
-    for (const line of lines.slice(timing + 1)) {
-      const text = line.replace(/<[^>]*>/g, "");
+    const cue = lines
+      .slice(timing + 1)
+      .join("\n")
+      .replace(TAG, "");
+    for (const text of cue.split("\n")) {
       words.push(strip(text.startsWith("- ") ? text.slice(2) : text));
     }
   }
