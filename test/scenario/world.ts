@@ -1,5 +1,5 @@
 /**
- * What the seven steps of the scenario share: the real daemon (`run` of `src/main.ts`) started
+ * What the eight steps of the scenario share: the real daemon (`run` of `src/main.ts`) started
  * in a config folder of its own, whose `.env` selects the plain agent and the memory chat by
  * name, over a registry that holds those two entries and nothing else. The test plays the owner
  * through the memory chat and scripts the plain agent; nothing is mocked below `run`.

@@ -1,5 +1,5 @@
 /**
- * Step 9 of the scenario the memory chat carries: the agent's process dies with a permission
+ * Step 8 of the scenario the memory chat carries: the agent's process dies with a permission
  * request waiting for the owner. The plain agent's `kill` is the process ending with no word
  * from the core.
  */
