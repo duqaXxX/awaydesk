@@ -392,8 +392,9 @@ export interface InboundMessage {
 export interface ChatInbound {
   message(message: InboundMessage): Promise<void>;
   /**
-   * The owner answered the request `requestId`, shown by `message` in `ref`. False when the
-   * request is no longer waiting there: the core told the owner so.
+   * The owner answered the request `requestId`, shown by `message` in `ref`; `message` is null
+   * when the answer came from a form that is no message of the thread. False when the request
+   * is no longer waiting there: the core told the owner so.
    */
   answer(
     ref: ThreadRef,
@@ -405,7 +406,7 @@ export interface ChatInbound {
   picked(pick: ListPick): Promise<void>;
 }
 
-/** Whether a chat still has a channel; `no answer` when it could not say. */
+/** Whether a chat still has a channel; `no answer` when it could not say, with no reason to give. */
 export type ChannelState = "gone" | "there" | "no answer";
 
 /** The list of every session the chat shows on a page of its own. */
@@ -431,6 +432,10 @@ export interface ChatProvider {
    * the name tells nothing.
    */
   openedAt(ref: ThreadRef): number | null;
+  /**
+   * Whether the chat still has `channel`. A chat that could not say answers `no answer`, or
+   * rejects with a `ChatError` whose name is the reason: the core logs it and forgets nothing.
+   */
   channelState(channel: string): Promise<ChannelState>;
   /** Present with `homeIndex`. */
   readonly index?: SessionIndex;
@@ -443,7 +448,8 @@ export interface ChatProvider {
   start(inbound: ChatInbound): Promise<void>;
   /**
    * Closes the connection: nothing reaches the core any more, and a call already under way
-   * does nothing from its next step on.
+   * does nothing from its next step on. What the daemon says outside a reply from here on may
+   * be dropped; a reply still writes, since the sessions end theirs after this.
    */
   stop(): Promise<void>;
   /** After every session closed: what the chat shows of them is written one last time. */

@@ -241,8 +241,6 @@ chatConformance("the memory chat", memoryRig);
 chatConformance("the Slack provider", slackRig, {
   todo: {
     inbound: STAGE_2,
-    noAnswer:
-      "Slack rejects with a ChatError where the seam says `no answer`; the core takes both (core/cleanup.ts)",
     folded:
       "Slack's sink folds a run of calls itself (core Fold) and does not rewrite a stream that already shows the line, so the words an update carries are not drawn (reply/sinks.ts, streamShows)",
     endReplyBody:

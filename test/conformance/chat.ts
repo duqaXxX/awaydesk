@@ -114,8 +114,6 @@ export interface ChatConformanceOptions {
   readonly todo?: {
     /** The owner check and every check of what reaches `ChatInbound`. */
     readonly inbound?: string;
-    /** `channelState` answers `no answer` when the chat can not say. */
-    readonly noAnswer?: string;
     /** A line that carries `folded` words shows them, and not its title, once the body ended. */
     readonly folded?: string;
     /** `endReply` keeps what the reply showed before the note. */
@@ -444,12 +442,13 @@ export function chatConformance(
       });
 
       check(
-        "says `no answer` when it can not say",
+        "says `no answer`, or rejects with a named ChatError, when it can not say",
         async ({ rig, provider }) => {
           rig.failLookups();
-          assert.equal(await provider.channelState(rig.channel), "no answer");
+          const answer = await provider.channelState(rig.channel).catch((error: unknown) => error);
+          if (answer instanceof ChatError) assert.notEqual(answer.name, "");
+          else assert.equal(answer, "no answer");
         },
-        { todo: todo.noAnswer },
       );
 
       test("starts, stops and closes, each once, in that order", async (t) => {
