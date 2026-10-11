@@ -3,15 +3,29 @@
  * of the tests, and the Slack provider over its fake client. The suite includes the owner check:
  * a message, a click and a form from someone else never arrive.
  *
- * Where Slack stands: its listeners still call the core directly (`sessions`, `approvals`,
- * `holds`) and never `ChatInbound`, so every check of what reaches the inbound is `todo` for it,
- * and its adapter builds only the payloads it can build today (a message). The owner checks of
- * the Slack listeners are `test/chat/slack/app/owner-checks.test.ts`.
+ * Where Slack stands: every listener tells the core through `ChatInbound`, and the adapter builds
+ * the payloads Slack would send (the recorded click and form fixtures, through the builders of
+ * `test/support/slack-app.ts`). The owner checks of each Slack listener are also
+ * `test/chat/slack/app/owner-checks.test.ts`.
  */
 import type { App, Receiver } from "@slack/bolt";
+import type { Question } from "../../src/agent/seam.ts";
+import type { ThreadRef } from "../../src/chat/seam.ts";
 import { ChannelGuard } from "../../src/chat/slack/app/guards.ts";
+import { BIND_ACTION } from "../../src/chat/slack/bind.ts";
+import { HOLD_CANCEL, HOLD_CONTINUE } from "../../src/chat/slack/hold.ts";
+import {
+  APPROVAL_ALLOW,
+  APPROVAL_DENY,
+  newDraft,
+  QUESTION_SKIP,
+} from "../../src/chat/slack/requests.ts";
+import { RESUME_ACTION } from "../../src/chat/slack/resume.ts";
+import { SETUP_START } from "../../src/chat/slack/setup.ts";
 import { SlackChat } from "../../src/chat/slack/thread.ts";
 import type { Clock } from "../../src/clock.ts";
+import type { CorePort } from "../../src/core/port.ts";
+import type { Pending } from "../../src/core/requests.ts";
 import {
   AGENT,
   CHANNEL,
@@ -21,7 +35,17 @@ import {
   THREAD,
 } from "../support/fake-slack.ts";
 import { memoryChat, OWNER, SOMEONE } from "../support/memory-chat.ts";
-import { type Body, message, reply, type World, worldOf } from "../support/slack-app.ts";
+import {
+  type Body,
+  clickIn,
+  formBody,
+  message,
+  picked,
+  reply,
+  setupState,
+  type World,
+  worldOf,
+} from "../support/slack-app.ts";
 import {
   type ChatRig,
   chatConformance,
@@ -84,8 +108,6 @@ async function memoryRig(): Promise<ChatRig> {
 
 // ---- the Slack provider
 
-const STAGE_2 = "stage 2 moves this listener behind ChatInbound";
-
 /** The calls that write in Slack, refused when the chat refuses writes. */
 const WRITES = [
   "chat.postMessage",
@@ -146,12 +168,23 @@ function slackRead(slack: FakeSlack, scope: Scope): Shown[] {
   return shown;
 }
 
-function slackPerson(world: World, app: () => App, user: string): Person {
+/** What a click or a form names of `user`: the user's id, in the owner's workspace. */
+function userOf(user: string, world: World): Body {
+  return user === world.identity.ownerUserId ? {} : { id: user };
+}
+
+function slackPerson(
+  world: World,
+  app: () => App | null,
+  asked: Map<string, Pending>,
+  user: string,
+): Person {
   let sequence = 0;
   const dispatch = async (body: Body): Promise<void> => {
-    app()
-      .processEvent({ body, ack: async () => {} })
-      .catch(() => {});
+    // The chat delivers nothing before the connection opens.
+    const built = app();
+    if (built === null) return;
+    built.processEvent({ body, ack: async () => {} }).catch(() => {});
     await world.idle();
   };
   return {
@@ -166,21 +199,92 @@ function slackPerson(world: World, app: () => App, user: string): Person {
       await dispatch(body);
       return { id: String(body.event.ts), ref: { channel, thread: options.thread } };
     },
-    // A click and a form are read by listeners that still call the core: their payloads are
-    // built from the request the core holds, which the stage that moves them behind
-    // `ChatInbound` replaces by the request id and the message the seam gives.
-    answers: async () => {
-      throw new Error(STAGE_2);
+    // The button of each request carries its request id; the question's form carries it in the
+    // draft it rides on, and Slack's listener looks the question up in what the core holds.
+    answers: async (request, answer): Promise<void> => {
+      const { ref, requestId, message: shownAt } = request;
+      const click = (actionId: string): Body =>
+        clickIn(actionId, requestId, ref.channel, ref.thread, {
+          messageTs: shownAt,
+          user: userOf(user, world),
+        });
+      switch (answer.type) {
+        case "permission":
+          await dispatch(click(answer.allow ? APPROVAL_ALLOW : APPROVAL_DENY));
+          return;
+        case "hold":
+          await dispatch(click(answer.send ? HOLD_CONTINUE : HOLD_CANCEL));
+          return;
+        case "setup": {
+          const { model, effort, bypass } = answer.selection;
+          const body = click(SETUP_START);
+          body.state = { values: setupState(model, effort, bypass) };
+          await dispatch(body);
+          return;
+        }
+        case "question": {
+          if (answer.answers === null) {
+            await dispatch(click(QUESTION_SKIP));
+            return;
+          }
+          if (request.request.type !== "question") throw new Error("a question's answer");
+          const { questions } = request.request;
+          asked.set(requestId, pendingOf(ref, questions));
+          const draft = newDraft(requestId, ref.channel, ref.thread);
+          // The option each question was answered with, by its place in the question's list.
+          const values = Object.assign(
+            {},
+            ...questions.map((question, at) => {
+              const label = answer.answers?.[question.text];
+              const index = question.options.findIndex((option) => option.label === label);
+              if (index === -1) throw new Error(`no option ${String(label)} in the question`);
+              return picked(at, String(index));
+            }),
+          );
+          const body = formBody("view_submission", draft, values, userOf(user, world));
+          await dispatch(body);
+          return;
+        }
+      }
     },
-    picks: async () => {
-      throw new Error(STAGE_2);
+    picks: async (list, row): Promise<void> => {
+      const { channel, message: shownAt } = list;
+      // A list posted in the channel is a message of the channel: its thread is its own ts.
+      const value = (): string =>
+        list.list.type === "sessions" ? `${row}@${list.list.thread.thread}` : row;
+      const actionId = list.list.type === "sessions" ? RESUME_ACTION : BIND_ACTION;
+      await dispatch(
+        clickIn(actionId, value(), channel, shownAt, {
+          messageTs: shownAt,
+          user: userOf(user, world),
+        }),
+      );
     },
+  };
+}
+
+/** The request the core holds for a question the daemon asked, as the form's listener reads it. */
+function pendingOf(ref: ThreadRef, questions: readonly Question[]): Pending {
+  return {
+    channelId: ref.channel,
+    threadId: ref.thread,
+    title: "A request",
+    questions,
+    decision: new Promise(() => {}),
+    decided: false,
+    messageTs: null,
   };
 }
 
 async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
   const world = worldOf(t);
   let built: App | null = null;
+  // The questions the checks asked: the core holds each under the id the check chose.
+  const asked = new Map<string, Pending>();
+  const core: CorePort = {
+    ...world.core,
+    approvals: { get: (id) => asked.get(id) ?? world.approvals.get(id) },
+  };
   const receiver: Receiver = {
     init: (app) => {
       built = app;
@@ -196,7 +300,7 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
     limiter: world.limiter,
     clock: world.slackClock,
     app: {
-      core: () => world.core,
+      core: () => core,
       config: world.config,
       guard: new ChannelGuard(world.slack, world.identity),
       home: world.home,
@@ -204,10 +308,7 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
       receiver,
     },
   });
-  const app = (): App => {
-    if (built === null) throw new Error("the Slack app was not built");
-    return built;
-  };
+  const app = (): App | null => built;
   const refuse = (...methods: string[]) => {
     for (const method of methods) world.slack.responses[method] = rejected("channel_not_found");
   };
@@ -215,8 +316,8 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
     provider,
     channel: CHANNEL,
     thread: { channel: CHANNEL, thread: THREAD },
-    owner: slackPerson(world, app, world.identity.ownerUserId),
-    other: slackPerson(world, app, STRANGER),
+    owner: slackPerson(world, app, asked, world.identity.ownerUserId),
+    other: slackPerson(world, app, asked, STRANGER),
     read: (scope) => slackRead(world.slack, scope),
     settle: async () => {
       await world.slackClock.advance(2);
@@ -234,7 +335,6 @@ chatConformance("the memory chat", memoryRig);
 
 chatConformance("the Slack provider", slackRig, {
   todo: {
-    inbound: STAGE_2,
     folded:
       "Slack's sink folds a run of calls itself (core Fold) and does not rewrite a stream that already shows the line, so the words an update carries are not drawn (reply/sinks.ts, streamShows)",
     endReplyBody:
