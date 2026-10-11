@@ -61,6 +61,7 @@ import type {
 import { ResumeRefused } from "../../agent/seam.ts";
 import type { FooterFields, MessageId, Reply, SessionStatus, ThreadChat } from "../../chat/seam.ts";
 import { getLogger } from "../../log.ts";
+import { errorName } from "../../values.ts";
 import {
   effortChange,
   footerFields,
@@ -105,11 +106,6 @@ import { type ActiveTurn, notSent, Turn, takenNote } from "./turn.ts";
 export const logger = getLogger("awaydesk.core.sessions");
 
 type TaskEnded = Extract<SessionEvent, { type: "task_ended" }>;
-
-/** What a log line may say of a failure: its name (the chat's code for a `ChatError`), never its words. */
-export function describe(error: unknown): string {
-  return error instanceof Error ? error.name : typeof error;
-}
 
 /** The signal for a `finally`: none once it has aborted, since asyncio cancelled a task once. */
 function live(signal: AbortSignal | undefined): AbortSignal | undefined {
@@ -820,7 +816,7 @@ export class ThreadSession {
         // model without it, measured), and the refusal leaves bypass running: off then lands
         // on the mode the agent itself starts in when auto mode is unavailable.
         logger.warning(
-          `could not return ${this.where} to auto mode, setting default: ${describe(error)}`,
+          `could not return ${this.where} to auto mode, setting default: ${errorName(error)}`,
         );
         mode = modes.default;
         await client.setPermissionMode(mode);
@@ -909,7 +905,7 @@ export class ThreadSession {
         try {
           await this.forgetSetup();
         } catch (undo) {
-          logger.warning(`could not undo a failed setup in ${this.where}: ${describe(undo)}`);
+          logger.warning(`could not undo a failed setup in ${this.where}: ${errorName(undo)}`);
         }
         throw error;
       }
@@ -1037,7 +1033,7 @@ export class ThreadSession {
         await client.stopTask(taskId);
       } catch (error) {
         // it may have ended meanwhile; the others still stop
-        logger.warning(`could not stop a task in ${this.where}: ${describe(error)}`);
+        logger.warning(`could not stop a task in ${this.where}: ${errorName(error)}`);
       }
     }
     // A stop the owner gave is not an error. `react` clears `errorStanding`, so a later idle
@@ -1097,9 +1093,9 @@ export class ThreadSession {
       } else {
         // the status still answers, with what a prompt would get
         logger.warning(
-          `could not read the footer's values for the status in ${this.where}: ${describe(error)}`,
+          `could not read the footer's values for the status in ${this.where}: ${errorName(error)}`,
         );
-        unavailable = [texts.fill(texts.ERROR_REPLY, { error: describe(error) })];
+        unavailable = [texts.fill(texts.ERROR_REPLY, { error: errorName(error) })];
       }
     }
     // The daemon closed the session (shutdown, an idle close) while this call was reading it.
@@ -1259,7 +1255,7 @@ export class ThreadSession {
         }
       } catch (error) {
         logger.warning(
-          `could not clear state.json's crash-repair fields for ${this.where}: ${describe(error)}`,
+          `could not clear state.json's crash-repair fields for ${this.where}: ${errorName(error)}`,
         );
       }
       // Only now: the agent's process (if any) has had its chance to flush and exit, or
@@ -1285,7 +1281,7 @@ export class ThreadSession {
     try {
       await client.close();
     } catch (error) {
-      logger.warning(`could not close Claude Code in ${this.where}: ${describe(error)}`);
+      logger.warning(`could not close Claude Code in ${this.where}: ${errorName(error)}`);
     }
   }
 
@@ -1373,10 +1369,10 @@ export class ThreadSession {
           this.idleTimerCheck(); // a no-op if this also closed the session
         } else {
           // a failed turn must not stop this thread's queue
-          logger.error(`turn failed in ${this.where}: ${describe(error)}`);
+          logger.error(`turn failed in ${this.where}: ${errorName(error)}`);
           const at = this.sent.indexOf(turn);
           if (at !== -1) this.sent.splice(at, 1);
-          await this.fail(turn, texts.fill(texts.ERROR_REPLY, { error: describe(error) }), {
+          await this.fail(turn, texts.fill(texts.ERROR_REPLY, { error: errorName(error) }), {
             error: true,
           });
           this.idleTimerCheck(); // the session stays alive; may need arming again
@@ -1403,7 +1399,7 @@ export class ThreadSession {
         } catch (error) {
           if (error instanceof Cancelled) throw error;
           // one event that fails to render must not end it all
-          logger.error(`could not render a message in ${this.where}: ${describe(error)}`);
+          logger.error(`could not render a message in ${this.where}: ${errorName(error)}`);
         }
         // A task event or a turn's own end (through `dispatch`) may leave the session idle
         // again, or may end it: re-armed or cancelled here either way.
@@ -1415,7 +1411,7 @@ export class ThreadSession {
         events.return?.().catch(() => {});
         throw error;
       }
-      reason = describe(error);
+      reason = errorName(error);
     }
     logger.error(`session reader stopped in ${this.where}: ${reason}`);
     if (this.client === client) this.client = null;
@@ -1801,7 +1797,7 @@ export class ThreadSession {
       }
     } catch (error) {
       if (error instanceof Cancelled) throw error;
-      logger.warning(`could not post a background update in ${this.where}: ${describe(error)}`);
+      logger.warning(`could not post a background update in ${this.where}: ${errorName(error)}`);
     } finally {
       // A notification that arrived while this wrote is expected on a wait of its own, armed
       // below: `expectInjectedTurn` found this task still running and started none, and it
@@ -2349,7 +2345,7 @@ export class ThreadSession {
       } catch (error) {
         if (error instanceof Cancelled) throw error;
         // the reply still ends, with no footer
-        logger.warning(`could not build the footer in ${this.where}: ${describe(error)}`);
+        logger.warning(`could not build the footer in ${this.where}: ${errorName(error)}`);
         footer = null;
       }
       stopped = result.ending === "interrupted";
@@ -2521,7 +2517,9 @@ export class ThreadSession {
         context = await this.client.contextUsage();
       } catch (error) {
         // model and context are left out of the footer
-        logger.warning(`could not read the context usage in ${this.channelId}: ${describe(error)}`);
+        logger.warning(
+          `could not read the context usage in ${this.channelId}: ${errorName(error)}`,
+        );
       }
     }
     const here = this.workingDirectory || this.directory;
@@ -2567,7 +2565,7 @@ export class ThreadSession {
         messageTs = await this.thread.ask(approvalId, request, title);
       } catch (error) {
         // Nobody can answer a request that was never shown: deny it, and say why.
-        logger.error(`could not post an approval request in ${this.where}: ${describe(error)}`);
+        logger.error(`could not post an approval request in ${this.where}: ${errorName(error)}`);
         return questions === null
           ? { allow: false, message: texts.APPROVAL_UNPOSTED }
           : { answered: false, message: texts.APPROVAL_UNPOSTED };
@@ -2584,7 +2582,7 @@ export class ThreadSession {
           this.deps.state.addRequest(this.channelId, this.threadTs, messageTs);
         } catch (error) {
           logger.error(
-            `posted a request in ${this.where} that state.json could not record: ${describe(error)}`,
+            `posted a request in ${this.where} that state.json could not record: ${errorName(error)}`,
           );
         }
       } else {
@@ -2625,7 +2623,7 @@ export class ThreadSession {
       await this.thread.keepAnswers(messageTs, questions, answers);
     } catch (error) {
       // The request must not keep buttons that no longer work: remove it.
-      logger.warning(`could not record an answer in ${this.where}: ${describe(error)}`);
+      logger.warning(`could not record an answer in ${this.where}: ${errorName(error)}`);
       await this.deleteRequest(messageTs);
       return;
     }
@@ -2635,7 +2633,7 @@ export class ThreadSession {
       this.deps.state.removeRequest(this.channelId, this.threadTs, messageTs);
     } catch (error) {
       logger.warning(
-        `could not clear an answered request from state.json in ${this.where}: ${describe(error)}`,
+        `could not clear an answered request from state.json in ${this.where}: ${errorName(error)}`,
       );
     }
   }
@@ -2676,7 +2674,7 @@ export class ThreadSession {
       this.deps.state.removeRequest(this.channelId, this.threadTs, messageTs);
     } catch (error) {
       logger.warning(
-        `could not clear a deleted request from state.json in ${this.where}: ${describe(error)}`,
+        `could not clear a deleted request from state.json in ${this.where}: ${errorName(error)}`,
       );
     }
   }

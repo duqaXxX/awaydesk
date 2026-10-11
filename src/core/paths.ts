@@ -4,6 +4,9 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, parse } from "node:path";
 import { errorCode } from "../values.ts";
 
+/** What Python's `Path.exists` and `Path.is_dir` read as "not there" rather than as a failure. */
+export const ABSENT: ReadonlySet<string> = new Set(["ENOENT", "ENOTDIR", "EBADF", "ELOOP"]);
+
 const SEPARATORS = process.platform === "win32" ? /[\\/]+/ : /\/+/;
 
 /**

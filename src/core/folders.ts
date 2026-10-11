@@ -10,6 +10,7 @@ import { lstat, opendir, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { getLogger } from "../log.ts";
 import { compareCodePoints } from "../text.ts";
+import { ABSENT } from "./paths.ts";
 
 export const logger = getLogger("awaydesk.core.folders");
 
@@ -18,9 +19,6 @@ export const FOLDER_DEPTH = 2;
 // Each trust check reads the filesystem: a batch at a time, so a root with many untrusted folders
 // lists in a few rounds, and the check stops soon after the rows are filled.
 export const TRUST_BATCH = 8;
-
-// What Python's `Path.exists` and `Path.is_dir` read as "not there" rather than as a failure.
-const ABSENT = new Set(["ENOENT", "ENOTDIR", "EBADF", "ELOOP"]);
 
 function code(error: unknown): string {
   return (error as { code?: unknown } | null)?.code as string;

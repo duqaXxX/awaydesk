@@ -60,6 +60,7 @@ import { Listings } from "../openfile/listing.ts";
 import { OPEN_BUTTON_ACTION, OPEN_FORM, QUERY_ACTION } from "../openfile/modal.ts";
 import { levelLogger } from "../quiet-logger.ts";
 import { REQUEST_TIMEOUT_MS } from "../reply/clients.ts";
+import { describe } from "../reply/errors.ts";
 import type { Limiter } from "../reply/limiter.ts";
 import {
   APPROVAL_ALLOW,
@@ -71,7 +72,7 @@ import {
 import { RESUME_ACTION } from "../resume.ts";
 import { SETUP_BYPASS, SETUP_EFFORT, SETUP_MODEL, SETUP_START } from "../setup.ts";
 import * as voice from "../voice.ts";
-import { Answers, type AppParts, errorName, type Fetch, logger } from "./answers.ts";
+import { Answers, type AppParts, type Fetch, logger } from "./answers.ts";
 import { Clips } from "./clip.ts";
 import { type ChannelGuard, type Identity, isPromptMessage, messageActor } from "./guards.ts";
 import { HomeControls } from "./home-controls.ts";
@@ -323,7 +324,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action(CLEAN_ACTION, home.onHomeClean);
 
   app.error(async (error) => {
-    logger.error(`handler failed: ${errorName(thrown(error))}`);
+    logger.error(`handler failed: ${describe(thrown(error))}`);
   });
 
   return {

@@ -1765,6 +1765,28 @@ test("an unreadable directory says how to grant access", POSIX_ONLY, async (t) =
   assert.equal(h.slack.pushes(), 1);
 });
 
+test(
+  "a directory under a folder the daemon cannot enter says how to grant access",
+  POSIX_ONLY,
+  async (t) => {
+    // The stat itself is refused there. It read as a folder that no longer exists.
+    const h = harnessFor(t)({});
+    const locked = join(h.tmpPath, "locked");
+    const inside = join(locked, "inside");
+    mkdirSync(inside, { recursive: true });
+    h.state.bind(CHANNEL, inside);
+    chmodSync(locked, 0);
+    try {
+      const turn = await h.session().submit("hello");
+      await turn.done.wait();
+    } finally {
+      chmodSync(locked, 0o755);
+    }
+    assert.deepEqual(h.clients, []);
+    assert.deepEqual(h.bodies(), [texts.fill(texts.DIRECTORY_UNREADABLE, { directory: inside })]);
+  },
+);
+
 /** The footer (the last context block) of every write that carried one, in order. */
 function statuses(h: Harness): string[] {
   const lasts: string[] = [];

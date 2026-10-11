@@ -7,6 +7,7 @@ import {
   type WebClient,
 } from "@slack/web-api";
 import { getLogger, type Logger } from "../../../log.ts";
+import { errorName } from "../../../values.ts";
 
 // The sink's lines: Python logged them all under `awaydesk.render.sinks`. `sinks.ts` imports this
 // logger and, through `export *`, its callers get the `Logger` type from here.
@@ -46,7 +47,7 @@ export function describe(error: unknown): string {
   if (error instanceof WebAPIRateLimitedError) return "ratelimited";
   if (error instanceof WebAPIHTTPError) return `http_${error.statusCode}`;
   if (error instanceof WebAPIRequestError) return requestFailure(error.original);
-  return error instanceof Error ? error.constructor.name : typeof error;
+  return errorName(error);
 }
 
 // What Slack says of a message whose blocks, once it has translated the markdown ones, pass 50

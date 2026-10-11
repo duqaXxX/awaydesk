@@ -29,7 +29,7 @@ import {
   questionView,
 } from "../requests.ts";
 import { readChoice, setupBlocks, summary as setupSummary } from "../setup.ts";
-import { type Answers, type AppParts, errorName, isCancelled, logger } from "./answers.ts";
+import { type Answers, type AppParts, isCancelled, logger } from "./answers.ts";
 import { interactionActor, isOwner } from "./guards.ts";
 import {
   type Ack,
@@ -130,7 +130,7 @@ export class Requests {
         state.removeRequest(channel, threadTs, shownAt);
       } catch (error) {
         logger.warning(
-          `could not clear a setup message from state.json in ${channel}/${threadTs}: ${errorName(error)}`,
+          `could not clear a setup message from state.json in ${channel}/${threadTs}: ${describe(error)}`,
         );
       }
       const line = setupSummary(models, choice);
@@ -223,7 +223,7 @@ export class Requests {
         state.addRequest(channel, threadTs, shownAt);
       } catch (error) {
         logger.error(
-          `posted a hold in ${channel}/${threadTs} that state.json could not record: ${errorName(error)}`,
+          `posted a hold in ${channel}/${threadTs} that state.json could not record: ${describe(error)}`,
         );
       }
     }
@@ -244,7 +244,7 @@ export class Requests {
             throw error;
           }
           logger.warning(
-            `a cancelled hold in ${channel}/${threadTs} failed while applied: ${errorName(error)}`,
+            `a cancelled hold in ${channel}/${threadTs} failed while applied: ${describe(error)}`,
           );
         }
       }

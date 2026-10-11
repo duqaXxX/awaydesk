@@ -4,13 +4,14 @@
  * how its waits are said is the header of `session.ts`.
  */
 import type { ListedSession, Repository } from "../../agent/seam.ts";
+import { errorName } from "../../values.ts";
 import { bindableFolders } from "../folders.ts";
 import * as texts from "../texts.ts";
 import { DRAIN_POLL_SECONDS } from "./constants.ts";
 import type { SessionDeps } from "./deps.ts";
 import { checkDirectory } from "./directory.ts";
 import { DirectoryUnavailable, SessionClosed } from "./errors.ts";
-import { describe, logger, ThreadSession } from "./session.ts";
+import { logger, ThreadSession } from "./session.ts";
 import type { Event } from "./tasks.ts";
 
 function keyOf(channelId: string, threadTs: string): string {
@@ -347,7 +348,7 @@ export class SessionManager {
       } catch (error) {
         // one session's failure must not skip the rest
         logger.error(
-          `could not close ${session.channelId}/${session.threadTs}: ${describe(error)}`,
+          `could not close ${session.channelId}/${session.threadTs}: ${errorName(error)}`,
         );
       }
     }

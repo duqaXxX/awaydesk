@@ -19,7 +19,7 @@ import {
   query as sdkQuery,
 } from "@anthropic-ai/claude-agent-sdk";
 import { getLogger } from "../../log.ts";
-import { isRecord } from "../../values.ts";
+import { errorName, isRecord } from "../../values.ts";
 import {
   type AgentInfo,
   type AgentSession,
@@ -136,11 +136,6 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
       return: async (): Promise<IteratorResult<T>> => ({ done: true, value: undefined }),
     };
   }
-}
-
-/** The name a log line gives a failure: the error's name, never its message. */
-function errorName(error: unknown): string {
-  return error instanceof Error ? error.name : typeof error;
 }
 
 function effortOf(level: string | null): EffortLevel | undefined {

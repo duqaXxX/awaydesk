@@ -41,7 +41,7 @@ import {
 import { take } from "../reply/chars.ts";
 import { describe } from "../reply/errors.ts";
 import { shownAsWritten } from "../reply/escape.ts";
-import { type Answers, type AppParts, errorName, isCancelled, logger } from "./answers.ts";
+import { type Answers, type AppParts, isCancelled, logger } from "./answers.ts";
 import { interactionActor, isOwner } from "./guards.ts";
 import {
   type Ack,
@@ -158,7 +158,7 @@ export class Open {
       });
     } catch (error) {
       if (signal?.aborted || isCancelled(error)) throw error;
-      logger.warning(`could not list files for a search: ${errorName(error)}`);
+      logger.warning(`could not list files for a search: ${describe(error)}`);
       return { paths: [], count: 0, complete: false };
     }
   }

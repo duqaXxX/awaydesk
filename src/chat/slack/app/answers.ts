@@ -17,7 +17,6 @@ import type { Approvals } from "../../../core/requests.ts";
 import { DirectoryUnavailable, SessionClosed, SessionGone } from "../../../core/sessions/errors.ts";
 import type { SessionManager } from "../../../core/sessions/manager.ts";
 import type { ThreadSession } from "../../../core/sessions/session.ts";
-import { describe as nameOf } from "../../../core/sessions/session.ts";
 import { Cancelled } from "../../../core/sessions/tasks.ts";
 import type { StateStore } from "../../../core/state.ts";
 import * as texts from "../../../core/texts.ts";
@@ -85,11 +84,6 @@ export interface AppParts {
 /** Whether a wait was cancelled: a task's signal aborted. */
 export function isCancelled(error: unknown): boolean {
   return error instanceof Cancelled;
-}
-
-/** The name of an error, as the session's own failures are named: never its words. */
-export function errorName(error: unknown): string {
-  return nameOf(error);
 }
 
 export class Answers {
@@ -241,8 +235,8 @@ export class Answers {
         await guarded(error.message);
         return;
       }
-      logger.error(`a request failed in ${channel}/${threadTs}: ${errorName(error)}`);
-      await guarded(fill(texts.ERROR_REPLY, { error: errorName(error) }));
+      logger.error(`a request failed in ${channel}/${threadTs}: ${describe(error)}`);
+      await guarded(fill(texts.ERROR_REPLY, { error: describe(error) }));
     }
   }
 
@@ -301,7 +295,7 @@ export class Answers {
       this.parts.state.removeRequest(channel, threadTs, ts);
     } catch (error) {
       logger.warning(
-        `could not clear a deleted request from state.json in ${channel}: ${errorName(error)}`,
+        `could not clear a deleted request from state.json in ${channel}: ${describe(error)}`,
       );
     }
   }
@@ -363,7 +357,7 @@ export class Answers {
         }
       } catch (error) {
         if (isCancelled(error)) throw error;
-        logger.warning(`could not list a folder's sessions: ${errorName(error)}`);
+        logger.warning(`could not list a folder's sessions: ${describe(error)}`);
       }
     }
 

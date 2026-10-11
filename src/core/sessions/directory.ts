@@ -3,7 +3,7 @@ import { realpathSync, statSync } from "node:fs";
 import { opendir, stat } from "node:fs/promises";
 import { isAbsolute, sep } from "node:path";
 import { errorCode } from "../../values.ts";
-import { expandUser, resolvePath } from "../paths.ts";
+import { ABSENT, expandUser, resolvePath } from "../paths.ts";
 import * as texts from "../texts.ts";
 import { DirectoryMissing, DirectoryUnreadable, DirectoryUntrusted } from "./errors.ts";
 
@@ -16,15 +16,17 @@ export async function checkDirectory(
   trusted: (folder: string) => Promise<boolean>,
 ): Promise<void> {
   // One stat and one directory open on a local folder, as a session start always made them.
-  const found = await stat(directory).catch(() => null);
-  if (found === null || !found.isDirectory()) throw new DirectoryMissing(directory);
+  // A folder the daemon is not let into is unreadable at either: at the stat when a folder
+  // above it is closed, at the open when it is closed itself. Python's `is_dir` raised at the
+  // first, and the owner read the error's name where the second told him what to grant.
   try {
+    if (!(await stat(directory)).isDirectory()) throw new DirectoryMissing(directory);
     await (await opendir(directory)).close();
   } catch (error) {
+    const code = errorCode(error);
     // Python's `PermissionError` is these two.
-    if (errorCode(error) === "EACCES" || errorCode(error) === "EPERM") {
-      throw new DirectoryUnreadable(directory);
-    }
+    if (code === "EACCES" || code === "EPERM") throw new DirectoryUnreadable(directory);
+    if (code !== undefined && ABSENT.has(code)) throw new DirectoryMissing(directory);
     throw error;
   }
   if (!(await trusted(directory))) throw new DirectoryUntrusted(directory);

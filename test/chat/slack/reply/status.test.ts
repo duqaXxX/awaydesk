@@ -512,6 +512,25 @@ test("a thread status that changes its words says the new ones at once", async (
   assert.deepEqual(statuses(slack).at(-1), CLEARED);
 });
 
+test("a thread status that fails below Slack is logged by the name the rest of the log uses", async () => {
+  // `status.ts` named a failure by its class alone: a reset connection read `Error` here and
+  // `ECONNRESET` in every other line of the log.
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const log = new Lines();
+  slack.responses["assistant.threads.setStatus"] = Object.assign(new Error("socket hang up"), {
+    code: "ECONNRESET",
+  });
+  const status = threadStatus(slack, clock, { refresh: 10 }, log);
+  status.show(texts.THREAD_WORKING);
+  await beat(clock);
+  await status.close();
+  assert.deepEqual(
+    log.warnings.filter((line) => line.includes("setStatus")),
+    [`assistant.threads.setStatus failed on ${CHANNEL}/${THREAD}: ECONNRESET`],
+  );
+});
+
 test("a clearing call that fails is tried once more", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();

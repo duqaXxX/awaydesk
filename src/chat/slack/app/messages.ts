@@ -42,14 +42,7 @@ import {
 import { describe } from "../reply/errors.ts";
 import { markdownEscape, mrkdwnEscape } from "../reply/escape.ts";
 import { TITLE_LIMIT } from "../resume.ts";
-import {
-  type Answers,
-  type AppParts,
-  errorName,
-  isCancelled,
-  logger,
-  type Report,
-} from "./answers.ts";
+import { type Answers, type AppParts, isCancelled, logger, type Report } from "./answers.ts";
 import type { Open } from "./open.ts";
 import type { Requests } from "./requests.ts";
 import type { ResumeBind } from "./resume-bind.ts";
@@ -630,7 +623,7 @@ export class Messages {
           for (const session of dated) known.set(session.id, session);
         } catch (error) {
           if (isCancelled(error)) throw error;
-          logger.warning(`could not list a folder's sessions: ${errorName(error)}`);
+          logger.warning(`could not list a folder's sessions: ${describe(error)}`);
         }
       }
       lines.push(

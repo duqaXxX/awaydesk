@@ -25,13 +25,12 @@
  * - The two process-wide flags are module state; `resetStatusFlags` is what Python's tests did
  *   with their autouse fixture.
  */
-import { WebAPIPlatformError, type WebClient } from "@slack/web-api";
+import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
 import * as texts from "../../../core/texts.ts";
 import { getLogger, type Logger } from "../../../log.ts";
+import { describe } from "./errors.ts";
 
-// Kept local until `reply/clock.ts` exists: the part of a clock this module needs.
-/** Time on a clock's own scale, in seconds, and a sleep the signal can cut short. */
 export const logger = getLogger("awaydesk.chat.slack.reply.status");
 
 // Slack removes a status two minutes after it was set (the method's reference): set again well
@@ -63,12 +62,6 @@ let refusedStatus = false;
 export function resetStatusFlags(): void {
   missingScope = false;
   refusedStatus = false;
-}
-
-/** Slack's error code, or the error's class name: never the request or its content. */
-function describe(error: unknown): string {
-  if (error instanceof WebAPIPlatformError) return String(error.data.error);
-  return error instanceof Error ? error.constructor.name : typeof error;
 }
 
 /** `asyncio.Lock`: first come, first served; a waiter can leave through its signal. */

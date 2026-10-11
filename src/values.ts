@@ -20,7 +20,12 @@ export function errorCode(error: unknown): string | undefined {
     : undefined;
 }
 
-/** The name a log line gives a failure: the errno code of a system error, else the error's name. */
+/**
+ * The name of a failure, all a log line or a reply may say of it, never its words: the code of
+ * a system error (`EACCES`), else the name the error gives itself (a `ChatError` is named by
+ * the chat's code), else its class, as Python's `type(exc).__name__` named it.
+ */
 export function errorName(error: unknown): string {
-  return error instanceof Error ? (errorCode(error) ?? error.name) : typeof error;
+  if (!(error instanceof Error)) return typeof error;
+  return errorCode(error) ?? (error.name !== "Error" ? error.name : error.constructor.name);
 }

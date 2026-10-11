@@ -28,3 +28,16 @@ test("a system error is named by its code and any other error by its name", () =
   assert.equal(errorName("text"), "string");
   assert.equal(errorName(null), "object");
 });
+
+test("an error with no code is named by the name it gives itself, else by its class", () => {
+  // Python named a failure `type(exc).__name__`; a class here may or may not set `name`.
+  class Unnamed extends Error {}
+  class Named extends Error {
+    override name = "channel_not_found";
+  }
+  assert.equal(errorName(new Unnamed("words")), "Unnamed");
+  assert.equal(errorName(new Named("words")), "channel_not_found");
+  assert.equal(errorName(new Error("words")), "Error");
+  // The code comes first, whatever the class: it is what tells one system failure from another.
+  assert.equal(errorName(Object.assign(new Unnamed("words"), { code: "EACCES" })), "EACCES");
+});
