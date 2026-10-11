@@ -95,8 +95,12 @@ One message's way from the chat to the agent and back, with Slack and Claude Cod
    (`app.socketReceiver`). `app.buildApp` registered the listener for it when `SlackChat.start`
    opened the connection.
 2. Bolt acknowledges an event before its listener runs. The listener then checks the owner and the
-   workspace (`guards.isOwner`) and the channel (`ChannelGuard.refusal`), both through
-   `Answers.admitted`, and reads the payload into an `InboundMessage` (`messages.inboundMessage`).
+   workspace (`guards.isOwner`, through `Answers.fromOwner`) and, in the message's place among its
+   thread's (`order.ThreadOrder`), the channel (`ChannelGuard.refusal`, through
+   `Answers.channelAllowed`), and reads the payload into an `InboundMessage`
+   (`messages.inboundMessage`). The place is taken before the channel check and left when the
+   listener has called `ChatInbound.message`, so two messages of one thread are handed over in the
+   order their listeners were called although the check takes longer for one than for the other.
 3. The listener calls `ChatInbound.message`. The message flow (`messages.messages`) reads a message
    that starts with `!` with `commands.parseBang`, as one of the daemon's words (`words.wordFlow`)
    or as a passthrough to a command of the agent. Anything else is a prompt. A top-level message
@@ -370,7 +374,8 @@ logged and the rest still runs.
 
 A listener or a flow that was in flight when the stop ended goes on at its next step, since Node
 does not cancel it with the loop. From `ChatProvider.stop` it does nothing the owner can see: the
-flows end silently (`Talk.stopped`), the Slack listeners' `Answers.admitted` refuses, and nothing
+flows end silently (`Talk.stopped`), the Slack listeners' checks (`Answers.admitted`, or
+`Answers.fromOwner` and `Answers.channelAllowed` for a message) refuse, and nothing
 posts, reacts, opens a modal, submits a prompt or deletes a request. From the
 first line of `SessionManager.closeAll` the manager hands out no session (`get` answers null),
 and `open`, `resume` and `bind` throw `SessionClosed` before they read or write `state.json`;
@@ -537,7 +542,8 @@ The chat provider checks that it was the owner on every inbound path that acts (
 including a `!word`, a button, a form), each path on its own, before it calls `ChatInbound`: the
 core is never told of an act of anyone else, and the chat conformance suite holds that for every
 provider (a message, a click and a form from someone else never arrive). The Slack listeners run
-two checks, through `Answers.admitted`, before anything reaches Claude Code:
+two checks, through `Answers.admitted` (the `message` listener runs its two halves itself, in the
+order "Slack handlers" gives), before anything reaches Claude Code:
 
 1. `guards.isOwner`: the Slack user is the configured owner AND the workspace is the one `auth.test`
    reported at startup. A click from a user whose home workspace differs is refused
@@ -612,7 +618,9 @@ or nothing is written there; at each start the files older
 than 3 days are removed (`attachments.prepareUploads`), so a conversation resumed after a restart
 still finds its files. A refused file or a failed download sends nothing: `content` answers null after the provider told
 the owner which file and why. Prompts, messages with files and Claude Code commands enter the queue in the order
-they were sent, although downloads take a while (the arrival lock of `messages.messages`). A message that waited on its
+they were sent, although downloads take a while: the provider hands the messages of a thread over in the order
+its listeners were called (see "Slack handlers"), and the arrival lock of `messages.messages` keeps that order from
+there. A message that waited on its
 files is submitted to the thread's session as it is then; if that session closed meanwhile (an idle
 close, most likely), the submit is retried once against a freshly looked-up session for the same
 thread.
@@ -1689,6 +1697,19 @@ and Clean up, and its New thread link button, which is only acknowledged). The l
 of the classes of `src/chat/slack/app/` (`Requests`, `Open`, `ResumeBind`, `Clips`,
 `HomeControls`), which share `Answers`: the checks, where an answer goes, and how a failure is told.
 The app registers no slash command.
+
+The `message` listener is the one that keeps an order. It checks the owner and the workspace
+first, with nothing awaited (`Answers.fromOwner`), so that an event from anyone else takes no
+place and reaches no Slack call. Then it takes its place among the messages of its thread
+(`ThreadOrder.enter`, keyed by channel and thread, before its first await), waits for the places
+taken before it, runs the channel check (`Answers.channelAllowed`) inside it and calls
+`ChatInbound.message`, or `Clips.takeClip` for a clip, which ends the stretch: the place is left
+on that call's return, before the core's work on the message ends, so a later message never waits
+for a turn, a download or a setup the owner has not answered. A refused check leaves the place too.
+Threads do not wait for each other, and a thread's entry is dropped when its last place is left.
+Without the place, the channel checks of two messages ran side by side and the one that finished
+first was handed over first. The buttons and forms keep no such order: each names the message
+it answers.
 
 | The owner | The listener reads | The core decides |
 |---|---|---|

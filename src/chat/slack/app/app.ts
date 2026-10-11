@@ -80,6 +80,7 @@ import { type ChannelGuard, type Identity, isPromptMessage, messageActor } from 
 import { HomeControls } from "./home-controls.ts";
 import { filesOf, inboundMessage } from "./messages.ts";
 import { Open } from "./open.ts";
+import { ThreadOrder } from "./order.ts";
 import { Requests } from "./requests.ts";
 import { ResumeBind } from "./resume-bind.ts";
 import { type Ack, type Payload, str, text } from "./wire.ts";
@@ -253,6 +254,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   });
 
   const registered: Registration[] = [];
+  const order = new ThreadOrder();
 
   app.event("message", async ({ event, body }) => {
     const message = event as unknown as Payload;
@@ -262,20 +264,33 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     const channel = text(message.channel);
     const ts = str(message.ts);
     const threadTs = str(message.thread_ts || ts);
-    if (!(await answers.admitted(user, team, channel, threadTs)) || channel === null) return;
-    // (sync) From here to the turn the message takes among its thread's (`arrival` in
-    // `core/flows/messages.ts`): nothing is awaited between the checks above and the call.
-    const spoken = voice.clip(filesOf(message));
-    if (spoken !== null) {
-      await answers.replyOnFailure(channel, threadTs, () =>
-        clips.takeClip(channel, threadTs, ts, message, spoken),
-      );
-      return;
+    // The owner and the workspace first, with nothing awaited: anyone else takes no place.
+    if (!answers.fromOwner(user, team, channel)) return;
+    // (sync) The place among the thread's messages is taken in the order the listeners were
+    // called, before the first await: the channel check below takes longer for one message than
+    // for the next, and a message that passed it first would be handed over first. The place is
+    // left once the message is handed over (`arrival` in `core/flows/messages.ts` orders it from
+    // there), never held through the turn, a download or a setup the owner has not answered.
+    const place = order.enter(`${channel}\n${threadTs}`);
+    let handed: Promise<void>;
+    try {
+      await place.turn;
+      if (!(await answers.channelAllowed(channel, threadTs))) return;
+      // (sync) From the check to the call that hands the message over, nothing is awaited.
+      const spoken = voice.clip(filesOf(message));
+      // A failure of the prompt itself (or of the session it starts) lands in that session's
+      // thread: it is the turn's one push. A word answers where it was typed instead. The core
+      // tells the owner of a failure of its own.
+      handed =
+        spoken !== null
+          ? answers.replyOnFailure(channel, threadTs, () =>
+              clips.takeClip(channel, threadTs, ts, message, spoken),
+            )
+          : parts.inbound.message(inboundMessage(parts, answers, channel, threadTs, ts, message));
+    } finally {
+      place.leave();
     }
-    // A failure of the prompt itself (or of the session it starts) lands in that session's
-    // thread: it is the turn's one push. A word answers where it was typed instead. The core
-    // tells the owner of a failure of its own.
-    await parts.inbound.message(inboundMessage(parts, answers, channel, threadTs, ts, message));
+    await handed;
   });
 
   app.event("file_change", ({ event }) => clips.onFileChange(event as unknown as Payload));
