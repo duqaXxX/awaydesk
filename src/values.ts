@@ -15,7 +15,10 @@ export function records(value: unknown): Record<string, unknown>[] {
 
 /** The errno code of a system error (`ENOENT`, `EACCES`); undefined for anything else. */
 export function errorCode(error: unknown): string | undefined {
-  return error instanceof Error && "code" in error && typeof error.code === "string"
+  return error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    error.code !== ""
     ? error.code
     : undefined;
 }
@@ -23,9 +26,9 @@ export function errorCode(error: unknown): string | undefined {
 /**
  * The name of a failure, all a log line or a reply may say of it, never its words: the code of
  * a system error (`EACCES`), else the name the error gives itself (a `ChatError` is named by
- * the chat's code), else its class, as Python's `type(exc).__name__` named it.
+ * the chat's code). Never its class: a bundled library's is a minified name that changes with
+ * each release, so the daemon's own error classes set `name`.
  */
 export function errorName(error: unknown): string {
-  if (!(error instanceof Error)) return typeof error;
-  return errorCode(error) ?? (error.name !== "Error" ? error.name : error.constructor.name);
+  return error instanceof Error ? (errorCode(error) ?? error.name) : typeof error;
 }

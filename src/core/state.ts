@@ -7,6 +7,7 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import { dirname, join } from "node:path";
 import { getLogger } from "../log.ts";
+import { errorName } from "../values.ts";
 
 export const logger = getLogger("awaydesk.core.state");
 
@@ -105,7 +106,9 @@ export class UnknownChannel extends Error {
 }
 
 /** A part of the file has the wrong shape; the message becomes the detail of a `StateError`. */
-class Malformed extends Error {}
+class Malformed extends Error {
+  override name = "Malformed";
+}
 
 type Raw = Record<string, unknown>;
 
@@ -575,8 +578,7 @@ export class StateStore {
     try {
       this.onSessionsChange(changed);
     } catch (error) {
-      const name = error instanceof Error ? error.constructor.name : typeof error;
-      this.warn(`the session index was not told of a change: ${name}`);
+      this.warn(`the session index was not told of a change: ${errorName(error)}`);
     }
   }
 

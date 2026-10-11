@@ -68,6 +68,30 @@ test("a task that fails with nobody asking for its result is logged by name and 
   }
 });
 
+test("the words of a failure never pass for the place it was thrown", async () => {
+  // A stack opens with the message, and a message may hold a line that reads like a frame.
+  const lines = await logged(async () => {
+    const task = new Task(async () => {
+      throw new Error("could not read it:\n    at the words of the reply (not/a/place.ts:1:2)");
+    });
+    await task.settled();
+  });
+  assert.equal(lines.length, 1);
+  assert.doesNotMatch(lines[0] as string, /the words of the reply/);
+  assert.match(lines[0] as string, /a task failed: Error \(at .*tasks\.test\.ts:\d+:\d+\)$/);
+  // A stack that is no string names no place, and breaks nothing.
+  const odd = Object.assign(new Error("words"), { stack: 7 });
+  const others = await logged(async () => {
+    await new Task(async () => {
+      throw odd;
+    }).settled();
+  });
+  assert.deepEqual(
+    others.map((line) => line.replace(/^.*: a task failed: /, "")),
+    ["Error"],
+  );
+});
+
 test("a task whose result was asked for, and a task that was cancelled, are not logged", async () => {
   const lines = await logged(async () => {
     const asked = new Task(async () => {

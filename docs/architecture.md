@@ -1021,7 +1021,9 @@ any of the channel's threads is not idle (`SessionManager.bind`).
 A `ThreadSession` knows neither library. It starts its agent through `AgentBackend.start`, reads
 `SessionEvent`s, and writes its thread through `ThreadChat`. Its worker, its reader and its timers
 are tasks with an `AbortSignal` each (`tasks.Task`); a cancel aborts the signal, and every wait a
-cancel could interrupt takes it. A call that has begun is never cut: a write to the chat, the
+cancel could interrupt takes it. A task that fails with nothing waiting for its result is logged
+by the failure's name and the place it was thrown, never its words. A call that has begun is never
+cut: a write to the chat, the
 agent's start, a git call. The signal releases whoever waited for it, and where the result of such a
 call would be lost an explicit cleanup picks it up: an agent session whose start was given up is
 closed when the start returns (`ThreadSession.connect`).

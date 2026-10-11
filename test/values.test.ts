@@ -29,15 +29,17 @@ test("a system error is named by its code and any other error by its name", () =
   assert.equal(errorName(null), "object");
 });
 
-test("an error with no code is named by the name it gives itself, else by its class", () => {
-  // Python named a failure `type(exc).__name__`; a class here may or may not set `name`.
-  class Unnamed extends Error {}
+test("an error with no code is named by the name it gives itself, never by its class", () => {
+  // A class of a bundled library is a minified name (`Kn` for the Agent SDK's abort, SDK
+  // 0.3.296): it would reach a reply to the owner and change with each release.
+  class Kn extends Error {}
   class Named extends Error {
     override name = "channel_not_found";
   }
-  assert.equal(errorName(new Unnamed("words")), "Unnamed");
+  assert.equal(errorName(new Kn("words")), "Error");
   assert.equal(errorName(new Named("words")), "channel_not_found");
   assert.equal(errorName(new Error("words")), "Error");
-  // The code comes first, whatever the class: it is what tells one system failure from another.
-  assert.equal(errorName(Object.assign(new Unnamed("words"), { code: "EACCES" })), "EACCES");
+  // The code comes first: it is what tells one system failure from another. An empty one is none.
+  assert.equal(errorName(Object.assign(new Kn("words"), { code: "EACCES" })), "EACCES");
+  assert.equal(errorName(Object.assign(new Named("words"), { code: "" })), "channel_not_found");
 });

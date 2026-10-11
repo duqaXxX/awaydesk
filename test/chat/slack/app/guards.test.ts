@@ -166,7 +166,8 @@ test("a network failure reading the channel is a refusal", async () => {
     await new ChannelGuard(slack, IDENTITY, log).refusal(CHANNEL),
     texts.REASON_UNREADABLE,
   );
-  assert.deepEqual(log.lines, [`could not read channel ${CHANNEL}: WebAPIRequestError`]);
+  // Named as every other line of the log names a call that never reached Slack: by its cause.
+  assert.deepEqual(log.lines, [`could not read channel ${CHANNEL}: ENETUNREACH`]);
 });
 
 test("a file share names its workspace in the file", () => {

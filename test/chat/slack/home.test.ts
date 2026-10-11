@@ -606,7 +606,10 @@ const NEW_THREAD = "1789000500.000100";
 const EMPTY_THREAD = "1789000900.0001";
 
 /** An error whose class name is what the log line carries (Python: `OSError`). */
-class OSError extends Error {}
+/** Python's `OSError`, as Node gives one: an error with the system's code. */
+class OSError extends Error {
+  readonly code = "EIO";
+}
 
 function info(id: string, title: string): ListedSession {
   return { id, title, customTitle: null, branch: null, size: null, lastModified: 1 };
@@ -898,7 +901,7 @@ test("a folder that cannot be listed does not stop the page", async (t) => {
   });
   await home.publish();
   assert.equal(cards(published(w.slack)[0] as Json).length, 2);
-  assert.ok(warned().includes("OSError"));
+  assert.ok(warned().includes("EIO")); // the name of a system error is its code
 });
 
 test("a channel slack no longer has is left out with its threads and asked once", async (t) => {

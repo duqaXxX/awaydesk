@@ -4,10 +4,11 @@
  * Every inbound path calls these on its own: a button is never trusted because of the message it
  * sits on, and the channel is re-read from Slack each time, since membership can change.
  */
-import { WebAPIPlatformError, type WebClient } from "@slack/web-api";
+import type { WebClient } from "@slack/web-api";
 import * as texts from "../../../core/texts.ts";
 import { getLogger, type Logger } from "../../../log.ts";
 import { isSpace } from "../../../text.ts";
+import { describe } from "../reply/errors.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.app.guards");
 
@@ -128,12 +129,6 @@ export function isPromptMessage(event: Payload): boolean {
   );
 }
 
-/** What went wrong reading a channel, as a log line says it: Slack's error code, or the error's name. */
-function failure(error: unknown): string {
-  if (error instanceof WebAPIPlatformError) return error.data.error;
-  return error instanceof Error ? error.name : typeof error;
-}
-
 const SHARED_FLAGS = ["is_shared", "is_ext_shared", "is_org_shared", "is_pending_ext_shared"];
 
 export class ChannelGuard {
@@ -158,7 +153,7 @@ export class ChannelGuard {
       members = await this.#slack.conversations.members({ channel: channelId, limit: 10 });
     } catch (error) {
       // A network failure too: an unread channel is never trusted.
-      this.#log.warning(`could not read channel ${channelId}: ${failure(error)}`);
+      this.#log.warning(`could not read channel ${channelId}: ${describe(error)}`);
       return texts.REASON_UNREADABLE;
     }
     if (!truthy(info.is_private) || truthy(info.is_im) || truthy(info.is_mpim)) {

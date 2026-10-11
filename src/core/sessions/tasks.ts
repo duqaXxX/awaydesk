@@ -13,12 +13,20 @@ import { errorName } from "../../values.ts";
 
 export const logger = getLogger("awaydesk.core.sessions.tasks");
 
-/** Where an error was thrown, as a log line may say it: the first frame of its stack, never its words. */
+// A stack frame as V8 writes it: `at name (place:line:column)` or `at place:line:column`.
+const FRAME = /^\s+at (?:.+ \()?[^\s()]+:\d+:\d+\)?$/;
+
+/**
+ * Where an error was thrown, as a log line may say it: the first frame of its stack. The stack
+ * opens with the error's own words, which may run over several lines and may hold one that reads
+ * like a frame, so only what follows them is looked at, and only a line shaped as a frame.
+ */
 function thrownAt(error: unknown): string {
-  const frame =
-    error instanceof Error
-      ? error.stack?.split("\n").find((line) => /^\s+at /.test(line))
-      : undefined;
+  if (!(error instanceof Error) || typeof error.stack !== "string") return "";
+  const words = error.stack.indexOf(error.message);
+  if (words === -1) return "";
+  const frames = error.stack.slice(words + error.message.length).split("\n");
+  const frame = frames.find((line) => FRAME.test(line));
   return frame === undefined ? "" : ` (${frame.trim()})`;
 }
 

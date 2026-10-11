@@ -16,6 +16,7 @@ import { join } from "node:path";
 import type { ImagePart, PromptContent, TextPart } from "../../agent/seam.ts";
 import * as texts from "../../core/texts.ts";
 import { getLogger } from "../../log.ts";
+import { errorName } from "../../values.ts";
 import { mrkdwnEscape } from "./reply/escape.ts";
 
 /** A Slack file object, read field by field since it is wire data. */
@@ -358,9 +359,7 @@ export async function save(folder: string, file: SlackFile, data: Uint8Array): P
   try {
     await writeFile(path, data);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    const name = code ?? (error instanceof Error ? error.name : "Error");
-    throw new DownloadFailed(`could not be saved (${name})`, { cause: error });
+    throw new DownloadFailed(`could not be saved (${errorName(error)})`, { cause: error });
   }
   return path;
 }

@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import type { ModelTokens, Repository } from "../agent/seam.ts";
 import type { FooterFields, UsageLimit } from "../chat/seam.ts";
 import { getLogger } from "../log.ts";
+import { errorName } from "../values.ts";
 
 export const logger = getLogger("awaydesk.core.footer");
 
@@ -96,7 +97,7 @@ export class UsageCache {
         this.current = await this.fetch();
       } catch (error) {
         // The footer is optional: never let it break a reply. The name only, never the text.
-        this.warn(`usage refresh failed: ${error instanceof Error ? error.name : typeof error}`);
+        this.warn(`usage refresh failed: ${errorName(error)}`);
       }
       this.fetchedAt = this.clock();
     } finally {

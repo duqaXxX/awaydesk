@@ -316,8 +316,16 @@ All notable changes to this project are documented here. The format follows
     workspace <workspace id>`. A start that fails on a token Slack refuses logs `ERROR
     awaydesk.main: stopped by an unexpected error: <Slack's error>` and exits with status 1, in
     place of a traceback.
-  - Where a text names the error that stopped something (a failed download, a turn that failed),
-    the name is the runtime's (`TypeError`, `TimeoutError`, `Error`) in place of Python's class.
+  - Where a text or a log line names the error that stopped something (a failed download, a
+    turn that failed), the name is the code of a system error (`EACCES`, `ENOENT`), else the
+    name the error gives itself (`TypeError`, `TimeoutError`, `Error`), in place of Python's
+    class (`PermissionError`).
+  - A folder under one the daemon may not enter is answered as a folder it cannot read, with
+    how to grant access, as a folder closed itself already was. The Python daemon answered
+    ``Claude Code reported an error: `PermissionError` ``.
+  - A task of the daemon that fails with nothing waiting for its result is logged, by the
+    failure's name and the place it was thrown, as asyncio logged
+    `Task exception was never retrieved`.
   - An approval request prints a number with a whole value as JavaScript writes it: a `1.0` in
     a tool's input shows as `1`.
   - A background subagent that hands its report back no longer leaves a message of its own

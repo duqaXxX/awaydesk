@@ -38,11 +38,12 @@ import {
   STOP_TAIL_WAIT,
 } from "../../../src/core/sessions/constants.ts";
 import {
+  checkDirectory,
   resolveDirectory,
   shellQuote,
   terminalLine,
 } from "../../../src/core/sessions/directory.ts";
-import { SessionClosed } from "../../../src/core/sessions/errors.ts";
+import { DirectoryMissing, SessionClosed } from "../../../src/core/sessions/errors.ts";
 import { SessionManager } from "../../../src/core/sessions/manager.ts";
 import { ThreadSession } from "../../../src/core/sessions/session.ts";
 import { asked } from "../../../src/core/sessions/turn.ts";
@@ -1786,6 +1787,14 @@ test(
     assert.deepEqual(h.bodies(), [texts.fill(texts.DIRECTORY_UNREADABLE, { directory: inside })]);
   },
 );
+
+test("a path the system refuses to look at names no folder", async () => {
+  // A null in a path: Node throws before any call to the system. Python's `is_dir` said no.
+  await assert.rejects(
+    checkDirectory("/home/dev/pro\0ject", async () => true),
+    (error: unknown) => error instanceof DirectoryMissing,
+  );
+});
 
 /** The footer (the last context block) of every write that carried one, in order. */
 function statuses(h: Harness): string[] {

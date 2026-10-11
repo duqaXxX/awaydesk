@@ -26,7 +26,10 @@ export async function checkDirectory(
     const code = errorCode(error);
     // Python's `PermissionError` is these two.
     if (code === "EACCES" || code === "EPERM") throw new DirectoryUnreadable(directory);
-    if (code !== undefined && ABSENT.has(code)) throw new DirectoryMissing(directory);
+    // A path with a null in it is one Node refuses to look at: Python's `is_dir` said no.
+    if (code !== undefined && (ABSENT.has(code) || code === "ERR_INVALID_ARG_VALUE")) {
+      throw new DirectoryMissing(directory);
+    }
     throw error;
   }
   if (!(await trusted(directory))) throw new DirectoryUntrusted(directory);
