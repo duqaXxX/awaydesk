@@ -2,10 +2,19 @@
 import { realpathSync, statSync } from "node:fs";
 import { opendir, stat } from "node:fs/promises";
 import { isAbsolute, sep } from "node:path";
+import type { AgentBackend } from "../../agent/seam.ts";
 import { errorCode } from "../../values.ts";
 import { ABSENT, expandUser, resolvePath } from "../paths.ts";
 import * as texts from "../texts.ts";
 import { DirectoryMissing, DirectoryUnreadable, DirectoryUntrusted } from "./errors.ts";
+
+/**
+ * `agent`'s record of trust as `checkDirectory` and the folder list read it. An agent that
+ * keeps none (`folderTrust`) has no gate to start a session behind: every folder counts.
+ */
+export function trustedBy(agent: AgentBackend): (folder: string) => Promise<boolean> {
+  return async (folder) => !agent.capabilities.folderTrust || agent.folderTrusted(folder);
+}
 
 /**
  * Rejects with the `DirectoryUnavailable` that keeps a session from starting in `directory`,

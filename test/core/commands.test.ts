@@ -289,3 +289,22 @@ test("login and logout are answered on the host, whatever their case", () => {
   );
   assert.equal(hostOnly({ kind: "passthrough", text: "compact" }, NAMES), null);
 });
+
+test("an agent with no commands of its own has none listed, refused or run on the host", () => {
+  const listed = recordedCommands().slice(0, 2);
+  const help = helpText(listed, "", markdownEscape, NAMES, false);
+  // The daemon's own words and the rule that tells them from a text, and nothing of the agent's.
+  assert.ok(help.includes(texts.HELP_OWN) && help.includes(texts.HELP_RULE));
+  assert.ok(!help.includes(texts.named(texts.HELP_AGENT, NAMES)));
+  assert.ok(listed.every((entry) => !help.includes(`!${entry.name}`)));
+  assert.ok(
+    !helpText(null, "", markdownEscape, NAMES, false).includes(
+      texts.named(texts.HELP_UNBOUND, NAMES),
+    ),
+  );
+  assert.deepEqual([...refusedInThread(null, false)], []);
+  assert.equal(hostOnly({ kind: "passthrough", text: "login" }, NAMES, false), null);
+  // The same calls for an agent that has them are as before.
+  assert.ok(refusedInThread(null).has("clear"));
+  assert.notEqual(hostOnly({ kind: "passthrough", text: "login" }, NAMES), null);
+});

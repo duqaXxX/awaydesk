@@ -996,3 +996,95 @@ test("a reply keeps the answers of a question it holds the line of, and shows th
     [["complete", "· Which color do you prefer? → Blue", true]],
   );
 });
+
+/** What a sink was handed, in order: a text with its options, or a task line by its id. */
+class OrderedSink extends RecordingSink {
+  log: Array<readonly ["text", string] | readonly ["task", string]> = [];
+
+  override async text(
+    markdown: string,
+    options: { readonly notice?: boolean; readonly ending?: boolean } = {},
+  ): Promise<void> {
+    this.log.push(["text", `${options.notice ? "notice:" : ""}${markdown}`]);
+    await super.text(markdown, options);
+  }
+
+  override async task(update: TaskUpdate): Promise<void> {
+    this.log.push(["task", `${update.id}:${update.status}`]);
+    await super.task(update);
+  }
+
+  /** The log with the texts between two task lines put together as one. */
+  get whole(): Array<readonly [string, string]> {
+    const merged: Array<readonly [string, string]> = [];
+    for (const entry of this.log) {
+      const last = merged.at(-1);
+      if (entry[0] === "text" && last?.[0] === "text" && !entry[1].startsWith("notice:")) {
+        merged[merged.length - 1] = ["text", last[1] + entry[1]];
+      } else {
+        merged.push(entry);
+      }
+    }
+    return merged;
+  }
+}
+
+async function renderOrdered(
+  events: readonly SessionEvent[],
+  streaming: boolean,
+): Promise<OrderedSink> {
+  const sink = new OrderedSink();
+  const renderer = new TurnRenderer<string>(sink, NAMES, null, streaming);
+  for (const event of events) await renderer.feed(event);
+  await renderer.close("footer");
+  await renderer.closeOut();
+  return sink;
+}
+
+for (const name of ["tools", "foreground", "tool-error", "subagent", "ask"]) {
+  test(`without native streaming each text reaches the sink whole, in place [${name}]`, async () => {
+    const events = recordedEvents(name);
+    const streamed = await renderOrdered(events, true);
+    const whole = await renderOrdered(events, false);
+    // The same texts and lines in the same order; only the pieces of a text are put together.
+    assert.deepEqual(whole.log, streamed.whole);
+    assert.ok(whole.texts.length <= streamed.texts.length);
+    assert.deepEqual(whole.finished, streamed.finished);
+    assert.equal(whole.closedOut, streamed.closedOut);
+  });
+}
+
+test("without native streaming a text of several pieces is one write", async () => {
+  const events = recordedEvents("tools");
+  const streamed = await renderOrdered(events, true);
+  const whole = await renderOrdered(events, false);
+  const pieces = streamed.log.filter(([kind]) => kind === "text").length;
+  const texts = whole.log.filter(([kind]) => kind === "text").length;
+  assert.ok(pieces > texts, `${pieces} pieces became ${texts} texts`);
+  // Each text of the message once: none is cut in two, none repeated.
+  assert.equal(new Set(whole.texts).size, whole.texts.length);
+});
+
+test("without native streaming a text waits for its end, and a notice does not reorder it", async () => {
+  const sink = new OrderedSink();
+  const renderer = new TurnRenderer<string>(sink, NAMES, null, false);
+  await renderer.feed({ type: "text_started", messageId: "m", parentCallId: null });
+  await renderer.feed({ type: "text_delta", messageId: "m", text: "Hello ", parentCallId: null });
+  await renderer.feed({ type: "text_delta", messageId: "m", text: "there", parentCallId: null });
+  assert.deepEqual(sink.log, [], "nothing is handed over while the text is being written");
+  await renderer.feedError("what a restart dropped");
+  assert.deepEqual(sink.log, [
+    ["text", "Hello there"],
+    ["text", "notice:\n\nwhat a restart dropped"],
+  ]);
+});
+
+test("without native streaming the last text is handed over when the reply closes", async () => {
+  const sink = new OrderedSink();
+  const renderer = new TurnRenderer<string>(sink, NAMES, null, false);
+  await renderer.feed({ type: "text_started", messageId: "m", parentCallId: null });
+  await renderer.feed({ type: "text_delta", messageId: "m", text: "done", parentCallId: null });
+  await renderer.close(null);
+  assert.deepEqual(sink.log, [["text", "done"]]);
+  assert.notEqual(sink.finished, null);
+});

@@ -198,17 +198,19 @@ export function unformatted(text: string, blocks: unknown): string {
  * those its thread refuses (`refusedInThread`), keeping only the lines whose name or description
  * contains `query`, ignoring case. With no query, the rule that tells a command from a text comes
  * first. `escapeMarkdown` is the chat provider's escape for a markdown block; `names` fill the
- * texts that name the agent and the chat.
+ * texts that name the agent and the chat. An agent with no commands of its own
+ * (`agentCommands` false) has none listed, and no line about where they are listed.
  */
 export function helpText(
   commands: readonly CommandInfo[] | null,
   query: string,
   escapeMarkdown: (text: string) => string,
   names: texts.Names,
+  agentCommands = true,
 ): string {
   const keep = (line: string): boolean => line.toLowerCase().includes(query.toLowerCase());
   const own = texts.HELP_WORDS.map((word) => texts.named(word, names)).filter(keep);
-  const refused = refusedInThread(commands);
+  const refused = refusedInThread(commands, agentCommands);
   const offered = (commands ?? []).filter((c) => !refused.has(c.name.toLowerCase()));
   const session = offered
     .toSorted((a, b) => compareCodePoints(a.name, b.name))
@@ -217,9 +219,9 @@ export function helpText(
     .map(([usage, description]) => `${usage} ${escapeMarkdown(description)}`.replace(TRAILING, ""));
   // The rule heads the whole list; a search shows its matches alone.
   const lines = [texts.HELP_OWN, ...(query ? [] : [texts.HELP_RULE]), ...own];
-  if (commands === null) {
+  if (agentCommands && commands === null) {
     lines.push(texts.named(texts.HELP_UNBOUND, names));
-  } else {
+  } else if (agentCommands) {
     lines.push(texts.named(texts.HELP_AGENT, names), ...session);
   }
   if (query && own.length === 0 && session.length === 0) {
@@ -229,19 +231,30 @@ export function helpText(
 }
 
 /**
- * The answer to a command that is only ever run on the host (`HOST_ONLY`), or null for any other:
- * the caller sends that answer and nothing to Claude Code.
+ * The answer to a command that is only ever run on the host (`HOST_ONLY`), or null for any other,
+ * and for every one when the agent has no commands of its own (`agentCommands` false): the caller
+ * sends that answer and nothing to Claude Code.
  */
-export function hostOnly(command: Passthrough, names: texts.Names): string | null {
+export function hostOnly(
+  command: Passthrough,
+  names: texts.Names,
+  agentCommands = true,
+): string | null {
+  if (!agentCommands) return null; // no command is the agent's, so none is run on the host
   const answer = HOST_ONLY.get((command.text.split(" ", 1)[0] as string).toLowerCase());
   return answer === undefined ? null : texts.named(answer, names);
 }
 
 /**
  * The command names a thread refuses, lowercase: `NEW_SESSION_NAMES`, with every alias the
- * session's own list (`commands`, null or empty before it connects) gives one of them.
+ * session's own list (`commands`, null or empty before it connects) gives one of them. None
+ * for an agent with no commands of its own (`agentCommands` false).
  */
-export function refusedInThread(commands: readonly CommandInfo[] | null): ReadonlySet<string> {
+export function refusedInThread(
+  commands: readonly CommandInfo[] | null,
+  agentCommands = true,
+): ReadonlySet<string> {
+  if (!agentCommands) return new Set(); // an agent with no commands of its own has none to refuse
   const aliases = (commands ?? [])
     .filter((command) => NEW_SESSION_NAMES.has(command.name.toLowerCase()))
     .flatMap((command) => command.aliases.map((alias) => alias.toLowerCase()));

@@ -722,11 +722,11 @@ test("rate limit event invalidates usage", async (t) => {
   const session = h.session();
   await (await session.submit("a")).done.wait();
   await h.until(() => h.usageFetches === 1);
-  await h.deps.usage.refreshIfStale();
+  await h.usage.refreshIfStale();
   assert.equal(h.usageFetches, 1); // still fresh
   h.clients[0]?.inject([at(events, 0)]);
   await h.sleep(0.05);
-  await h.deps.usage.refreshIfStale();
+  await h.usage.refreshIfStale();
   assert.equal(h.usageFetches, 2);
 });
 
@@ -1105,7 +1105,7 @@ test("closing a session does not cancel a pending usage refresh", async (t) => {
   const started = new AsyncEvent();
   const release = new AsyncEvent();
   let finished = false;
-  t.mock.method(h.deps.usage, "refreshIfStale", async () => {
+  t.mock.method(h.usage, "refreshIfStale", async () => {
     started.set();
     await release.wait();
     finished = true;

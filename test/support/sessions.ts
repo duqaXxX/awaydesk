@@ -45,6 +45,7 @@ import type {
   SessionEvent,
   StartOptions,
 } from "../../src/agent/seam.ts";
+import type { ChatCapabilities } from "../../src/chat/seam.ts";
 import { UpdateLimiter } from "../../src/chat/slack/reply/limiter.ts";
 import { resetStatusFlags } from "../../src/chat/slack/reply/status.ts";
 import { SlackChat } from "../../src/chat/slack/thread.ts";
@@ -394,6 +395,8 @@ export class FakeAgentBackend implements AgentBackend {
   readonly sessions: FakeAgentSession[] = [];
   /** What `listSessions` answers for a folder. */
   listed: ListedSession[] = [];
+  /** The members of the listing, the trust and the usage limits called, in order. */
+  readonly called: string[] = [];
   trusted: (folder: string) => Promise<boolean> = async () => true;
   repository: (folder: string, sessionFolder: string) => Promise<Repository | null> = (folder) =>
     anyRepository(folder);
@@ -414,6 +417,7 @@ export class FakeAgentBackend implements AgentBackend {
   }
 
   async listSessions(_folder: string): Promise<readonly ListedSession[]> {
+    this.called.push("listSessions");
     return this.listed;
   }
 
@@ -421,18 +425,22 @@ export class FakeAgentBackend implements AgentBackend {
     _folder: string,
     sessions: readonly ListedSession[],
   ): Promise<ListedSession[]> {
+    this.called.push("datedSessions");
     return [...sessions].sort((a, b) => b.lastModified - a.lastModified);
   }
 
   async aliveSessions(_folder: string): Promise<ReadonlySet<string> | null> {
+    this.called.push("aliveSessions");
     return new Set(this.listed.map((session) => session.id));
   }
 
   folderTrusted(folder: string): Promise<boolean> {
+    this.called.push("folderTrusted");
     return this.trusted(folder);
   }
 
   trustedRepository(folder: string, sessionFolder: string): Promise<Repository | null> {
+    this.called.push("trustedRepository");
     return this.repository(folder, sessionFolder);
   }
 
@@ -516,6 +524,42 @@ export interface HarnessOptions {
   readonly taskRepliesKept?: number;
   /** The client replies are written with, when it is not the one everything else goes through. */
   readonly replies?: FakeSlack;
+  /**
+   * What the sessions' chat declares instead of the provider's own. The sessions then write
+   * through a facade that records every call (`Harness.chatCalls`); without it they get the
+   * provider itself.
+   */
+  readonly chatCapabilities?: Partial<ChatCapabilities>;
+  /** `null`: no usage cache in the sessions' deps, as for an agent with no limits. */
+  readonly usage?: null;
+}
+
+/**
+ * `target` with every member called and every property read reported; `wrap` replaces what a
+ * member returns (a thread's reply, recorded in turn).
+ */
+function recording<T extends object>(
+  target: T,
+  seen: {
+    readonly call: (name: string, args: readonly unknown[]) => void;
+    readonly read: (name: string) => void;
+  },
+  wrap: (name: string, value: unknown) => unknown = (_name, value) => value,
+): T {
+  return new Proxy(target, {
+    get(object, name) {
+      const value = Reflect.get(object, name);
+      if (typeof name !== "string") return value;
+      if (typeof value !== "function") {
+        seen.read(name);
+        return value;
+      }
+      return (...args: unknown[]) => {
+        seen.call(name, args);
+        return wrap(name, value.apply(object, args));
+      };
+    },
+  });
 }
 
 export class Harness {
@@ -534,6 +578,18 @@ export class Harness {
   readonly deps: SessionDeps;
   manager: SessionManager;
   usageFetches = 0;
+  /** The usage cache of the sessions' deps; throws when the harness was made with none. */
+  get usage(): UsageCache {
+    if (this.deps.usage === null) throw new Error("the harness has no usage cache");
+    return this.deps.usage;
+  }
+
+  /** The members of the sessions' threads and replies called, when `chatCapabilities` is set. */
+  readonly chatCalls: string[] = [];
+  /** The properties of those threads read. */
+  readonly chatReads: string[] = [];
+  /** Every text handed to a reply, as the core handed it. */
+  readonly replyTexts: string[] = [];
 
   constructor(
     slack: FakeSlack,
@@ -561,20 +617,53 @@ export class Harness {
       }),
     });
     this.deps = {
-      chat: this.chat,
+      chat:
+        options.chatCapabilities === undefined
+          ? this.chat
+          : this.declaring(options.chatCapabilities),
       agent: this.backend,
       state: this.state,
       approvals: this.approvals,
-      usage: new UsageCache(async () => {
-        this.usageFetches += 1;
-        return { session: { percent: 5, resetsAt: null }, week: null };
-      }),
+      usage:
+        options.usage === null
+          ? null
+          : new UsageCache(async () => {
+              this.usageFetches += 1;
+              return { session: { percent: 5, resetsAt: null }, week: null };
+            }),
       holds: this.holds,
       clock: this.clock,
       ...(options.tasksKept !== undefined && { tasksKept: options.tasksKept }),
       ...(options.taskRepliesKept !== undefined && { taskRepliesKept: options.taskRepliesKept }),
     };
     this.manager = new SessionManager(this.deps);
+  }
+
+  /** The provider as the sessions see it when the test chooses what the chat declares. */
+  private declaring(declared: Partial<ChatCapabilities>): SlackChat {
+    const capabilities = { ...this.chat.capabilities, ...declared };
+    const seen = {
+      call: (name: string, args: readonly unknown[]) => {
+        this.chatCalls.push(name);
+        if (name === "text" && typeof args[0] === "string") this.replyTexts.push(args[0]);
+      },
+      read: (name: string) => {
+        this.chatReads.push(name);
+      },
+    };
+    const reply = (name: string, value: unknown): unknown =>
+      name === "openReply" ? recording(value as object, seen) : value;
+    return new Proxy(this.chat, {
+      get: (object, name) => {
+        if (name === "capabilities") return capabilities;
+        if (name !== "thread") {
+          const value = Reflect.get(object, name);
+          return typeof value === "function" ? value.bind(object) : value;
+        }
+        return (ref: Parameters<SlackChat["thread"]>[0]) =>
+          recording(object.thread(ref), seen, reply);
+      },
+    });
   }
 
   /** A restart of the daemon: every session closed, then a new manager on the same state. */

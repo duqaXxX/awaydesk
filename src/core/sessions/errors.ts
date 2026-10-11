@@ -63,3 +63,14 @@ export class SessionGone extends Error {
     this.name = "SessionGone";
   }
 }
+
+/**
+ * `!bypass` was asked of an agent with no mode that skips permission requests: nothing was
+ * switched or stored.
+ */
+export class BypassUnavailable extends Error {
+  constructor() {
+    super("the agent has no bypass mode");
+    this.name = "BypassUnavailable";
+  }
+}

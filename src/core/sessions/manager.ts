@@ -10,7 +10,7 @@ import { bindableFolders } from "../folders.ts";
 import * as texts from "../texts.ts";
 import { DRAIN_POLL_SECONDS } from "./constants.ts";
 import type { SessionDeps } from "./deps.ts";
-import { checkDirectory } from "./directory.ts";
+import { checkDirectory, trustedBy } from "./directory.ts";
 import { DirectoryUnavailable, SessionClosed } from "./errors.ts";
 import { logger, ThreadSession } from "./session.ts";
 import type { Event } from "./tasks.ts";
@@ -53,9 +53,11 @@ export class SessionManager {
   /**
    * The repository holding `directory` when the daemon's git may run in it for a session
    * started in `sessionFolder`: the footer's own lookup, so what runs git for `!open` is what
-   * runs it for the footer.
+   * runs it for the footer. Null for an agent with no record of trust (`folderTrust`): the
+   * daemon's git runs in no folder then.
    */
-  repository(directory: string, sessionFolder: string): Promise<Repository | null> {
+  async repository(directory: string, sessionFolder: string): Promise<Repository | null> {
+    if (!this.deps.agent.capabilities.folderTrust) return null;
     return this.deps.agent.trustedRepository(directory, sessionFolder);
   }
 
@@ -261,12 +263,14 @@ export class SessionManager {
 
   /**
    * Every session of `directory`, the one the caller read for its channel; `dated`, by their
-   * last message, newest first, as the terminal's picker shows them.
+   * last message, newest first, as the terminal's picker shows them. None for an agent that
+   * lists none (`sessionListing`).
    */
   async sessionsIn(
     directory: string,
     options: { readonly dated?: boolean } = {},
   ): Promise<readonly ListedSession[]> {
+    if (!this.deps.agent.capabilities.sessionListing) return [];
     const found = await this.deps.agent.listSessions(directory);
     return options.dated ? this.dated(directory, found) : found;
   }
@@ -275,7 +279,8 @@ export class SessionManager {
    * `found`, sessions of `directory`, by their last message, newest first. Dating reads files,
    * so a caller that shows only some of a folder's sessions passes those alone.
    */
-  dated(directory: string, found: readonly ListedSession[]): Promise<ListedSession[]> {
+  async dated(directory: string, found: readonly ListedSession[]): Promise<ListedSession[]> {
+    if (!this.deps.agent.capabilities.sessionListing) return [];
     return this.deps.agent.datedSessions(directory, found);
   }
 
@@ -285,11 +290,7 @@ export class SessionManager {
    */
   async unavailable(directory: string): Promise<DirectoryUnavailable | null> {
     try {
-      await checkDirectory(
-        directory,
-        (folder) => this.deps.agent.folderTrusted(folder),
-        this.names,
-      );
+      await checkDirectory(directory, trustedBy(this.deps.agent), this.names);
     } catch (error) {
       if (error instanceof DirectoryUnavailable) return error;
       throw error;
@@ -299,7 +300,7 @@ export class SessionManager {
 
   /** The folders under `root` where a session can start, as `bindableFolders` finds them. */
   foldersIn(root: string): Promise<string[]> {
-    return bindableFolders(root, (folder) => this.deps.agent.folderTrusted(folder));
+    return bindableFolders(root, trustedBy(this.deps.agent));
   }
 
   /**
