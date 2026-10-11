@@ -773,9 +773,45 @@ test("a start that fails with no session to resume rethrows the failure", LIMIT,
     start: [{ ...refusal, is_error: true }, fail(failure)],
   });
   const session = new ClaudeSession(CONFIG, handlerOf(), sdk.query);
-  await assert.rejects(session.ready(), (error) => error === failure);
+  // Issue #238: under the name of how the process ended, the SDK's error as its cause.
+  await assert.rejects(
+    session.ready(),
+    (error) => error instanceof Error && error.name === "ErrorResult" && error.cause === failure,
+  );
   assert.equal(sdk.only.closed, true);
 });
+
+test("a start that fails with other words rethrows the failure itself", LIMIT, async () => {
+  const failure = new Error("Claude Code executable not found at /nowhere");
+  const sdk = new FakeSdk({ initError: failure, start: [fail(failure)] });
+  const session = new ClaudeSession(CONFIG, handlerOf(), sdk.query);
+  await assert.rejects(session.ready(), (error) => error === failure);
+});
+
+test(
+  "a request the SDK rejects because the process ended fails under that name",
+  LIMIT,
+  async (t) => {
+    // Not measured on a real process: which message a request on a dead process is rejected with.
+    const failure = new Error("Claude Code process exited with code 1. stderr: a secret sentence");
+    const { session } = await started(t, {
+      rejects: { setModel: failure, interrupt: failure, getContextUsage: failure },
+    });
+    for (const request of [
+      () => session.setModel("haiku"),
+      () => session.interrupt(),
+      () => session.contextUsage(),
+    ]) {
+      await assert.rejects(request(), (error) => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.name, "ProcessExited");
+        assert.equal(error.message.includes("secret"), false);
+        assert.equal(error.cause, failure);
+        return true;
+      });
+    }
+  },
+);
 
 test(
   "a resume that fails to start with no error result is not a refused resume",

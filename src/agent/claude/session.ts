@@ -52,13 +52,27 @@ const LOST_PROCESS: readonly (readonly [start: string, name: string])[] = [
 ];
 
 /**
- * The name of what ended the stream: `errorName`, except for an error that names itself no
- * more than `Error` and whose message starts as one of `LOST_PROCESS`.
+ * The name of a failure of the SDK: `errorName`, except for an error that names itself no more
+ * than `Error` and whose message starts as one of `LOST_PROCESS`.
  */
 function lostName(error: unknown): string {
   const name = errorName(error);
   if (name !== "Error" || !(error instanceof Error)) return name;
   return LOST_PROCESS.find(([start]) => error.message.startsWith(start))?.[1] ?? name;
+}
+
+/** A Claude Code process that ended, named for how it did; the SDK's own error is its cause. */
+export class ProcessLostError extends Error {
+  constructor(name: string, cause: unknown) {
+    super("the Claude Code process ended", { cause });
+    this.name = name;
+  }
+}
+
+/** `error` as it leaves this class: under its name when it says the process ended, else itself. */
+function underItsName(error: unknown): unknown {
+  const name = lostName(error);
+  return name === errorName(error) ? error : new ProcessLostError(name, error);
 }
 // What a call is told when nobody could be asked about it. This layer does not import
 // `src/core/`, so the core's own text for it (`APPROVAL_UNPOSTED`) is not reused.
@@ -291,7 +305,19 @@ export class ClaudeSession implements AgentSession {
       await this.close();
       if (this.#config.resume !== null && this.#startRefused)
         throw new ResumeRefused({ cause: error });
-      throw error;
+      throw underItsName(error);
+    }
+  }
+
+  /**
+   * Asks the query. The SDK rejects a request with the error that ended the process, when it
+   * did: that one leaves under its name, as the stream's own end does.
+   */
+  async #ask<T>(request: () => Promise<T>): Promise<T> {
+    try {
+      return await request();
+    } catch (error) {
+      throw underItsName(error);
     }
   }
 
@@ -303,19 +329,19 @@ export class ClaudeSession implements AgentSession {
   }
 
   async interrupt(): Promise<void> {
-    await this.#query.interrupt();
+    await this.#ask(() => this.#query.interrupt());
   }
 
   async stopTask(taskId: string): Promise<void> {
-    await this.#query.stopTask(taskId);
+    await this.#ask(() => this.#query.stopTask(taskId));
   }
 
   async setPermissionMode(mode: PermissionMode): Promise<void> {
-    await this.#query.setPermissionMode(modeOf(mode));
+    await this.#ask(() => this.#query.setPermissionMode(modeOf(mode)));
   }
 
   async setModel(model: string | null): Promise<void> {
-    await this.#query.setModel(model ?? undefined);
+    await this.#ask(() => this.#query.setModel(model ?? undefined));
   }
 
   /**
@@ -323,11 +349,12 @@ export class ClaudeSession implements AgentSession {
    * 28 ms in the back end's own live check, both on 2026-10-10.
    */
   async setEffort(level: string | null): Promise<void> {
-    await this.#query.applyFlagSettings({ effortLevel: level === null ? null : effortOf(level) });
+    const effortLevel = level === null ? null : effortOf(level);
+    await this.#ask(() => this.#query.applyFlagSettings({ effortLevel }));
   }
 
   async contextUsage(): Promise<ContextUsage> {
-    return contextUsageOf(await this.#query.getContextUsage());
+    return contextUsageOf(await this.#ask(() => this.#query.getContextUsage()));
   }
 
   /**
@@ -335,7 +362,7 @@ export class ClaudeSession implements AgentSession {
    * session started in (measured 2026-10-10 on SDK 0.3.296): nothing else is asked.
    */
   async info(): Promise<AgentInfo> {
-    return agentInfo(await this.#query.initializationResult());
+    return agentInfo(await this.#ask(() => this.#query.initializationResult()));
   }
 
   /**

@@ -896,7 +896,9 @@ All notable changes to this project are documented here. The format follows
   (issue #238). `@anthropic-ai/claude-agent-sdk` 0.3.296 throws a plain `Error` for the three,
   with no class and no code, so the name was `Error`. The back end reads the start of the
   message, which is what the SDK's troubleshooting page prescribes (read 2026-10-11); the rest of
-  the message still reaches no log line and no reply. Not run against a real process that died.
+  the message still reaches no log line and no reply. The same holds for a start and for a
+  request the SDK rejects with one of those errors. Not run against a real process that died:
+  which message a request on a dead process is rejected with is not measured.
 - The crash repair keeps in `state.json` what the chat did not repair, and the next start asks
   again (issue #264). `repair.repair` cleared each of a thread's three fields once its repair had
   been attempted, successfully or not: with Slack answering HTTP 503 to every call of one start,
