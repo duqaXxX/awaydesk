@@ -44,7 +44,7 @@ export interface Binding extends BindFlow {
 }
 
 export function binding(deps: FlowDeps, talk: Talk): Binding {
-  const { chat, sessions, state, names, allowedRoot } = deps;
+  const { agent, chat, sessions, state, names, allowedRoot } = deps;
   const inNotice = (text: string): string => chat.escape(text, "notice");
 
   /** The folder a typed path or a pick names, inside the allowed root; null, told, otherwise. */
@@ -85,10 +85,12 @@ export function binding(deps: FlowDeps, talk: Talk): Binding {
     async list(channel) {
       const record = state.channel(channel);
       const folders = await sessions.foldersIn(allowedRoot);
-      const title = fill(
-        folders.length > 0 ? named(texts.BIND_LIST, names) : named(texts.BIND_EMPTY, names),
-        { root: allowedRoot },
-      );
+      // An agent with no record of trust is offered every folder: no title names its trust.
+      const trusted =
+        folders.length > 0 ? named(texts.BIND_LIST, names) : named(texts.BIND_EMPTY, names);
+      const title = fill(agent.capabilities.folderTrust ? trusted : texts.BIND_LIST_ANY, {
+        root: allowedRoot,
+      });
       await chat.channel(channel).offer(
         {
           type: "folders",

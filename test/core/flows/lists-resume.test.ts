@@ -302,20 +302,15 @@ class Unlisted extends PlainAgent {
   override readonly capabilities = { ...PLAIN_CAPABILITIES, sessionListing: false };
 }
 
-// What the core says today for an agent without `sessionListing`: the list it posts is empty,
-// and a typed target names nothing. No text says that the agent keeps no list.
-test("an agent with no session listing gets an empty list and finds no target", async (t) => {
-  const world = await ListsWorld.build(t, new Unlisted());
+test("an agent with no session listing is offered no list and finds no target", async (t) => {
+  const agent = new Unlisted();
+  const world = await ListsWorld.build(t, agent);
   await world.bound(world.app);
   world.remember(world.app, FIRST, "Fix the footer", 1_000);
+  const unlisted = `${agent.name} keeps no list of its sessions, so \`!resume\` has nothing to pick from.`;
   await world.flows.resume.word(await world.word(), "");
-  const [list] = world.chat.lists();
-  assert.ok(list?.list.type === "sessions");
-  if (list?.list.type !== "sessions") return;
-  assert.deepEqual(list.list.sessions, []);
-  assert.equal(list.list.held, 0);
+  assert.deepEqual(world.chat.lists(), []);
+  assert.deepEqual(world.said().slice(-1), [unlisted]);
   await world.flows.resume.word(await world.word(), FIRST);
-  assert.deepEqual(world.said().slice(-1), [
-    fill(texts.RESUME_NONE, { directory: world.app, target: FIRST }),
-  ]);
+  assert.deepEqual(world.said().slice(-1), [unlisted]);
 });

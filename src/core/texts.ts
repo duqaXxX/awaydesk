@@ -191,6 +191,8 @@ export const SESSION_CLOSED =
   "Nothing was done: this session closed while it ran (idle for a while, or the daemon " +
   "restarted). Send it again if it is still meant.";
 export const BIND_LIST = naming("Folders under `{root}` that {agent} trusts:");
+// The title of the list for an agent that keeps no record of trust: every folder is offered.
+export const BIND_LIST_ANY = "Folders under `{root}`:";
 export const BIND_EMPTY = naming(
   "No folder under `{root}` is trusted by {agent} yet. Open one in the terminal with " +
     "`{cli}` and accept the trust dialog, then send `!bind` again.",
@@ -329,6 +331,10 @@ export const APPROVAL_UNPOSTED = naming(
 export const APPROVAL_GONE =
   "This request is no longer pending: the turn ended or awaydesk restarted.";
 export const RESUME_LIST = "Sessions in `{directory}`, newest first:";
+// Shown only by an agent that keeps no list of its sessions.
+export const RESUME_UNLISTED = naming(
+  "{agent} keeps no list of its sessions, so `!resume` has nothing to pick from.",
+);
 // Two processes on one session share its file and not its conversation (measured 2026-10-03,
 // issue #41, SDK 0.2.163 beside a host CLI 2.1.288 process): each keeps the session as it loaded
 // it plus its own turns, and a later resume continues one of the two branches.

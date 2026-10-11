@@ -41,7 +41,7 @@ export interface Resuming extends ResumeFlow {
 }
 
 export function resuming(deps: FlowDeps, talk: Talk): Resuming {
-  const { chat, sessions, state, names, allowedRoot } = deps;
+  const { agent, chat, sessions, state, names, allowedRoot } = deps;
   const inNotice = (text: string): string => chat.escape(text, "notice");
 
   /** The channel is not bound: the owner is told, and nothing else happens. */
@@ -134,6 +134,10 @@ export function resuming(deps: FlowDeps, talk: Talk): Resuming {
       const record = state.channel(channel);
       if (record === null) {
         await unbound(channel);
+        return;
+      }
+      if (!agent.capabilities.sessionListing) {
+        await talk.inChannel(channel, named(texts.RESUME_UNLISTED, names));
         return;
       }
       const directory = record.directory;

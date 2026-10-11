@@ -10,7 +10,7 @@ import * as texts from "../../../src/core/texts.ts";
 import { OWNER } from "../../support/memory-chat.ts";
 import { ListsWorld } from "./lists-world.ts";
 
-const { fill, named } = texts;
+const { fill } = texts;
 
 test("a path inside the root binds the channel and says so", async (t) => {
   const world = await ListsWorld.build(t);
@@ -73,7 +73,8 @@ test("the list holds the folders a session can start in and the channel's own", 
   await world.flows.bind.list(world.channel);
   const [first, second] = world.chat.lists();
   const folders = await world.sessions.foldersIn(world.root);
-  const title = fill(named(texts.BIND_LIST, world.names), { root: world.root });
+  // The plain agent keeps no record of trust: the title names no trust.
+  const title = `Folders under \`${world.root}\`:`;
   assert.deepEqual(first?.list, { type: "folders", root: world.root, folders, bound: null });
   assert.deepEqual(second?.list, { type: "folders", root: world.root, folders, bound: world.docs });
   assert.deepEqual([first?.title, second?.title], [title, title]);
