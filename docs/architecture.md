@@ -493,7 +493,8 @@ for the error status (`ThreadChat.showStatus`), only where the chat has `reactio
 three calls answers whether the chat did it. An entry is cleared when its repair was made or the
 chat said its message is gone, and stays when the chat did not make it, so the next start asks
 again: a chat that keeps refusing is asked once at every start, for as long as the thread is in
-`state.json`. A failed `state.json` write here is logged and swallowed, never left to break
+`state.json`. A status the chat did not show keeps its word for the next start beside the error
+one as `ended`, which is what a list of the sessions reads first. A failed `state.json` write here is logged and swallowed, never left to break
 startup, and one thread's failure is logged and does not stop the others.
 
 The Slack provider's `endReply` (`src/chat/slack/repair.ts`) stops the message's stream
@@ -506,9 +507,11 @@ stop is the one notification the reply owes, and the edit never notifies; nothin
 message that cannot be read back, or is gone, is left as it is. Its `withdraw` deletes the message
 (`message_not_found` counts as done) and `showStatus` goes through the same `StatusReaction` a live
 session uses. Each of the three answers false when Slack did not do it and the message is still
-there: a read or a rewrite that failed, a delete that failed for another reason than the message
-being gone, a `reactions.add` that failed. A stop that failed is not one of them, since Slack ends
-a stream itself and the rewrite says the rest.
+there: a read or a rewrite that failed, a delete or a `reactions.add` that failed. A stop that
+failed is not one of them, since Slack ends a stream itself and the rewrite says the rest. Slack
+answering `channel_not_found`, `message_not_found` or `thread_not_found` (`errors.GONE`) says the
+message is gone, which counts as done. A reply that already carries the note in a context block is
+left as it is: a rewrite whose answer was lost may have landed.
 
 `lock.singleInstance` takes the lock by the mechanism of the platform, and a second process fails to
 start with `AlreadyRunning`. macOS is the only supported host.
@@ -1594,7 +1597,7 @@ link is kept per thread with that `ts` and asked again only when the `ts` change
 one call. It carries a query (`?thread_ts=…&cid=…`), written into the page with `&` escaped as
 mrkdwn takes it. `home.THREADS_AT_ONCE` threads are asked about at a time.
 
-Only three answers are final, the ones in `home.GONE`: `channel_not_found`, `message_not_found` and
+Only three answers are final, the ones in `errors.GONE`: `channel_not_found`, `message_not_found` and
 `thread_not_found`. The channel or the thread is then left out, a thread until a state write touches
 it again and a channel for the rest of the run. Any other failure (a rate limit, a server error, the
 network, a root in a shape that cannot be read) is no answer: nothing is kept from it, what was read

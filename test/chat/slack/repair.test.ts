@@ -264,7 +264,8 @@ test("a start Slack did not serve leaves the repair to the next one", async (t) 
   assert.deepEqual(thread(state).openReplies, ["1790000000.000001"]);
   assert.deepEqual(thread(state).requests, ["1790000000.000002"]);
   assert.equal(thread(state).status, Status.WAITING);
-  assert.equal(thread(state).ended, null);
+  // What the Home tab shows meanwhile: a session that does not run, and can be deleted.
+  assert.equal(thread(state).ended, Status.ERROR);
 
   const served = new FakeSlack();
   served.responses["conversations.replies"] = {
@@ -291,6 +292,58 @@ test("a start Slack did not serve leaves the repair to the next one", async (t) 
   const third = new FakeSlack();
   await repairCrash(third, state, new UpdateLimiter());
   assert.deepEqual(third.apiCalls, []);
+});
+
+test("a reply, a request and a root Slack no longer has count as repaired", async (t) => {
+  // The owner deleted the thread of a crashed session: nothing is left to ask about again.
+  resetStatusFlags();
+  const { state, slack } = makeState();
+  t.mock.method(logger, "warning", () => {});
+  state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002");
+  state.setStatusPending(CHANNEL, THREAD, Status.WORKING);
+  slack.responses["chat.stopStream"] = rejected("message_not_found");
+  slack.responses["conversations.replies"] = rejected("thread_not_found");
+  slack.responses["chat.delete"] = rejected("message_not_found");
+  slack.responses["reactions.add"] = rejected("message_not_found");
+  await repairCrash(slack, state, new UpdateLimiter());
+  assert.deepEqual(thread(state).openReplies, []);
+  assert.deepEqual(thread(state).requests, []);
+  assert.equal(thread(state).status, null);
+});
+
+test("a rewrite that fails because the message is gone counts as repaired", async (t) => {
+  const { state, slack } = makeState();
+  t.mock.method(logger, "warning", () => {});
+  slack.responses["conversations.replies"] = {
+    ok: true,
+    messages: [{ ts: "1790000000.000001", blocks: [] }],
+  };
+  slack.responses["chat.update"] = rejected("message_not_found");
+  state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
+  await repairCrash(slack, state, new UpdateLimiter());
+  assert.deepEqual(thread(state).openReplies, []);
+});
+
+test("a reply that already says it stopped is not rewritten again", async () => {
+  // A rewrite whose answer was lost keeps the entry, and may have landed: the next start reads
+  // the line this file wrote, alone or after the footer, and adds no second one.
+  for (const text of [texts.STOPPED_BEFORE_ANSWER, `1 turn · ${texts.STOPPED_BEFORE_ANSWER}`]) {
+    const { state, slack } = makeState();
+    slack.responses["conversations.replies"] = {
+      ok: true,
+      messages: [
+        {
+          ts: "1790000000.000001",
+          blocks: [{ type: "context", elements: [{ type: "mrkdwn", text }] }],
+        },
+      ],
+    };
+    state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
+    await repairCrash(slack, state, new UpdateLimiter());
+    assert.deepEqual(slack.callsTo("chat.update"), [], text);
+    assert.deepEqual(thread(state).openReplies, [], text);
+  }
 });
 
 test("a request Slack did not delete stays for the next start, beside one it did", async (t) => {

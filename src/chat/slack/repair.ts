@@ -22,7 +22,7 @@ import type { KnownBlock, WebClient } from "@slack/web-api";
 import { getLogger } from "../../log.ts";
 import { isRecord, records } from "../../values.ts";
 import { contextBlock } from "./reply/blocks.ts";
-import { describe, NOT_STREAMING } from "./reply/errors.ts";
+import { describe, gone, NOT_STREAMING } from "./reply/errors.ts";
 import type { Limiter } from "./reply/limiter.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.repair");
@@ -44,7 +44,9 @@ export const SLACK_BLOCKS = 50;
  * is logged and left alone: never replaced with a shorter form that would lose its content.
  * `note` is the line that says it stopped. Never rejects. False when the message is there and
  * was not rewritten (a failed read, a failed rewrite), so the caller can ask again; a stop that
- * failed is not a reason to, since Slack ends a stream itself and the rewrite says the rest.
+ * failed is not a reason to, since Slack ends a stream itself and the rewrite says the rest. A
+ * message Slack no longer has (`GONE`) counts as ended, and one that already carries `note` in
+ * a context block is left as it is: a rewrite whose answer was lost may have landed.
  */
 export async function endReply(
   slack: WebClient,
@@ -71,7 +73,7 @@ export async function endReply(
     logger.warning(
       `could not read a crashed reply's message in ${channelId}/${threadTs}: ${describe(error)}`,
     );
-    return false;
+    return gone(error);
   }
   const messages = records(isRecord(answer) ? answer.messages : undefined);
   const message = messages.find((found) => String(found.ts) === messageTs);
@@ -79,6 +81,7 @@ export async function endReply(
     logger.info(`a crashed reply's message is gone in ${channelId}/${threadTs}`);
     return true;
   }
+  if (saysStopped(records(message.blocks), note)) return true;
   let blocks: Block[] = records(message.blocks).map((block) =>
     block.type === "task_card" && RUNNING_CARD.includes(String(block.status))
       ? { ...block, status: "error" }
@@ -99,9 +102,18 @@ export async function endReply(
     logger.warning(
       `could not rewrite a crashed reply in ${channelId}/${threadTs}: ${describe(error)}`,
     );
-    return false;
+    return gone(error);
   }
   return true;
+}
+
+/** Whether a context block's text already ends with `note`: where this file writes it. */
+function saysStopped(blocks: Block[], note: string): boolean {
+  return blocks.some((block) => {
+    if (block.type !== "context") return false;
+    const first = records(block.elements)[0];
+    return typeof first?.text === "string" && first.text.endsWith(note);
+  });
 }
 
 /**

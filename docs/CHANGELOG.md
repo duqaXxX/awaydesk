@@ -885,7 +885,11 @@ All notable changes to this project are documented here. The format follows
   now cleared when its repair was made or the chat said its message is gone. For that the chat
   seam's `ThreadChat.endReply`, `ThreadChat.withdraw` and `ThreadChat.showStatus` answer a
   boolean, false when the chat did not do it and the message is still there, as
-  `ChannelChat.withdraw` already did. A repair Slack refuses every time (a rewrite it answers
+  `ChannelChat.withdraw` already did. With Slack, `channel_not_found`, `message_not_found` and
+  `thread_not_found` (`errors.GONE`, which the Home tab already read) say the message is gone; a
+  reply that already carries the stopped line is not rewritten a second time; and a root whose
+  status could not be shown is recorded as ended in error meanwhile, so the Home tab does not
+  list the session as running. A repair Slack refuses every time (a rewrite it answers
   `invalid_blocks` to, a `reactions.add` with the scope missing) is asked once at every start and
   logged, until the thread leaves `state.json`. Not run against Slack.
 - `listing.aliveSessions` answers "cannot tell" (null) when the `stat` of a folder's transcripts

@@ -7,7 +7,7 @@
  * stop clears these same fields itself, so a second start finds nothing to do. What the chat
  * did not repair stays in the state, and the next start asks again (issue #264).
  */
-import type { ChatProvider, ThreadChat } from "../../chat/seam.ts";
+import type { ChatProvider } from "../../chat/seam.ts";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import type { ThreadsState } from "../port/threads.ts";
@@ -44,10 +44,16 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
         } else left(channelId, threadId, "a request");
       }
       if (thread.status !== null) {
-        const ended = await repairStatus(chat, chatThread, thread.status);
-        if (ended !== undefined) {
-          safe(() => state.setStatusPending(channelId, threadId, null, ended));
-        } else left(channelId, threadId, "the status");
+        const { status } = thread;
+        const ended = endedWord(status);
+        // Shown through a thread object of its own: its first status also strips every other
+        // stray status from the root, more than removing the one name the state recorded.
+        const shown =
+          ended === null || !chat.capabilities.reactions || (await chatThread.showStatus("error"));
+        // Not shown: the word stays for the next start, and the ended one says meanwhile, to
+        // whoever lists the sessions, that this one does not run.
+        safe(() => state.setStatusPending(channelId, threadId, shown ? null : status, ended));
+        if (!shown) left(channelId, threadId, "the status");
       }
     } catch (error) {
       logger.error(
@@ -78,18 +84,11 @@ function safe(write: () => void): void {
 }
 
 /**
- * Shows the error status on a root left working or waiting, through a thread object of its
- * own (issue #19 fix round item 9): its first status also strips every other stray status
- * from the root, which is strictly more thorough than removing just the one name the state
- * recorded. Returns the stored word for the status asked for, the thread's ended one from now
- * on; null for a word that is neither; undefined when the chat did not show it.
+ * The stored word a root left working or waiting ends on, the error one; null for a word that
+ * is neither, which is cleared with nothing shown.
  */
-async function repairStatus(
-  chat: ChatProvider,
-  thread: Pick<ThreadChat, "showStatus">,
-  stored: string,
-): Promise<string | null | undefined> {
-  if (stored !== STORED_STATUS.working && stored !== STORED_STATUS.waiting) return null;
-  if (chat.capabilities.reactions && !(await thread.showStatus("error"))) return undefined;
-  return STORED_STATUS.error;
+function endedWord(stored: string): string | null {
+  return stored === STORED_STATUS.working || stored === STORED_STATUS.waiting
+    ? STORED_STATUS.error
+    : null;
 }

@@ -81,6 +81,20 @@ export function describeRefusal(error: unknown): string {
   return words;
 }
 
+// What Slack answers about a channel or a message it no longer has: the only refusals taken as
+// final by the Home tab and by the crash repair. Any other failure (a rate limit, a server
+// error, the network) is no answer.
+export const GONE: ReadonlySet<string> = new Set([
+  "channel_not_found",
+  "message_not_found",
+  "thread_not_found",
+]);
+
+/** Whether Slack answered that the channel or the message is not there any more. */
+export function gone(error: unknown): boolean {
+  return error instanceof WebAPIPlatformError && GONE.has(describe(error));
+}
+
 /**
  * Whether a failed call may have been applied: Slack answering with an error says it was not
  * (an error code, a rate limit, an HTTP status), anything else (a reset, a timeout) says nothing.
