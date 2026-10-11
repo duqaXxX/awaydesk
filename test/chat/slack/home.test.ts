@@ -517,27 +517,8 @@ test("the controls blocks change their id with the choice", () => {
   assert.ok(disjoint(ids(homeFilter({ search: "a" })), ids(homeFilter({ search: "b" }))));
 });
 
-// The mark is the first 8 hex digits of the SHA-256 of Python's `repr` of the filter, so a page
-// built for the same choice keeps the id it had under the Python daemon. The expected values were
-// computed with `hashlib.sha256(repr(HomeFilter(...)).encode()).hexdigest()[:8]` on 2026-10-10.
-test("the controls block id is the one the Python daemon wrote for the same choice", () => {
-  const ids = (chosen: HomeFilter): string[] =>
-    view([row()], chosen)
-      .blocks.filter((b: Json) => "block_id" in b)
-      .map((b: Json) => b.block_id);
-  const cases: [HomeFilter, string][] = [
-    [homeFilter(), "fef96678"],
-    [homeFilter({ channel: CHANNEL, search: 'it\'s "a" \\ é\n\u200b' }), "f6b5c36b"],
-    [homeFilter({ search: "it's", date: null }), "723d1034"],
-    [homeFilter({ search: "\x00\x7f\u{1F600}x\xa0\u{e0001}" }), "09f19add"],
-  ];
-  for (const [chosen, mark] of cases) {
-    assert.deepEqual(ids(chosen), [`home_filters:${mark}`, `home_search:${mark}`]);
-  }
-});
-
 function option(value: string): Json {
-  // A static_select's state, as tests/fixtures/slack/001-block_actions.json records its action.
+  // A static_select's state, as test/fixtures/slack/001-block_actions.json records its action.
   return { type: "static_select", selected_option: { value } };
 }
 

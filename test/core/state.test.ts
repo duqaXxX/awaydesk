@@ -838,10 +838,11 @@ test("prune leaves alone the threads it is told to keep", () => {
 
 // The cases below have no Python test: they pin the bytes and the readers the port must keep.
 
-// What the Python store wrote for the same calls (`json.dump(data, f, indent=2)`, captured from
-// `awaydesk.state` on 2026-10-10): two-space indent, key order of the code, every non-ASCII
-// character and DEL escaped, empty containers as `[]` and `{}`, and no trailing newline.
-const PYTHON_BYTES = String.raw`{
+// The bytes of `state.json` for the calls below, as the Python daemon wrote them (captured on
+// 2026-10-10): a file already on an owner's disk has this form, and the store keeps writing it.
+// Two-space indent, key order of the code, every non-ASCII character and DEL escaped, empty
+// containers as `[]` and `{}`, and no trailing newline.
+const STATE_BYTES = String.raw`{
   "version": 2,
   "channels": {
     "C000CHAN": {
@@ -921,8 +922,8 @@ test("the file is written byte for byte as the Python store wrote it", () => {
   store.setStatusPending(c, t1, "hourglass_flowing_sand");
   store.setStatusPending(o, t3, null, "white_check_mark");
   store.setSession(c, t2, "s-é ");
-  assert.equal(readFileSync(path, "utf8"), PYTHON_BYTES);
-  // And the Python bytes read back into the same state.
+  assert.equal(readFileSync(path, "utf8"), STATE_BYTES);
+  // And the same bytes read back into the same state.
   assert.deepEqual(new StateStore(path).threads(), store.threads());
 });
 

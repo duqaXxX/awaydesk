@@ -1,11 +1,8 @@
 /**
- * The proof that `FakeSlack` answers as Python's did: the Slack tests of `tests/test_fakes.py`,
- * the TypeScript half (the funnel, the errors, the normalisation), and a replay of every golden
- * of the reply sink onto a fresh fake.
+ * What `FakeSlack` answers: Slack's recorded responses, the funnel every call goes through, the
+ * errors of `@slack/web-api` and the normalisation of the arguments.
  */
 import assert from "node:assert/strict";
-import { readdirSync } from "node:fs";
-import { join } from "node:path";
 import { test } from "node:test";
 import {
   type FetchFunction,
@@ -31,7 +28,7 @@ import {
   THREAD,
   timedOut,
 } from "./fake-slack.ts";
-import { GOLDEN, golden, type Json, type JsonObject } from "./fixtures.ts";
+import type { JsonObject } from "./fixtures.ts";
 
 // ported from tests/test_fakes.py
 
@@ -657,56 +654,3 @@ test("a sleep that is aborted rejects and is not woken later", async () => {
   await clock.advance(10);
   await assert.rejects(clock.sleep(1, abort.signal), /cancelled/);
 });
-
-// The goldens: the Slack calls the Python reply sink made, replayed onto a fresh fake.
-
-const GOLDENS = readdirSync(join(GOLDEN, "slack"))
-  .filter((file) => file.endsWith(".json"))
-  .map((file) => file.slice(0, -".json".length))
-  .sort();
-
-/** The library adds an empty `response_metadata` to every answer; the golden holds Slack's own. */
-function slacksOwn(answer: unknown): Json {
-  const { response_metadata: metadata, ...rest } = answer as JsonObject;
-  const empty =
-    typeof metadata === "object" && metadata !== null && Object.keys(metadata).length === 0;
-  return empty ? rest : (answer as JsonObject);
-}
-
-test("there is a golden for every recording", () => {
-  assert.equal(GOLDENS.length, 43);
-});
-
-for (const name of GOLDENS) {
-  test(`the fake answers as Python's did [${name}]`, async () => {
-    const recorded = golden("slack", name);
-    const calls = recorded.slack_calls as JsonObject[] | undefined;
-    if (calls === undefined) {
-      assert.equal(
-        typeof recorded.input_raises,
-        "string",
-        "a golden with neither calls nor a raise",
-      );
-      return;
-    }
-    const slack = new FakeSlack();
-    for (const [index, call] of calls.entries()) {
-      const method = call.method as string;
-      const answer = await bound(slack, method)(structuredClone(call.args as JsonObject));
-      assert.deepEqual(slacksOwn(answer), call.answer, `the answer to call ${index}, ${method}`);
-    }
-    assert.deepEqual(
-      slack.apiCalls,
-      calls.map((call) => ({ method: call.method, args: call.args })),
-    );
-    assert.deepEqual(
-      {
-        message_blocks: slack.messageBlocks(),
-        message_cards: slack.messageCards(),
-        message_texts: slack.messageTexts(),
-        pushes: slack.pushes(),
-      },
-      recorded.final,
-    );
-  });
-}

@@ -512,7 +512,7 @@ function streamEvents(wire: readonly JsonObject[], parent: string | null = null)
 
 /**
  * The stream events of one content block, in the shape the recorded streams have (see
- * `tests/fixtures/sdk/goal.jsonl`): a start, one delta per piece, a stop.
+ * `test/fixtures/sdk/goal.jsonl`): a start, one delta per piece, a stop.
  */
 function blockEvents(
   pieces: readonly string[],

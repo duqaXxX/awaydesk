@@ -16,7 +16,7 @@ import { type Choice, DEFAULT, DEFAULT_CHOICE, effortLevels } from "../../../src
 import * as texts from "../../../src/core/texts.ts";
 import { sdkJson } from "../../support/fixtures.ts";
 
-// The CLI's own list (tests/fixtures/sdk/server-info.json, Claude Code 2.1.286): the first entry
+// The CLI's own list (test/fixtures/sdk/server-info.json, Claude Code 2.1.286): the first entry
 // is `default`, and Haiku carries no effort fields at all.
 const MODELS: readonly ModelInfo[] = agentInfo(sdkJson("server-info")).models;
 
@@ -30,7 +30,7 @@ function choice(known: Partial<Choice> = {}): Choice {
 /**
  * `state.values` as Slack sends it for these controls: keyed by block_id, then action_id, and
  * all four controls share one `actions` block. static_select: recorded in
- * tests/fixtures/slack/000-block_actions.json (`selected_option` is null when nothing is
+ * test/fixtures/slack/000-block_actions.json (`selected_option` is null when nothing is
  * chosen). checkboxes: `selected_options`, an empty list when none is ticked: verified live on
  * 2026-09-30 (a ticked Start ran bypassPermissions in real Slack, CLI 2.1.285, slack-bolt
  * 1.30.0), and the field slack_sdk 3.44.1 models on `ViewStateValue`.

@@ -42,11 +42,6 @@
  "slack_calls": [
   {
    "after_sink_call": 0,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -66,11 +61,6 @@
   },
   {
    "after_sink_call": 1,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -87,11 +77,6 @@
   },
   {
    "after_sink_call": 2,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -109,11 +94,6 @@
   },
   {
    "after_sink_call": 3,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -131,11 +111,6 @@
   },
   {
    "after_sink_call": 4,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -153,11 +128,6 @@
   },
   {
    "after_sink_call": 5,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -175,11 +145,6 @@
   },
   {
    "after_sink_call": 6,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -194,11 +159,6 @@
   },
   {
    "after_sink_call": 7,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -213,11 +173,6 @@
   },
   {
    "after_sink_call": 8,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -232,11 +187,6 @@
   },
   {
    "after_sink_call": 9,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -251,11 +201,6 @@
   },
   {
    "after_sink_call": 10,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -270,11 +215,6 @@
   },
   {
    "after_sink_call": 11,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -289,11 +229,6 @@
   },
   {
    "after_sink_call": 12,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -308,11 +243,6 @@
   },
   {
    "after_sink_call": 13,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -327,11 +257,6 @@
   },
   {
    "after_sink_call": 14,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -346,11 +271,6 @@
   },
   {
    "after_sink_call": 15,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -365,11 +285,6 @@
   },
   {
    "after_sink_call": 16,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -384,11 +299,6 @@
   },
   {
    "after_sink_call": 17,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -403,11 +313,6 @@
   },
   {
    "after_sink_call": 18,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -422,11 +327,6 @@
   },
   {
    "after_sink_call": 19,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -441,11 +341,6 @@
   },
   {
    "after_sink_call": 20,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -460,11 +355,6 @@
   },
   {
    "after_sink_call": 21,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -479,11 +369,6 @@
   },
   {
    "after_sink_call": 22,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -498,11 +383,6 @@
   },
   {
    "after_sink_call": 23,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -517,11 +397,6 @@
   },
   {
    "after_sink_call": 24,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -536,11 +411,6 @@
   },
   {
    "after_sink_call": 25,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -555,11 +425,6 @@
   },
   {
    "after_sink_call": 26,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -574,11 +439,6 @@
   },
   {
    "after_sink_call": 27,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -593,11 +453,6 @@
   },
   {
    "after_sink_call": 28,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -612,11 +467,6 @@
   },
   {
    "after_sink_call": 29,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -631,11 +481,6 @@
   },
   {
    "after_sink_call": 30,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -650,11 +495,6 @@
   },
   {
    "after_sink_call": 31,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -669,11 +509,6 @@
   },
   {
    "after_sink_call": 32,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -688,11 +523,6 @@
   },
   {
    "after_sink_call": 33,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -707,11 +537,6 @@
   },
   {
    "after_sink_call": 34,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -729,11 +554,6 @@
   },
   {
    "after_sink_call": 35,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -751,11 +571,6 @@
   },
   {
    "after_sink_call": 36,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -772,11 +587,6 @@
   },
   {
    "after_sink_call": 38,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -791,11 +601,6 @@
   },
   {
    "after_sink_call": 39,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -810,11 +615,6 @@
   },
   {
    "after_sink_call": 40,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -829,11 +629,6 @@
   },
   {
    "after_sink_call": 41,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -848,11 +643,6 @@
   },
   {
    "after_sink_call": 42,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -867,11 +657,6 @@
   },
   {
    "after_sink_call": 43,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -886,11 +671,6 @@
   },
   {
    "after_sink_call": 44,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -905,11 +685,6 @@
   },
   {
    "after_sink_call": 45,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -924,11 +699,6 @@
   },
   {
    "after_sink_call": 46,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -943,11 +713,6 @@
   },
   {
    "after_sink_call": 47,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -962,11 +727,6 @@
   },
   {
    "after_sink_call": 48,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -981,11 +741,6 @@
   },
   {
    "after_sink_call": 49,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1000,11 +755,6 @@
   },
   {
    "after_sink_call": 50,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1019,11 +769,6 @@
   },
   {
    "after_sink_call": 51,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1038,11 +783,6 @@
   },
   {
    "after_sink_call": 52,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1057,11 +797,6 @@
   },
   {
    "after_sink_call": 53,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1078,11 +813,6 @@
   },
   {
    "after_sink_call": 55,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1097,11 +827,6 @@
   },
   {
    "after_sink_call": 56,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1116,11 +841,6 @@
   },
   {
    "after_sink_call": 57,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1135,11 +855,6 @@
   },
   {
    "after_sink_call": 58,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1154,11 +869,6 @@
   },
   {
    "after_sink_call": 59,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1173,11 +883,6 @@
   },
   {
    "after_sink_call": 60,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1192,11 +897,6 @@
   },
   {
    "after_sink_call": 61,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1211,11 +911,6 @@
   },
   {
    "after_sink_call": 62,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1230,11 +925,6 @@
   },
   {
    "after_sink_call": 63,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -1249,11 +939,6 @@
   },
   {
    "after_sink_call": 65,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "blocks": [
      {

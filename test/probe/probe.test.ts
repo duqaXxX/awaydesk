@@ -213,7 +213,7 @@ test("new and gone commands are told apart", () => {
   assert.deepEqual(found, { new: ["brand-new"], gone: ["retired"] });
   const told = report(found, "9.9.9");
   assert.ok(told.includes("[ ] /brand-new") && told.includes("[ ] /retired"));
-  assert.ok(told.includes("tests/fixtures/sdk/server-info.json"));
+  assert.ok(told.includes("test/fixtures/sdk/server-info.json"));
   const same = report(changes(new Set(["compact"]), new Set(["compact"])), "9.9.9");
   assert.equal(same, "Commands: the same as recorded (Claude Code 9.9.9).");
 });

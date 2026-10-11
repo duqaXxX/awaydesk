@@ -42,11 +42,6 @@
  "slack_calls": [
   {
    "after_sink_call": 0,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -66,11 +61,6 @@
   },
   {
    "after_sink_call": 1,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -87,11 +77,6 @@
   },
   {
    "after_sink_call": 2,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -106,11 +91,6 @@
   },
   {
    "after_sink_call": 3,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -125,11 +105,6 @@
   },
   {
    "after_sink_call": 4,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -144,11 +119,6 @@
   },
   {
    "after_sink_call": 5,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -163,11 +133,6 @@
   },
   {
    "after_sink_call": 6,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -182,11 +147,6 @@
   },
   {
    "after_sink_call": 7,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -201,11 +161,6 @@
   },
   {
    "after_sink_call": 9,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "blocks": [
      {
@@ -228,9 +183,6 @@
   },
   {
    "after_sink_call": 9,
-   "answer": {
-    "ok": true
-   },
    "args": {
     "blocks": [
      {

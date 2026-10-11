@@ -30,7 +30,7 @@ for (const feature of features()) {
 test("the checklist lists only what is left by hand", () => {
   const table = tableAt(
     "| Feature | Test suite | Probe | By hand |\n|---|---|---|---|\n" +
-      "| A | `test_a` | P1 | none |\n| B | `test_b` | none | Look at it |\n",
+      "| A | `test/a.test.ts` | P1 | none |\n| B | `test/b.test.ts` | none | Look at it |\n",
   );
   assert.deepEqual(
     features(table).map((f) => f.claims),
@@ -47,9 +47,9 @@ test("a changed header is an error not an empty map", () => {
 });
 
 const ROWS: [string, string][] = [
-  ["too few cells", "| A | `test_a` | none |"],
+  ["too few cells", "| A | `test/a.test.ts` | none |"],
   ["a bar inside a cell", "| A | `x | y` | none | none |"],
-  ["too many cells", "| A | `test_a` | P1 | none | extra |"],
+  ["too many cells", "| A | `test/a.test.ts` | P1 | none | extra |"],
 ];
 
 for (const [name, row] of ROWS) {

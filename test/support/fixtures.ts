@@ -1,12 +1,9 @@
-/**
- * The recordings the tests replay. They stay under `tests/fixtures/`, where the Python suite
- * reads them, until the Python tree is removed.
- */
+/** The recordings the tests replay, and the golden files made from them. */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..", "..");
-export const FIXTURES = join(ROOT, "tests", "fixtures");
+export const FIXTURES = join(ROOT, "test", "fixtures");
 export const GOLDEN = join(ROOT, "test", "golden");
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
@@ -45,7 +42,12 @@ export function slackPayload(name: string): JsonObject {
   return JSON.parse(readFileSync(join(FIXTURES, "slack", `${name}.json`), "utf8")) as JsonObject;
 }
 
-/** What the Python code produced at `seam` for a recording. */
+/** The recordings that have a golden file at `seam`. */
+export function goldenNames(seam: "reply" | "slack"): string[] {
+  return names(join(GOLDEN, seam), ".json");
+}
+
+/** What the code produced at `seam` for a recording when the goldens were last written. */
 export function golden(seam: "reply" | "slack", name: string): JsonObject {
   return JSON.parse(readFileSync(join(GOLDEN, seam, `${name}.json`), "utf8")) as JsonObject;
 }

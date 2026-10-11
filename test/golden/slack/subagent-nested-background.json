@@ -41,11 +41,6 @@
  "slack_calls": [
   {
    "after_sink_call": 0,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -65,11 +60,6 @@
   },
   {
    "after_sink_call": 1,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -87,11 +77,6 @@
   },
   {
    "after_sink_call": 2,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -106,11 +91,6 @@
   },
   {
    "after_sink_call": 3,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -128,11 +108,6 @@
   },
   {
    "after_sink_call": 4,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -150,11 +125,6 @@
   },
   {
    "after_sink_call": 5,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -171,11 +141,6 @@
   },
   {
    "after_sink_call": 6,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -192,11 +157,6 @@
   },
   {
    "after_sink_call": 8,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -211,11 +171,6 @@
   },
   {
    "after_sink_call": 9,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -230,11 +185,6 @@
   },
   {
    "after_sink_call": 10,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -249,11 +199,6 @@
   },
   {
    "after_sink_call": 11,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -268,11 +213,6 @@
   },
   {
    "after_sink_call": 12,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -289,11 +229,6 @@
   },
   {
    "after_sink_call": 16,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -308,11 +243,6 @@
   },
   {
    "after_sink_call": 17,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -327,11 +257,6 @@
   },
   {
    "after_sink_call": 18,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -346,11 +271,6 @@
   },
   {
    "after_sink_call": 19,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -365,11 +285,6 @@
   },
   {
    "after_sink_call": 20,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -384,11 +299,6 @@
   },
   {
    "after_sink_call": 21,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -403,11 +313,6 @@
   },
   {
    "after_sink_call": 22,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -422,11 +327,6 @@
   },
   {
    "after_sink_call": 23,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -441,11 +341,6 @@
   },
   {
    "after_sink_call": 25,
-   "answer": {
-    "channel": "C000CHAN",
-    "ok": true,
-    "ts": "1790000000.000001"
-   },
    "args": {
     "blocks": [
      {

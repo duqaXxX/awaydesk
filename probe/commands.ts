@@ -6,7 +6,7 @@
  *
  * - which commands are new, or gone: a new one is typed in Slack as `!name` from the day the SDK is
  *   pinned, so somebody has to see what it does there; `changes` compares the list a session is
- *   offered with `tests/fixtures/sdk/server-info.json`, the list recorded when the fixtures were;
+ *   offered with `test/fixtures/sdk/server-info.json`, the list recorded when the fixtures were;
  * - whether a command the limits page calls not offered still is: `notOffered` reads the page's
  *   table, and the scene `commands not offered` sends each one (claim P23).
  *
@@ -24,8 +24,8 @@ import type { PermissionAnswer, QuestionAnswer, RequestHandler } from "../src/ag
 
 const ROOT = join(import.meta.dirname, "..");
 const LIMITS = join(ROOT, "docs", "limits.md");
-const RECORDED = join(ROOT, "tests", "fixtures", "sdk", "server-info.json");
-const RECORDED_SHOWN = "tests/fixtures/sdk/server-info.json";
+const RECORDED = join(ROOT, "test", "fixtures", "sdk", "server-info.json");
+const RECORDED_SHOWN = "test/fixtures/sdk/server-info.json";
 const SDK_SECTION = "Limits of the Claude Agent SDK";
 // Claude Code's whole answer to a command it does not offer a session (measured 2026-10-09,
 // Claude Code 2.1.292, on 22 commands).

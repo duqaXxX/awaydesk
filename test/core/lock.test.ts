@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -27,14 +27,6 @@ const POSIX_ONLY = { skip: process.platform === "win32" };
 const MACOS_ONLY = {
   skip: process.platform === "darwin" ? false : "the directory lock is the macOS mechanism",
 };
-const HAS_PYTHON =
-  process.platform === "darwin" &&
-  spawnSync("python3", ["-c", "import fcntl"], { stdio: "ignore" }).status === 0;
-const PYTHON_FLOCK = {
-  skip: HAS_PYTHON ? false : "needs macOS and a python3 on the path",
-  timeout: 20000,
-};
-
 const made: string[] = [];
 
 /**
@@ -87,27 +79,6 @@ function holder(directory: string, taker: "singleInstance" | "socketLock"): Prom
     setTimeout(() => {}, 30000);
   `;
   return child(process.execPath, ["--input-type=module", "-e", script]);
-}
-
-/** A Python child that holds `flock(LOCK_EX | LOCK_NB)` on `directory`, as the Python daemon does. */
-function pythonHolder(directory: string): Promise<ChildProcess> {
-  const script = [
-    "import fcntl, os, sys, time",
-    "fcntl.flock(os.open(sys.argv[1], os.O_RDONLY), fcntl.LOCK_EX | fcntl.LOCK_NB)",
-    "print('held', flush=True); time.sleep(30)",
-  ].join("\n");
-  return child("python3", ["-c", script, directory]);
-}
-
-/** What Python's `flock(LOCK_EX | LOCK_NB)` on `directory` answers now: "refused" or "got it". */
-function pythonTries(directory: string): string {
-  const script = [
-    "import fcntl, os, sys",
-    "try: fcntl.flock(os.open(sys.argv[1], os.O_RDONLY), fcntl.LOCK_EX | fcntl.LOCK_NB)",
-    "except BlockingIOError: print('refused')",
-    "else: print('got it')",
-  ].join("\n");
-  return spawnSync("python3", ["-c", script, directory], { encoding: "utf8" }).stdout.trim();
 }
 
 /** Resolves once `child` has exited, whatever its state now. */
@@ -164,46 +135,12 @@ test("the lock creates no file", MACOS_ONLY, async () => {
   }
 });
 
-// Review round 2026-10-10: the macOS lock is Python's own `flock` on the directory.
-
-test("Python's flock on the directory refuses the TypeScript lock", PYTHON_FLOCK, async () => {
-  const directory = scratch();
-  const python = await pythonHolder(directory);
-  try {
-    await assert.rejects(
-      singleInstance(directory),
-      (error: unknown) =>
-        error instanceof AlreadyRunning &&
-        error.message === `another awaydesk is running (lock on ${directory})`,
-    );
-  } finally {
-    await killed(python);
-  }
-  // The kernel drops Python's flock with its process: the next start gets in.
-  await (await singleInstance(directory)).release();
-});
-
-test("the TypeScript lock refuses Python's flock", PYTHON_FLOCK, async () => {
-  const directory = scratch();
-  const lock = await singleInstance(directory);
-  try {
-    assert.equal(pythonTries(directory), "refused");
-  } finally {
-    await lock.release();
-  }
-  assert.equal(pythonTries(directory), "got it");
-});
-
-test("the TypeScript lock of another process refuses Python's flock", PYTHON_FLOCK, async () => {
+test("the lock of a killed process does not block the next start", MACOS_ONLY, async () => {
   const directory = scratch();
   const other = await holder(directory, "singleInstance");
-  try {
-    assert.equal(pythonTries(directory), "refused");
-  } finally {
-    await killed(other);
-  }
+  await killed(other);
   // A killed process cannot clean up, and needs no cleanup: the kernel drops the lock.
-  assert.equal(pythonTries(directory), "got it");
+  await (await singleInstance(directory)).release();
   assert.deepEqual(readdirSync(directory), []);
 });
 

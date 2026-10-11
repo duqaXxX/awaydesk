@@ -243,7 +243,7 @@ function hunksOf(patch: unknown): DiffHunk[] | null {
 /**
  * What an `Edit` or a `Write` did to a file, from `tool_use_result`: a shape the SDK types as
  * `unknown` and does not document, measured on Claude Code 2.1.283 (2026-09-27,
- * `tests/fixtures/sdk/edit-write.jsonl`). Any other shape gives null, and the core shows the
+ * `test/fixtures/sdk/edit-write.jsonl`). Any other shape gives null, and the core shows the
  * call's generic line.
  */
 export function fileChange(result: unknown): FileChange | null {
@@ -270,7 +270,7 @@ function user(memory: Memory, record: WireRecord): SessionEvent[] {
   // A background subagent hands its report back as a message from a peer that names its task
   // (`SDKMessageOrigin`, kind `peer`, `senderTaskId`), and the agent answers it in a turn of
   // its own: measured 2026-10-10 on Claude Code 2.1.294 and 2.1.296 with the owner's setting
-  // sources loaded (`tests/fixtures/sdk/subagent-handback.jsonl`). A peer with no task of this
+  // sources loaded (`test/fixtures/sdk/subagent-handback.jsonl`). A peer with no task of this
   // session (another session's message) says nothing about a task's report.
   const origin = isRecord(record.origin) ? record.origin : {};
   const sender = origin.kind === "peer" ? string(origin.senderTaskId) : null;

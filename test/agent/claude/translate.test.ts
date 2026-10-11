@@ -1,6 +1,6 @@
 /**
  * The Claude back end's wire records into session events, on the recorded streams. The expected
- * values are read off the recordings: `tests/fixtures/sdk/*.jsonl`, Claude Code 2.1.286, with
+ * values are read off the recordings: `test/fixtures/sdk/*.jsonl`, Claude Code 2.1.286, with
  * `compact`, `auto-compact` and `auto-compact-report-turn` on 2.1.292. The shapes no recording
  * holds (a server tool's blocks, a stream that names no message) are the ones the Python SDK's
  * parser and the Python renderer read, claude-agent-sdk 0.2.165.

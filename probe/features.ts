@@ -3,7 +3,7 @@
  * to check by hand. The probe prints the second at the end of a run;
  * `test/probe/features.test.ts` keeps the first in step with `CLAIMS`.
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -12,7 +12,7 @@ const COLUMNS = ["Feature", "Test suite", "Probe", "By hand"];
 
 export interface Feature {
   readonly name: string;
-  /** Test modules, as `test_sessions`, or the path of a `*.test.ts` file. */
+  /** Test modules, each the path of a `*.test.ts` file. */
   readonly tests: readonly string[];
   /** Probe claim ids, as `P1`. */
   readonly claims: readonly string[];
@@ -53,7 +53,7 @@ export function features(path: string = FEATURES): Feature[] {
     const [name = "", tests = "", claims = "", byHand = ""] = row;
     out.push({
       name,
-      tests: [...tests.matchAll(/`(test_\w+|[\w./-]+\.test\.ts)`/g)].map((m) => m[1] ?? ""),
+      tests: [...tests.matchAll(/`([\w./-]+\.test\.ts)`/g)].map((m) => m[1] ?? ""),
       claims: [...claims.matchAll(/\bP\d+\b/g)].map((m) => m[0]),
       byHand: byHand === "none" ? "" : byHand,
     });
@@ -65,27 +65,9 @@ function basename(path: string): string {
   return path.split("/").at(-1) ?? path;
 }
 
-function testFiles(directory: string): string[] {
-  const found: string[] = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) found.push(...testFiles(path));
-    else if (entry.name.endsWith(".test.ts")) found.push(path);
-  }
-  return found;
-}
-
-/**
- * Whether a test module the table names exists: the path of a `*.test.ts` file, or a Python
- * module name (`test_state`), which is `tests/test_state.py` while the Python tree stands and a
- * `state.test.ts` file anywhere under `test/` once the suite is ported (underscores become
- * hyphens).
- */
+/** Whether a test module the table names exists. */
 export function testModuleExists(module: string): boolean {
-  if (module.endsWith(".test.ts")) return existsSync(join(ROOT, module));
-  if (existsSync(join(ROOT, "tests", `${module}.py`))) return true;
-  const wanted = `${module.replace(/^test_/, "").replaceAll("_", "-")}.test.ts`;
-  return testFiles(join(ROOT, "test")).some((path) => basename(path) === wanted);
+  return existsSync(join(ROOT, module));
 }
 
 /** The checks no test and no probe claim makes, as the probe prints them. */

@@ -11,7 +11,7 @@ import {
 } from "../../src/core/setup.ts";
 import { sdkJson } from "../support/fixtures.ts";
 
-// The CLI's own list (tests/fixtures/sdk/server-info.json, Claude Code 2.1.286): the first entry
+// The CLI's own list (test/fixtures/sdk/server-info.json, Claude Code 2.1.286): the first entry
 // is `default`, and Haiku carries no effort fields at all.
 const MODELS: readonly ModelInfo[] = agentInfo(sdkJson("server-info")).models;
 

@@ -1,4 +1,4 @@
-# Every action is pinned to a commit SHA, and every Python dependency to an exact version: the cost
+# Every action is pinned to a commit SHA, and every npm dependency to an exact version: the cost
 # is a frozen dependency. This file opens the pull requests that move them. For the SDK it also
 # moves the Claude Code CLI the daemon runs, which the SDK bundles.
 version: 2
@@ -15,7 +15,7 @@ updates:
         patterns:
           - '*'
 
-  - package-ecosystem: uv
+  - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
@@ -24,8 +24,8 @@ updates:
     # The SDK gets a pull request of its own: its bump changes the bundled CLI and so the message
     # shapes the fixtures record. The rest travels together.
     groups:
-      python:
+      npm:
         patterns:
           - '*'
         exclude-patterns:
-          - claude-agent-sdk
+          - '@anthropic-ai/claude-agent-sdk'

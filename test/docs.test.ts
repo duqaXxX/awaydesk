@@ -73,10 +73,6 @@ function markdownFiles(directory: string): string[] {
 
 const DOCS = markdownFiles(ROOT);
 const PROSE_DOCS = DOCS.filter((doc) => basename(doc) !== "CHANGELOG.md");
-// `docs/sdk-surface.md` is the table of the Python package's use of the Python SDK, kept until
-// the Python tree is removed: its names are Python's, so the symbol check leaves it out.
-const SYMBOL_DOCS = PROSE_DOCS.filter((doc) => docId(doc) !== join("docs", "sdk-surface.md"));
-
 function read(path: string): string {
   return readFileSync(path, "utf8");
 }
@@ -448,7 +444,7 @@ function unresolved(span: string): boolean {
   return !members?.has(second);
 }
 
-for (const doc of SYMBOL_DOCS) {
+for (const doc of PROSE_DOCS) {
   test(`every symbol a doc names exists in the source [${docId(doc)}]`, () => {
     // A function, class or constant renamed in the source and not in the doc fails here.
     const missing = [...new Set([...read(doc).matchAll(SYMBOL)].map((m) => m[1] ?? ""))]

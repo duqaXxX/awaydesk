@@ -162,10 +162,9 @@ every client, store and clock the layers use is built here and handed down.
 `main.main` is the entry point. A `ConfigError`, a `StateError` or `AlreadyRunning` is logged with
 its message, any other failure of `main.run` by its name alone, and the process exits with 1. A
 rejected promise or an exception nobody handled is logged by its name
-(`main.installProcessHandlers`). After a rejected promise the daemon goes on, as the Python daemon
-did after a task's exception. An uncaught exception stops it the way a `SIGINT` does, with the
-shutdown below and no drain, and the process exits with 1, so that launchd, which keeps the
-service alive, starts a clean daemon and the crash repair runs: Node documents the process as
+(`main.installProcessHandlers`). After a rejected promise the daemon goes on. An uncaught
+exception stops it the way a `SIGINT` does, with the shutdown below and no drain, and the process
+exits with 1, so that launchd, which keeps the service alive, starts a clean daemon and the crash repair runs: Node documents the process as
 unsafe to resume after one, and letting Node end it there would skip the shutdown and leave open
 replies and a Claude Code process per session. One rejection leaves the daemon running and deaf.
 `@slack/socket-mode` 3.1.0 reconnects from its `close` listener without awaiting the call
@@ -689,7 +688,7 @@ has already ended, the report gets a reply of its own.
 
 A background subagent can hand its report back before, or without, a turn of that kind (measured
 2026-10-10 on Claude Code 2.1.294 and 2.1.296 with the owner's setting sources loaded, recorded in
-`tests/fixtures/sdk/subagent-handback.jsonl`). Its last call is a tool named `SubagentHandback`;
+`test/fixtures/sdk/subagent-handback.jsonl`). Its last call is a tool named `SubagentHandback`;
 the report reaches the main agent as a `user` record whose `origin` is a peer that names the task
 (`SDKMessageOrigin`, `senderTaskId`), and the agent answers it in a turn of its own; the task's
 notification then gets a turn that does nothing, an `init` and a `result` with `num_turns` 0 and

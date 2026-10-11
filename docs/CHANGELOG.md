@@ -285,9 +285,13 @@ All notable changes to this project are documented here. The format follows
   `state.json` (version 2). The command is installed with npm, from a tarball `npm pack` builds (`docs/setup.md`, Part 0), in place of `uv tool install`. The checks are Biome, `tsc --noEmit` and `node --test`,
   which runs the tests from their sources (`npm run check`); the release probe is
   `node probe/main.ts` and `node probe/live-agent.ts` runs 23 live checks of the Claude back end.
-  `tests/golden.py` replays each recording of `tests/fixtures/sdk/` through the Python renderer
-  and the Python reply sink and writes what they did under `test/golden/`, for the TypeScript
-  tests to compare against; CI runs the TypeScript tests on Linux, macOS and Windows. Numbers are
+  The Python daemon, its tests and its probe are removed (`src/awaydesk/`, `tests/`, `probe/*.py`,
+  `pyproject.toml`, `uv.lock`), and the recordings moved to `test/fixtures/`. `test/golden/` holds
+  what the renderer and the reply sink do for each recording of `test/fixtures/sdk/`: the files
+  the Python code wrote, kept as snapshots that `npm run golden` writes again from the code. CI
+  runs the tests on Linux, macOS and Windows, Dependabot follows the npm dependencies, and the SDK
+  release watch reads the npm registry. `docs/sdk-surface.md` is the table of the TypeScript SDK's
+  surface. Numbers are
   rounded as before, ties to the even digit as Python's `format` and `round` do, in the footer's
   figures and in the minutes of a clip's wait. What does differ:
   - The single-instance lock on macOS is the lock Python took, on the configuration directory

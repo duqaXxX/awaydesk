@@ -103,7 +103,7 @@ export const FORM_THREAD = "1790285951.735939";
 export const HOME_THREAD = "1790000000.000001";
 export const SESSION_A = "68da9311-0000-4000-8000-00000000000a";
 export const SESSION_B = "68da9311-0000-4000-8000-00000000000b";
-// The permalink FakeSlack answers with by default (tests/fixtures/slack/api-chat-getPermalink.json).
+// The permalink FakeSlack answers with by default (test/fixtures/slack/api-chat-getPermalink.json).
 export const PERMALINK = "https://example.slack.com/archives/C000CHAN/p1780000000000001";
 
 /** The first recording of a kind, as a copy a test may change. */

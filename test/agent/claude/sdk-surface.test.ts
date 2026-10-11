@@ -1,5 +1,5 @@
 /**
- * `docs/sdk-surface-typescript.md` against the source under `src/agent/claude/` and the
+ * `docs/sdk-surface.md` against the source under `src/agent/claude/` and the
  * declarations of the installed `@anthropic-ai/claude-agent-sdk` (`sdk.d.ts`): the map of what the
  * daemon depends on is only worth reading while both agree with it.
  *
@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { test } from "node:test";
+import { CLAIMS } from "../../../probe/claims.ts";
 import { kindOf, TRANSLATED_KINDS, UNREAD_KINDS } from "../../../src/agent/claude/translate.ts";
 import { sdkRecordings, sdkRecords } from "../../support/fixtures.ts";
 
@@ -22,10 +23,8 @@ const ROOT = join(import.meta.dirname, "..", "..", "..");
 const SRC = join(ROOT, "src");
 const CLAUDE = join(SRC, "agent", "claude");
 const PACKAGE = "@anthropic-ai/claude-agent-sdk";
-const SURFACE = join(ROOT, "docs", "sdk-surface-typescript.md");
+const SURFACE = join(ROOT, "docs", "sdk-surface.md");
 const DECLARATIONS_FILE = join(ROOT, "node_modules", PACKAGE, "sdk.d.ts");
-// The claims are read from the Python probe until the TypeScript probe replaces that file.
-const CLAIMS_FILE = join(ROOT, "probe", "claims.py");
 
 export const COLUMNS = ["Owner", "Member", "Kind", "Used in", "Source", "Checked by"] as const;
 // A `type` or `function` row's owner is the module it is imported from; every other row's owner
@@ -580,10 +579,9 @@ export function body(file: string, symbol: string): string {
 
 // The probe's claims.
 
-/** The ids of the claims the probe makes; the TypeScript probe replaces this file's source. */
+/** The ids of the claims the probe makes. */
 export function claimIds(): Set<string> {
-  const text = readFileSync(CLAIMS_FILE, "utf8");
-  return new Set([...text.matchAll(/Claim\(\s*"(P\d+)"/g)].map((match) => match[1] ?? ""));
+  return new Set(CLAIMS.map((claim) => claim.id));
 }
 
 // What the table sets aside.
@@ -945,5 +943,5 @@ test("a changed header or a bad cell is an error not a shorter map", () => {
       claims: ["P1"],
     },
   ]);
-  assert.equal(basename(SURFACE), "sdk-surface-typescript.md");
+  assert.equal(basename(SURFACE), "sdk-surface.md");
 });

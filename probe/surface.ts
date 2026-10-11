@@ -1,5 +1,5 @@
 /**
- * The SDK surface map in `docs/sdk-surface-typescript.md`: every type, field, value, method and
+ * The SDK surface map in `docs/sdk-surface.md`: every type, field, value, method and
  * option of `@anthropic-ai/claude-agent-sdk` the daemon depends on, and where each is known from.
  * `test/agent/claude/sdk-surface.test.ts` keeps it in step with the source and the installed
  * package; the probe checks it against the release it runs on and against the published
@@ -15,7 +15,7 @@ import { basename, join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
 const PACKAGE = "@anthropic-ai/claude-agent-sdk";
-const SURFACE = join(ROOT, "docs", "sdk-surface-typescript.md");
+const SURFACE = join(ROOT, "docs", "sdk-surface.md");
 const DECLARATIONS_FILE = join(ROOT, "node_modules", PACKAGE, "sdk.d.ts");
 const REFERENCE = "https://code.claude.com/docs/en/agent-sdk/typescript.md";
 
@@ -641,7 +641,7 @@ export function report(result: Check, full = false): string {
   return lines.join("\n");
 }
 
-/** The table of `docs/sdk-surface-typescript.md`. */
+/** The table of `docs/sdk-surface.md`. */
 export function loadSurface(path: string = SURFACE): Row[] {
   return surface(readFileSync(path, "utf8"), basename(path));
 }

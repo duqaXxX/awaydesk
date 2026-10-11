@@ -9,7 +9,7 @@ in `probe/claims.ts` is missing from the Probe column, when the column names a c
 exist, and when a row names a test file that does not exist. The probe prints the By hand column at
 the end of every run, as the checklist of what it cannot see.
 
-The suite replays recorded SDK streams and Slack payloads (`tests/fixtures/`), so it cannot see a
+The suite replays recorded SDK streams and Slack payloads (`test/fixtures/`), so it cannot see a
 change in a new Claude Code CLI: the probe runs the real one. Neither drives the Slack clients, so
 how a reply looks on desktop and on mobile is checked by hand.
 

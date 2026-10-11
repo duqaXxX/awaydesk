@@ -345,41 +345,13 @@ function select(
   return { type: "static_select", action_id: actionId, options: built, initial_option: initial };
 }
 
-/** Python's `repr` of a string: the quote it picks and the escapes it writes. */
-function pyStr(text: string): string {
-  const quote = text.includes("'") && !text.includes('"') ? '"' : "'";
-  let out = quote;
-  for (const char of text) {
-    const code = char.codePointAt(0) as number;
-    if (char === quote || char === "\\") out += `\\${char}`;
-    else if (char === "\t") out += "\\t";
-    else if (char === "\n") out += "\\n";
-    else if (char === "\r") out += "\\r";
-    else if (code >= 0x20 && code < 0x7f) out += char;
-    else if (code > 0x7f && !/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}\p{Zs}]/u.test(char)) {
-      out += char;
-    } else if (code <= 0xff) out += `\\x${code.toString(16).padStart(2, "0")}`;
-    else if (code <= 0xffff) out += `\\u${code.toString(16).padStart(4, "0")}`;
-    else out += `\\U${code.toString(16).padStart(8, "0")}`;
-  }
-  return out + quote;
-}
-
-/** What Python's dataclass `repr` of the filter read, which the controls' block ids hash. */
-function filterRepr(chosen: HomeFilter): string {
-  const field = (value: string | null) => (value === null ? "None" : pyStr(value));
-  return (
-    `HomeFilter(channel=${field(chosen.channel)}, status=${field(chosen.status)}, ` +
-    `date=${field(chosen.date)}, search=${pyStr(chosen.search)})`
-  );
-}
-
 function controlsOf(channels: ReadonlyMap<string, string>, chosen: HomeFilter): Block[] {
   // Slack keeps what a control shows for as long as its block keeps its id, whatever
   // `initial_option` a later page carries (seen 2026-10-01: after a restart the menus still
   // showed the choices of the run before). An id that follows the choice makes the controls
   // show what the page was built with: a restart, Show all and a dropped channel included.
-  const mark = createHash("sha256").update(filterRepr(chosen)).digest("hex").slice(0, 8);
+  const choice = JSON.stringify([chosen.channel, chosen.status, chosen.date, chosen.search]);
+  const mark = createHash("sha256").update(choice).digest("hex").slice(0, 8);
   const search: Block = {
     type: "plain_text_input",
     action_id: SEARCH_ACTION,

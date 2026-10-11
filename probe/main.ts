@@ -4,7 +4,7 @@
  *     node probe/main.ts            run if the pinned SDK is not certified yet
  *     node probe/main.ts --force    run anyway
  *     node probe/main.ts --latest   run on the newest release on npm, in a temporary worktree
- *     node probe/main.ts --surface  check docs/sdk-surface-typescript.md alone and list its rows: no
+ *     node probe/main.ts --surface  check docs/sdk-surface.md alone and list its rows: no
  *                                   tokens
  *     node probe/main.ts --commands list the commands that are new or gone on this release: no tokens
  *
