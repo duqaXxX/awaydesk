@@ -221,7 +221,7 @@ export class ResumeBind {
     }
     const holder = state.holder(chosen.id);
     if (holder !== null) {
-      const link = await this.answers.threadMrkdwnLink(holder[0], holder[1], "Session");
+      const link = await this.answers.threadMrkdwnLink(holder.channel, holder.thread, "Session");
       await this.answers.inChannel(channel, fill(texts.RESUME_ELSEWHERE, { link }));
       return false;
     }

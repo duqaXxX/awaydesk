@@ -270,6 +270,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The Slack provider implements the whole chat seam (`ChatProvider`), and the daemon starts it
+  through `slackChat` in `src/chat/slack/module.ts`: its clients, identity, thread deleter, Home
+  tab and channel guard are built there and read the core only when first used. `SlackChat` now
+  opens and closes the connection (`start`, `stop`, `close`) and holds the stop signal the
+  listeners check; `SlackThread` and the new `SlackChannel` carry the words the handlers say
+  (`tell`, `say`, `acknowledge`, `link`, `rewrite`, `endReply`, `offer`). The crash repair and the
+  upgrade notice are flows of the core over the seam (`src/core/flows/`). What the owner sees in
+  Slack is unchanged.
 - The daemon is written in TypeScript and runs on Node 22.18 or later, in place of Python and
   uv. It has three layers behind two seams: `src/agent/` holds the only code that knows an agent
   SDK (the Claude back end, on `@anthropic-ai/claude-agent-sdk` 0.3.296, which bundles Claude Code

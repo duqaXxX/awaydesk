@@ -38,11 +38,7 @@
 import { App, LogLevel, type Receiver, SocketModeReceiver } from "@slack/bolt";
 import type { WebClient, WebClientOptions } from "@slack/web-api";
 import { type Clock, monotonicClock } from "../../../clock.ts";
-import type { Config } from "../../../core/config.ts";
-import type { Holds } from "../../../core/hold.ts";
-import type { Approvals } from "../../../core/requests.ts";
-import type { SessionManager } from "../../../core/sessions/manager.ts";
-import type { StateStore } from "../../../core/state.ts";
+import type { ApprovalsPort, HoldsPort, SessionsPort, StatePort } from "../../../core/port.ts";
 import { download } from "../attachments.ts";
 import { BIND_ACTION } from "../bind.ts";
 import { HOLD_CANCEL, HOLD_CONTINUE } from "../hold.ts";
@@ -60,7 +56,6 @@ import { OPEN_BUTTON_ACTION, OPEN_FORM, QUERY_ACTION } from "../openfile/modal.t
 import { levelLogger } from "../quiet-logger.ts";
 import { REQUEST_TIMEOUT_MS } from "../reply/clients.ts";
 import { describe } from "../reply/errors.ts";
-import type { Limiter } from "../reply/limiter.ts";
 import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
@@ -70,8 +65,9 @@ import {
 } from "../requests.ts";
 import { RESUME_ACTION } from "../resume.ts";
 import { SETUP_BYPASS, SETUP_EFFORT, SETUP_MODEL, SETUP_START } from "../setup.ts";
+import type { SlackChat } from "../thread.ts";
 import * as voice from "../voice.ts";
-import { Answers, type AppParts, type Fetch, logger } from "./answers.ts";
+import { Answers, type AppConfig, type AppParts, type Fetch, logger } from "./answers.ts";
 import { Clips } from "./clip.ts";
 import { type ChannelGuard, type Identity, isPromptMessage, messageActor } from "./guards.ts";
 import { HomeControls } from "./home-controls.ts";
@@ -93,18 +89,21 @@ export const DECISION_ACTIONS = [APPROVAL_ALLOW, APPROVAL_DENY, QUESTION_SKIP] a
 export interface BuildAppOptions {
   /** The shared client every handler calls Slack with. */
   readonly slack: WebClient;
-  readonly config: Config;
+  /**
+   * The provider the handlers answer through: its `chat.update` budget every reply draws from
+   * and the stop signal every listener checks.
+   */
+  readonly chat: SlackChat;
+  readonly config: AppConfig;
   readonly identity: Identity;
-  readonly sessions: SessionManager;
-  readonly approvals: Approvals;
-  readonly holds: Holds;
+  readonly sessions: SessionsPort;
+  readonly approvals: ApprovalsPort;
+  readonly holds: HoldsPort;
   readonly guard: ChannelGuard;
-  readonly state: StateStore;
+  readonly state: StatePort;
   /** The folder a message's files that are no image are saved in (`attachments.uploadsDir`). */
   readonly uploads: string;
   readonly home: Home;
-  /** The `chat.update` budget every reply draws from: `SlackChat.limiter`. */
-  readonly limiter: Limiter;
   /** Where Slack's payloads come from: `socketReceiver(config.appToken)` in the daemon. */
   readonly receiver: Receiver;
   /** How a file is downloaded; `attachments.download` with the bot token when absent. */
@@ -135,11 +134,14 @@ export interface BuiltApp {
    */
   readonly registered: readonly Registration[];
   /**
-   * Tells every listener the daemon is stopping, and gives up the clips still waiting for a
-   * transcript, whose timers would keep the process alive. A listener still in flight does
-   * nothing from its next step on: it posts, opens a modal, submits and writes nothing.
+   * Tells every listener the daemon is stopping (`SlackChat.halt`), and gives up the clips
+   * still waiting for a transcript, whose timers would keep the process alive. A listener still
+   * in flight does nothing from its next step on: it posts, opens a modal, submits and writes
+   * nothing.
    */
   close(): void;
+  /** `!open` typed in a session's thread, for the folder the session works in. */
+  openFile(channel: string, threadTs: string, folder: string, words: string): Promise<void>;
 }
 
 // The longest wait between two tries to get the connection back.
@@ -200,10 +202,10 @@ function thrown(error: unknown): unknown {
 
 /** The Bolt app, with one listener per inbound path. */
 export function buildApp(options: BuildAppOptions): BuiltApp {
-  const { config, identity, sessions } = options;
-  const stopping = new AbortController();
+  const { chat, config, identity, sessions } = options;
   const parts: AppParts = {
     slack: options.slack,
+    chat,
     config,
     identity,
     sessions,
@@ -213,12 +215,12 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     state: options.state,
     uploads: options.uploads,
     home: options.home,
-    limiter: options.limiter,
+    limiter: chat.limiter,
     fetch:
       options.fetch ??
       (({ url, mimetype, limit }) => download(url, config.botToken, mimetype, limit)),
     clock: options.clock ?? monotonicClock,
-    stopped: stopping.signal,
+    stopped: chat.stopped,
     now: options.now ?? (() => Date.now() / 1000),
     listings:
       options.listings ??
@@ -330,8 +332,9 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     app,
     registered,
     close: () => {
-      stopping.abort();
+      chat.halt();
       clips.close();
     },
+    openFile: (channel, threadTs, folder, words) => open.openWord(channel, threadTs, folder, words),
   };
 }

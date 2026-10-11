@@ -48,11 +48,12 @@ import { createHash } from "node:crypto";
 import { WebAPIPlatformError, type WebClient } from "@slack/web-api";
 import type { ListedSession } from "../../agent/seam.ts";
 import { type Clock, systemClock } from "../../clock.ts";
+import type { StatePort } from "../../core/port.ts";
 import { oneLine } from "../../core/reply/words.ts";
 import { Cancelled, Mutex, Semaphore } from "../../core/sessions/tasks.ts";
-import type { StateStore, ThreadKey } from "../../core/state.ts";
 import * as texts from "../../core/texts.ts";
 import { getLogger } from "../../log.ts";
+import type { ThreadRef } from "../seam.ts";
 import { contextBlock, plainTextObject } from "./reply/blocks.ts";
 import { take } from "./reply/chars.ts";
 import { describe } from "./reply/errors.ts";
@@ -685,7 +686,7 @@ const keyOf = (channelId: string, threadTs: string): string => `${channelId}:${t
 export interface HomeOptions {
   readonly ownerUserId: string;
   readonly teamId: string;
-  readonly state: StateStore;
+  readonly state: Pick<StatePort, "channels" | "threads">;
   /** The sessions Claude Code lists for a folder (the seam's `listSessions`). */
   readonly sessionsOf: (
     directory: string,
@@ -714,7 +715,7 @@ export class Home {
   private readonly slack: WebClient;
   private readonly owner: string;
   private readonly team: string;
-  private readonly state: StateStore;
+  private readonly state: Pick<StatePort, "channels" | "threads">;
   private readonly sessionsOf: HomeOptions["sessionsOf"];
   private readonly deleteThread: HomeOptions["delete"];
   private readonly cleanChannel: HomeOptions["clean"];
@@ -780,9 +781,9 @@ export class Home {
   }
 
   /** Ask for a publish soon; `changed` are the (channel, thread) a state write touched. */
-  request(changed: Iterable<ThreadKey> = []): void {
+  request(changed: Iterable<ThreadRef> = []): void {
     if (this.off) return;
-    for (const [channelId, threadTs] of changed) this.stale.add(keyOf(channelId, threadTs));
+    for (const ref of changed) this.stale.add(keyOf(ref.channel, ref.thread));
     this.dirty = true;
     if (!this.settling) {
       this.settling = true;

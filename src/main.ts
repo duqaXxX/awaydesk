@@ -43,33 +43,25 @@
  *   `node_modules/.bin` included: Node runs the real path. Comparing `process.argv[1]` with
  *   this file's path would fail through that symlink.
  */
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { ClaudeBackend } from "./agent/claude/backend.ts";
-import { type BareStart, UsageProbe } from "./agent/claude/usage-probe.ts";
+import type { BareStart } from "./agent/claude/usage-probe.ts";
 import type { AgentBackend } from "./agent/seam.ts";
-import { type BuildAppOptions, buildApp, socketReceiver } from "./chat/slack/app/app.ts";
-import { ChannelGuard, type Identity } from "./chat/slack/app/guards.ts";
-import { prepareUploads, uploadsDir } from "./chat/slack/attachments.ts";
-import { channelLookup } from "./chat/slack/channels.ts";
-import { ThreadDeleter } from "./chat/slack/delete.ts";
-import { Home } from "./chat/slack/home.ts";
-import { repairCrash } from "./chat/slack/repair.ts";
-import { contextBlock, noticeText } from "./chat/slack/reply/blocks.ts";
-import { type ClientOptions, repliesClient, sharedClient } from "./chat/slack/reply/clients.ts";
+import { type Clients, type SlackOptions, slackChat } from "./chat/slack/module.ts";
 import { describe } from "./chat/slack/reply/errors.ts";
-import { UpdateLimiter } from "./chat/slack/reply/limiter.ts";
-import { SlackChat } from "./chat/slack/thread.ts";
 import { type Clock, monotonicClock, systemClock } from "./clock.ts";
 import { CLEAN_EVERY_SECONDS, clean } from "./core/cleanup.ts";
 import { CONFIG_DIR, ConfigError, loadConfig } from "./core/config.ts";
+import { Inbound } from "./core/flows/inbound.ts";
+import { postUpgradeNotices } from "./core/flows/notices.ts";
+import { repair } from "./core/flows/repair.ts";
 import { UsageCache } from "./core/footer.ts";
 import { Holds } from "./core/hold.ts";
 import { AlreadyRunning, singleInstance } from "./core/lock.ts";
+import type { ChatContext, CorePort } from "./core/port.ts";
 import { Approvals } from "./core/requests.ts";
 import { SessionManager } from "./core/sessions/manager.ts";
 import { StateError, StateStore } from "./core/state.ts";
-import * as texts from "./core/texts.ts";
 import { getLogger } from "./log.ts";
 
 export const logger = getLogger("awaydesk.main");
@@ -88,9 +80,6 @@ export function deferred(seconds: number, action: () => void): NodeJS.Timeout {
   return setTimeout(action, seconds * 1000).unref();
 }
 
-/** The client of the Slack packages every call goes through; its type is all this file names. */
-export type SlackClient = ReturnType<typeof sharedClient>;
-
 /** The two signals a stop is asked with. */
 export type Stop = "SIGTERM" | "SIGINT";
 
@@ -106,37 +95,13 @@ export interface ProcessEvents {
   on(event: "uncaughtException", listener: (error: Error) => void): unknown;
 }
 
-/** The Slack clients of the daemon, one constructor for each way it calls. */
-export interface Clients {
-  /** The shared client and the one replies are written with, on the bot token. */
-  bot(token: string): readonly [shared: SlackClient, replies: SlackClient];
-  /** The owner's own client, on the user token. */
-  owner(token: string): SlackClient;
-}
-
-/**
- * The daemon's two Slack clients on one token (the retry policy is in `reply/clients.ts`): the
- * shared one for everything but a reply, and the one replies are written with.
- */
-export function makeClients(
-  botToken: string,
-  options: ClientOptions = {},
-): readonly [shared: SlackClient, replies: SlackClient] {
-  return [sharedClient(botToken, options), repliesClient(botToken, options)];
-}
-
-export const CLIENTS: Clients = {
-  bot: (token) => makeClients(token),
-  owner: (token) => sharedClient(token),
-};
-
 /** Every outside thing `run` uses, with the real one as the default. */
 export interface RunOptions {
   /** `~/.config/awaydesk`. */
   readonly configDir?: string;
   readonly clients?: Clients;
   /** Where Slack's payloads come from: `socketReceiver`. */
-  readonly receiver?: (appToken: string) => BuildAppOptions["receiver"];
+  readonly receiver?: SlackOptions["receiver"];
   /** The agent: Claude Code over the Agent SDK. */
   readonly backend?: AgentBackend;
   /**
@@ -168,38 +133,6 @@ export interface MainOptions extends RunOptions {
   readonly later?: (seconds: number, action: () => void) => unknown;
 }
 
-/** The text of a field `auth.test` must answer, which a log line and an identity rely on. */
-function authField(
-  answer: { readonly user_id?: string | undefined; readonly team_id?: string | undefined },
-  key: "user_id" | "team_id",
-): string {
-  const value = answer[key];
-  if (typeof value !== "string" || value === "") throw new Error(`auth.test answered no ${key}`);
-  return value;
-}
-
-/**
- * The v1-to-v2 migration notice, once per channel, top-level: not a reply to any message, so it
- * carries no thread_ts. A channel whose post failed keeps its flag for the next start.
- */
-export async function postUpgradeNotices(slack: SlackClient, state: StateStore): Promise<void> {
-  for (const channelId of state.pendingNotices()) {
-    try {
-      await slack.chat.postMessage({
-        channel: channelId,
-        text: texts.UPGRADE_NOTICE,
-        blocks: [contextBlock(noticeText(texts.UPGRADE_NOTICE))],
-        unfurl_links: false,
-        unfurl_media: false,
-      });
-    } catch (error) {
-      logger.warning(`could not post the upgrade notice in ${channelId}: ${describe(error)}`);
-      continue;
-    }
-    state.clearNotice(channelId);
-  }
-}
-
 /**
  * The scheduled cleanup of `state.json`: a pass every `seconds`, none once a stop has begun (the
  * sessions are closing, and the next start cleans anyway). Ends when `signal` aborts; a pass in
@@ -221,36 +154,6 @@ export async function cleanEvery(options: {
     if (options.sessions.draining) return;
     await options.clean();
   }
-}
-
-/**
- * What deletes a thread for the Home tab, when the owner's user token is configured. The token
- * must be the owner's own, in the bot's workspace: it deletes as whoever it belongs to.
- */
-export async function deleter(
-  userToken: string | null,
-  slack: SlackClient,
-  identity: Identity,
-  state: StateStore,
-  sessions: Pick<SessionManager, "release" | "free">,
-  clients: Pick<Clients, "owner"> = CLIENTS,
-): Promise<ThreadDeleter | null> {
-  if (userToken === null) return null;
-  const owner = clients.owner(userToken);
-  const who = await owner.auth.test();
-  if (
-    authField(who, "user_id") !== identity.ownerUserId ||
-    authField(who, "team_id") !== identity.teamId
-  ) {
-    throw new ConfigError("SLACK_USER_TOKEN must be the owner's own token, in the bot's workspace");
-  }
-  return new ThreadDeleter(slack, owner, {
-    botUserId: identity.botUserId,
-    ownerUserId: identity.ownerUserId,
-    state,
-    release: (channelId, threadTs) => sessions.release(channelId, threadTs),
-    free: (channelId, threadTs) => sessions.free(channelId, threadTs),
-  });
 }
 
 /**
@@ -343,7 +246,6 @@ async function step(name: string, work: () => unknown): Promise<void> {
  */
 export async function run(options: RunOptions = {}): Promise<number> {
   const configDir = options.configDir ?? CONFIG_DIR;
-  const clients = options.clients ?? CLIENTS;
   // Wall time for what is dated (a reply's footer, the page's hours), the monotonic clock for
   // what is paced.
   const wall = options.clock ?? systemClock;
@@ -357,77 +259,47 @@ export async function run(options: RunOptions = {}): Promise<number> {
     const state = (options.openState ?? ((path) => new StateStore(path)))(
       join(configDir, "state.json"),
     );
-    const uploads = options.uploads ?? uploadsDir();
-    await prepareUploads(uploads);
-    const [slack, replySlack] = clients.bot(config.botToken);
-    const auth = await slack.auth.test();
-    const identity: Identity = {
-      ownerUserId: config.ownerUserId,
-      teamId: authField(auth, "team_id"),
-      botUserId: authField(auth, "user_id"),
-    };
-    const claude = options.backend === undefined ? new ClaudeBackend() : null;
-    const backend = options.backend ?? (claude as ClaudeBackend);
-    const bare =
-      options.bareStart ??
-      ((folder, requests) => (claude as ClaudeBackend).startBare(folder, requests));
-    const probe = new UsageProbe(homedir(), bare, { clock: options.clock });
-    const approvals = new Approvals();
-    const holds = new Holds();
-    const chat = new SlackChat({
-      slack,
-      replies: replySlack,
-      identity,
-      limiter: new UpdateLimiter({ clock: steady }),
+    const backend =
+      options.backend ?? new ClaudeBackend({ bareStart: options.bareStart, clock: options.clock });
+    const limits = backend.usageLimits?.bind(backend);
+    // The core exists once the sessions do, and the chat is built before them: it reads the core
+    // through `context.core()` when it first needs it.
+    let core: CorePort | null = null;
+    const context: ChatContext = {
+      variables: {
+        SLACK_BOT_TOKEN: config.botToken,
+        SLACK_APP_TOKEN: config.appToken,
+        SLACK_OWNER_USER_ID: config.ownerUserId,
+        ...(config.userToken !== null && { SLACK_USER_TOKEN: config.userToken }),
+      },
+      allowedRoot: config.allowedRoot,
       clock: wall,
       steady,
-    });
+      core: () => {
+        if (core === null) throw new Error("the core is read before the daemon built it");
+        return core;
+      },
+    };
+    const chat = await slackChat({
+      clients: options.clients,
+      receiver: options.receiver,
+      uploads: options.uploads,
+    }).build(context);
+    const approvals = new Approvals();
+    const holds = new Holds();
     const sessions = new SessionManager({
       chat,
       agent: backend,
       state,
       approvals,
       holds,
-      usage: new UsageCache(() => probe.read()),
+      usage: new UsageCache(limits ?? (() => Promise.reject(new Error("no usage limits")))),
       clock: steady,
     });
-    const threadDeleter = await deleter(
-      config.userToken,
-      slack,
-      identity,
-      state,
-      sessions,
-      clients,
-    );
-    const home = new Home(slack, {
-      ownerUserId: identity.ownerUserId,
-      teamId: identity.teamId,
-      state,
-      sessionsOf: (directory) => backend.listSessions(directory),
-      ...(threadDeleter !== null && {
-        delete: (channelId, threadTs) => threadDeleter.delete(channelId, threadTs),
-        clean: (channelId) => threadDeleter.clean(channelId),
-      }),
-      clock: wall,
-    });
-    const { app, close } = buildApp({
-      slack,
-      config,
-      identity,
-      sessions,
-      approvals,
-      holds,
-      guard: new ChannelGuard(slack, identity),
-      state,
-      uploads,
-      home,
-      limiter: chat.limiter,
-      receiver: (options.receiver ?? socketReceiver)(config.appToken),
-      clock: steady,
-    });
+    core = { sessions, state, approvals, holds, agent: backend };
 
     const cleanOnce = (): Promise<void> =>
-      clean(channelLookup(slack), state, {
+      clean((channel) => chat.channelState(channel), state, {
         alive: (directory) => backend.aliveSessions(directory),
         live: () => sessions.liveThreads(),
       });
@@ -447,10 +319,10 @@ export async function run(options: RunOptions = {}): Promise<number> {
       if (options.failure?.aborted) signals.fail();
       else options.failure?.addEventListener("abort", onFailure, { once: true });
 
-      // Repaired, then cleaned, before the Socket Mode connection opens: `slack` (already
-      // `auth.test`'d above) works without it, and opening Socket Mode is what starts delivering
+      // Repaired, then cleaned, before the connection opens: the chat (already built, and so
+      // known to its workspace) works without it, and opening it is what starts delivering
       // events. A pruned thread's leftovers must be repaired first.
-      await repairCrash(slack, state, chat.limiter);
+      await repair(chat, state);
       await cleanOnce();
       cleaned = cleanEvery({
         seconds: CLEAN_EVERY_SECONDS,
@@ -461,12 +333,11 @@ export async function run(options: RunOptions = {}): Promise<number> {
       });
       // The session index (the owner's Home tab): written once what the last run left is
       // repaired and pruned, then again whenever state.json's sessions change.
-      state.onSessionsChange = (changed) => home.request(changed);
-      home.request();
+      state.onSessionsChange = (changed) => chat.index?.refresh(changed);
+      chat.index?.refresh();
 
-      await app.start();
-      logger.info(`connected to Slack workspace ${identity.teamId}`);
-      await postUpgradeNotices(slack, state);
+      await chat.start(new Inbound());
+      await postUpgradeNotices(chat, state);
       await signals.requested;
       // launchd stops and restarts with SIGTERM: the turns already running finish first. Not on
       // SIGINT: see `StopSignals`. A second signal stops without waiting.
@@ -478,13 +349,12 @@ export async function run(options: RunOptions = {}): Promise<number> {
       logger.info("shutting down");
       cleaning.abort();
       if (cleaned !== null) await step("stop the cleanup", () => cleaned);
-      await step("stop the Slack connection", () => app.stop());
-      // The timers of clips still waiting for a transcript would keep the process alive.
-      await step("end the clips' waits", () => close());
+      // The connection, and the clips' waits, whose timers would keep the process alive.
+      await step("stop the chat", () => chat.stop());
       await step("close the sessions", () => sessions.closeAll());
       // After the sessions: the page shows them as this stop left them.
-      await step("close the session index", () => home.close());
-      await step("stop the usage probe", () => probe.stop());
+      await step("close the chat", () => chat.close());
+      await step("close the agent", () => backend.close());
       clearInterval(keepAlive);
     }
   } finally {

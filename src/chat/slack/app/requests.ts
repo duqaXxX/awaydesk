@@ -74,7 +74,7 @@ export class Requests {
     session: ThreadSession,
     other: ThreadSession,
   ): Promise<boolean> {
-    const link = await this.answers.threadMrkdwnLink(other.channelId, other.threadTs, "Session");
+    const link = await this.answers.threadMrkdwnLink(other.channelId, other.threadId, "Session");
     const answer = await this.askOwner(channel, threadTs, session, {
       text: fill(texts.HOLD_QUESTION, { link }),
       blocks: (holdId) => holdBlocks(holdId, link),
@@ -318,7 +318,7 @@ export class Requests {
       this.logRefusedClick("setup start, not resolved", body, {
         held: true,
         decided: pending.decided,
-        same_thread: pending.channelId === channel && pending.threadTs === threadTs,
+        same_thread: pending.channelId === channel && pending.threadId === threadTs,
       });
       await this.answers.tellOwner(channel, threadTs, texts.HOLD_GONE);
       return;
@@ -386,7 +386,7 @@ export class Requests {
     const action = firstAction(body);
     const approvalId = str(action.value);
     const pending = approvals.get(approvalId);
-    if (pending === null || pending.channelId !== channel || pending.threadTs !== threadTs) {
+    if (pending === null || pending.channelId !== channel || pending.threadId !== threadTs) {
       await this.answers.tellOwner(channel, threadTs, texts.APPROVAL_GONE);
       return;
     }
@@ -416,7 +416,7 @@ export class Requests {
     if (
       pending === null ||
       pending.channelId !== channel ||
-      pending.threadTs !== threadTs ||
+      pending.threadId !== threadTs ||
       pending.questions === null ||
       pending.questions.length === 0
     ) {
@@ -462,7 +462,7 @@ export class Requests {
     if (
       pending === null ||
       pending.channelId !== draft.channelId ||
-      pending.threadTs !== draft.threadTs ||
+      pending.threadId !== draft.threadTs ||
       pending.questions === null ||
       pending.questions.length === 0
     ) {

@@ -74,7 +74,7 @@ function made(options: { replies?: FakeSlack } = {}): Made {
     limiter,
     clock,
   });
-  return { slack, clock, limiter, chat, thread: chat.thread(CHANNEL, THREAD) };
+  return { slack, clock, limiter, chat, thread: chat.thread({ channel: CHANNEL, thread: THREAD }) };
 }
 
 /** Let what is ready run: the status line's own task, a reaction asked for and not awaited. */
@@ -314,7 +314,7 @@ test("the status line counts its refresh on the steady clock, not on the wall cl
     clock: wall,
     steady,
   });
-  const thread = chat.thread(CHANNEL, THREAD);
+  const thread = chat.thread({ channel: CHANNEL, thread: THREAD });
   const shown = () => slack.callsTo("assistant.threads.setStatus").length;
   thread.showActivity("Working…", "is working…");
   await steady.advance(0);
@@ -329,7 +329,7 @@ test("the status line counts its refresh on the steady clock, not on the wall cl
 
 test("the provider gives each thread its own object and shares one budget", async () => {
   const { slack, limiter, chat, thread } = made();
-  const other = chat.thread(CHANNEL, OTHER_THREAD);
+  const other = chat.thread({ channel: CHANNEL, thread: OTHER_THREAD });
   assert.notEqual(other, thread);
   assert.equal(chat.limiter, limiter);
   await other.showStatus("working");

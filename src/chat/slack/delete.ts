@@ -33,8 +33,8 @@
  * are gone, and a thread taken for a leftover would lose its root.
  */
 import type { WebClient } from "@slack/web-api";
+import type { StatePort } from "../../core/port.ts";
 import { Mutex } from "../../core/sessions/tasks.ts";
-import type { StateStore } from "../../core/state.ts";
 import * as texts from "../../core/texts.ts";
 import { fill } from "../../core/texts.ts";
 import { getLogger } from "../../log.ts";
@@ -50,10 +50,13 @@ export const CANT_DELETE = "cant_delete_message";
 export const THREAD_NOT_FOUND = "thread_not_found";
 
 /** What the deleter asks of the session manager (`SessionManager.release` and `.free`). */
+/** The part of the daemon's state a delete reads and writes. */
+export type DeleterState = Pick<StatePort, "thread" | "channels" | "removeThread">;
+
 export interface ThreadDeleterOptions {
   readonly botUserId: string;
   readonly ownerUserId: string;
-  readonly state: StateStore;
+  readonly state: DeleterState;
   /**
    * Closes the thread's live session when it is idle, holds the thread so that no session is
    * built in it meanwhile, and says whether it did.
@@ -88,7 +91,7 @@ export class ThreadDeleter {
   readonly #owner: WebClient;
   readonly #botUserId: string;
   readonly #ownerUserId: string;
-  readonly #state: StateStore;
+  readonly #state: DeleterState;
   readonly #release: ThreadDeleterOptions["release"];
   readonly #free: ThreadDeleterOptions["free"];
   // One thread at a time: two deletes at once would share Slack's rate limit, and each would

@@ -135,29 +135,30 @@ every client, store and clock the layers use is built here and handed down.
 1. It loads the configuration (`config.loadConfig`), so a bad `.env` fails before anything else.
 2. It takes the single-instance lock (`lock.singleInstance`), so a second daemon fails before it
    opens a Socket Mode connection.
-3. It reads `state.json` (`StateStore`) and prepares the attachments folder
-   (`attachments.prepareUploads`, see "Attached files").
-4. It builds the two Slack clients (`main.makeClients`: `clients.sharedClient` for every call but a
-   reply's, `clients.repliesClient` for replies) and calls `auth.test` for the workspace id and the
-   bot user id.
-5. It builds the parts and wires them: the `ClaudeBackend`, the `UsageProbe` and its `UsageCache`,
-   `Approvals` and `Holds`, the `SlackChat` with the shared `UpdateLimiter`, the `SessionManager`,
-   the `ThreadDeleter` when the owner's user token is configured (`main.deleter`, which calls
-   `auth.test` with that token), the `Home`, and the Bolt app (`app.buildApp`) with its
-   `ChannelGuard`.
+3. It reads `state.json` (`StateStore`) and builds the `ClaudeBackend`.
+4. It builds the Slack provider (`module.slackChat`, whose `build` reads the core only once it is
+   used): the two Slack clients (`module.makeClients`: `clients.sharedClient` for every call but a
+   reply's, `clients.repliesClient` for replies), `auth.test` for the workspace id and the bot
+   user id, the `SlackChat` with the shared `UpdateLimiter`, the `ThreadDeleter` when the owner's
+   user token is configured (`module.deleter`, which calls `auth.test` with that token), the
+   `Home`, the `ChannelGuard` and the attachments folder (`attachments.prepareUploads`, see
+   "Attached files").
+5. It builds the `UsageProbe` and its `UsageCache`, `Approvals` and `Holds`, and the
+   `SessionManager`, which together are the core the provider reaches through `CorePort`.
 6. It installs the `SIGTERM` and `SIGINT` listeners (`main.StopSignals`), so a signal that arrives
    during a long repair is caught and not left to the default disposition, which would end the
    process at once.
-7. With the shared client, Socket Mode not opened yet, it repairs what a crashed daemon left open
-   (`repair.repairCrash`, see "State and the single-instance lock") and then cleans `state.json`
+7. With the connection not opened yet, it repairs what a crashed daemon left open
+   (`repair.repair`, see "State and the single-instance lock") and then cleans `state.json`
    (`cleanup.clean`, see "Cleaning `state.json`"). Cleaning runs only after repair, so a pruned
    thread's leftovers are still repaired first, and it runs again every
    `cleanup.CLEAN_EVERY_SECONDS` until a stop begins (`main.cleanEvery`).
 8. It sets `StateStore.onSessionsChange` and asks for the first session index (`Home.request`, see
    "The session index").
-9. It opens the Socket Mode connection and, once connected, posts the version 1 to version 2 upgrade
-   notice to each channel that still owes one (`main.postUpgradeNotices`), as a message of its own,
-   not a reply.
+9. It opens the Socket Mode connection (`SlackChat.start`, which builds the Bolt app with
+   `app.buildApp`) and, once connected, posts the version 1 to version 2 upgrade notice to each
+   channel that still owes one (`notices.postUpgradeNotices`), as a message of its own, not a
+   reply.
 
 `main.main` is the entry point. A `ConfigError`, a `StateError` or `AlreadyRunning` is logged with
 its message, any other failure of `main.run` by its name alone, and the process exits with 1. A
@@ -225,12 +226,12 @@ warning or error that names the library, and the daemon logs the states of the c
 
 When no session is working, after `main.DRAIN_LIMIT_SECONDS`, or on a second signal, the daemon
 stops the scheduled cleanup, closes the connection, tells the listeners it is stopping and gives up
-the clips still waiting for a transcript (`BuiltApp.close`), closes every session
-(`SessionManager.closeAll`), publishes the session index a last time (`Home.close`), closes the
+the clips still waiting for a transcript (`SlackChat.stop`), closes every session
+(`SessionManager.closeAll`), publishes the session index a last time (`SlackChat.close`), closes the
 usage probe and releases the lock. A step that fails is logged and the rest still runs.
 
 A listener that was in flight when the stop ended goes on at its next step, since Node does not
-cancel it with the loop. From `BuiltApp.close` it does nothing the owner can see: `Answers.admitted`
+cancel it with the loop. From `SlackChat.stop` it does nothing the owner can see: `Answers.admitted`
 refuses, and nothing posts, reacts, opens a modal, submits a prompt or deletes a request. From the
 first line of `SessionManager.closeAll` the manager hands out no session (`get` answers null),
 and `open`, `resume` and `bind` throw `SessionClosed` before they read or write `state.json`;
@@ -301,7 +302,7 @@ clears all three for its thread once it is done, whatever the fields looked like
 open replies and the status stay, with `ended` set to ❌, so the next start's repair closes the reply
 and says so. Otherwise only a crash leaves them set.
 
-On start, before the Socket Mode connection opens, `repair.repairCrash` repairs every thread
+On start, before the Socket Mode connection opens, `repair.repair` repairs every thread
 `state.json` still shows as left open. For each open reply it stops the message's stream
 (`chat.stopStream`; `message_not_in_streaming_state` means Slack closed it already, at 5 minutes,
 and is fine), reads the message back by its own ts (`conversations.replies` with `ts` and `limit=1`)
@@ -1405,7 +1406,7 @@ the one before it landed, so a filter just chosen is never replaced by an older 
 
 ### Edit mode and Delete
 
-With the owner's user token configured (`Config.userToken`, `SLACK_USER_TOKEN`), `main.deleter`
+With the owner's user token configured (`Config.userToken`, `SLACK_USER_TOKEN`), `module.deleter`
 builds a `ThreadDeleter` (in `delete`) after checking with `auth.test` that the token is the owner's
 own in the bot's workspace, and `main.run` hands its `delete` and `clean` to `Home`. Any other token
 stops the start with a `ConfigError`. The header line is then a section with an **Edit** button

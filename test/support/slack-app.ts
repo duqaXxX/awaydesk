@@ -241,6 +241,8 @@ export class World {
   readonly home: Home;
   readonly deleted: Array<[string, string]> = [];
   readonly cleaned: string[] = [];
+  /** The Slack provider the handlers answer through. */
+  readonly chat: SlackChat;
   readonly built: BuiltApp;
   readonly app: App;
   /** Whether the app's receiver was started, and stopped. */
@@ -269,7 +271,7 @@ export class World {
     };
     // A generous burst: these tests are about the handlers, not the shared limiter's pacing.
     this.limiter = options.limiter ?? new UpdateLimiter({ burst: 1_000, clock: this.slackClock });
-    const chat = new SlackChat({
+    this.chat = new SlackChat({
       slack,
       replies: slack,
       identity: this.identity,
@@ -277,7 +279,7 @@ export class World {
       clock: this.slackClock,
     });
     this.sessions = new SessionManager({
-      chat,
+      chat: this.chat,
       agent: this.backend,
       state: this.state,
       approvals: this.approvals,
@@ -328,7 +330,7 @@ export class World {
       state: this.state,
       uploads: this.uploads,
       home: this.home,
-      limiter: this.limiter,
+      chat: this.chat,
       receiver,
       fetch: (request) => this.fetch(request),
       clock: this.appClock,

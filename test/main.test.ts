@@ -27,9 +27,12 @@ import type { App } from "@slack/bolt";
 import { type FetchFunction, LogLevel, WebAPIRequestError } from "@slack/web-api";
 import type { BuildAppOptions } from "../src/chat/slack/app/app.ts";
 import { DELETE_ACTION, EDIT_ACTION, EDIT_ON } from "../src/chat/slack/home.ts";
+import { deleter, makeClients } from "../src/chat/slack/module.ts";
+import { SlackChat } from "../src/chat/slack/thread.ts";
 import type { Clock } from "../src/clock.ts";
 import { CLEAN_EVERY_SECONDS, logger as cleanupLogger } from "../src/core/cleanup.ts";
 import { ConfigError } from "../src/core/config.ts";
+import { postUpgradeNotices } from "../src/core/flows/notices.ts";
 import { AlreadyRunning, singleInstance } from "../src/core/lock.ts";
 import { StateStore } from "../src/core/state.ts";
 import * as texts from "../src/core/texts.ts";
@@ -37,13 +40,10 @@ import {
   cleanEvery,
   DRAIN_LIMIT_SECONDS,
   deferred,
-  deleter,
   FAILURE_STOP_SECONDS,
   installProcessHandlers,
   logger,
   main,
-  makeClients,
-  postUpgradeNotices,
   type RunOptions,
   run,
   type SignalSource,
@@ -518,11 +518,21 @@ test("the manifest asks for the minimum", () => {
   assert.ok(!("slash_commands" in manifest.features));
 });
 
+/** The Slack provider over a fake workspace, as the notices are posted through it. */
+function chatOver(slack: FakeSlack): SlackChat {
+  return new SlackChat({
+    slack,
+    replies: slack,
+    identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
+    limiter: { acquire: async () => {}, refund: async () => {} },
+  });
+}
+
 test("the upgrade notice posts top level and clears the flag", async (t) => {
   const state = v1State(configDirectory(t));
   assert.deepEqual(state.pendingNotices(), [CHANNEL]);
   const slack = new FakeSlack();
-  await postUpgradeNotices(slack, state);
+  await postUpgradeNotices(chatOver(slack), state);
   const [post, ...others] = slack.callsTo("chat.postMessage");
   assert.deepEqual(others, []);
   assert.equal(post?.channel, CHANNEL);
@@ -535,7 +545,7 @@ test("a failed upgrade notice keeps the flag for next start", async (t) => {
   const state = v1State(configDirectory(t));
   const slack = new FakeSlack();
   slack.responses["chat.postMessage"] = new Error("network down");
-  await postUpgradeNotices(slack, state);
+  await postUpgradeNotices(chatOver(slack), state);
   assert.deepEqual(state.pendingNotices(), [CHANNEL]);
 });
 

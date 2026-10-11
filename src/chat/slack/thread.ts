@@ -1,35 +1,57 @@
 /**
- * One Slack thread as its session uses it (`ThreadChat` of the chat seam), composed from what
- * the provider already has: a `ReplySink` per reply, the `StatusReaction` on the thread's root,
- * the `ThreadStatus` line under its last message, and the request messages of `requests.ts`.
+ * The Slack provider (`ChatProvider` of the chat seam) and one Slack thread as its session uses
+ * it (`ThreadChat`), composed from what the provider already has: a `ReplySink` per reply, the
+ * `StatusReaction` on the thread's root, the `ThreadStatus` line under its last message, and the
+ * request messages of `requests.ts`.
  *
- * What it adds to those parts is their wiring: every pass of a reply that wrote, and every
+ * What the thread adds to those parts is their wiring: every pass of a reply that wrote, and every
  * notice, tells the status line (Slack clears a thread's status when the app replies); the
  * seam's four statuses are the four reactions; an answered question is rewritten on the budget
  * every reply draws from; and a failed post or rewrite crosses the seam as a `ChatError` named
  * by Slack's code.
  */
+import type { Receiver } from "@slack/bolt";
 import type { KnownBlock, WebClient } from "@slack/web-api";
-import type { PermissionRequest, Question, QuestionRequest } from "../../agent/seam.ts";
+import type { Question } from "../../agent/seam.ts";
 import { type Clock, monotonicClock, systemClock } from "../../clock.ts";
+import type { CorePort } from "../../core/port.ts";
 import * as texts from "../../core/texts.ts";
 import { getLogger } from "../../log.ts";
 import {
+  type ChannelChat,
+  type ChannelState,
+  type ChatCapabilities,
   ChatError,
+  type ChatInbound,
   type ChatProvider,
+  type Markup,
   type MessageId,
   type OpenMessageChange,
+  type OwnerRequest,
   type Reply,
+  type SessionIndex,
   type SessionStatus,
   type ThreadChat,
+  type ThreadRef,
 } from "../seam.ts";
-import { contextBlock, noticeText } from "./reply/blocks.ts";
+import type { AppConfig, Fetch } from "./app/answers.ts";
+import { type BuiltApp, buildApp } from "./app/app.ts";
+import type { ChannelGuard } from "./app/guards.ts";
+import { SlackChannel } from "./channel.ts";
+import { channelLookup } from "./channels.ts";
+import { holdBlocks } from "./hold.ts";
+import type { Home } from "./home.ts";
+import { crossing, deliver, deliverNotice, rewriteAsNotice } from "./notice.ts";
+import type { Listings } from "./openfile/listing.ts";
+import { endReply } from "./repair.ts";
+import { contextBlock, noticeText, split } from "./reply/blocks.ts";
 import { deleteRequest, describe } from "./reply/errors.ts";
-import { mrkdwnEscape } from "./reply/escape.ts";
+import { markdownEscape, mrkdwnEscape } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
 import { ReplySink } from "./reply/sinks.ts";
 import { Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
 import { answeredBlocks, approvalBlocks, questionBlocks } from "./requests.ts";
+import { setupBlocks } from "./setup.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.thread");
 
@@ -46,6 +68,27 @@ export interface SlackIdentity {
   readonly teamId: string;
   readonly ownerUserId: string;
   readonly botUserId: string;
+}
+
+/** What `start` builds the Bolt app from: the Slack side's own parts, and the core. */
+export interface SlackApp {
+  /** The core; read when the connection opens, which is after the provider was built. */
+  readonly core: () => CorePort;
+  /** The bot token downloads a message's files with; the folder sessions may start under. */
+  readonly config: AppConfig;
+  readonly guard: ChannelGuard;
+  /** The session index: the Home tab. */
+  readonly home: Home;
+  /** The folder a message's files that are no image are saved in (`attachments.uploadsDir`). */
+  readonly uploads: string;
+  /** Where Slack's payloads come from: `socketReceiver(appToken)` in the daemon. */
+  readonly receiver: Receiver;
+  /** How a file is downloaded; `attachments.download` with the bot token when absent. */
+  readonly fetch?: Fetch;
+  /** Wall-clock seconds as a Slack ts counts them; `Date.now` when absent. */
+  readonly now?: () => number;
+  /** `!open`'s listings; made over the core's `repository` when absent. */
+  readonly listings?: Listings;
 }
 
 export interface SlackChatOptions {
@@ -72,14 +115,37 @@ export interface SlackChatOptions {
   readonly debounceSeconds?: number;
   /** `sinks.FINAL_RETRY_SECONDS`, unless a test shortens it. */
   readonly finalRetrySeconds?: number;
+  /**
+   * What the connection is made of. Absent in a test of the threads alone: `start` then has
+   * nothing to open, and there is no session index.
+   */
+  readonly app?: SlackApp;
 }
 
-/** The Slack provider as the session manager uses it: one `SlackThread` per thread. */
+/** Slack draws every part of the chat seam. */
+const CAPABILITIES: ChatCapabilities = {
+  nativeStreaming: true,
+  reactions: true,
+  activityLine: true,
+  homeIndex: true,
+  fileUpload: true,
+  ownerOnlyNotices: true,
+};
+
+/** The Slack provider: one `SlackThread` per thread, one `SlackChannel` per channel. */
 export class SlackChat implements ChatProvider {
+  readonly name = "Slack";
+  readonly capabilities = CAPABILITIES;
+  /** Present when the provider holds the Home tab (`SlackApp.home`). */
+  readonly index?: SessionIndex;
   private readonly options: SlackChatOptions;
+  private readonly stopping = new AbortController();
+  private built: BuiltApp | null = null;
 
   constructor(options: SlackChatOptions) {
     this.options = options;
+    const home = options.app?.home;
+    if (home !== undefined) this.index = { refresh: (changed) => home.request(changed) };
   }
 
   /**
@@ -90,8 +156,102 @@ export class SlackChat implements ChatProvider {
     return this.options.limiter;
   }
 
-  thread(channelId: string, threadTs: string): SlackThread {
-    return new SlackThread(channelId, threadTs, this.options);
+  /**
+   * Aborts when the daemon stops. A listener still in flight then does nothing at its next
+   * step: the sessions are closed and the lock is released.
+   */
+  get stopped(): AbortSignal {
+    return this.stopping.signal;
+  }
+
+  /** Tells every listener, and every call of the chat, that the daemon is stopping. */
+  halt(): void {
+    this.stopping.abort();
+  }
+
+  thread(ref: ThreadRef): SlackThread {
+    return new SlackThread(ref.channel, ref.thread, this.options, this.stopped);
+  }
+
+  /**
+   * The thread as a handler answers in it. A post of the app's clears the status line of the
+   * session that lives there, not of this object, which only posts: `written` sets that line
+   * again.
+   */
+  answering(ref: ThreadRef, written: () => void): SlackThread {
+    return new SlackThread(ref.channel, ref.thread, this.options, this.stopped, written);
+  }
+
+  channel(channel: string): ChannelChat {
+    const { slack, identity, limiter, clock } = this.options;
+    return new SlackChannel(channel, {
+      slack,
+      ownerUserId: identity.ownerUserId,
+      limiter,
+      clock: clock ?? systemClock,
+      stopped: this.stopped,
+    });
+  }
+
+  escape(text: string, markup: Markup): string {
+    return markup === "notice" ? mrkdwnEscape(text) : markdownEscape(text);
+  }
+
+  openedAt(ref: ThreadRef): number | null {
+    // A Slack ts is the post time in epoch seconds.
+    const seconds = ref.thread.trim() === "" ? Number.NaN : Number(ref.thread);
+    return Number.isNaN(seconds) ? null : seconds;
+  }
+
+  channelState(channel: string): Promise<ChannelState> {
+    return channelLookup(this.options.slack)(channel);
+  }
+
+  async openFile(ref: ThreadRef, folder: string, target: string): Promise<void> {
+    if (this.built === null) throw new Error("the Slack app is not started");
+    await this.built.openFile(ref.channel, ref.thread, folder, target);
+  }
+
+  async start(_inbound: ChatInbound): Promise<void> {
+    const { app, identity, steady } = this.options;
+    if (app === undefined) throw new Error("this Slack provider was built with no app to open");
+    const core = app.core();
+    this.built = buildApp({
+      chat: this,
+      slack: this.options.slack,
+      config: app.config,
+      identity,
+      sessions: core.sessions,
+      approvals: core.approvals,
+      holds: core.holds,
+      guard: app.guard,
+      state: core.state,
+      uploads: app.uploads,
+      home: app.home,
+      receiver: app.receiver,
+      ...(steady !== undefined && { clock: steady }),
+      ...(app.fetch !== undefined && { fetch: app.fetch }),
+      ...(app.now !== undefined && { now: app.now }),
+      ...(app.listings !== undefined && { listings: app.listings }),
+    });
+    await this.built.app.start();
+    logger.info(`connected to Slack workspace ${identity.teamId}`);
+  }
+
+  async stop(): Promise<void> {
+    const built = this.built;
+    try {
+      await built?.app.stop();
+    } finally {
+      // Even when the connection would not close: what listens must stop all the same.
+      this.halt();
+      // The timers of clips still waiting for a transcript would keep the process alive.
+      built?.close();
+    }
+  }
+
+  async close(): Promise<void> {
+    await this.options.app?.home.close();
   }
 }
 
@@ -106,11 +266,25 @@ export class SlackThread implements ThreadChat {
   private readonly reaction: StatusReaction;
   /** Issues #83 and #95: Slack's status line at the bottom of the thread. */
   private readonly line: ThreadStatus;
+  private readonly stopped: AbortSignal;
+  private readonly onWritten: () => void;
 
-  constructor(channelId: string, threadTs: string, options: SlackChatOptions) {
+  /**
+   * `written` stands for this object's own status line where something else holds it: the
+   * handlers answer through a thread of their own, and the session's line is the one a post
+   * clears.
+   */
+  constructor(
+    channelId: string,
+    threadTs: string,
+    options: SlackChatOptions,
+    stopped: AbortSignal,
+    written?: () => void,
+  ) {
     this.channel = channelId;
     this.threadTs = threadTs;
     this.options = options;
+    this.stopped = stopped;
     this.slack = options.slack;
     this.clock = options.clock ?? systemClock;
     this.reaction = new StatusReaction(this.slack, { channel: channelId, rootTs: threadTs });
@@ -119,6 +293,7 @@ export class SlackThread implements ThreadChat {
       threadTs,
       clock: options.steady ?? options.clock ?? monotonicClock,
     });
+    this.onWritten = written ?? (() => this.line.wrote());
   }
 
   openReply(onOpenMessage: OpenMessageChange): Reply {
@@ -163,7 +338,7 @@ export class SlackThread implements ThreadChat {
   }
 
   written(): void {
-    this.line.wrote();
+    this.onWritten();
   }
 
   async notice(text: string): Promise<void> {
@@ -184,22 +359,29 @@ export class SlackThread implements ThreadChat {
     }
   }
 
-  async ask(
-    requestId: string,
-    request: PermissionRequest | QuestionRequest,
-    title: string,
-  ): Promise<MessageId> {
-    const blocks =
-      request.type === "question"
-        ? questionBlocks(requestId, request.questions)
-        : approvalBlocks(requestId, request);
+  async ask(requestId: string, request: OwnerRequest, title: string): Promise<MessageId> {
+    let blocks: readonly object[];
+    switch (request.type) {
+      case "question":
+        blocks = questionBlocks(requestId, request.questions);
+        break;
+      case "permission":
+        blocks = approvalBlocks(requestId, request);
+        break;
+      case "hold":
+        blocks = holdBlocks(requestId, request.link);
+        break;
+      case "setup":
+        blocks = setupBlocks(requestId, request.models, request.selection);
+        break;
+    }
     let ts: unknown;
     try {
       const posted = await this.slack.chat.postMessage({
         channel: this.channel,
         thread_ts: this.threadTs,
         text: title,
-        // Built to Block Kit's reference by `requests.ts`: opaque to the library's types.
+        // Built to Block Kit's reference by the modules that make them: opaque to the library's types.
         blocks: blocks as unknown as KnownBlock[],
         unfurl_links: false,
         unfurl_media: false,
@@ -236,7 +418,81 @@ export class SlackThread implements ThreadChat {
     }
   }
 
+  rewrite(message: MessageId, text: string): Promise<void> {
+    return rewriteAsNotice(this.slack, this.options.limiter, this.channel, message, text);
+  }
+
+  async tell(text: string, options: { readonly stays?: boolean } = {}): Promise<void> {
+    if (this.stopped.aborted) return;
+    try {
+      await deliverNotice(this.slack, this.options.identity.ownerUserId, this.place, text, {
+        ephemeral: !options.stays,
+      });
+      // Slack clears a thread's status line when the app replies: the session's is set
+      // again, so `Working…` does not go for a minute after the answer to a word.
+      this.written();
+    } catch (error) {
+      logger.warning(`could not reach the owner in ${this.channel}: ${describe(error)}`);
+    }
+  }
+
+  async say(markdown: string, options: { readonly ownerOnly?: boolean } = {}): Promise<void> {
+    for (const chunk of split(markdown)) {
+      if (this.stopped.aborted) return;
+      await crossing(() =>
+        deliver(
+          this.slack,
+          this.options.identity.ownerUserId,
+          this.place,
+          chunk,
+          [{ type: "markdown", text: chunk }],
+          { ephemeral: options.ownerOnly ?? false },
+        ),
+      );
+      this.written();
+    }
+  }
+
+  async acknowledge(message: MessageId): Promise<void> {
+    if (this.stopped.aborted) return;
+    try {
+      await this.slack.reactions.add({
+        channel: this.channel,
+        name: "white_check_mark",
+        timestamp: message,
+      });
+    } catch (error) {
+      logger.warning(`could not react to a word in ${this.channel}: ${describe(error)}`);
+    }
+  }
+
+  async link(label: string, markup: Markup): Promise<string | null> {
+    let permalink: unknown;
+    try {
+      ({ permalink } = await this.slack.chat.getPermalink({
+        channel: this.channel,
+        message_ts: this.threadTs,
+      }));
+      if (typeof permalink !== "string") throw new TypeError("no permalink");
+    } catch (error) {
+      logger.warning(
+        `could not get a permalink for ${this.channel}/${this.threadTs}: ${describe(error)}`,
+      );
+      return null;
+    }
+    // A notice is mrkdwn, which takes `<url|label>`; a reference is Markdown, `[label](url)`.
+    return markup === "notice" ? `<${permalink}|${label}>` : `[${label}](${permalink})`;
+  }
+
+  endReply(reply: MessageId, note: string): Promise<void> {
+    return endReply(this.slack, this.options.limiter, this.place, reply, note);
+  }
+
   close(): Promise<void> {
     return this.line.close();
+  }
+
+  private get place(): { readonly channel: string; readonly threadTs: string } {
+    return { channel: this.channel, threadTs: this.threadTs };
   }
 }

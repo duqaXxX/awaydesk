@@ -6,7 +6,6 @@
  * up when the click is done: a walk or a git call in flight is never cut, the signal only stops
  * what would follow it.
  */
-import type { ThreadSession } from "../../../core/sessions/session.ts";
 import { Cancelled } from "../../../core/sessions/tasks.ts";
 import * as texts from "../../../core/texts.ts";
 import { fill } from "../../../core/texts.ts";
@@ -90,13 +89,7 @@ export class Open {
    * path, else the file whose name contains them, else the files that do. A file is opened on
    * its own only when it is the one match of a listing that is complete.
    */
-  async openWord(
-    channel: string,
-    threadTs: string,
-    session: ThreadSession,
-    words: string,
-  ): Promise<void> {
-    const folder = session.directory;
+  async openWord(channel: string, threadTs: string, folder: string, words: string): Promise<void> {
     if (!words) {
       await this.answers.deliver(channel, threadTs, texts.OPEN_FALLBACK, pickerBlocks(), {
         ephemeral: false,

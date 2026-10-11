@@ -520,7 +520,7 @@ export class Messages {
           await this.answers.tellOwner(channel, threadTs, texts.BYPASS_BEFORE_START);
         } else {
           // Both: the line says what changed and is gone on reload, the ✅ stays.
-          await this.answers.acknowledge(channel, ts);
+          await this.answers.acknowledge(channel, threadTs, ts);
           await this.answers.tellOwner(
             channel,
             threadTs,
@@ -569,7 +569,7 @@ export class Messages {
         return;
       case "open":
         if (session === null) await this.answers.inChannel(channel, texts.OPEN_TOP_LEVEL);
-        else await open.openWord(channel, threadTs, session, command.target);
+        else await open.openWord(channel, threadTs, session.directory, command.target);
         return;
       case "resume":
         if (session !== null || outside) {
@@ -606,7 +606,7 @@ export class Messages {
       // shows are dated, since dating reads their files.
       const shown = new Set<string>();
       for (const session of live) {
-        const stored = state.thread(channel, session.threadTs);
+        const stored = state.thread(channel, session.threadId);
         if (stored?.sessionId) shown.add(stored.sessionId);
       }
       const known = new Map<string, ListedSession>();
@@ -643,10 +643,10 @@ export class Messages {
     session: ThreadSession,
     known: ReadonlyMap<string, ListedSession>,
   ): Promise<string> {
-    const stored = this.parts.state.thread(channel, session.threadTs);
+    const stored = this.parts.state.thread(channel, session.threadId);
     const info = stored === null ? undefined : known.get(String(stored.sessionId));
     const title = info === undefined ? "" : oneLine(info.title, TITLE_LIMIT);
-    const linked = await this.answers.threadLink(channel, session.threadTs, title);
+    const linked = await this.answers.threadLink(channel, session.threadId, title);
     let activity: string;
     if (session.waitingForOwner) {
       activity = texts.STATUS_CHANNEL_WAITING;
