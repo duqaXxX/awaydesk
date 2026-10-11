@@ -36,10 +36,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # No npm cache here: this job installs a release nobody has reviewed, and a cache it saved
+      # would be one the CI workflow restores.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-          cache: npm
 
       # `npm view <package> version` prints the release the registry tags `latest`
       # (docs.npmjs.com/cli/commands/npm-view).

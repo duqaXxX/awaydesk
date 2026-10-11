@@ -5,9 +5,8 @@
  * What the public SDK does not give. `SDKSessionInfo.lastModified` is the transcript file's
  * mtime, and `getSessionMessages` returns messages without a time (`SessionMessage` has no
  * timestamp field, SDK 0.3.296 `sdk.d.ts`); no public function names a session's transcript path
- * or a folder's project directory either. The package has no public equivalent, so the folder
- * is derived here the way the package itself derives it (read in `sdk.mjs` 0.3.296,
- * the functions that build `<config dir>/projects/<key>`): the real path, composed to NFC on
+ * or a folder's project directory either, so the folder is derived here the way the package
+ * itself derives it (read in `sdk.mjs` 0.3.296, the functions that build `<config dir>/projects/<key>`): the real path, composed to NFC on
  * macOS; every character that is not an ASCII letter or digit turned into `-`; past 200
  * characters, the first 200, a `-` and the base-36 form of the absolute value of the 32-bit
  * string hash `h = 31 * h + unit`. `test/agent/claude/listing.test.ts` writes a transcript where

@@ -29,3 +29,9 @@ updates:
           - '*'
         exclude-patterns:
           - '@anthropic-ai/claude-agent-sdk'
+    # The types of Node stay on the major of the oldest Node the package accepts (`engines` in
+    # package.json), so that the type check refuses an API that Node lacks.
+    ignore:
+      - dependency-name: '@types/node'
+        update-types:
+          - version-update:semver-major

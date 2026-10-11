@@ -288,7 +288,8 @@ All notable changes to this project are documented here. The format follows
   The Python daemon, its tests and its probe are removed (`src/awaydesk/`, `tests/`, `probe/*.py`,
   `pyproject.toml`, `uv.lock`), and the recordings moved to `test/fixtures/`. `test/golden/` holds
   what the renderer and the reply sink do for each recording of `test/fixtures/sdk/`: the files
-  the Python code wrote, kept as snapshots that `npm run golden` writes again from the code. CI
+  the Python code wrote, less the fake Slack's answer to each call, kept as snapshots that
+  `npm run golden` writes again from the code. CI
   runs the tests on Linux, macOS and Windows, Dependabot follows the npm dependencies, and the SDK
   release watch reads the npm registry. `docs/sdk-surface.md` is the table of the TypeScript SDK's
   surface. Numbers are

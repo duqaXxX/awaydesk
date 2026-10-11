@@ -208,7 +208,8 @@ function assistant(memory: Memory, record: WireRecord): SessionEvent[] {
     } else if (block.type === "tool_result") {
       events.push(...callEnded(block, parentCallId, block.is_error === true, null));
     } else if (block.type === "advisor_tool_result") {
-      // A server tool result: it carries no error flag.
+      // The one server tool result read, as the Python SDK's `parse_message` keeps this one
+      // alone (claude-agent-sdk 0.2.165). It carries no error flag.
       events.push(...callEnded(block, parentCallId, false, null));
     }
   }
