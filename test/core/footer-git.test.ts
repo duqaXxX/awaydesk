@@ -21,7 +21,7 @@ import { afterEach, beforeEach, test as nodeTest } from "node:test";
 import { trustedRepository } from "../../src/agent/claude/trust.ts";
 import type { Repository } from "../../src/agent/seam.ts";
 import { gitState } from "../../src/core/footer.ts";
-import { addWorktree, bareLayout, committed, git, trust } from "../support/git-layouts.ts";
+import { addWorktree, bareLayout, committed, git, gitEnv, trust } from "../support/git-layouts.ts";
 import { GIT_LAYOUT } from "../support/platform.ts";
 
 const test = GIT_LAYOUT.skip ? nodeTest.skip : nodeTest;
@@ -168,11 +168,7 @@ function filterRan(): boolean {
 
 /** What a footer that lets git find the repository runs in `folder`. */
 function gitDiffsThere(folder: string): void {
-  const env = { ...process.env };
-  for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"]) {
-    delete env[name];
-  }
-  spawnSync("git", ["-C", folder, "diff-files", "--shortstat"], { env, stdio: "ignore" });
+  spawnSync("git", ["-C", folder, "diff-files", "--shortstat"], { env: gitEnv(), stdio: "ignore" });
 }
 
 for (const [name, plant] of PLANTED) {

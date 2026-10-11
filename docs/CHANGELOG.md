@@ -351,6 +351,17 @@ All notable changes to this project are documented here. The format follows
   changes for the owner; the golden files did not move. Not changed: the unbound notice that
   the Slack provider sends for an audio clip still speaks of trust, since the provider cannot read
   the agent's capabilities.
+- The test helper `repoUnder` (`test/core/sessions/helpers.ts`) runs its `git init` without the
+  variables an outer git sets (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`), through
+  `git-layouts.gitEnv`, now exported and shared with `test/core/footer-git.test.ts`. A git hook
+  that runs the suite from a linked worktree gives every git it starts an absolute `GIT_DIR`, and
+  `git init` then re-initialises that repository and makes no new one (git warns of a re-init and ignores
+  the branch it was asked for; git 2.54.0, 2026-10-11). One test of invariant 1 is gone:
+  `test/scenario/step-8-owner-only.test.ts` loaded nothing of `src` but the seam's error class, and
+  what it asserted is decided by the memory chat's own check in `test/support/memory-chat/room.ts`.
+  The conformance suite (`test/conformance/chat.ts`) holds that chat and the Slack provider to the
+  same check on a message, a click, a form and a pick: removing `room.ts`'s check on each of the
+  three paths fails 1, 4 and 1 of its checks (2026-10-11).
 - The daemon's own git (footer, `!status`, `!open`) runs only in a repository the owner trusted
   in Claude Code by its own key (`trust.trustedRepository`). A repository inside the folder a
   session started in was covered by that folder's trust, so one that reached a trusted folder in
