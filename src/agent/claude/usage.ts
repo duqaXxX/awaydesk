@@ -1,5 +1,7 @@
 /** Claude Code's `/usage` text read into the 5-hour and weekly limits. */
 
+import { strip } from "../../text.ts";
+
 // `/usage` answers in seconds; past this the probe gives up, so the footer never stops refreshing.
 export const USAGE_TIMEOUT = 60_000;
 // Wording measured on Claude Code 2.1.280 (2026-09-23). A change hides the field, nothing more.
@@ -92,7 +94,7 @@ function instantOf(wall: number, formatter: Intl.DateTimeFormat): number {
 
 /** The instant in `text` ("Sep 24 at 1:10am (Europe/Berlin)"), null when it cannot be read. */
 export function parseReset(text: string, now: number): number | null {
-  const found = RESET.exec(text.trim())?.groups;
+  const found = RESET.exec(strip(text))?.groups;
   if (found === undefined) {
     return null;
   }

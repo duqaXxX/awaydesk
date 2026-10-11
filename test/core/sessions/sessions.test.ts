@@ -46,7 +46,7 @@ import {
 import { DirectoryMissing, SessionClosed } from "../../../src/core/sessions/errors.ts";
 import { SessionManager } from "../../../src/core/sessions/manager.ts";
 import { ThreadSession } from "../../../src/core/sessions/session.ts";
-import { asked } from "../../../src/core/sessions/turn.ts";
+import { asked, Turn } from "../../../src/core/sessions/turn.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { setLevel, setWriter } from "../../../src/log.ts";
@@ -2435,6 +2435,22 @@ test("status shows a running task while the reply s own closing still waits", as
   await (await session.submit("start it")).done.wait();
   assert.equal(runningBlock(h.slack.messageBlocks().at(-1) ?? []), null);
   assert.ok((await session.status()).endsWith("\nBackground: `1 shell`"));
+});
+
+test("a queued prompt is a command by Python's lstrip: U+001C is skipped, U+FEFF is not", async (t) => {
+  const h = harnessFor(t)({});
+  const session = h.session();
+  const state = inside(session);
+  state.notificationWaits = true;
+  // A report turn that opens with words leaves a plain prompt waiting, and takes a command's.
+  for (const [prompt, taken] of [
+    ["\u001c/compact", true],
+    ["\ufeff/compact", false],
+  ] as const) {
+    const turn = new Turn(prompt, null as never);
+    state.sent = [turn];
+    assert.equal(state.whoseTurn(true), taken ? turn : null, JSON.stringify(prompt));
+  }
 });
 
 /** The recorded background run with the type its task starts under changed to `taskType`. */

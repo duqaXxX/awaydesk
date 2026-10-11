@@ -87,6 +87,21 @@ test("reads an env that starts with a byte order mark", () => {
   assert.equal(load(directory).chatVariables.SLACK_BOT_TOKEN, BOT);
 });
 
+test("a value is stripped as Python strips it", () => {
+  // U+001C is whitespace to Python and U+FEFF is not: `\u001c` alone is no value, and the
+  // byte order mark inside a value stays.
+  const directory = scratch();
+  writeEnv(directory, directory, {
+    SLACK_OWNER_USER_ID: "\u001cU000ALICE\u001c",
+    SLACK_USER_TOKEN: "\u001c",
+  });
+  const config = load(directory);
+  assert.equal(config.chatVariables.SLACK_OWNER_USER_ID, "U000ALICE");
+  assert.equal(config.chatVariables.SLACK_USER_TOKEN, undefined);
+  writeEnv(directory, directory, { SLACK_OWNER_USER_ID: "U000ALICE\ufeff" });
+  assert.equal(load(directory).chatVariables.SLACK_OWNER_USER_ID, "U000ALICE\ufeff");
+});
+
 test("the owner s user token is optional and never shown", () => {
   const directory = scratch();
   writeEnv(directory, directory);

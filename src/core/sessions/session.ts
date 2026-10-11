@@ -58,6 +58,7 @@ import type {
 import { ResumeRefused } from "../../agent/seam.ts";
 import type { FooterFields, MessageId, Reply, SessionStatus, ThreadChat } from "../../chat/seam.ts";
 import { getLogger } from "../../log.ts";
+import { strip } from "../../text.ts";
 import { errorName } from "../../values.ts";
 import {
   effortChange,
@@ -2145,7 +2146,7 @@ export class ThreadSession {
     const first = this.sent[0];
     if (this.injectedExpected || first === undefined) return null;
     const head = first.prompt;
-    const plain = typeof head === "string" && !head.trimStart().startsWith("/");
+    const plain = typeof head === "string" && !strip(head).startsWith("/");
     if (worded && this.notificationWaits && plain) return null;
     this.sent.shift();
     return first;

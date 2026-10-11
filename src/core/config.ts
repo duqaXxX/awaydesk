@@ -3,6 +3,7 @@ import { lstatSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { parseEnv } from "node:util";
+import { strip } from "../text.ts";
 import { errorCode } from "../values.ts";
 import { expandUser, resolvePath } from "./paths.ts";
 
@@ -194,7 +195,7 @@ export function loadConfig(
   // A byte order mark would become part of the first variable's name.
   const text = readFileSync(envPath, "utf8").replace(/^\ufeff/, "");
   for (const [key, raw] of Object.entries(expandEnv(text, env))) {
-    const value = raw?.trim();
+    const value = raw === undefined ? "" : strip(raw);
     if (value) values[key] = value;
   }
   const [agent, agentModule] = selected(
