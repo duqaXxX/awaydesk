@@ -40,6 +40,26 @@ export const logger = getLogger("awaydesk.agent.claude.session");
 
 // The reason given when the stream ends without an exception.
 const PROCESS_EXITED = "the Claude Code process exited";
+// How the SDK says the process ended, and the name each way is given (issue #238). It throws a
+// plain `Error` for these, with no class and no code to tell them by, and its troubleshooting
+// page says to match on the message (code.claude.com/docs/en/agent-sdk/troubleshooting, read
+// 2026-10-11): a nonzero exit, a signal, and an error result the CLI reported before it exited.
+// Only the start of the message is read; what follows is the CLI's own words.
+const LOST_PROCESS: readonly (readonly [start: string, name: string])[] = [
+  ["Claude Code process exited with code ", "ProcessExited"],
+  ["Claude Code process terminated by signal ", "ProcessKilled"],
+  ["Claude Code returned an error result: ", "ErrorResult"],
+];
+
+/**
+ * The name of what ended the stream: `errorName`, except for an error that names itself no
+ * more than `Error` and whose message starts as one of `LOST_PROCESS`.
+ */
+function lostName(error: unknown): string {
+  const name = errorName(error);
+  if (name !== "Error" || !(error instanceof Error)) return name;
+  return LOST_PROCESS.find(([start]) => error.message.startsWith(start))?.[1] ?? name;
+}
 // What a call is told when nobody could be asked about it. This layer does not import
 // `src/core/`, so the core's own text for it (`APPROVAL_UNPOSTED`) is not reused.
 const REQUEST_UNSHOWN = "awaydesk could not show this request in Slack, so nobody approved it.";
@@ -241,7 +261,7 @@ export class ClaudeSession implements AgentSession {
         }
       }
     } catch (error) {
-      reason = errorName(error);
+      reason = lostName(error);
     }
     this.#ended = true;
     if (!this.#closing) {

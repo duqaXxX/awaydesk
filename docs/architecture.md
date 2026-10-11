@@ -1333,7 +1333,10 @@ closed when the start returns (`ThreadSession.connect`).
   says how to grant access.
 - If the Claude Code process exits or its stream fails, the back end ends the session's events with
   `process_lost`, whose reason is its own words for a process that exited or the name of the
-  failure, never its message. The requests the thread had open are denied and their messages
+  failure, never its message. The SDK throws a plain `Error` for a process that ended, so the back
+  end names it by the start of that message, as the SDK's troubleshooting page says to:
+  `ProcessExited` for an exit with a status other than 0, `ProcessKilled` for a signal,
+  `ErrorResult` for an error result reported before the exit. The requests the thread had open are denied and their messages
   deleted, as a close does it (`ThreadSession.settleRequests`), so none keeps buttons nobody can
   answer and the session stops counting as waiting for the owner: the idle close can fire and
   `!stop` has nothing left to deny. The open reply ends with an error line, every waiting message

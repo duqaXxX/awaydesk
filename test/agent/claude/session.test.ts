@@ -558,6 +558,64 @@ test("a stream that throws gives process_lost with the error's name", LIMIT, asy
   assert.deepEqual(errors, ["session stopped: ProcessExitError"]);
 });
 
+// The three messages the SDK's troubleshooting page gives for a process that ended, each with
+// what follows it there: the CLI's stderr, or its error report.
+for (const [message, name] of [
+  ["Claude Code process exited with code 1. stderr: a secret sentence", "ProcessExited"],
+  ["Claude Code process exited with code 137", "ProcessExited"],
+  ["Claude Code process terminated by signal SIGKILL. stderr: a secret sentence", "ProcessKilled"],
+  ["Claude Code returned an error result: a secret sentence", "ErrorResult"],
+] as const) {
+  test(
+    `a process the SDK reports as a plain error is named for how it ended [${message.slice(0, 44)}]`,
+    LIMIT,
+    async (t) => {
+      // Issue #238: the SDK gives these no class and no code, so the owner read `Error`.
+      const errors: string[] = [];
+      t.mock.method(logger, "error", (line: string) => errors.push(line));
+      const { session, events } = await started(t, { turns: [[fail(new Error(message))]] });
+      await session.send(PROMPT);
+      const seen = await until(events, "process_lost");
+      assert.deepEqual(seen.at(-1), { type: "process_lost", reason: name });
+      // The name, never the message.
+      assert.deepEqual(errors, [`session stopped: ${name}`]);
+    },
+  );
+}
+
+test(
+  "a plain error with other words, and a named one with these words, keep their own name",
+  LIMIT,
+  async (t) => {
+    t.mock.method(logger, "error", () => {});
+    const other = await started(t, {
+      turns: [[fail(new Error("Cannot write to terminated process"))]],
+    });
+    await other.session.send(PROMPT);
+    assert.deepEqual((await until(other.events, "process_lost")).at(-1), {
+      type: "process_lost",
+      reason: "Error",
+    });
+    const inside = await started(t, {
+      turns: [[fail(new Error("it said: Claude Code process exited with code 1"))]],
+    });
+    await inside.session.send(PROMPT);
+    assert.deepEqual((await until(inside.events, "process_lost")).at(-1), {
+      type: "process_lost",
+      reason: "Error",
+    });
+    const named = Object.assign(new Error("Claude Code process exited with code 1"), {
+      name: "AbortError",
+    });
+    const own = await started(t, { turns: [[fail(named)]] });
+    await own.session.send(PROMPT);
+    assert.deepEqual((await until(own.events, "process_lost")).at(-1), {
+      type: "process_lost",
+      reason: "AbortError",
+    });
+  },
+);
+
 test("a session that was closed gives no process_lost", LIMIT, async (t) => {
   const { session, events, query } = await started(t, { turns: [TOOLS.slice(0, 3)] });
   await session.send(PROMPT);
