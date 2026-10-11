@@ -151,7 +151,8 @@ export function parseBang(text: string): Command | null {
  * contains `query`, ignoring case. With no query, the rule that tells a command from a text comes
  * first. `escapeMarkdown` is the chat provider's escape for a markdown block; `names` fill the
  * texts that name the agent and the chat. An agent with no commands of its own
- * (`agentCommands` false) has none listed, and no line about where they are listed.
+ * (`agentCommands` false) has none listed, and no line about where they are listed. An agent that
+ * keeps no record of trust (`folderTrust` false) has a `!bind` line that speaks of none.
  */
 export function helpText(
   commands: readonly CommandInfo[] | null,
@@ -160,6 +161,7 @@ export function helpText(
   names: texts.Names,
   agentCommands = true,
   unserved: ReadonlySet<string> = new Set(),
+  folderTrust = true,
 ): string {
   const keep = (line: string): boolean => line.toLowerCase().includes(query.toLowerCase());
   // A word the agent or the chat cannot serve is not offered: its line is left out.
@@ -167,7 +169,8 @@ export function helpText(
     ![...unserved].some(
       (word) => line.startsWith(`\`!${word} `) || line.startsWith(`\`!${word}\``),
     );
-  const own = texts.HELP_WORDS.map((word) => texts.named(word, names))
+  const own = (folderTrust ? texts.HELP_WORDS : texts.HELP_WORDS_ANY)
+    .map((word) => texts.named(word, names))
     .filter(served)
     .filter(keep);
   const refused = refusedInThread(commands, agentCommands);

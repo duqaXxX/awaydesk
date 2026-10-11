@@ -67,6 +67,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
             names,
             agent.capabilities.commands,
             unserved,
+            agent.capabilities.folderTrust,
           ),
           { ownerOnly: quiet },
         );

@@ -42,9 +42,7 @@ test("a channel bound to no folder says where sessions start", async (t) => {
     topLevel: true,
     text: "!status",
   });
-  assert.deepEqual(world.chat.texts(free), [
-    fill(named(texts.UNBOUND, PLAIN_NAMES), { root: world.folder }),
-  ]);
+  assert.deepEqual(world.chat.texts(free), [fill(texts.UNBOUND_ANY, { root: world.folder })]);
 });
 
 test("a channel with no live session says so after its folder", async (t) => {

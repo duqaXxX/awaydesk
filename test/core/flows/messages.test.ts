@@ -48,7 +48,7 @@ test("a message in a channel bound to no folder says where sessions start", asyn
   const free = world.chat.openChannel("free");
   await world.chat.as(OWNER).says(free, "hello");
   assert.deepEqual(world.chat.texts(free).slice(1), [
-    fill(named(texts.UNBOUND, PLAIN_NAMES), { root: world.folder }),
+    fill(texts.UNBOUND_ANY, { root: world.folder }),
   ]);
   assert.deepEqual(await world.prompts(), []);
   assert.deepEqual(world.chat.requests(), []);

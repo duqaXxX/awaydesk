@@ -153,6 +153,16 @@ export class Talk {
     }
   }
 
+  /**
+   * Tells the channel it is not bound to a folder, in the words of an agent that keeps a record
+   * of trust or of one that does not.
+   */
+  unbound(channel: string): Promise<void> {
+    const { agent, names, allowedRoot } = this.deps;
+    const text = agent.capabilities.folderTrust ? named(texts.UNBOUND, names) : texts.UNBOUND_ANY;
+    return this.inChannel(channel, fill(text, { root: allowedRoot }));
+  }
+
   /** The request's message has done its job: removed from the chat and from what repair reads. */
   async removeRequest(ref: ThreadRef, message: MessageId | null): Promise<void> {
     if (message === null || this.stopped) return;

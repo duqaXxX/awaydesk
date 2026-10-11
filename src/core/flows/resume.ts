@@ -41,12 +41,8 @@ export interface Resuming extends ResumeFlow {
 }
 
 export function resuming(deps: FlowDeps, talk: Talk): Resuming {
-  const { agent, chat, sessions, state, names, allowedRoot } = deps;
+  const { agent, chat, sessions, state, names } = deps;
   const inNotice = (text: string): string => chat.escape(text, "notice");
-
-  /** The channel is not bound: the owner is told, and nothing else happens. */
-  const unbound = (channel: string): Promise<void> =>
-    talk.inChannel(channel, fill(named(texts.UNBOUND, names), { root: allowedRoot }));
 
   /**
    * The list has done its job once a session is resumed from it. With `remove`, the
@@ -133,7 +129,7 @@ export function resuming(deps: FlowDeps, talk: Talk): Resuming {
       const { channel } = ref;
       const record = state.channel(channel);
       if (record === null) {
-        await unbound(channel);
+        await talk.unbound(channel);
         return;
       }
       if (!agent.capabilities.sessionListing) {
@@ -176,7 +172,7 @@ export function resuming(deps: FlowDeps, talk: Talk): Resuming {
       const { channel } = pick;
       const record = state.channel(channel);
       if (record === null) {
-        await unbound(channel);
+        await talk.unbound(channel);
         return;
       }
       // The pick is not trusted: the session must still belong to the channel's folder, and

@@ -207,7 +207,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `commands` | `AgentInfo.commands` is ignored: a `!name` that is no word of the daemon is sent as typed, and `!help` lists no command of the agent |
 | `promptDuringTurn` | the next prompt is sent once the running turn has ended |
 | `sessionListing` | `!resume` answers that the agent keeps no list of its sessions (`texts.RESUME_UNLISTED`), and the cleanup never drops a thread for a session it cannot find. The Slack Home tab does not check it: it calls `AgentBackend.listSessions` through the port (`HomeAgent`) for the titles of the threads it lists |
-| `folderTrust` | every folder counts as trusted, `!bind` offers every folder under the root, and the daemon's own git runs in no folder, so the footer shows no branch and no changes |
+| `folderTrust` | every folder counts as trusted, `!bind` offers every folder under the root (`texts.BIND_LIST_ANY`; the notice of an unbound channel, `texts.UNBOUND_ANY`, and the `!bind` line of `!help`, `texts.HELP_WORDS_ANY`, say nothing of trust either), and the daemon's own git runs in no folder, so the footer shows no branch and no changes |
 
 | Chat capability | What the core does without it |
 |---|---|

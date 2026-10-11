@@ -77,6 +77,11 @@ export const UNBOUND = naming(
     "{agent} trusts, or `!bind <folder>` with the folder's path relative to `{root}`, for " +
     "example `!bind my-project`. `!guide` explains how awaydesk works.",
 );
+// The same notice for an agent that keeps no record of trust: every folder under the root is offered.
+export const UNBOUND_ANY =
+  "This channel is not bound to a folder yet. Send `!bind` to choose one of the folders " +
+  "under `{root}`, or `!bind <folder>` with the folder's path relative to `{root}`, for " +
+  "example `!bind my-project`. `!guide` explains how awaydesk works.";
 export const AUTH_FAILED = naming(
   "{agent} is not logged in on the host. On that machine, run `{cli}`, then `/login`. " +
     "The login is never done from {chat}.",
@@ -318,6 +323,14 @@ export const HELP_WORDS: readonly Named[] = [
     "its file viewer: a picker alone, or a path or part of a name; inside a thread, refused in " +
     "the channel",
 ].map(naming);
+// The words for an agent that keeps no record of trust: only the `!bind` line differs.
+const HELP_BIND_ANY = naming(
+  "`!bind [folder]` the folders under the allowed root, or bind this channel to one, its " +
+    "path relative to that root; in the channel, refused inside a thread",
+);
+export const HELP_WORDS_ANY: readonly Named[] = HELP_WORDS.map((word) =>
+  word.template.startsWith("`!bind ") ? HELP_BIND_ANY : word,
+);
 export const HELP_NO_MATCH = "No command matches `{query}`.";
 export const HELP_AGENT = naming(
   "\n**{agent}** (this session, now). Any other `!name args` runs that command; " +

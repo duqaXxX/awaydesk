@@ -35,9 +35,7 @@ function linkTo(thread: string): string {
 test("an unbound channel is told how to bind, and no list is posted", async (t) => {
   const world = await ListsWorld.build(t);
   await world.flows.resume.word(await world.word(), "");
-  assert.deepEqual(world.said().slice(1), [
-    fill(named(texts.UNBOUND, world.names), { root: world.root }),
-  ]);
+  assert.deepEqual(world.said().slice(1), [fill(texts.UNBOUND_ANY, { root: world.root })]);
   assert.deepEqual(world.chat.lists(), []);
 });
 
@@ -230,9 +228,7 @@ test("a pick from a channel that is not bound is told how to bind", async (t) =>
   const world = await withSessions(t);
   const elsewhere = world.chat.openChannel("elsewhere");
   await pick(world, { channel: elsewhere, thread: "1780000000.000009" }, elsewhere);
-  assert.deepEqual(world.chat.texts(elsewhere), [
-    fill(named(texts.UNBOUND, world.names), { root: world.root }),
-  ]);
+  assert.deepEqual(world.chat.texts(elsewhere), [fill(texts.UNBOUND_ANY, { root: world.root })]);
 });
 
 test("a pick is not trusted: the thread opens in the channel that was checked", async (t) => {

@@ -114,8 +114,9 @@ test("!stop ends the turn that runs, in a thread or in the channel, and says so 
 });
 
 // The words of the daemon this pair can serve: no bypass mode and no file upload, so `!bypass`
-// and `!open` are refused when typed and the help does not offer them.
-const OFFERED_WORDS = texts.HELP_WORDS.map((line) => named(line, NAMES)).filter(
+// and `!open` are refused when typed and the help does not offer them. It keeps no record of
+// trust: the `!bind` line is the one that speaks of none.
+const OFFERED_WORDS = texts.HELP_WORDS_ANY.map((line) => named(line, NAMES)).filter(
   (line) => !line.startsWith("`!bypass") && !line.startsWith("`!open"),
 );
 
