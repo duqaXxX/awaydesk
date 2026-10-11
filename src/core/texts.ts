@@ -109,6 +109,8 @@ export const NOT_A_SESSION =
   "`!resume` to continue an earlier one.";
 export const OPEN_TOP_LEVEL =
   "Opening a file belongs to one session: send `!open` inside its thread.";
+// Shown only by a chat that cannot share a file into a thread.
+export const OPEN_UNAVAILABLE = naming("{chat} cannot show a file here, so `!open` does nothing.");
 export const WORD_IN_THREAD = "`!{word}` works in the channel, not inside a thread.";
 // `!stop` typed in a thread that holds no session: it would have stopped the whole channel.
 export const STOP_OUTSIDE_SESSION =
@@ -200,6 +202,10 @@ export const BIND_BUSY =
 export const BYPASS_TOP_LEVEL =
   "Bypass belongs to one session: send `!bypass on` inside its thread.";
 // True with the setup on screen and without it (after a stop, a restart or a Cancel).
+// Shown only by an agent with no mode that skips permission requests.
+export const BYPASS_UNAVAILABLE = naming(
+  "{agent} has no mode that runs tools without asking, so there is no bypass to switch.",
+);
 export const BYPASS_BEFORE_START =
   "This session has not started yet: tick Bypass in its setup and press Start. " +
   "If no setup is shown, send a message here first.";

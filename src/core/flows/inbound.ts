@@ -11,7 +11,7 @@ import type {
   ThreadRef,
 } from "../../chat/seam.ts";
 
-/** The flows a call is handed to; one that is absent is not in the core yet. */
+/** The flows a call is handed to; a test may leave out those it does not reach. */
 export interface Flows {
   readonly message?: (message: InboundMessage) => Promise<void>;
   readonly answer?: (

@@ -144,13 +144,7 @@ function started(world: ReturnType<typeof worldOf>, options: { stuck?: boolean }
     app: {
       core: () => {
         cores += 1;
-        return {
-          sessions: world.sessions,
-          state: world.state,
-          approvals: world.approvals,
-          holds: world.holds,
-          agent: world.backend,
-        };
+        return world.core;
       },
       config: world.config,
       guard: new ChannelGuard(world.slack, world.identity),

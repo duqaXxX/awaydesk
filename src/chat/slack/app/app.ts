@@ -42,9 +42,11 @@ import type {
   ApprovalsPort,
   HoldsPort,
   Names,
+  OtherFlows,
   SessionsPort,
   StatePort,
 } from "../../../core/port.ts";
+import type { ChatInbound } from "../../seam.ts";
 import { download } from "../attachments.ts";
 import { BIND_ACTION } from "../bind.ts";
 import { HOLD_CANCEL, HOLD_CONTINUE } from "../hold.ts";
@@ -109,6 +111,10 @@ export interface BuildAppOptions {
   readonly state: StatePort;
   /** The agent's and the chat's names, which the texts that name them take. */
   readonly names: Names;
+  /** What the listeners tell the core of what the owner did. */
+  readonly inbound: ChatInbound;
+  /** The flows of the core a handler still calls itself. */
+  readonly flows: OtherFlows;
   /** The folder a message's files that are no image are saved in (`attachments.uploadsDir`). */
   readonly uploads: string;
   readonly home: Home;
@@ -222,6 +228,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     guard: options.guard,
     state: options.state,
     names: options.names,
+    inbound: options.inbound,
+    flows: options.flows,
     uploads: options.uploads,
     home: options.home,
     limiter: chat.limiter,

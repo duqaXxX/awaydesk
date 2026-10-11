@@ -1025,6 +1025,14 @@ export class ThreadSession {
   }
 
   /**
+   * The thread as this session writes it. What a flow posts through it, outside the session,
+   * counts as written here: the chat sets the activity line again.
+   */
+  get threadChat(): ThreadChat {
+    return this.thread;
+  }
+
+  /**
    * A message of the app's was posted in this thread outside the session: the chat clears a
    * thread's activity line when the app replies, so it is set again.
    */

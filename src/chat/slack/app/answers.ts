@@ -15,6 +15,7 @@ import {
   type HoldsPort,
   type Names,
   named,
+  type OtherFlows,
   oneLine,
   SessionClosed,
   SessionGone,
@@ -24,6 +25,7 @@ import {
   texts,
 } from "../../../core/port.ts";
 import { getLogger } from "../../../log.ts";
+import type { ChatInbound } from "../../seam.ts";
 import type { Home } from "../home.ts";
 import { deliver } from "../notice.ts";
 import type { Listings } from "../openfile/listing.ts";
@@ -78,6 +80,10 @@ export interface AppParts {
   readonly state: StatePort;
   /** The agent's and the chat's names, which the texts that name them take. */
   readonly names: Names;
+  /** What the listeners tell the core of what the owner did. */
+  readonly inbound: ChatInbound;
+  /** The flows of the core a handler still calls itself. */
+  readonly flows: OtherFlows;
   /** The folder a message's files that are no image are saved in. */
   readonly uploads: string;
   readonly home: Home;

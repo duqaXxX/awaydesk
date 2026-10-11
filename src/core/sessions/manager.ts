@@ -4,7 +4,7 @@
  * `session.ts`.
  */
 import type { ListedSession, Repository } from "../../agent/seam.ts";
-import type { ThreadRef } from "../../chat/seam.ts";
+import type { ThreadChat, ThreadRef } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
 import { bindableFolders } from "../folders.ts";
 import * as texts from "../texts.ts";
@@ -68,6 +68,17 @@ export class SessionManager {
    */
   wrote(channelId: string, threadId: string): void {
     this.sessions.get(keyOf(channelId, threadId))?.threadWritten();
+  }
+
+  /**
+   * The thread as a flow answers in it: the live session's own, so that what is posted there
+   * sets its activity line again, or the chat's for a thread with no live session.
+   */
+  chatOf(channelId: string, threadId: string): ThreadChat {
+    return (
+      this.sessions.get(keyOf(channelId, threadId))?.threadChat ??
+      this.deps.chat.thread({ channel: channelId, thread: threadId })
+    );
   }
 
   /**

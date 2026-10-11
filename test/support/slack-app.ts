@@ -36,6 +36,7 @@ import type {
   RequestHandler,
   StartOptions,
 } from "../../src/agent/seam.ts";
+import type { ChatInbound } from "../../src/chat/seam.ts";
 import type { AppConfig } from "../../src/chat/slack/app/answers.ts";
 import { type BuiltApp, buildApp } from "../../src/chat/slack/app/app.ts";
 import { ChannelGuard, type Identity } from "../../src/chat/slack/app/guards.ts";
@@ -63,8 +64,10 @@ import {
   SETUP_START,
 } from "../../src/chat/slack/setup.ts";
 import { SlackChat } from "../../src/chat/slack/thread.ts";
+import { buildFlows } from "../../src/core/flows/flows.ts";
 import { UsageCache } from "../../src/core/footer.ts";
 import { Holds } from "../../src/core/hold.ts";
+import type { CorePort } from "../../src/core/port.ts";
 import { Approvals } from "../../src/core/requests.ts";
 import { SessionManager } from "../../src/core/sessions/manager.ts";
 import { StateStore } from "../../src/core/state.ts";
@@ -245,6 +248,10 @@ export class World {
   readonly cleaned: string[] = [];
   /** The Slack provider the handlers answer through. */
   readonly chat: SlackChat;
+  /** The core as the provider reaches it: the stores above, and the flows built over them. */
+  readonly core: CorePort;
+  /** What the listeners tell the core of what the owner did. */
+  readonly inbound: ChatInbound;
   readonly built: BuiltApp;
   readonly app: App;
   /** Whether the app's receiver was started, and stopped. */
@@ -291,6 +298,27 @@ export class World {
       clock: this.clock,
     });
     this.config = { botToken: `${"xox"}b-fake`, allowedRoot: this.root };
+    const { inbound, flows } = buildFlows({
+      chat: this.chat,
+      agent: this.backend,
+      sessions: this.sessions,
+      state: this.state,
+      approvals: this.approvals,
+      holds: this.holds,
+      names: NAMES,
+      allowedRoot: this.root,
+      stopped: this.chat.stopped,
+      now: () => this.now(),
+    });
+    this.inbound = inbound;
+    this.core = {
+      sessions: this.sessions,
+      state: this.state,
+      approvals: this.approvals,
+      holds: this.holds,
+      agent: this.backend,
+      flows,
+    };
     this.home = new Home(slack, {
       ownerUserId: OWNER,
       teamId: TEAM,
@@ -326,6 +354,8 @@ export class World {
       guard: new ChannelGuard(slack, this.identity),
       state: this.state,
       names: NAMES,
+      inbound: this.inbound,
+      flows: this.core.flows,
       uploads: this.uploads,
       home: this.home,
       chat: this.chat,

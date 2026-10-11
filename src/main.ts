@@ -48,7 +48,7 @@ import type { AgentEntry } from "./agent/seam.ts";
 import { type Clock, monotonicClock, systemClock } from "./clock.ts";
 import { CLEAN_EVERY_SECONDS, clean } from "./core/cleanup.ts";
 import { CONFIG_DIR, ConfigError, loadConfig } from "./core/config.ts";
-import { Inbound } from "./core/flows/inbound.ts";
+import { buildFlows } from "./core/flows/flows.ts";
 import { postUpgradeNotices } from "./core/flows/notices.ts";
 import { repair } from "./core/flows/repair.ts";
 import { UsageCache } from "./core/footer.ts";
@@ -284,7 +284,21 @@ export async function run(options: RunOptions = {}): Promise<number> {
       usage: limits === undefined ? null : new UsageCache(limits),
       clock: steady,
     });
-    core = { sessions, state, approvals, holds, agent: backend };
+    // Aborted once the chat has stopped: a flow still in flight then does nothing more.
+    const stopping = new AbortController();
+    const { inbound, flows } = buildFlows({
+      chat,
+      agent: backend,
+      sessions,
+      state,
+      approvals,
+      holds,
+      names,
+      allowedRoot: config.allowedRoot,
+      stopped: stopping.signal,
+      now: () => wall.time(),
+    });
+    core = { sessions, state, approvals, holds, agent: backend, flows };
 
     const cleanOnce = (): Promise<void> =>
       clean((channel) => chat.channelState(channel), state, {
@@ -327,7 +341,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
       state.onSessionsChange = (changed) => chat.index?.refresh(changed);
       chat.index?.refresh();
 
-      await chat.start(new Inbound());
+      await chat.start(inbound);
       await postUpgradeNotices(chat, state, names);
       await signals.requested;
       // launchd stops and restarts with SIGTERM: the turns already running finish first. Not on
@@ -341,7 +355,13 @@ export async function run(options: RunOptions = {}): Promise<number> {
       cleaning.abort();
       if (cleaned !== null) await step("stop the cleanup", () => cleaned);
       // The connection, and the clips' waits, whose timers would keep the process alive.
-      await step("stop the chat", () => chat.stop());
+      await step("stop the chat", async () => {
+        try {
+          await chat.stop();
+        } finally {
+          stopping.abort();
+        }
+      });
       await step("close the sessions", () => sessions.closeAll());
       // After the sessions: the page shows them as this stop left them.
       await step("close the chat", () => chat.close());

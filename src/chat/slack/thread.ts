@@ -232,7 +232,7 @@ export class SlackChat implements ChatProvider {
     await this.built.openFile(ref.channel, ref.thread, folder, target);
   }
 
-  async start(_inbound: ChatInbound): Promise<void> {
+  async start(inbound: ChatInbound): Promise<void> {
     const { app, identity, steady } = this.options;
     if (app === undefined) throw new Error("this Slack provider was built with no app to open");
     const core = app.core();
@@ -245,6 +245,8 @@ export class SlackChat implements ChatProvider {
       approvals: core.approvals,
       holds: core.holds,
       names: this.names(),
+      inbound,
+      flows: core.flows,
       guard: app.guard,
       state: core.state,
       uploads: app.uploads,

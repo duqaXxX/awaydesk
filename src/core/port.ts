@@ -11,6 +11,7 @@
 import type { AgentBackend } from "../agent/seam.ts";
 import type { ChatProvider } from "../chat/seam.ts";
 import type { Clock } from "../clock.ts";
+import type { OtherFlows } from "./flows/contract.ts";
 import type { FilesSession, FilesSessions, FilesState } from "./port/file-flows.ts";
 import type { HoldHolds, HoldSession, HoldSessions } from "./port/hold.ts";
 import type { HomeAgent, HomeState } from "./port/home.ts";
@@ -60,6 +61,8 @@ export interface CorePort {
   readonly approvals: ApprovalsPort;
   readonly holds: HoldsPort;
   readonly agent: AgentPort;
+  /** The flows a provider's own code still calls, until the message flow is the core's. */
+  readonly flows: OtherFlows;
 }
 
 /** What a chat provider is built with. */
@@ -97,6 +100,7 @@ export type { ChannelLookup } from "./cleanup.ts";
 export type { Command, Passthrough, Word } from "./commands.ts";
 export { helpText, hostOnly, parseBang, refusedInThread, unformatted, WORD } from "./commands.ts";
 export { ConfigError } from "./config.ts";
+export type { OtherFlows } from "./flows/contract.ts";
 export { FOLDER_ROWS, foldersWithin } from "./folders.ts";
 export type { FooterKey } from "./footer.ts";
 export { footerFields, GIT_TIMEOUT, runGit } from "./footer.ts";
@@ -105,7 +109,12 @@ export { Fold, shownPreview } from "./reply/fold.ts";
 export { oneLine, STOPPED } from "./reply/words.ts";
 export { APPROVE, answerOf, DENY } from "./requests.ts";
 export { resolveDirectory } from "./sessions/directory.ts";
-export { DirectoryUnavailable, SessionClosed, SessionGone } from "./sessions/errors.ts";
+export {
+  BypassUnavailable,
+  DirectoryUnavailable,
+  SessionClosed,
+  SessionGone,
+} from "./sessions/errors.ts";
 export { Cancelled, cancellable, Mutex, Semaphore, Task } from "./sessions/tasks.ts";
 export type { Choice, Summary } from "./setup.ts";
 export { choiceOf, DEFAULT, DEFAULT_CHOICE, effortLevels, summaryOf } from "./setup.ts";

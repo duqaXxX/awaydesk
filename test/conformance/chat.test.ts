@@ -196,13 +196,7 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
     limiter: world.limiter,
     clock: world.slackClock,
     app: {
-      core: () => ({
-        sessions: world.sessions,
-        state: world.state,
-        approvals: world.approvals,
-        holds: world.holds,
-        agent: world.backend,
-      }),
+      core: () => world.core,
       config: world.config,
       guard: new ChannelGuard(world.slack, world.identity),
       home: world.home,
