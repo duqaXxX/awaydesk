@@ -33,8 +33,8 @@ export interface PermissionModes {
 
 /**
  * What differs between back ends and the core adapts to. A capability is here because the core
- * reads it: without one the feature it names is not offered, and the core never calls what
- * serves it. What every back end does alike needs none.
+ * reads it, but for the two that say so: without one the feature it names is not offered, and
+ * the core never calls what serves it. What every back end does alike needs none.
  */
 export interface Capabilities {
   /**
@@ -51,9 +51,15 @@ export interface Capabilities {
   readonly backgroundTasks: boolean;
   /** The agent compacts a conversation (`compaction_started`, `compacted`). */
   readonly compaction: boolean;
-  /** The agent asks the owner questions (`RequestHandler.question`). */
+  /**
+   * The agent asks the owner questions (`RequestHandler.question`). The core offers nothing of
+   * its own for a question, so nothing of it reads this: it says what a back end may call.
+   */
   readonly questions: boolean;
-  /** A permission can be granted with the call's input changed (`PermissionAnswer`). */
+  /**
+   * A permission can be granted with the call's input changed (`PermissionAnswer`). The core
+   * builds no changed input, so nothing of it reads this either.
+   */
   readonly changedInput: boolean;
   /** `AgentBackend.usageLimits`. */
   readonly usageLimits: boolean;
