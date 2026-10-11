@@ -789,7 +789,7 @@ test("a stop by a signal ends the process with 0", async (t) => {
     ...d.options(),
     exit: (code) => exits.push(code),
     process: new EventEmitter(),
-    later: () => {},
+    later: () => () => {},
   });
   await d.connected.wait();
   d.signals.emit("SIGTERM");
@@ -801,22 +801,49 @@ test("a stop by a signal ends the process with 0", async (t) => {
 // and launchd would see a live job and start nothing. Measured on 2026-10-10 with
 // `@slack/socket-mode` 3.1.0: the WebSocket outlived every stop by 5.9 seconds.
 
-/** `main` over the daemon, with a `later` that keeps what it was asked instead of arming a timer. */
-function mainOf(d: Daemon, events: EventEmitter = new EventEmitter()) {
+/** A deadline `main` asked `later` for. */
+interface Deadline {
+  readonly seconds: number;
+  readonly action: () => void;
+  /** The daemon's clock when it was asked for. */
+  readonly at: number;
+  cancelled: boolean;
+}
+
+/** The seconds of the deadlines that were not cancelled. */
+function standing(timers: readonly Deadline[]): number[] {
+  return timers.filter((timer) => !timer.cancelled).map((timer) => timer.seconds);
+}
+
+/**
+ * `main` over the daemon, with a `later` that keeps what it was asked instead of arming a timer.
+ * With `onClock`, a deadline that is not cancelled also fires when the daemon's fake clock reaches
+ * it, as the real timer would.
+ */
+function mainOf(d: Daemon, events: EventEmitter = new EventEmitter(), onClock = false) {
   const exits: number[] = [];
-  const timers: Array<{ seconds: number; action: () => void }> = [];
+  const timers: Deadline[] = [];
   const running = main({
     ...d.options(),
     exit: (code) => exits.push(code),
     process: events,
     later: (seconds, action) => {
-      timers.push({ seconds, action });
+      const deadline: Deadline = { seconds, action, at: d.clock.now, cancelled: false };
+      timers.push(deadline);
+      const cancel = new AbortController();
+      if (onClock) {
+        d.clock.sleep(seconds, cancel.signal).then(action, () => undefined);
+      }
+      return () => {
+        deadline.cancelled = true;
+        cancel.abort();
+      };
     },
   });
   return { exits, timers, running, events };
 }
 
-test("a stop ends the process as soon as the daemon has stopped, and the deadline never fires", async (t) => {
+test("a stop ends the process with 0 as soon as the daemon has stopped", async (t) => {
   const d = new Daemon(t);
   const { exits, timers, running } = mainOf(d);
   const warnings = written(t, logger, "warning");
@@ -825,11 +852,8 @@ test("a stop ends the process as soon as the daemon has stopped, and the deadlin
   assert.deepEqual(exits, []); // not before the stop is over
   await running;
   assert.deepEqual(exits, [0]);
-  // Armed when the shutdown began, and beaten by it.
-  assert.deepEqual(
-    timers.map((timer) => timer.seconds),
-    [SHUTDOWN_LIMIT_SECONDS],
-  );
+  // The shutdown armed its deadline and ended before it: one stands, `exit` was not left to it.
+  assert.deepEqual(standing(timers), [SHUTDOWN_LIMIT_SECONDS]);
   assert.deepEqual(warnings(), []);
   // Everything the daemon made was closed first: the lock is free for the next one.
   await (await singleInstance(d.dir)).release();
@@ -946,9 +970,12 @@ test("a stop after a failure that does not finish ends the process with 1", asyn
   await running;
 });
 
-// C7: a stop by a signal has the limit a failure's stop has, from the end of the drain on. A word
-// of the daemon (`!status`, the setup of a thread) starts the agent outside the worker, and
-// `ThreadSession.close` waits for that start without a signal.
+// C7: a signal's stop has a limit on a shutdown that makes no progress. A word of the daemon
+// (`!status`, the setup of a thread) starts the agent outside the worker, and
+// `ThreadSession.close` waits for that start without a signal. The limit is
+// `SHUTDOWN_LIMIT_SECONDS` since the last step of the shutdown that completed, so a long shutdown
+// that goes on (many replies to end) is not cut. A stop that a failure asked for has one deadline,
+// at the failure, which a step does not move.
 
 /** A daemon with a thread whose `!status` started the agent and has not been answered. */
 async function holdingAStart(t: TestContext) {
@@ -959,29 +986,36 @@ async function holdingAStart(t: TestContext) {
   state.bind(CHANNEL, d.dir);
   state.openThread(CHANNEL, thread, "some-id");
   d.backend.listed = [{ id: "some-id" } as never];
-  const made = mainOf(d);
+  const made = mainOf(d, new EventEmitter(), true);
   await d.connected.wait();
   void d.deliver(reply("!status", thread)).catch(() => undefined);
   await d.until(() => d.backend.sessions.length === 1);
+  t.after(async () => {
+    starting.set(); // a failed assertion must not leave the stop waiting on the start
+    await made.running;
+  });
   return { d, starting, ...made };
 }
 
 test("a stop by a signal that waits on a start of the agent ends the process after the limit", async (t) => {
   const errors = written(t, logger, "error");
-  const { d, starting, exits, timers, running } = await holdingAStart(t);
-  t.after(async () => {
-    starting.set(); // a failed assertion must not leave the stop waiting on the start
-    await running;
+  const { d, exits, timers } = await holdingAStart(t);
+  const hung = new AsyncEvent();
+  t.mock.method(d.receiver, "stop", async () => {
+    await hung.wait(); // a connection that takes 20 seconds to close
   });
   d.signals.emit("SIGTERM");
-  await d.until(() => timers.length > 0);
-  // The stop is stuck on the start: the process is not ended, and the deadline is armed.
+  await d.until(() => timers.length > 0); // the shutdown has begun, stuck on the connection
+  await d.clock.advance(20);
+  hung.set(); // the last step that completes: the shutdown then waits on the start
+  await d.clock.advance(0);
+  await realWorkDone();
   assert.deepEqual(exits, []);
-  assert.deepEqual(
-    timers.map((timer) => timer.seconds),
-    [SHUTDOWN_LIMIT_SECONDS],
-  );
-  timers[0]?.action();
+  assert.equal(standing(timers).length, 1);
+  // Thirty seconds after the step, not after the shutdown began.
+  await d.clock.advance(SHUTDOWN_LIMIT_SECONDS - 1);
+  assert.deepEqual(exits, []);
+  await d.clock.advance(2);
   assert.deepEqual(exits, [1]);
   assert.ok(errors().some((line) => line.includes("did not finish")));
 });
@@ -1012,10 +1046,81 @@ test("the limit of a stop by a signal starts once the drain is over", async (t) 
   await d.until(() => exits.length > 0); // the replies' last writes wait on the clock
   await running;
   assert.deepEqual(exits, [0]);
-  assert.deepEqual(
-    timers.map((timer) => timer.seconds),
-    [SHUTDOWN_LIMIT_SECONDS],
-  );
+  assert.deepEqual(standing(timers), [SHUTDOWN_LIMIT_SECONDS]);
+});
+
+test("a shutdown that makes progress is not cut by the limit however long it takes", async (t) => {
+  // Each reply to end costs two acquires of the shared update limiter (1.5 s a token past a burst
+  // of 5): 20 sessions take 53 s of the fake clock (measured 2026-10-11).
+  const sessions = 20;
+  const messages = sdkMessages("tools");
+  const d = new Daemon(t, {
+    scripts: Array.from({ length: sessions }, () => ({ turns: [messages.slice(0, -1)] })),
+  });
+  const state = new StateStore(d.path);
+  const threads: string[] = [];
+  for (let i = 0; i < sessions; i += 1) {
+    const folder = join(d.dir, `project-${i}`);
+    mkdirSync(folder);
+    const thread = `1780000000.${String(i + 1).padStart(6, "0")}`;
+    state.bind(CHANNEL, folder); // a folder of its own for each: no same-folder hold
+    state.openThread(CHANNEL, thread, `id-${i}`);
+    threads.push(thread);
+  }
+  d.backend.listed = threads.map((_, i) => ({ id: `id-${i}` }) as never);
+  const { exits, timers, running } = mainOf(d, new EventEmitter(), true);
+  t.after(async () => {
+    d.signals.emit("SIGINT");
+    await running;
+  });
+  await d.connected.wait();
+  for (const thread of threads) void d.deliver(reply("go", thread)).catch(() => undefined);
+  await d.until(() => d.backend.sessions.every((session) => session.queries.join() === "go"));
+  await d.until(() => d.slack.streamTs.length + d.replies.streamTs.length >= sessions);
+  await d.clock.advance(120); // the limiter's bucket is full again
+  const stops = () =>
+    d.slack.callsTo("chat.stopStream").length + d.replies.callsTo("chat.stopStream").length;
+  const before = stops();
+  const began = d.clock.now;
+  d.signals.emit("SIGINT");
+  for (let i = 0; i < 4000 && exits.length === 0; i += 1) {
+    await d.clock.advance(0.5);
+    await realWorkDone();
+  }
+  assert.deepEqual(exits, [0]);
+  assert.ok(d.clock.now - began > SHUTDOWN_LIMIT_SECONDS, "the shutdown must outlast the limit");
+  assert.equal(stops() - before, sessions);
+  assert.deepEqual(new StateStore(d.path).repairsPending(), []);
+  // Every step moved the deadline, and the last one stands unfired.
+  assert.ok(timers.length > sessions);
+  assert.deepEqual(standing(timers), [SHUTDOWN_LIMIT_SECONDS]);
+});
+
+test("a failure during a signal's shutdown makes its deadline the one a failure has", async (t) => {
+  const d = new Daemon(t);
+  const hung = new AsyncEvent();
+  t.mock.method(d.receiver, "stop", async () => {
+    await hung.wait();
+  });
+  const { exits, timers, running, events } = mainOf(d, new EventEmitter(), true);
+  t.after(async () => {
+    hung.set();
+    await running;
+  });
+  await d.connected.wait();
+  d.signals.emit("SIGINT");
+  await d.clock.advance(10); // stuck on the connection since the first step
+  assert.equal(standing(timers).length, 1);
+  events.emit("uncaughtException", new TypeError("boom"));
+  const armed = timers.length;
+  assert.deepEqual(standing(timers), [SHUTDOWN_LIMIT_SECONDS]);
+  assert.equal(timers.at(-1)?.at, 10); // from the failure
+  hung.set(); // the steps that follow do not move it
+  await d.clock.advance(0);
+  await realWorkDone();
+  assert.equal(timers.length, armed);
+  await running;
+  assert.deepEqual(exits, [1]);
 });
 
 test("a failure during the drain ends it as a second signal does", async () => {

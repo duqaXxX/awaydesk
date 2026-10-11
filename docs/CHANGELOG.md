@@ -978,6 +978,26 @@ All notable changes to this project are documented here. The format follows
   Seen in a test on 2026-10-11: with the start held, after SIGTERM, the drain's limit, a second
   SIGTERM, a SIGINT and 1.5 seconds, `run` was still running with the lock held. Not measured:
   whether a real Claude Code start can hang.
+- A stop by a signal has a limit once its drain is over, on a shutdown that completes no step
+  (`main.SHUTDOWN_LIMIT_SECONDS`, renamed from `FAILURE_STOP_SECONDS`, 30 seconds, as before).
+  SIGTERM or SIGINT that arrived while a start of the agent made outside the worker had not
+  answered (the setup of a new thread, `!status`, `!bypass`, a passthrough command) left the
+  daemon waiting for good: `ThreadSession.close` waits for the connect lock, the Socket Mode
+  connection was already closed, so the daemon heard nothing, kept the single-instance lock, and
+  no further signal ended it. Only a stop that a failure asked for was bounded. `main.run` now
+  reports the shutdown's progress (`RunOptions.shutdownProgress`: its beginning, each step, each
+  session `SessionManager.closeAll` closes), after the drain, whose wait is not shortened, and
+  `main.main` ends the process with 1 when 30 seconds pass with no report. A limit on the whole
+  shutdown would cut one that is making progress: each reply to end costs two acquires of the
+  shared update limiter, and 20 sessions took 53 seconds on the fake clock (measured
+  2026-10-11), with 13 streams stopped and 8 threads left with repair fields at 30 seconds. A
+  stop that a failure asked for keeps one deadline of 30 seconds from the failure, which no
+  report moves, and a failure during a signal's shutdown replaces the deadline of progress with
+  it. A shutdown that returns in time ends with the same code as before. What an end by the limit
+  leaves is ended by the next start's repair; the note of the prompts that were not sent is not
+  written. Seen in a test on 2026-10-11: with the start held, after SIGTERM, the drain's limit, a
+  second SIGTERM, a SIGINT and 1.5 seconds, `run` was still running with the lock held. Not
+  measured: whether a real Claude Code start can hang.
 - A close that does not drain ends the reply of a turn whose end it cut (`ThreadSession.finish`,
   `ThreadSession.cutBeforeClose`). SIGINT, a second signal, the drain's limit and the stop after
   an uncaught exception could land between a turn's `turn_ended` and the reply's last write (the
@@ -985,8 +1005,8 @@ All notable changes to this project are documented here. The format follows
   cleared it on its way out, `close` found no active turn to abandon, and the reply's stream was
   never stopped: no ending line, no footer, and `close` had already cleared the thread's open
   replies in `state.json`, so the next start's repair did not end it either. The turn now stays
-  active when the cancel comes before the reply was closed out, and the reply ends as one cut
-  short does. Seen in a test on 2026-10-11 that closed the session one event apart: `chat.stopStream`
+  active when a close cancels the reader before the reply was closed out (`ActiveTurn.cut`; the
+  reader cancelled by a reconnect settles it as before), and the reply ends as one cut short does. Seen in a test on 2026-10-11 that closed the session one event apart: `chat.stopStream`
   was called once with the turn running and never with the turn ending.
 - A table's delimiter row in a reply is recognised in linear time (`markdown.markdownStarts`).
   One pattern read the whole row, and on a line of spaces around a single dash, under a line

@@ -901,9 +901,10 @@ signal, such as a loop waiting for the new process, which could only end once th
 The shutdown ends those tasks, and the session's root shows ✅. After 29 minutes awaydesk stops waiting and ends what still
 runs, whose replies say that it stopped. Sending the signal a second time stops without waiting.
 `SIGINT` (Ctrl-C in a terminal) stops without waiting too, because the terminal sends it to the
-Claude Code processes as well. Once it has stopped waiting, the shutdown itself gets 30 seconds:
-if it is still stuck then, for instance on a start of Claude Code that never answers, the daemon
-ends the process with exit status 1 and `KeepAlive` starts a new one.
+Claude Code processes as well. Once it has stopped waiting, the shutdown itself goes on for as long as it completes steps (the connection, each session, the chat). If 30 seconds pass with no step
+completing, for instance on a start of Claude Code that never answers, the daemon ends the process
+with exit status 1 and `KeepAlive` starts a new one. The next start's repair ends the replies the
+stop left open; the note that lists the messages that were not sent is not written.
 
 How long a turn can take to finish depends on who sends the signal. `launchctl kill TERM` only
 sends it, so a restart waits up to those 29 minutes. `launchctl bootout` and `launchctl

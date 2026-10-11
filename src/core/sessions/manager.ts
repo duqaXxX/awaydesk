@@ -352,9 +352,10 @@ export class SessionManager {
    * already had in flight: `close()` is safe to call again on a session already closing, but
    * returning as soon as this call's own no-op finds the client already gone would not wait for
    * whichever call is actually disconnecting it. From its first line the manager refuses to open,
-   * resume or bind, and hands out no session.
+   * resume or bind, and hands out no session. `closed` is called after each session's close, so
+   * a caller can tell a long shutdown that goes on from one that is stuck.
    */
-  async closeAll(): Promise<void> {
+  async closeAll(closed?: () => void): Promise<void> {
     this.closed = true;
     const sessions = [...this.sessions.values()];
     for (const session of sessions) {
@@ -367,6 +368,7 @@ export class SessionManager {
           `could not close ${session.channelId}/${session.threadId}: ${errorName(error)}`,
         );
       }
+      closed?.();
     }
     for (const session of sessions) await session.doneClosing.wait();
     this.sessions.clear();
