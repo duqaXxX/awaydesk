@@ -118,7 +118,9 @@ export function binding(deps: FlowDeps, talk: Talk): Binding {
         return;
       }
       await announce(channel, directory);
-      await talk.removeRequest({ channel, thread: pick.list }, pick.list);
+      // The list is a message of the channel, not a thread's request: withdrawn through the
+      // channel, as `!resume` does.
+      if (!talk.stopped) await chat.channel(channel).withdraw(pick.list);
     },
   };
 }

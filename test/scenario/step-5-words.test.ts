@@ -252,6 +252,9 @@ test("!bind binds the channel to a folder by its path, or from the list of folde
       channelLines(world).some(([, text]) => text === fill(texts.BIND_OK, { directory: third })),
     "the bind",
   );
+  // The list is withdrawn through the channel: no thread is asked for from its message id.
+  assert.deepEqual(world.chat.strayCalls(), []);
+  assert.equal(world.chat.message(list?.message as string), null);
 
   // The next message starts its session in the folder the channel is bound to.
   const thread = await session(world, "in the third");

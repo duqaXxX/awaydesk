@@ -214,7 +214,7 @@ export class Room {
 
   /**
    * Calls the daemon made for a capability this chat lacks (a reaction, a status, an activity
-   * line): empty while the core honours the capabilities.
+   * line), or asked for a thread the chat never issued: empty while the core honours the seam.
    */
   strayCalls(): readonly string[] {
     return this.#strays;

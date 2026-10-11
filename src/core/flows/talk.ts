@@ -159,7 +159,7 @@ export class Talk {
     await this.thread(ref).withdraw(message);
     try {
       // Spoken for either way, as the session's own removal does. A no-op for a message this
-      // thread never recorded (a pick from a list).
+      // thread never recorded.
       this.deps.state.removeRequest(ref.channel, ref.thread, message);
     } catch (error) {
       logger.warning(
