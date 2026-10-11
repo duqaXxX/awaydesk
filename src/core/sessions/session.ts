@@ -90,11 +90,10 @@ import {
   STORED_STATUS,
   SUMMARY_IS_END_LINE,
   TASK_EVENTS,
-  TASK_KINDS,
   TASK_REPLIES_KEPT,
   TASKS_KEPT,
   TURN_EVENTS,
-  UNKNOWN_KIND,
+  taskKind,
 } from "./constants.ts";
 import type { SessionDeps } from "./deps.ts";
 import { checkDirectory, repositoryBy, terminalLine, trustedBy } from "./directory.ts";
@@ -1792,7 +1791,7 @@ export class ThreadSession {
     } else {
       const origin = this.taskReplies.get(event.taskId);
       const label = description || (origin?.taskTitle(event.taskId) ?? null);
-      const name = (TASK_KINDS[taskType] ?? UNKNOWN_KIND)[1];
+      const name = taskKind(taskType)[1];
       const outcome = event.status === "completed" ? "finished" : event.status;
       text = `${name} "${oneLine(label || event.taskId, 120)}" ${outcome}`;
     }
@@ -2366,7 +2365,7 @@ export class ThreadSession {
     for (const [taskId, renderer] of this.taskReplies) {
       if (options.awaitedOnly && this.afterRestart.has(taskId)) continue;
       if (renderer.runningTasks.includes(taskId)) {
-        const kind = (TASK_KINDS[this.tasks.get(taskId)?.[0] ?? ""] ?? UNKNOWN_KIND)[0];
+        const kind = taskKind(this.tasks.get(taskId)?.[0] ?? "")[0];
         counts.set(kind, (counts.get(kind) ?? 0) + 1);
       }
     }

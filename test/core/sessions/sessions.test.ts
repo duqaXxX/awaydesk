@@ -2437,6 +2437,31 @@ test("status shows a running task while the reply s own closing still waits", as
   assert.ok((await session.status()).endsWith("\nBackground: `1 shell`"));
 });
 
+/** The recorded background run with the type its task starts under changed to `taskType`. */
+function retypedBackground(taskType: string): ReturnType<typeof splitBackground> {
+  return splitBackground(
+    sdkMessages("background").map((item) =>
+      isSystem(item, "task_started") && "record" in item
+        ? { record: { ...item.record, task_type: taskType } }
+        : item,
+    ),
+  );
+}
+
+// The type comes from the agent: a name of `Object.prototype` is no kind of ours.
+for (const taskType of ["constructor", "toString", "__proto__"]) {
+  test(`a task of type ${taskType} counts and ends as an unknown kind`, async (t) => {
+    const [first, notice, injected] = retypedBackground(taskType);
+    const h = harnessFor(t)({ turns: [first] });
+    const session = h.session();
+    await (await session.submit("start it")).done.wait();
+    assert.ok((await session.status()).endsWith("\nBackground: `1 task`"));
+    h.clients[0]?.inject([...notice, ...injected]);
+    await h.until(() => h.bodies().some((body) => body.includes('Task "')));
+    assert.ok(!h.bodies().some((body) => body.includes("undefined")), h.bodies().join("\n"));
+  });
+}
+
 test("status refreshes the usage limits and the next one shows them", async (t) => {
   const h = harnessFor(t)({ turns: [] });
   const session = h.session();

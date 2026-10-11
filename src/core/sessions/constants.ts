@@ -37,6 +37,11 @@ export const TASK_KINDS: Readonly<Record<string, readonly [counted: string, name
   local_agent: ["agent", "Agent"],
 };
 export const UNKNOWN_KIND: readonly [counted: string, named: string] = ["task", "Task"];
+/** The kind of a task type the agent reported: an own entry of TASK_KINDS, else UNKNOWN_KIND. */
+export function taskKind(taskType: string): readonly [counted: string, named: string] {
+  // `Object.hasOwn`: `constructor` and `toString` are no kind, whatever the agent calls its task.
+  return (Object.hasOwn(TASK_KINDS, taskType) ? TASK_KINDS[taskType] : undefined) ?? UNKNOWN_KIND;
+}
 // Tasks whose type and description the session keeps. A task can end with a terminal
 // `task_updated` and no notification (SDK docstring), so past this many the oldest are dropped.
 export const TASKS_KEPT = 200;
