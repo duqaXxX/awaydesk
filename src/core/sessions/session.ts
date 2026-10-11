@@ -797,8 +797,14 @@ export class ThreadSession {
         if (choice === true) {
           mode = this.modeFor(true);
           await cancellable(client.setPermissionMode(mode), signal);
-        } else if (choice === false && this.nativeMode === modes.bypass) {
-          // An explicit off outlives a rebuild: the folder's own bypass would return.
+        } else if (choice === false && (this.nativeMode === modes.bypass || !info.permissionMode)) {
+          // An explicit off outlives a rebuild: the folder's own bypass would return. An agent
+          // that reports no mode (a release can drop the field) may have started in it.
+          if (!info.permissionMode) {
+            logger.warning(
+              `the agent reported no permission mode for ${this.where}, setting ${modes.default}`,
+            );
+          }
           mode = modes.default;
           await cancellable(client.setPermissionMode(mode), signal);
         }

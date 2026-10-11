@@ -2020,6 +2020,34 @@ test("bypass from the folder s own settings shows and turns off", async (t) => {
   assert.ok(!statuses(h).at(-1)?.startsWith("⚡ bypass"));
 });
 
+test("a stored bypass off is sent when the agent reports no mode, with one line in the log", async (t) => {
+  // The initialize answer without `current_permission_mode`, which no SDK type declares: what a
+  // release that drops the field gives. The process may have started in bypass.
+  const info = infoOf({ commands: [] });
+  assert.equal(info.permissionMode, null);
+  const warnings = logged(t, "warning");
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")], info });
+  const session = h.session();
+  h.state.setBypass(CHANNEL, THREAD, false);
+  await (await session.submit("list the files")).done.wait();
+  assert.deepEqual(h.clients[0]?.modes, ["default"]);
+  assert.equal(session.mode, "default");
+  const unreported = warnings.filter((line) => line.includes("reported no permission mode"));
+  assert.equal(unreported.length, 1, warnings.join("\n"));
+  assert.ok(unreported[0]?.includes(`${CHANNEL}/${THREAD}`));
+});
+
+test("a stored bypass off sends nothing when the agent reports the default mode", async (t) => {
+  const info = infoOf({ commands: [], current_permission_mode: "default" });
+  const warnings = logged(t, "warning");
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")], info });
+  const session = h.session();
+  h.state.setBypass(CHANNEL, THREAD, false);
+  await (await session.submit("list the files")).done.wait();
+  assert.deepEqual(h.clients[0]?.modes, []);
+  assert.ok(!warnings.some((line) => line.includes("reported no permission mode")));
+});
+
 const AUTO_INFO = infoOf({ commands: [], current_permission_mode: "auto" });
 
 test("a thread claude code started in auto mode says so in status only", async (t) => {
