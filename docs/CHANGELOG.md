@@ -804,6 +804,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A table's delimiter row in a reply is recognised in linear time (`markdown.markdownStarts`).
+  One pattern read the whole row, and on a line of spaces around a single dash, under a line
+  holding a `|`, it backtracked in cubic time: 200 ms at 800 spaces a side and 3.1 s at 2,000
+  (measured 2026-10-11, Node 26.5.1). The text is the agent's, so a page it read could shape such
+  a line and hold the event loop every thread shares. The row is now read cell by cell. Found by
+  a security scan of `src` and `.github` on 2026-10-11.
 - A clip's WebVTT transcript loses every tag of a cue (`voice.vttText`). A tag runs from `<` to
   the next `>`, a line end does not close it, and one that nothing closes takes the rest of its
   cue, as the cue text tokenizer of WebVTT 1 reads them. One pass over each line left a tag that

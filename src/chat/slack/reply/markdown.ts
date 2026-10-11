@@ -28,7 +28,7 @@ const WORD = "[\\p{L}\\p{N}_]";
 const HEADING = new RegExp(` {0,3}#{1,6}(?:${S}|$)`, "y");
 const UNDERLINE = new RegExp(`^ {0,3}=+${S}*$`);
 const RULE = new RegExp(`^ {0,3}([-*_])(?:${S}*\\1){2,}${S}*$`);
-const TABLE_RULE = new RegExp(`^${S}*\\|?${S}*:?-+:?${S}*(?:\\|${S}*:?-+:?${S}*)*\\|?${S}*$`);
+const TABLE_CELL = /^:?-+:?$/;
 const FENCE = /^ {0,3}(`{3,}|~{3,})([^\n]*)$/;
 
 /** Whether a heading starts at `offset` of `text`. */
@@ -42,6 +42,21 @@ function rstripReturns(line: string): string {
   let end = line.length;
   while (end > 0 && line.charCodeAt(end - 1) === 0x0d) end -= 1;
   return line.slice(0, end);
+}
+
+/**
+ * Whether `line` is a table's delimiter row: cells of dashes, each with an optional colon at
+ * either end, between pipes, the first and the last pipe optional.
+ *
+ * Read cell by cell, in time linear in the line. The agent writes the text, and one pattern for
+ * the whole row backtracks in cubic time on a long run of spaces (measured 2026-10-11, Node
+ * 26.5.1), on the event loop every thread shares.
+ */
+function tableRule(line: string): boolean {
+  let row = strip(line);
+  if (row.startsWith("|")) row = row.slice(1);
+  if (row.endsWith("|")) row = row.slice(0, -1);
+  return row.split("|").every((cell) => TABLE_CELL.test(strip(cell)));
 }
 
 /** Where each block starts that Slack makes of a markdown text, as offsets into it. */
@@ -73,7 +88,7 @@ export function markdownStarts(text: string): number[] {
       if (table && line.includes("|")) continue;
       table = false;
       const following = rstripReturns(lines[number + 1] ?? "");
-      if (line.includes("|") && following.includes("|") && TABLE_RULE.test(following)) {
+      if (line.includes("|") && following.includes("|") && tableRule(following)) {
         starts.push(here);
         table = true;
         running = false;

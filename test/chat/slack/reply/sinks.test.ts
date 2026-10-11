@@ -3816,6 +3816,35 @@ for (const [text, stored] of [
   });
 }
 
+for (const [row, table] of [
+  ["|---|---|", true],
+  ["---|---", true],
+  ["  | :--- | ---: |  ", true],
+  ["|:-:|", true],
+  ["-|-", true],
+  ["|---|x|", false],
+  ["||---|", false],
+  ["---||", false],
+  ["| |", false],
+  ["|--- ---|", false],
+] as const) {
+  test(`a table starts only above a delimiter row [${JSON.stringify(row)}]`, () => {
+    // A table is a block of its own between two runs of text; with no table the text is one run.
+    const text = `before\n\na | b\n${row}\n1 | 2\n\nafter`;
+    assert.equal(sinks.markdownBlocks(text), table ? 3 : 1);
+  });
+}
+
+test("a long line of spaces under a table row is read in linear time", () => {
+  // The agent writes this text, so a page it read can shape it. Measured 2026-10-11 on Node
+  // 26.5.1: one pattern for the whole row took 200 ms at 800 spaces a side and about eight times
+  // that at each doubling, on the event loop every thread shares.
+  const side = " ".repeat(2000);
+  const began = performance.now();
+  assert.equal(sinks.markdownBlocks(`a | b\n${side}-${side}|x`), 1);
+  assert.ok(performance.now() - began < 500);
+});
+
 test("markdown is cut at the line that starts one block too many", () => {
   const text = sections(3);
   assert.equal(sinks.markdownCut(text, 6), null);
