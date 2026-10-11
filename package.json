@@ -12,6 +12,8 @@
     "dist",
     "slack-app-manifest.json",
     "README.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
     "LICENSE",
     "docs"
   ],

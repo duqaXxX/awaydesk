@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { test } from "node:test";
 import { features } from "../probe/features.ts";
 import { WORD } from "../src/core/commands.ts";
@@ -209,6 +209,43 @@ test("the readme states the version and the node the package declares", () => {
     text.includes(`Node ${node}`) || text.includes(`Node ${node.replace(/\.0$/, "")}`),
     `README.md does not name Node ${node}`,
   );
+});
+
+/** Whether `path` is one of the `files` entries of package.json or lies under a listed folder. */
+function shipped(path: string, files: string[]): boolean {
+  // Forward slashes on every system: `files` is written with them.
+  const rel = relative(ROOT, path).split(sep).join("/");
+  return (
+    rel === "package.json" || files.some((entry) => rel === entry || rel.startsWith(`${entry}/`))
+  );
+}
+
+test("a document the package ships links only to files the package ships", () => {
+  const { files } = JSON.parse(read(join(ROOT, "package.json"))) as { files: string[] };
+  const broken: string[] = [];
+  for (const doc of DOCS.filter((doc) => shipped(doc, files))) {
+    for (const target of targetsOf(read(doc))) {
+      if (/^[a-z]+:/.test(target)) continue;
+      const filePart = target.split("#")[0] ?? "";
+      if (filePart && !shipped(resolve(dirname(doc), filePart), files)) {
+        broken.push(`${docId(doc)} -> ${target}`);
+      }
+    }
+  }
+  assert.deepEqual(broken, [], "links to files that `files` in package.json leaves out");
+});
+
+test("the build emits no source map", () => {
+  // The archive ships `dist` and not `src`, so a map would point at files that are not there.
+  const compilerOptions = (name: string) =>
+    JSON.parse(read(join(ROOT, name))).compilerOptions as Record<string, unknown>;
+  const effective = {
+    ...compilerOptions("tsconfig.json"),
+    ...compilerOptions("tsconfig.build.json"),
+  };
+  for (const option of ["sourceMap", "inlineSourceMap", "declarationMap"]) {
+    assert.notEqual(effective[option], true, `tsconfig.build.json emits ${option}`);
+  }
 });
 
 // ---- the source scan behind the dotted-name check ------------------------------------------

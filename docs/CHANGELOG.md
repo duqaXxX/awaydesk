@@ -843,6 +843,15 @@ All notable changes to this project are documented here. The format follows
   (`paths.resolvePath`), so `ALLOWED_ROOT=proj` passed Checkpoint 2 in a terminal and failed under
   launchd, which starts the job in `/`; it now refuses a value that is not absolute once `~/` is
   expanded, and the message quotes the value.
+- The package ships the two files its documents link to and no source maps (`files` in
+  `package.json`, `tsconfig.build.json`). `README.md` and `docs/limits.md` link to
+  `CONTRIBUTING.md` and `SECURITY.md`, which the archive left out, so the three links broke in an
+  installed copy. The build also wrote 114 `.js.map` files (678 kB of 2.1 MB unpacked) whose
+  `sources` pointed at `../src/*.ts`, which the archive does not hold, and nothing enables source
+  maps at run time. Both files are now listed and `sourceMap` is off. Measured with `npm pack` on
+  2026-10-11: 238 files and 530.5 kB before, 126 files and 416.1 kB after, no `.map` file, and
+  the three links resolve in the unpacked archive. `test/docs.test.ts` derives the shipped set from
+  `files` and fails on a link out of it, and on a build that emits a source map.
 - A table's delimiter row in a reply is recognised in linear time (`markdown.markdownStarts`).
   One pattern read the whole row, and on a line of spaces around a single dash, under a line
   holding a `|`, it backtracked in cubic time: 200 ms at 800 spaces a side and 3.1 s at 2,000
