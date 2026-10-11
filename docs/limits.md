@@ -43,8 +43,9 @@ Computer use was absent from the session's servers although it was switched on f
 
 For some rows the SDK has a way of its own, which awaydesk does not use: a program can
 set a session's permission mode to `plan`, rewind the files of a session to an earlier message,
-resume a session as a fork, and name more directories when it starts one. None was tried, and
-the issues say what has to be measured first.
+resume a session as a fork, and name more directories when it starts one. None was run with the
+TypeScript SDK awaydesk is built on. The issues hold the earlier measurements and say what has to
+be measured first.
 
 ## Limits of Slack
 
@@ -82,5 +83,9 @@ it they cannot be done.
 - The 47 commands Claude Code does not offer to an SDK session and that are not named above were
   not sent one by one. Most are outside daily use (themes, key bindings, installers).
 - A command that is offered can still open a dialog in the terminal (`/config`, `/mcp`,
-  `/agents`): what each does from Slack was not tried ([#218](https://github.com/duqaXxX/awaydesk/issues/218)).
-- Linux and Windows hosts were never run.
+  `/agents`): what each does from Slack was not tried with the TypeScript SDK awaydesk is built
+  on. The issue holds an earlier measurement
+  ([#218](https://github.com/duqaXxX/awaydesk/issues/218)).
+- The daemon has never run on a Linux or a Windows host. Its tests run on both in CI, where the
+  ones that build a git layout are skipped on Windows
+  ([#197](https://github.com/duqaXxX/awaydesk/issues/197)).
