@@ -298,6 +298,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The docs say what the code does where they said otherwise. `docs/sdk-surface.md`: the probe
+  (`probe/surface.ts`, `node probe/main.ts --surface`) reads the published reference and checks
+  the table, and the table gains the six `SDKSessionInfo` fields `info.ts` reads.
+  `docs/architecture.md`: `assemble` in `src/chat/slack/module.ts` hands `delete` and `clean` to
+  `Home`; a bare `!bind` in a thread with no session lists the folders; the Home tab calls
+  `AgentBackend.listSessions` whatever `sessionListing` says, and the provider makes the
+  `ownerOnlyNotices` substitution; the events list names `report_started`; nothing in `src` calls
+  `log.setLevel`; the uploads folder may have any mode with no group or other bit; four rows of
+  "Measured platform behaviour" say they were observed through the Python SDK and not measured
+  again on the TypeScript one. `docs/setup.md`: the `state.json` row names `open_replies`,
+  `requests` and `ended`; the troubleshooting table quotes the channel refusal and its four
+  reasons; the cleanup also drops a no-session thread opened more than a day ago.
+  `docs/features.md`: rows for the reply footer, `!guide` and the upgrade notice, and the
+  LaunchAgent row no longer names a test that does not cover it. `README.md` lists the message ids
+  among what `state.json` stores. The header of `src/core/lock.ts` no longer speaks of the Python
+  daemon. No behaviour changes.
 - The daemon's own git (footer, `!status`, `!open`) runs only in a repository the owner trusted
   in Claude Code by its own key (`trust.trustedRepository`). A repository inside the folder a
   session started in was covered by that folder's trust, so one that reached a trusted folder in

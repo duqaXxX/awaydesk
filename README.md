@@ -78,7 +78,8 @@ The bot answers one Slack user in one workspace, and only in private channels wh
 that user and the bot. Every message, button and form submission is checked on its own, and a
 session starts only in a folder you have trusted in Claude Code. The tokens live in a mode-600
 file, and nothing else is stored except each channel's directory and, per thread, its session id,
-bypass switch, effort level and the status reaction on its root message. See
+bypass switch, effort level, the status reactions on its root message and the message ids a crash
+repair needs. See
 [SECURITY.md](SECURITY.md) and the checklist in
 [docs/setup.md](docs/setup.md#part-5-security-checklist).
 

@@ -818,7 +818,8 @@ in [features.md](features.md#notifications), not restated here.
 
 | Symptom | Cause |
 |---|---|
-| The bot does not see a channel | The channel is public, or the bot was not invited |
+| The bot does not see a channel | The channel is public, or the bot was not invited: the manifest subscribes the app to the messages of private channels only (`message.groups`) |
+| ``awaydesk does not work in this channel: <reason>. It answers only in a private channel whose only members are you and the bot.`` | The bot checked the channel on its own and refused it; only you see the message. `<reason>` is one of `it is not a private channel`, `it is shared with another workspace`, `it has members other than you and the bot` and `the bot cannot read its details`. Remove the other members, or use a channel of your own. The first reason can come only from an event of a channel that is not private, which the manifest does not subscribe to |
 | `Claude Code is not logged in on the host` | Claude Code on the machine is logged out: run `claude`, then `/login` |
 | Some messages get no reply | A second instance is running and receiving part of the events |
 | `This thread's session no longer exists: Claude Code deleted it or cannot find it. Send a new message in the channel to start one.` | The stored session id can no longer be resumed (its transcript was deleted); send a new message in the channel to start one |
@@ -846,12 +847,12 @@ Detail that the install sequence links to, kept out of its way.
 | File | Written by | Holds |
 |---|---|---|
 | `.env` | you | the tokens and the settings of Part 2 |
-| `state.json` | awaydesk | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice (on, off or never chosen), the effort level set with `/effort` and the status reaction on its root message |
+| `state.json` | awaydesk | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice (on, off or never chosen), the effort level set with `/effort`, the status reaction on its root message and the reaction it ended with, and the ids (`open_replies`, `requests`) of the replies and request messages still open, which the repair after a crash needs. Never a message's text |
 
 `state.json` looks like this; you never need to edit it:
 
 ```json
-{"version": 3, "agent": "claude", "chat": "slack", "channels": {"C0123456789": {"directory": "/home/dev/code/project", "notice_pending": false, "threads": {"1700000000.000100": {"directory": "/home/dev/code/project", "session_id": "...", "bypass": false, "effort": null}}}}}
+{"version": 3, "agent": "claude", "chat": "slack", "channels": {"C0123456789": {"directory": "/home/dev/code/project", "notice_pending": false, "threads": {"1700000000.000100": {"directory": "/home/dev/code/project", "session_id": "...", "bypass": false, "effort": null, "open_replies": [], "requests": [], "status": null, "ended": null}}}}}
 ```
 
 `state.json` belongs to the agent and the chat named in it, since a session id and a thread's name
@@ -861,8 +862,9 @@ file names, awaydesk does not start and the message names both pairs: select the
 names again, or delete the file and bind the channels again.
 
 awaydesk keeps `state.json` clean on its own, when it starts and then every 6 hours. It
-forgets a channel Slack answers `channel_not_found` about, with its threads, and a thread whose
-Claude Code session no longer exists. Anything it cannot tell for certain stays: a rate limit, a
+forgets a channel Slack answers `channel_not_found` about, with its threads, a thread whose
+Claude Code session no longer exists, and a thread that has no session and was opened more than a
+day ago. Anything it cannot tell for certain stays: a rate limit, a
 server error or an unreadable folder removes nothing, and neither does a thread or a channel
 with a session open at that moment. When Slack finds none of the bound channels it forgets none
 and says so in the log, since that is what a bot token of another workspace looks like.

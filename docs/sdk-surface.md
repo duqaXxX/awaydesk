@@ -41,10 +41,15 @@ a release with no notice, so it is the first place to look when a release misbeh
   `UNREAD_KINDS` in `translate.ts`, when a type in either list is not in the SDK's `SDKMessage`
   union or is imported by the source, when that union holds a type that is neither in the table
   nor in a list, and when a recording carries a kind listed as not recorded.
-- No check reads the published reference yet. The helpers that would (`inReference`, `check`,
-  `report`) are in the test file and run against a small page there, and move to the TypeScript
-  probe when it has a surface module. Until then a `reference` row is checked against the page by
-  hand on a new release.
+- `probe/surface.ts` reads the published reference (`readReference`) and holds the table to it and
+  to the installed package (`check`, `report`); `node probe/main.ts` prints the result before its
+  scenes, and `node probe/main.ts --surface` prints it alone, with no token. It reports a row as
+  BROKEN when the package no longer declares it, and as UNPROVEN when a `reference` row is not
+  named in the section of its type or the reference could not be read. It also lists the
+  `package` and `measured` rows that no reference names and no claim covers, and the message types
+  of the package that the table neither lists nor sets aside. A `reference` row is matched by
+  name inside the section of its type: the match does not read what the reference says the member
+  means.
 - Nothing checks that the table lists every field the source reads: the import check is complete
   for types and functions only. A change that reads a new field, key or value of the SDK adds its
   row in the same pull request.
@@ -57,8 +62,11 @@ a release with no notice, so it is the first place to look when a release misbeh
    using. A `measured` row that the package now declares moves to `package`, or to `reference`.
 3. For each type the test reports as new in the `SDKMessage` union, decide whether the daemon
    should handle it: add its rows, or list it under "Types the daemon does not read".
-4. Read the reference sections of the `reference` rows: move a row to `package` or `measured` if
-   the reference dropped it, or correct it if the reference renamed it.
+4. Run `node probe/main.ts --surface`. A row it reports as BROKEN is no longer in the package. A
+   `reference` row it reports as UNPROVEN is no longer named in the reference: read that section
+   and move the row to `package` or `measured` if the reference dropped it, or correct it if the
+   reference renamed it. When it reports the reference could not be read, read the sections of
+   the `reference` rows by hand.
 5. Run `test/agent/claude/translate.test.ts` on the recordings: it fails on a recorded kind that
    the translator neither reads nor lists.
 6. Update the versions and the date at the top of this file.
@@ -156,6 +164,12 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKResultMessage` | `result` | field | translate.ts: result | reference | none |
 | `SDKResultMessage` | `session_id` | field | translate.ts: result | reference | P3 |
 | `SDKResultMessage` | `terminal_reason` | field | translate.ts: endingOf | reference | none |
+| `SDKSessionInfo` | `customTitle` | field | info.ts: listedSession | reference | none |
+| `SDKSessionInfo` | `fileSize` | field | info.ts: listedSession | reference | none |
+| `SDKSessionInfo` | `gitBranch` | field | info.ts: listedSession | reference | none |
+| `SDKSessionInfo` | `lastModified` | field | info.ts: listedSession | reference | none |
+| `SDKSessionInfo` | `sessionId` | field | info.ts: listedSession | reference | none |
+| `SDKSessionInfo` | `summary` | field | info.ts: listedSession | reference | none |
 | `SDKStatusMessage` | `compact_result` | field | translate.ts: status | package | none |
 | `SDKStatusMessage` | `permissionMode` | field | translate.ts: status | reference | none |
 | `SDKStatusMessage` | `status` | field | translate.ts: status | reference | P22 |

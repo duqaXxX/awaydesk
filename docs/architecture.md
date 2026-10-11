@@ -43,7 +43,7 @@ What crosses the agent seam:
 | Crossing | Direction | What |
 |---|---|---|
 | commands | core to back end | on `AgentBackend`: `start`, `listSessions`, `datedSessions`, `aliveSessions`, `folderTrusted`, `trustedRepository`, `usageLimits` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask`, `setPermissionMode`, `setModel`, `setEffort`, `contextUsage`, `info`, `close` |
-| events | back end to core | `SessionEvent`, read in order from `AgentSession.events`: the session's id and version, a message's start and end, text as pieces or whole, a call's start and end, a task's life, a compaction, a change of permission mode, effort or folder, a prompt the agent took, usage limits gone stale, a turn's end, an error message of the agent's, a lost process. A turn has no start event, and `turn_ended` is an event like the others, never the answer to `send` |
+| events | back end to core | `SessionEvent`, read in order from `AgentSession.events`: the session's id and version, a message's start and end, text as pieces or whole, a call's start and end, a task's life, a compaction, a change of permission mode, effort or folder, a prompt the agent took, word that the coming turn reports a background task (`report_started`), usage limits gone stale, a turn's end, an error message of the agent's, a lost process. A turn has no start event, and `turn_ended` is an event like the others, never the answer to `send` |
 | requests | back end to core, which answers | `RequestHandler.permission` and `RequestHandler.question`: each resolves once, for as long as the owner takes, with a `PermissionAnswer` or a `QuestionAnswer` |
 | declarations | read by the core | `AgentBackend.name` and `AgentBackend.words`, which the texts take; `AgentBackend.capabilities`, what the back end supports (`capabilities.CAPABILITIES` for Claude), listed under "Modules" |
 
@@ -183,8 +183,9 @@ and `SLACK_OWNER_USER_ID` and reads `SLACK_USER_TOKEN`.
 
 A capability names a feature that the core offers only when the module supports it. A module
 declares what it supports; for a feature it does not declare, the core does not offer the feature
-and never calls what serves it. The core invents no substitute, except the one in the last row of
-the chat table. What every module does alike needs no capability. `effortLevels` and
+and never calls what serves it. The core invents no substitute: the one in the last row of the chat
+table is the provider's, and no code of the core reads `ownerOnlyNotices`. What every module does
+alike needs no capability. `effortLevels` and
 `permissionModes` are values, not switches, and their rows say what the core reads them for.
 
 `!guide` is made of parts (`src/core/guide.ts`, `guideText`), and the words `!help` lists follow
@@ -205,7 +206,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `models` | `AgentInfo.models` is ignored: the setup has no Model select and `AgentSession.setModel` is never called |
 | `commands` | `AgentInfo.commands` is ignored: a `!name` that is no word of the daemon is sent as typed, and `!help` lists no command of the agent |
 | `promptDuringTurn` | the next prompt is sent once the running turn has ended |
-| `sessionListing` | `!resume` answers that the agent keeps no list of its sessions (`texts.RESUME_UNLISTED`), and the cleanup never drops a thread for a session it cannot find |
+| `sessionListing` | `!resume` answers that the agent keeps no list of its sessions (`texts.RESUME_UNLISTED`), and the cleanup never drops a thread for a session it cannot find. The Slack Home tab does not check it: it calls `AgentBackend.listSessions` through the port (`HomeAgent`) for the titles of the threads it lists |
 | `folderTrust` | every folder counts as trusted, `!bind` offers every folder under the root, and the daemon's own git runs in no folder, so the footer shows no branch and no changes |
 
 | Chat capability | What the core does without it |
@@ -311,8 +312,8 @@ the last wait 26 minutes (run on mocked timers, 2026-10-10). The log holds
 
 Logs are lines on standard error (`log.getLogger`), which the LaunchAgent writes to
 `~/Library/Logs/awaydesk/awaydesk.log`. A line reads `<time> <LEVEL> <name>: <message>`, the time
-local, the name that of the module (`awaydesk.core.state`); lines below `INFO` are not written
-unless `log.setLevel` lowers the threshold. A line carries ids, counts and error names, never the
+local, the name that of the module (`awaydesk.core.state`); lines below `INFO` are not written, and
+nothing in `src` calls `log.setLevel`, the only way to lower the threshold. A line carries ids, counts and error names, never the
 text of a prompt or of a reply. The Slack libraries are given loggers that never write their own
 text (`quiet-logger`), since it can quote a message and, at the debug level, the Socket Mode ticket
 in the WebSocket URL: the web clients write nothing, Bolt and the Socket Mode client one line per
@@ -598,7 +599,8 @@ An image becomes an image part, and the turn's prompt one user message of conten
 (`attachments.promptFor`), which the back end sends through the SDK's streaming input
 (`prompt.userMessage`); any other file is saved to `$TMPDIR/awaydesk/` and its path is appended to
 the prompt, but only once every file arrived, so a failed message leaves no copy. The folder must be
-a directory of this user with mode 700, or nothing is written there; at each start the files older
+a real directory of this user with no group or other permission bit set (it is created with mode 700),
+or nothing is written there; at each start the files older
 than 3 days are removed (`attachments.prepareUploads`), so a conversation resumed after a restart
 still finds its files. A refused file or a failed download sends nothing: `content` answers null after the provider told
 the owner which file and why. Prompts, messages with files and Claude Code commands enter the queue in the order
@@ -1561,7 +1563,8 @@ bound channel is a group, the ones with sessions first by their newest, each cut
 that shape alone: a channel whose sessions are all older keeps its header and says
 `texts.HOME_NO_MATCH`. A Home view holds 100 blocks and a session takes up to `home.CARD_BLOCKS` of
 them: the page stops before the cap, and ends with `texts.HOME_MORE` when that leaves a session out.
-The channel menu holds `home.CHANNEL_OPTIONS` channels, Slack's limit for a select menu.
+The channel menu holds `All channels` and at most `home.CHANNEL_OPTIONS` (99) channels, so that it stays
+within Slack's 100 options for a select menu.
 
 The filters are a `home.HomeFilter` kept in memory: channel, status, period and a search on the
 title. The period starts on the last 48 hours; the others start unset. The two blocks that hold the
@@ -1591,8 +1594,8 @@ the one before it landed, so a filter just chosen is never replaced by an older 
 
 With the owner's user token configured (`SLACK_USER_TOKEN`, in `Config.chatVariables`), `module.deleter`
 builds a `ThreadDeleter` (in `delete`) after checking with `auth.test` that the token is the owner's
-own in the bot's workspace, and `main.run` hands its `delete` and `clean` to `Home`. Any other token
-stops the start with a `ConfigError`. The header line is then a section with an **Edit** button
+own in the bot's workspace; `assemble` (`src/chat/slack/module.ts`) hands its `delete` and `clean`
+to `Home`. Any other token stops the start with a `ConfigError`. The header line is then a section with an **Edit** button
 (`home.EDIT_ACTION`), since a context block holds no button; without the token it stays the context
 line and the page has no such control. `Home.edit` keeps the mode in memory and publishes. It keeps
 the filters the page had on entering and puts them back on leaving, so one chosen inside edit mode
@@ -1722,8 +1725,10 @@ a message that opens with another element, and a message with no composer block,
 a mark from a character the owner typed. The word ends at any whitespace, so a line break after it
 separates the arguments as a space does. The words: `help`, `guide`, `bind`, `bypass`, `status`,
 `stop` and `resume` and `open` are the daemon's own words (`commands.Word`), dispatched in
-`words.wordFlow` by whether the lookup above found a session: `!bind` and `!resume` work only
-at the top level, refused inside a thread (`texts.WORD_IN_THREAD`); `!bypass` only inside a thread,
+`words.wordFlow` by whether the lookup above found a session: `!resume` works only at the top
+level, refused inside any thread (`texts.WORD_IN_THREAD`), and `!bind` is refused the same way in a
+thread that holds a session, and with a folder in a thread that holds none; a bare `!bind` at the
+top level or in a thread with no session lists the folders; `!bypass` only inside a thread,
 refused at the top level (`texts.BYPASS_TOP_LEVEL`), and so is `!open` (`texts.OPEN_TOP_LEVEL`);
 `!guide` answers the same either way; `!help`, `!status` and `!stop` answer both, but with different
 content: `!help` lists only the daemon's words at the top level and a session's own commands too
@@ -1819,13 +1824,14 @@ that a reference leaves open, with how and when each was observed. The prose poi
 `measured: "Name"`. "Not recorded" marks a date, version or method that was not written down when
 the observation was made. A row names the client and the package it was observed through
 (`ClaudeSDKClient`, `claude-agent-sdk`, `slack-sdk`, `@anthropic-ai/claude-agent-sdk`); the
-behaviour is Claude Code's or Slack's own. The last two rows are documentation reads, not
+behaviour is Claude Code's or Slack's own. A row observed through the Python SDK, which the daemon
+no longer uses, says so when it has not been measured again on the TypeScript SDK. The last two rows are documentation reads, not
 observations. Where `!open` relies on git's behaviour, its measurements are in the header of
 `src/chat/slack/openfile/listing.ts` and repeated by `test/chat/slack/openfile/changed.test.ts`.
 
 | Name | Observed | Method | Date | Version |
 |---|---|---|---|---|
-| Stopped task, no report turn | Claude Code starts no turn to report a task stopped with `ClaudeSDKClient.stop_task` | not recorded | not recorded | Claude Code 2.1.283 |
+| Stopped task, no report turn | Claude Code starts no turn to report a task stopped with `ClaudeSDKClient.stop_task` of the Python SDK. Not measured again on the TypeScript SDK | not recorded | not recorded | Claude Code 2.1.283 |
 | File share event has no team | A `file_share` message event carries no `team` field | not recorded | 2026-09-25 | not recorded |
 | Thread broadcast event has no team | A reply sent with **Also send to #channel** arrives as a `message` event of subtype `thread_broadcast` with `thread_ts`, a `root` copy of the thread's first message and no `team` or `parent_user_id`; its envelope has `team_id` and `is_ext_shared_channel`; a hidden `message_changed` wrapping the same reply follows | A reply recorded in Socket Mode, daemon stopped | 2026-10-09 | slack-bolt 1.30.0 |
 | Download without files:read | Slack answers 302 to a file download when the app lacks `files:read` | not recorded | 2026-09-25 | not recorded |
@@ -1841,8 +1847,8 @@ observations. Where `!open` relies on git's behaviour, its measurements are in t
 | Push on stream stop | A stream in a thread the owner started notifies once, when it stops, with its first text as the banner, and never when it starts | iPhone locked, Slack open in a browser, channel on Just mentions | 2026-09-29 | not recorded |
 | Open stream cannot be deleted | A stream cannot be deleted while it is open | not recorded | 2026-09-28 | not recorded |
 | Stream needs a thread | `chat.startStream` answers `invalid_thread_ts` without `thread_ts` | not recorded | 2026-09-23 | not recorded |
-| Usage before first turn | `get_context_usage()` answers before a session's first turn and during a turn | not recorded | 2026-09-25 | claude-agent-sdk 0.2.158, bundled CLI 2.1.280 |
-| Version on init | Claude Code's version comes with a turn's `init` message and not with the connect | not recorded | 2026-09-26 | claude-agent-sdk 0.2.158, bundled CLI 2.1.280 |
+| Usage before first turn | `get_context_usage()` of the Python SDK answers before a session's first turn and during a turn. Not measured again on the TypeScript SDK (`getContextUsage()`) | not recorded | 2026-09-25 | claude-agent-sdk 0.2.158, bundled CLI 2.1.280 |
+| Version on init | Claude Code's version comes with a turn's `init` message and not with the connect (observed through the Python SDK). Not measured again on the TypeScript SDK | not recorded | 2026-09-26 | claude-agent-sdk 0.2.158, bundled CLI 2.1.280 |
 | Permission mode status | A `status` system message carries `permissionMode` after each `set_permission_mode` | not recorded | 2026-10-08 | claude-agent-sdk 0.2.164 |
 | Model survives resume | `set_model()` on a live client survives a resume and leaves the owner's default alone | not recorded | 2026-09-30 | Claude Code 2.1.285 |
 | Prompt sent before a notification | A prompt sent with no turn running, a moment before a background command's notification, gets its turn first: `init`, the notification, the prompt's replay, then its words and a result of its own. The turn that reports the command follows with a result of origin `task-notification` and no replay before its words. The same holds in every turn of the fixtures `prompt-replay-*`, `compact` and `auto-compact*`: a prompt of plain text is replayed before its turn's first words, and no replay precedes a report turn | Haiku, the prompt sent 19.5 s and 19.9 s after the call of a 20 s command, one run each | 2026-10-09 | claude-agent-sdk 0.2.164, bundled CLI 2.1.292 |
@@ -1850,7 +1856,7 @@ observations. Where `!open` relies on git's behaviour, its measurements are in t
 | Thread status on iOS | A thread status sent as `status` alone showed nothing on iOS; the loading message shows | Slack iOS and desktop, free plan, an app holding `assistant:write` | 2026-10-02 | slack-sdk 3.44.1 |
 | Permalink opens on the reply | Slack opens a thread on the reply that a permalink names | Mac app and iOS | 2026-10-05 | not recorded |
 | Built-in servers | In a non-interactive run the `init` message lists the user, plugin and claude.ai MCP servers. `computer-use` is absent though switched on for the folder through `/mcp`; `claude-in-chrome` is absent with `/chrome` set to "Enabled by default" and listed, connected, with `--chrome` | The SDK's bundled CLI run with `-p --output-format stream-json`, with and without `--chrome`, reading `mcp_servers` and `tools` | 2026-10-09 | Claude Code 2.1.292 |
-| Chrome in an SDK session | A client started with `extra_args` `chrome` opened a page in the owner's Chrome, read it, took a screenshot (an `image` block in the tool result) and closed the tab. The permission callback was asked for `tabs_context_mcp`, `navigate`, `read_page` and `computer`, and not for `tabs_close_mcp` | `ClaudeSDKClient` with the daemon's options in `default` mode, Haiku, one run | 2026-10-09 | SDK 0.2.164, Claude Code 2.1.292 |
+| Chrome in an SDK session | A client of the Python SDK started with `extra_args` `chrome` opened a page in the owner's Chrome, read it, took a screenshot (an `image` block in the tool result) and closed the tab. The permission callback was asked for `tabs_context_mcp`, `navigate`, `read_page` and `computer`, and not for `tabs_close_mcp`. Tried again by hand through the TypeScript daemon on 2026-10-11 (SDK 0.3.296, thread started with Chrome enabled by default): the page opened in Chrome. Which tools the callback was asked for was not measured again | `ClaudeSDKClient` with the daemon's options in `default` mode, Haiku, one run | 2026-10-09 | SDK 0.2.164, Claude Code 2.1.292 |
 | Clip transcript | A clip is a message with no text and one file of subtype `slack_audio` (`audio/mp4`, `media_display_type` `audio`); the same recording uploaded as a file has no subtype and gets a transcript too. No event follows its posting. After **Generate transcript**, `file_change` arrived four times in 15 seconds and `files.info` then gave `transcription` with `status` `complete`, a `locale` and `preview` (`content`, `has_more` false up to 67 characters); `vtt` on `files.slack.com` returned the transcript as WebVTT to the bot token. Slack chose the locale: `it-IT` once and `en-GB` twice for clips spoken in Italian, the two with wrong words. Not seen: a status other than `complete`, `has_more` true, the body of the `file_change` event (the log names it only) | Three clips from the iOS app, Slack free plan, a workspace set to English | 2026-10-09 | slack-sdk 3.45.0 |
 | Claude Code and audio | The Read tool refuses an `.m4a` file as binary, and `/voice` is not among the commands an SDK session is offered | The SDK's bundled CLI with `-p`, one run; `get_server_info()` of a client with the daemon's options | 2026-10-09 | Claude Code 2.1.292 |
 | Commands an SDK session is not offered | Of the 119 built-in commands in Claude Code's commands reference, `get_server_info()` lists 50. Each of 22 others sent as a prompt (`/rewind`, `/plan`, `/branch`, `/fork`, `/subtask`, `/btw`, `/background`, `/add-dir`, `/cd`, `/diff`, `/export`, `/copy`, `/permissions`, `/memory`, `/hooks`, `/skills`, `/tasks`, `/sandbox`, `/voice`, `/chrome`, `/status`, `/help`) got `/<name> isn't available in this environment.` as the turn's whole answer, with no output tokens | `ClaudeSDKClient`, Haiku, one session, each command once | 2026-10-09 | SDK 0.2.164, Claude Code 2.1.292 |
