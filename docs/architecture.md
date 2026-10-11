@@ -72,7 +72,8 @@ One message's way from Slack to Claude Code and back:
    workspace (`guards.isOwner`) and the channel (`ChannelGuard.refusal`), both through
    `Answers.admitted`. A message that starts with `!` is read by `commands.parseBang` as one of the
    daemon's words or as a passthrough to a Claude Code command.
-3. A prompt reaches `Messages.submitToSession`. A top-level message opens a session
+3. The listener hands the message to the core (`ChatInbound.message`), where a prompt is sent by
+   `messages.messages`. A top-level message opens a session
    (`SessionManager.open`); a reply in a thread gets that thread's session (`SessionManager.get`),
    rebuilt when a restart or an idle close dropped it. Before the prompt is sent, it can wait for
    the owner: a first prompt for the session's setup, and a prompt that would wake an idle session
@@ -203,7 +204,7 @@ warning or error that names the library, and the daemon logs the states of the c
   its notification is waited for `constants.INJECTED_TURN_WAIT`, since the CLI can suppress the
   notification. No other turn is sent.
 - A new prompt gets `texts.RESTARTING` and, under it, the threads the stop still waits for
-  (`Answers.refuseRestarting`, from `SessionManager.restartHolds`).
+  (`Talk.refuseRestarting`, from `SessionManager.restartHolds`).
 - A queued turn is dropped without a reply of its own (`ThreadSession.dropQueued`). One note
   (`turn.notSent`, `N messages were not sent because awaydesk restarted: send them again.`, with the
   start of each) is added to the end of the thread's running reply, or posted as a message of its
@@ -406,21 +407,21 @@ A control of the session index (the Home tab) runs the first check alone. Its pa
 channel, and all it does is choose what the owner's own page shows, or delete what the owner
 confirmed there: nothing reaches Claude Code.
 
-Where the daemon's own answers go is decided in `Messages.handleWord`. A word typed at the top
+Where the daemon's own answers go is decided in `words.wordFlow`. A word typed at the top
 level, or in a thread that holds no session, acts as a top-level word: its answer is a normal post
-in the channel (`Answers.inChannel`, or `Answers.say` with no thread), which is neither ephemeral
+in the channel (`Talk.inChannel`, or `Talk.say` with no thread), which is neither ephemeral
 nor a thread reply, so it stays after a reload and never notifies. Three words are the exception in
 a thread that holds no session, where a word reads as being about that thread: `!stop`, `!resume`
 and `!bind` with a folder act on the whole channel, so there they change nothing and say where to
 send them, for the owner alone (`texts.STOP_OUTSIDE_SESSION`, `texts.WORD_IN_THREAD`). A word typed
-inside a session's thread is answered by `Answers.tellOwner` or an ephemeral `Answers.say` under the
+inside a session's thread is answered by `Talk.tell` or an ephemeral `Talk.say` under the
 owner's message (`chat.postEphemeral` with `thread_ts`), which Slack drops on reload; `!bypass` adds
-`Answers.acknowledge`, a ✅ reaction on the word, which stays; `!stop` there is answered by a post in
+`Talk.acknowledge`, a ✅ reaction on the word, which stays; `!stop` there is answered by a post in
 the thread, which stays: `texts.STOPPED_THREAD` when it stopped something,
 `texts.NOTHING_TO_STOP_THREAD` when nothing runs; `!open` posts its button in the thread.
-`Messages.wordReport` chooses the same place for a word's failure, and `Answers.replyOnFailure` logs
-a report that itself fails instead of letting it throw, since a throw would reach the message
-listener's own failure path, which posts `texts.ERROR_REPLY` threaded under the word. The old-folder
+`messages.messages` chooses the same place for a word's failure, and `Talk.replyOnFailure` logs
+a report that itself fails instead of letting it throw, since a throw would reach the
+message flow's own failure path, which posts `texts.ERROR_REPLY` threaded under the word. The old-folder
 notice (`texts.OLD_THREAD_FOLDER`, shown on a prompt sent in a thread whose folder differs from the
 channel's current one) and `Not sent.` are ephemeral as well. A Resume button carries
 `<session id>@<thread ts>`, the thread of the owner's `!resume` message (`resume.parseResumeValue`);
@@ -449,7 +450,7 @@ a directory of this user with mode 700, or nothing is written there; at each sta
 than 3 days are removed (`attachments.prepareUploads`), so a conversation resumed after a restart
 still finds its files. A refused file or a failed download sends nothing and tells the owner which
 file and why. Prompts, messages with files and Claude Code commands enter the queue in the order
-they were sent, although downloads take a while (`Messages.arrival`). A message that waited on its
+they were sent, although downloads take a while (the arrival lock of `messages.messages`). A message that waited on its
 files is submitted to the thread's session as it is then; if that session closed meanwhile (an idle
 close, most likely), the submit is retried once against a freshly looked-up session for the same
 thread.
@@ -1136,12 +1137,12 @@ closed when the start returns (`ThreadSession.connect`).
   interrupts the running turn, denies its pending approvals and stops the thread's background tasks
   (`AgentSession.stopTask`), then shows `✅` on the root through `ThreadSession.react`, which clears
   `ThreadSession.errorStanding`: a stop the owner gave is not an error.
-- The same-folder hold: before a message would wake an idle session (`Messages.submitToSession`), a
+- The same-folder hold: before a message would wake an idle session (`messages.messages`), a
   live session of any other thread, of any channel, whose resolved folder is the same and is not
   idle (`SessionManager.workingIn`) makes the daemon ask first:
   `Another session is working in this folder: <link>. Send anyway?`, with the buttons `Send anyway`
   and `Don't send` (`hold.holdFlow`, kept in `hold.Holds`, memory only). The wait runs
-  inside the thread's own arrival lock (`Messages.arrival`), so a later message of the same thread
+  inside the thread's own arrival lock (`messages.messages`), so a later message of the same thread
   queues behind it and opens no second hold. `!stop` inside the held thread or a top-level `!stop`
   of its channel cancels the wait the same way `Don't send` does (`Holds.cancel`); so does
   `SessionManager.drain`, which also cancels every hold still open when a restart starts (a hold
@@ -1499,14 +1500,14 @@ Start (its Effort select and Bypass checkbox are only acknowledged, since Start 
 control), the Bind and Resume buttons of the two lists, `!open`'s Choose a file button with its
 modal's search field and Open, and the session index's controls (its filters, Show all, Edit, Delete
 and Clean up, and its New thread link button, which is only acknowledged). The listeners are methods
-of the classes of `src/chat/slack/app/` (`Messages`, `Requests`, `Open`, `ResumeBind`, `Clips`,
+of the classes of `src/chat/slack/app/` (`Requests`, `Open`, `ResumeBind`, `Clips`,
 `HomeControls`), which share `Answers`: the checks, where an answer goes, and how a failure is told.
 The app registers no slash command. Bolt acknowledges an event before its listener runs, and a
 click's listener acknowledges first; each then checks the owner, the workspace and the channel
 itself; a control of the session index, and a character typed in `!open`'s modal, come with no
 channel and check the owner and the workspace. The question form's Next and Submit answer Slack
 after checks that make no network call, since a missing answer can only be shown in that answer. A
-failure after the checks reaches the owner as a line of its own (`Answers.replyOnFailure`): a post
+failure after the checks reaches the owner as a line of its own (`Talk.replyOnFailure`): a post
 in the thread for a prompt, where a word's failure goes for a word. A listener that throws past that
 is logged by the error's name. A link Slack made from a typed address (`<url|label>`, `<url>`)
 reaches Claude Code as typed; a link the owner named reaches it as `label (url)`, so the address is
@@ -1527,14 +1528,14 @@ cannot change the permission mode. A clip that a typed message could not follow 
 session, an unbound channel, a file somebody else uploaded) is refused when it comes, before any
 wait. A clip waits `voice.WAIT_SECONDS`, in memory only.
 
-A `message` event is routed by whether it is a reply in an existing thread: `Messages.handleMessage`
+A `message` event is routed by whether it is a reply in an existing thread: `messages.messages`
 reads `SessionManager.get` for a reply (null for a thread that holds no session), and always null
 for a top-level one (`thread_ts == ts`), even in a channel that is bound. `commands.parseBang` reads
 a message starting with `!` (none for one carrying files, which is always a prompt).
-`Messages.handleMessage` gives it the event's `text` first, then what `commands.unformatted` makes
-of it. Slack puts the formatting marks in `text` (a backtick before the `!` of a message in inline
+The listener hands over the event's `text` and what `messages.unformatted` makes of it, and
+`messages.messages` reads the `text` first, then the other. Slack puts the formatting marks in `text` (a backtick before the `!` of a message in inline
 code) and sends the same message in the `rich_text` block of its composer, as `text` elements whose
-`style` says how they look. `commands.unformatted` reads one thing in that block, the run the
+`style` says how they look. `messages.unformatted` reads one thing in that block, the run the
 message opens with, in a `rich_text_section` or a `rich_text_preformatted` part. When the run starts
 with `!` and the text reads as marks, that run, then the same marks closing the run or the message,
 it returns the text without those marks: the arguments stay as the owner sent them, with their own
@@ -1543,7 +1544,7 @@ a message that opens with another element, and a message with no composer block,
 a mark from a character the owner typed. The word ends at any whitespace, so a line break after it
 separates the arguments as a space does. The words: `help`, `guide`, `bind`, `bypass`, `status`,
 `stop` and `resume` and `open` are the daemon's own words (`commands.Word`), dispatched in
-`Messages.handleWord` by whether the lookup above found a session: `!bind` and `!resume` work only
+`words.wordFlow` by whether the lookup above found a session: `!bind` and `!resume` work only
 at the top level, refused inside a thread (`texts.WORD_IN_THREAD`); `!bypass` only inside a thread,
 refused at the top level (`texts.BYPASS_TOP_LEVEL`), and so is `!open` (`texts.OPEN_TOP_LEVEL`);
 `!guide` answers the same either way; `!help`, `!status` and `!stop` answer both, but with different
@@ -1559,7 +1560,7 @@ initialization result carries each command's aliases; measured: "Initialization 
 level it opens a new session like any other message, and reaches Claude Code as `/clear` if the
 freshly started session offers that command. `!login` and `!logout` are `Passthrough`s the daemon
 never sends (`commands.hostOnly`): they act on the host's own login, which the daemon and every
-session run on, so `Messages.handleMessage` answers with `texts.LOGIN_ON_HOST` or
+session run on, so `messages.messages` answers with `texts.LOGIN_ON_HOST` or
 `texts.LOGOUT_ON_HOST` before any session is opened, in the channel or, inside a session's thread,
 for the owner alone. Any other `!name args` is a `Passthrough` too: sent as `/name args` when the
 session (freshly opened, at the top level) offers `name`, as the text itself otherwise. A top-level
@@ -1591,7 +1592,7 @@ errors) are a context block, small and grey as the footer, so they read apart fr
 for the lines of the `!bind` and `!resume` lists; their rows keep a section, since a context block
 holds no button. Their text is mrkdwn, and what comes from outside (a folder, a file name, a typed
 target) is escaped with `escape.mrkdwnEscape`. `!help`, `!guide`, `!status` and the answer to a
-resume stay a markdown block at full size (`Answers.say`): the first three are read, and a resumed
+resume stay a markdown block at full size (`ThreadChat.say`): the first three are read, and a resumed
 session's title keeps every character inside its bold only there, since mrkdwn has no escape for
 `*`. A shorter target is read only as a title. The list holds the directory's own sessions, not
 other worktrees', as the terminal's picker starts. A Resume click is checked like any other button,
@@ -1616,8 +1617,8 @@ NFC on macOS) with every character that is not an ASCII letter or digit turned i
 Claude Code's to compute, the first directory that starts with the same 200 characters and `-`
 stands in for it. The rule is the one the SDK itself applies (measured: "Transcript folder name").
 With no such directory the sessions keep their files' times, and a warning says so. Top-level
-`!status` (`Messages.channelStatus`) lists the channel's directory, then one line per live session
-of the channel, each a link to its thread labelled with the session's title (`Answers.threadLink`),
+`!status` (`status.channelStatus`) lists the channel's directory, then one line per live session
+of the channel, each a link to its thread labelled with the session's title (`Talk.referenceLink`),
 busy, waiting for the owner or idle, with the time since its last message when idle, its running
 tasks, its bypass and its folder when it differs from the channel's; while a stop waits, a notice
 under it names the threads the stop waits for. Inside a thread `!status` is that session's own

@@ -248,7 +248,7 @@ export class World {
   readonly cleaned: string[] = [];
   /** The Slack provider the handlers answer through. */
   readonly chat: SlackChat;
-  /** The core as the provider reaches it: the stores above, and the flows built over them. */
+  /** The core as the provider reaches it: the stores above. */
   readonly core: CorePort;
   /** What the listeners tell the core of what the owner did. */
   readonly inbound: ChatInbound;
@@ -298,7 +298,7 @@ export class World {
       clock: this.clock,
     });
     this.config = { botToken: `${"xox"}b-fake`, allowedRoot: this.root };
-    const { inbound, flows } = buildFlows({
+    const { inbound } = buildFlows({
       chat: this.chat,
       agent: this.backend,
       sessions: this.sessions,
@@ -317,7 +317,6 @@ export class World {
       approvals: this.approvals,
       holds: this.holds,
       agent: this.backend,
-      flows,
     };
     this.home = new Home(slack, {
       ownerUserId: OWNER,
@@ -355,7 +354,6 @@ export class World {
       state: this.state,
       names: NAMES,
       inbound: this.inbound,
-      flows: this.core.flows,
       uploads: this.uploads,
       home: this.home,
       chat: this.chat,
@@ -366,6 +364,9 @@ export class World {
       ...(options.listings !== undefined && { listings: options.listings }),
     });
     this.app = this.built.app;
+    // The app is built by hand, not through `SlackChat.start`: `!open` reaches it from here.
+    this.chat.openFile = (ref, folder, words) =>
+      this.built.openFile(ref.channel, ref.thread, folder, words);
   }
 
   /** Every agent session started, in order: the back end's `sessions`. */

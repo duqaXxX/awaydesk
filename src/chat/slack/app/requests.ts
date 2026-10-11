@@ -7,7 +7,7 @@
  */
 
 import type { KnownBlock, ModalView } from "@slack/web-api";
-import { fill, type OtherFlows, type SessionPort, texts } from "../../../core/port.ts";
+import { fill, texts } from "../../../core/port.ts";
 import type { OwnerAnswer } from "../../seam.ts";
 import { HOLD_CONTINUE } from "../hold.ts";
 import { describe } from "../reply/errors.ts";
@@ -38,9 +38,6 @@ import {
   text,
 } from "./wire.ts";
 
-/** The session as the core's flows take it: what `SessionManager` hands out is one. */
-type FlowSession = Parameters<OtherFlows["setup"]["beforeSending"]>[1];
-
 export class Requests {
   private readonly parts: AppParts;
   private readonly answers: Answers;
@@ -48,38 +45,6 @@ export class Requests {
   constructor(parts: AppParts, answers: Answers) {
     this.parts = parts;
     this.answers = answers;
-  }
-
-  /**
-   * The same-folder hold (`core/flows/hold.ts`): True to send the message on; false when it was
-   * not, either way telling the owner `Not sent.` already.
-   */
-  holdBeforeSending(
-    channel: string,
-    threadTs: string,
-    session: SessionPort,
-    other: SessionPort,
-  ): Promise<boolean> {
-    return this.parts.flows.hold.beforeSending(
-      { channel, thread: threadTs },
-      session as FlowSession,
-      other as FlowSession,
-    );
-  }
-
-  /**
-   * The session's setup (`core/flows/setup.ts`): the session to send the message on, or null
-   * when it was not sent, either way telling the owner `Not sent.` already.
-   */
-  setupBeforeSending(
-    channel: string,
-    threadTs: string,
-    asked: SessionPort,
-  ): Promise<SessionPort | null> {
-    return this.parts.flows.setup.beforeSending(
-      { channel, thread: threadTs },
-      asked as FlowSession,
-    );
   }
 
   // Issue #142: the facts that tell apart the paths that answer `texts.HOLD_GONE`, for the click

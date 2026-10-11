@@ -145,54 +145,6 @@ export function parseBang(text: string): Command | null {
   return { kind: "passthrough", text: strip(`${word} ${rest}`) };
 }
 
-// The parts of a composer message a word is read through. A quote or a list is left out: what
-// opens it is not what the owner typed first.
-const READ_THROUGH = new Set(["rich_text_section", "rich_text_preformatted"]);
-// What Slack writes in a message's text around code, bold, italic, strikethrough.
-const MARKS = "`*_~";
-
-/** The first element of a list, or an empty record for anything else. */
-function firstOf(value: unknown): Record<string, unknown> {
-  const head: unknown = Array.isArray(value) ? value[0] : undefined;
-  return typeof head === "object" && head !== null ? (head as Record<string, unknown>) : {};
-}
-
-/**
- * The text a composer message opens with, without its formatting; null for a message that opens
- * with anything else (a quote, a list, an emoji, a mention) or has no composer block.
- */
-function firstRun(blocks: unknown): string | null {
-  const block = firstOf(blocks);
-  const part = block.type === "rich_text" ? firstOf(block.elements) : {};
-  const leaf =
-    typeof part.type === "string" && READ_THROUGH.has(part.type) ? firstOf(part.elements) : {};
-  if (leaf.type !== "text") return null;
-  return typeof leaf.text === "string" ? leaf.text : "";
-}
-
-/**
- * `text` without the marks around the run it opens with, when that run starts with `!`: the
- * composer's block says what the run is (`firstRun`), the text holds the rest as the owner sent
- * it. Empty when the message does not open with a formatted `!`, or when the text does not read as
- * its marks, that run, then the same marks closing it or the message.
- */
-export function unformatted(text: string, blocks: unknown): string {
-  const run = firstRun(blocks);
-  const stripped = strip(text);
-  const at = stripped.indexOf("!");
-  const opening = at === -1 ? stripped : stripped.slice(0, at);
-  const body = at === -1 ? "" : stripped.slice(at);
-  if (!run?.startsWith("!") || !opening || [...opening].some((c) => !MARKS.includes(c))) {
-    return "";
-  }
-  if (!body.startsWith(run)) return "";
-  const after = body.slice(run.length);
-  const closing = [...opening].reverse().join("");
-  if (after.startsWith(closing)) return run + after.slice(closing.length);
-  if (after.endsWith(closing)) return run + after.slice(0, after.length - closing.length);
-  return "";
-}
-
 /**
  * The daemon's words, then every command the session offers now (null: not bound yet) except
  * those its thread refuses (`refusedInThread`), keeping only the lines whose name or description

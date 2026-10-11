@@ -5,7 +5,6 @@
  * the core is told of. The lists themselves are drawn by `SlackChannel.offer`.
  */
 
-import { boundText } from "../../../core/port.ts";
 import { parseResumeValue } from "../resume.ts";
 import type { Answers, AppParts } from "./answers.ts";
 import { interactionActor } from "./guards.ts";
@@ -27,24 +26,6 @@ export class ResumeBind {
   constructor(parts: AppParts, answers: Answers) {
     this.parts = parts;
     this.answers = answers;
-  }
-
-  /** `!bind <folder>` typed in the channel. */
-  bindTo(channel: string, path: string): Promise<void> {
-    return this.parts.flows.bind.to(channel, path);
-  }
-
-  /** `!bind` alone: the folders a session can start in, each with its button. */
-  listFolders(channel: string): Promise<void> {
-    return this.parts.flows.bind.list(channel);
-  }
-
-  /**
-   * `!resume` typed in the channel (`threadTs` is the thread of the owner's word: the message
-   * itself when top-level).
-   */
-  handleResume(channel: string, threadTs: string, target: string): Promise<void> {
-    return this.parts.flows.resume.word({ channel, thread: threadTs }, target);
   }
 
   /** A Bind button of the folder list. */
@@ -83,6 +64,3 @@ export class ResumeBind {
     });
   };
 }
-
-// Until `app.ts` stops re-exporting it: the answer to a bind is the core's words now.
-export { boundText };

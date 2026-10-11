@@ -42,7 +42,6 @@ import type {
   ApprovalsPort,
   HoldsPort,
   Names,
-  OtherFlows,
   SessionsPort,
   StatePort,
 } from "../../../core/port.ts";
@@ -79,16 +78,14 @@ import { Answers, type AppConfig, type AppParts, type Fetch, logger } from "./an
 import { Clips } from "./clip.ts";
 import { type ChannelGuard, type Identity, isPromptMessage, messageActor } from "./guards.ts";
 import { HomeControls } from "./home-controls.ts";
-import { filesOf, Messages } from "./messages.ts";
+import { filesOf, inboundMessage } from "./messages.ts";
 import { Open } from "./open.ts";
 import { Requests } from "./requests.ts";
 import { ResumeBind } from "./resume-bind.ts";
 import { type Ack, type Payload, str, text } from "./wire.ts";
 
-export type { Fetch, Report } from "./answers.ts";
-export { logger, RESTART_WAIT_ROWS } from "./answers.ts";
-export { ago, isClear, slackUnescape } from "./messages.ts";
-export { boundText } from "./resume-bind.ts";
+export type { Fetch } from "./answers.ts";
+export { logger } from "./answers.ts";
 export { actionKey, clickThread } from "./wire.ts";
 
 export const DECISION_ACTIONS = [APPROVAL_ALLOW, APPROVAL_DENY, QUESTION_SKIP] as const;
@@ -113,8 +110,6 @@ export interface BuildAppOptions {
   readonly names: Names;
   /** What the listeners tell the core of what the owner did. */
   readonly inbound: ChatInbound;
-  /** The flows of the core a handler still calls itself. */
-  readonly flows: OtherFlows;
   /** The folder a message's files that are no image are saved in (`attachments.uploadsDir`). */
   readonly uploads: string;
   readonly home: Home;
@@ -229,7 +224,6 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     state: options.state,
     names: options.names,
     inbound: options.inbound,
-    flows: options.flows,
     uploads: options.uploads,
     home: options.home,
     limiter: chat.limiter,
@@ -247,8 +241,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   const requests = new Requests(parts, answers);
   const open = new Open(parts, answers);
   const resumeBind = new ResumeBind(parts, answers);
-  const messages = new Messages(parts, answers, { requests, open, resumeBind });
-  const clips = new Clips(parts, answers, messages);
+  const clips = new Clips(parts, answers);
   const home = new HomeControls(parts);
 
   const app = new App({
@@ -272,7 +265,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     const ts = str(message.ts);
     const threadTs = str(message.thread_ts || ts);
     if (!(await answers.admitted(user, team, channel, threadTs)) || channel === null) return;
-    // (sync) From here to the turn the message takes among its thread's (`Messages.arrival`).
+    // (sync) From here to the turn the message takes among its thread's (`arrival` in
+    // `core/flows/messages.ts`): nothing is awaited between the checks above and the call.
     const spoken = voice.clip(filesOf(message));
     if (spoken !== null) {
       await answers.replyOnFailure(channel, threadTs, () =>
@@ -281,10 +275,9 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
       return;
     }
     // A failure of the prompt itself (or of the session it starts) lands in that session's
-    // thread: it is the turn's one push. A word answers where it was typed instead.
-    await answers.replyOnFailure(channel, threadTs, () =>
-      messages.handleMessage(channel, threadTs, ts, message),
-    );
+    // thread: it is the turn's one push. A word answers where it was typed instead. The core
+    // tells the owner of a failure of its own.
+    await parts.inbound.message(inboundMessage(parts, answers, channel, threadTs, ts, message));
   });
 
   app.event("file_change", ({ event }) => clips.onFileChange(event as unknown as Payload));

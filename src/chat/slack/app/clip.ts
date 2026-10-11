@@ -12,7 +12,7 @@ import * as slackTexts from "../texts.ts";
 import * as voice from "../voice.ts";
 import { type Answers, type AppParts, isCancelled, logger } from "./answers.ts";
 import { isOwner } from "./guards.ts";
-import type { Messages } from "./messages.ts";
+import { inboundMessage } from "./messages.ts";
 import { type Payload, record, str, text } from "./wire.ts";
 
 /** An audio clip the owner sent, held until Slack has its transcript. */
@@ -28,15 +28,13 @@ export interface WaitingClip {
 export class Clips {
   private readonly parts: AppParts;
   private readonly answers: Answers;
-  private readonly messages: Messages;
   // Clips waiting for their transcript, by file id. In memory only: a restart forgets them,
   // and the owner sends the clip again.
   private readonly clips = new Map<string, WaitingClip>();
 
-  constructor(parts: AppParts, answers: Answers, messages: Messages) {
+  constructor(parts: AppParts, answers: Answers) {
     this.parts = parts;
     this.answers = answers;
-    this.messages = messages;
   }
 
   /**
@@ -142,9 +140,17 @@ export class Clips {
     // the composer's blocks describe the typed text alone
     const { blocks: _blocks, ...rest } = waiting.event;
     const said: Payload = { ...rest, text: typed ? `${typed}\n\n${heard}` : heard, files: [] };
-    await this.messages.handleMessage(waiting.channel, waiting.threadTs, waiting.ts, said, {
-      spoken: true,
-    });
+    await this.parts.inbound.message(
+      inboundMessage(
+        this.parts,
+        this.answers,
+        waiting.channel,
+        waiting.threadTs,
+        waiting.ts,
+        said,
+        { spoken: true },
+      ),
+    );
   }
 
   /**

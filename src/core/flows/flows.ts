@@ -9,8 +9,6 @@ import { type FlowDeps, Talk } from "./talk.ts";
 export interface Built {
   /** What the chat provider calls when the owner did something. */
   readonly inbound: Inbound;
-  /** The flows a provider's own code still calls, until the message flow is the core's. */
-  readonly flows: OtherFlows;
 }
 
 export function buildFlows(deps: FlowDeps): Built {
@@ -25,6 +23,5 @@ export function buildFlows(deps: FlowDeps): Built {
       answer: (ref, requestId, answer, message) => answers.answer(ref, requestId, answer, message),
       picked: (pick) => picks.picked(pick),
     }),
-    flows,
   };
 }

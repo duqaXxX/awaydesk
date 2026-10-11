@@ -246,7 +246,6 @@ export class SlackChat implements ChatProvider {
       holds: core.holds,
       names: this.names(),
       inbound,
-      flows: core.flows,
       guard: app.guard,
       state: core.state,
       uploads: app.uploads,

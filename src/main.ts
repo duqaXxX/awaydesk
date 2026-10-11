@@ -286,7 +286,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
     });
     // Aborted once the chat has stopped: a flow still in flight then does nothing more.
     const stopping = new AbortController();
-    const { inbound, flows } = buildFlows({
+    const { inbound } = buildFlows({
       chat,
       agent: backend,
       sessions,
@@ -298,7 +298,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
       stopped: stopping.signal,
       now: () => wall.time(),
     });
-    core = { sessions, state, approvals, holds, agent: backend, flows };
+    core = { sessions, state, approvals, holds, agent: backend };
 
     const cleanOnce = (): Promise<void> =>
       clean((channel) => chat.channelState(channel), state, {

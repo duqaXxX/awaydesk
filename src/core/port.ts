@@ -11,27 +11,16 @@
 import type { AgentBackend } from "../agent/seam.ts";
 import type { ChatProvider } from "../chat/seam.ts";
 import type { Clock } from "../clock.ts";
-import type { OtherFlows } from "./flows/contract.ts";
-import type { FilesSession, FilesSessions, FilesState } from "./port/file-flows.ts";
+import type { FilesSessions, FilesState } from "./port/file-flows.ts";
 import type { HomeAgent, HomeState } from "./port/home.ts";
-import type {
-  RequestsApprovals,
-  RequestsHolds,
-  RequestsSession,
-  RequestsSessions,
-  RequestsState,
-} from "./port/requests.ts";
+import type { RequestsApprovals, RequestsHolds, RequestsSessions } from "./port/requests.ts";
 import type { ThreadsSessions, ThreadsState } from "./port/threads.ts";
-import type { WordsSession, WordsSessions, WordsState } from "./port/words.ts";
 
 /** The live sessions, as every flow of a provider together may reach them. */
-export type SessionsPort = WordsSessions & RequestsSessions & FilesSessions & ThreadsSessions;
-
-/** One thread's session, as a provider holds it between two calls. */
-export type SessionPort = WordsSession & RequestsSession & FilesSession;
+export type SessionsPort = RequestsSessions & FilesSessions & ThreadsSessions;
 
 /** What the daemon keeps of its channels and threads. */
-export type StatePort = WordsState & RequestsState & FilesState & ThreadsState & HomeState;
+export type StatePort = FilesState & ThreadsState & HomeState;
 
 /** The requests of the agent that wait for the owner. */
 export type ApprovalsPort = RequestsApprovals;
@@ -49,8 +38,6 @@ export interface CorePort {
   readonly approvals: ApprovalsPort;
   readonly holds: HoldsPort;
   readonly agent: AgentPort;
-  /** The flows a provider's own code still calls, until the message flow is the core's. */
-  readonly flows: OtherFlows;
 }
 
 /** What a chat provider is built with. */
@@ -85,28 +72,17 @@ export interface ChatEntry {
 // ---- the core's values a provider's own code works with
 
 export type { ChannelLookup } from "./cleanup.ts";
-export type { Command, Passthrough, Word } from "./commands.ts";
-export { helpText, hostOnly, parseBang, refusedInThread, unformatted, WORD } from "./commands.ts";
 export { ConfigError } from "./config.ts";
-export { boundText } from "./flows/bind.ts";
-export type { OtherFlows } from "./flows/contract.ts";
 export { FOLDER_ROWS, foldersWithin } from "./folders.ts";
 export type { FooterKey } from "./footer.ts";
 export { footerFields, GIT_TIMEOUT, runGit } from "./footer.ts";
-export type { HoldAnswer, Pending as HoldPending } from "./hold.ts";
 export { Fold, shownPreview } from "./reply/fold.ts";
 export { oneLine, STOPPED } from "./reply/words.ts";
-export { APPROVE, answerOf, DENY } from "./requests.ts";
-export { resolveDirectory } from "./sessions/directory.ts";
-export {
-  BypassUnavailable,
-  DirectoryUnavailable,
-  SessionClosed,
-  SessionGone,
-} from "./sessions/errors.ts";
+export { answerOf } from "./requests.ts";
+export { DirectoryUnavailable, SessionClosed, SessionGone } from "./sessions/errors.ts";
 export { Cancelled, cancellable, Mutex, Semaphore, Task } from "./sessions/tasks.ts";
-export type { Choice, Summary } from "./setup.ts";
-export { choiceOf, DEFAULT, DEFAULT_CHOICE, effortLevels, summaryOf } from "./setup.ts";
+export type { Choice } from "./setup.ts";
+export { choiceOf, DEFAULT, effortLevels } from "./setup.ts";
 export type { Names } from "./texts.ts";
 export * as texts from "./texts.ts";
 export { fill, Named, NESTED, named } from "./texts.ts";

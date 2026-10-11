@@ -15,11 +15,8 @@ import {
   type HoldsPort,
   type Names,
   named,
-  type OtherFlows,
-  oneLine,
   SessionClosed,
   SessionGone,
-  type SessionPort,
   type SessionsPort,
   type StatePort,
   texts,
@@ -30,19 +27,13 @@ import type { Home } from "../home.ts";
 import { deliver } from "../notice.ts";
 import type { Listings } from "../openfile/listing.ts";
 import { contextBlock, noticeText } from "../reply/blocks.ts";
-import { deleteRequest, describe } from "../reply/errors.ts";
-import { markdownEscape, mrkdwnEscape } from "../reply/escape.ts";
+import { describe } from "../reply/errors.ts";
 import type { Limiter } from "../reply/limiter.ts";
-import { TITLE_LIMIT } from "../resume.ts";
 import * as slackTexts from "../texts.ts";
 import type { SlackChat, SlackThread } from "../thread.ts";
 import { type ChannelGuard, type Identity, isOwner } from "./guards.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.app");
-
-// Rows of threads a stop waits for in one notice: a row is under 300 characters (a permalink,
-// a title of TITLE_LIMIT), so the list stays inside a context element's 3,000.
-export const RESTART_WAIT_ROWS = 8;
 
 /** How a failure reaches the owner: the text of one line, delivered where the failed act answers. */
 export type Report = (text: string) => Promise<void>;
@@ -82,8 +73,6 @@ export interface AppParts {
   readonly names: Names;
   /** What the listeners tell the core of what the owner did. */
   readonly inbound: ChatInbound;
-  /** The flows of the core a handler still calls itself. */
-  readonly flows: OtherFlows;
   /** The folder a message's files that are no image are saved in. */
   readonly uploads: string;
   readonly home: Home;
@@ -158,20 +147,6 @@ export class Answers {
     await this.deliver(channel, threadTs, text, [contextBlock(noticeText(text))], {
       ephemeral: options.ephemeral ?? false,
     });
-  }
-
-  /**
-   * A reference the owner reads (`!help`, `!guide`, `!status`), at full size: a long one
-   * continues in a new message past a markdown block's limit.
-   */
-  async say(
-    channel: string,
-    threadTs: string | null,
-    text: string,
-    options: { readonly ephemeral?: boolean } = {},
-  ): Promise<void> {
-    if (threadTs === null) await this.parts.chat.channel(channel).say(text);
-    else await this.thread(channel, threadTs).say(text, { ownerOnly: options.ephemeral ?? false });
   }
 
   /**
@@ -270,108 +245,5 @@ export class Answers {
       return false;
     }
     return true;
-  }
-
-  /**
-   * ✅ on the owner's own message: the mark that a word took effect, which stays after a reload.
-   * A reaction never rings a phone; a failed one is logged, never thrown (the word already took
-   * effect).
-   */
-  async acknowledge(channel: string, threadTs: string, ts: string): Promise<void> {
-    await this.thread(channel, threadTs).acknowledge(ts);
-  }
-
-  /** The tool's line in the reply records the call: the request message has done its job. */
-  async removeRequest(channel: string, threadTs: string, ts: string | null): Promise<void> {
-    if (ts === null || this.stopped) return;
-    await deleteRequest(this.parts.slack, { channel, ts }, { now: this.parts.now });
-    try {
-      // Crash repair (issue #19): spoken for either way, as the session's own delete does. A
-      // no-op for a ts this thread never recorded (a folder or resume picker click).
-      // Best-effort: a failed write here is logged and swallowed.
-      this.parts.state.removeRequest(channel, threadTs, ts);
-    } catch (error) {
-      logger.warning(
-        `could not clear a deleted request from state.json in ${channel}: ${describe(error)}`,
-      );
-    }
-  }
-
-  /**
-   * `say` posts a markdown block: standard Markdown links (docs.slack.dev, markdown block), not
-   * mrkdwn's `<url|label>`. The title is shown as written, so its own brackets cannot end the
-   * label.
-   */
-  async threadLink(channel: string, threadTs: string, title = ""): Promise<string> {
-    const label = markdownEscape(title) || texts.STATUS_CHANNEL_SESSION;
-    const link = await this.thread(channel, threadTs).link(label, "reference");
-    return link ?? fill(texts.STATUS_CHANNEL_LINK_FALLBACK, { thread_ts: threadTs });
-  }
-
-  /** A resume row and a notice are mrkdwn (`contextBlock`), which takes `<url|label>`. */
-  async threadMrkdwnLink(channel: string, threadTs: string, label: string): Promise<string> {
-    const link = await this.thread(channel, threadTs).link(label, "notice");
-    return link ?? fill(texts.STATUS_CHANNEL_LINK_FALLBACK, { thread_ts: threadTs });
-  }
-
-  /**
-   * The threads a stop still waits for, one mrkdwn row each: its channel, a link to it labelled
-   * with its session's title, as the Home tab names it, and what holds the restart there. Then
-   * the word that ends the wait, when it ends any of them. Empty when nothing holds it. With
-   * `only`, the threads of that channel are named and the others counted: the answer is a post
-   * the channel's members read. At most RESTART_WAIT_ROWS rows, so the whole fits a notice and is
-   * never cut inside a link. Never throws: a title or a link that cannot be read falls back to a
-   * plain label.
-   */
-  async restartWaits(only: string | null = null): Promise<string> {
-    const { sessions, state } = this.parts;
-    const every = sessions.restartHolds();
-    const named = every.filter(([session]) => only === null || session.channelId === only);
-    if (every.length === 0) return "";
-    const shown = named.slice(0, RESTART_WAIT_ROWS);
-    const known = new Map<string, string>();
-    for (const directory of new Set(shown.map(([session]) => session.directory))) {
-      try {
-        for (const listed of await sessions.sessionsIn(directory)) {
-          known.set(listed.id, listed.title);
-        }
-      } catch (error) {
-        if (isCancelled(error)) throw error;
-        logger.warning(`could not list a folder's sessions: ${describe(error)}`);
-      }
-    }
-
-    const row = async (session: SessionPort, hold: string): Promise<string> => {
-      const stored = state.thread(session.channelId, session.threadId);
-      const title = stored === null ? "" : (known.get(String(stored.sessionId)) ?? "");
-      const label = mrkdwnEscape(oneLine(title, TITLE_LIMIT)) || texts.RESTART_WAIT_SESSION;
-      const link = await this.threadMrkdwnLink(session.channelId, session.threadId, label);
-      return fill(texts.RESTART_WAIT_ROW, { channel: session.channelId, link, hold });
-    };
-
-    const lines = await Promise.all(shown.map(([session, hold]) => row(session, hold)));
-    if (named.length > shown.length) {
-      lines.push(fill(texts.RESTART_WAITS_MORE, { count: named.length - shown.length }));
-    }
-    if (every.length > named.length) {
-      lines.push(fill(texts.RESTART_WAITS_ELSEWHERE, { count: every.length - named.length }));
-    }
-    if (every.some(([, hold]) => hold !== texts.RESTART_HOLD_REPORT)) {
-      // A thread that only waits for a task's report ends by itself: `!stop` stops nothing
-      // there, so the line is left out when no other thread holds the stop.
-      lines.push(texts.RESTART_WAIT_STOP);
-    }
-    return lines.join("\n");
-  }
-
-  /**
-   * Tell the owner their message was not taken because the daemon is stopping, and which
-   * threads the stop waits for (issue #119): only they can answer or `!stop` those.
-   */
-  async refuseRestarting(channel: string, threadTs: string): Promise<void> {
-    const waits = await this.restartWaits();
-    let text: string = texts.RESTARTING;
-    if (waits) text = [text, texts.RESTART_WAITS_FOR, waits].join("\n");
-    await this.tellOwner(channel, threadTs, text);
   }
 }

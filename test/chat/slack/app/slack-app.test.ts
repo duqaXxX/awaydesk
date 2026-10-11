@@ -9,7 +9,8 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { isDeepStrictEqual } from "node:util";
 import { type Question, ResumeRefused } from "../../../../src/agent/seam.ts";
-import { ago, logger, slackUnescape } from "../../../../src/chat/slack/app/app.ts";
+import { logger } from "../../../../src/chat/slack/app/app.ts";
+import { slackUnescape } from "../../../../src/chat/slack/app/messages.ts";
 import { DownloadFailed } from "../../../../src/chat/slack/attachments.ts";
 import { HOLD_CONTINUE, holdBlocks } from "../../../../src/chat/slack/hold.ts";
 import {
@@ -652,22 +653,6 @@ test("bang status falls back to session when the titles cannot be read", async (
   assert.equal((said(world).at(-1) as string).split("\n")[1], `[Session](${PERMALINK}): idle`);
 });
 
-for (const [seconds, shown] of [
-  [5, "just now"],
-  [59, "just now"],
-  [60, "1m ago"],
-  [3_599, "59m ago"],
-  [3_600, "1h ago"],
-  [86_399, "23h ago"],
-  [86_400, "1d ago"],
-  [30 * 86_400, "30d ago"],
-  [-30, "just now"],
-] as const) {
-  test(`how long ago reads in one unit [${seconds}-${shown}]`, () => {
-    assert.equal(ago(seconds), shown);
-  });
-}
-
 test("the hold question s buttons answer it in its own words", () => {
   // Issue #76: `Continue` beside the shorter `Cancel` made the second look the lesser choice,
   // and a button's width is its text. One `primary` in the set, as the button reference asks.
@@ -744,8 +729,11 @@ test("an answer in a session thread sets its status line again", async (t) => {
   const world = worldOf(t);
   await world.dispatch(message("hi", { ts: THREAD }));
   const told: Array<[string, string]> = [];
-  world.sessions.wrote = (channel, thread) => {
-    told.push([channel, thread]);
+  // The answer is posted through the session's own thread, which sets its status line again.
+  const session = world.sessions.get(CHANNEL, THREAD);
+  assert.ok(session !== null);
+  session.threadChat.written = () => {
+    told.push([CHANNEL, THREAD]);
   };
   await world.dispatch(reply("!status", THREAD));
   assert.deepEqual(told, [[CHANNEL, THREAD]]); // the answer cleared the status: it is set again

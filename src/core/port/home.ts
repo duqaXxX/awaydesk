@@ -5,6 +5,6 @@
 import type { AgentBackend } from "../../agent/seam.ts";
 import type { StateStore } from "../state.ts";
 
-export type HomeState = Pick<StateStore, "channels" | "threads">;
+export type HomeState = Pick<StateStore, "threads">;
 
 export type HomeAgent = Pick<AgentBackend, "listSessions">;
