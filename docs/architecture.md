@@ -386,9 +386,13 @@ its Claude Code process would keep Node alive after the lock was released. Once 
 returned, `main.main` ends the process with the code `run` gave. Node would otherwise stay alive
 while anything holds its event loop, and the Socket Mode connection does after every stop:
 `@slack/socket-mode` 3.1.0 closed its WebSocket 5.9 seconds after the stop in each of three runs
-on 2026-10-10, with the lock already free. A stop that a failure asked for and that has not
-returned after `main.FAILURE_STOP_SECONDS` ends the process with 1, on a timer that does not keep
-it alive (`main.deferred`). After `bootout` launchd kills the daemon once the LaunchAgent's `ExitTimeOut`
+on 2026-10-10, with the lock already free. A shutdown that has not
+returned after `main.SHUTDOWN_LIMIT_SECONDS` ends the process with 1, on a timer that does not keep
+it alive (`main.deferred`). The limit starts at the failure for a stop a failure asked for, and
+for a signal's stop once the drain is over, so the drain keeps its own limit. A start of the agent
+that a word of the daemon made (`!status`, the setup of a thread) and that does not answer would
+otherwise hold the shutdown for good: `ThreadSession.close` waits for it, and it is not
+abandoned. After `bootout` launchd kills the daemon once the LaunchAgent's `ExitTimeOut`
 passes (60 seconds at most), whatever the drain is doing. `SIGINT` skips the drain: from a terminal
 it also reaches the Claude Code processes, which share the daemon's process group. A signal that
 arrives before the daemon waits for one, during a repair for instance, is kept and starts the stop

@@ -965,6 +965,19 @@ All notable changes to this project are documented here. The format follows
   process's turn as lost. The back end's `canUseTool` callback still ignores the abort of its
   `signal`; ending a request on that signal needs a word from the back end to the core that the
   agent seam does not have.
+- A stop by a signal has a limit once its drain is over (`main.SHUTDOWN_LIMIT_SECONDS`, renamed
+  from `FAILURE_STOP_SECONDS`, 30 seconds, as before). SIGTERM or SIGINT that arrived while a
+  start of the agent made outside the worker had not answered (the setup of a new thread,
+  `!status`, `!bypass`, a passthrough command) left the daemon waiting for good:
+  `ThreadSession.close` waits for the connect lock, the Socket Mode connection was already
+  closed, so the daemon heard nothing, kept the single-instance lock, and no further signal
+  ended it. Only a stop that a failure asked for was bounded. `main.run` now tells `main.main`
+  when the shutdown begins (`RunOptions.shuttingDown`), after the drain, whose wait is not
+  shortened, and `main.main` ends the process with 1 if the shutdown has not returned by then,
+  as it does for a failure. A shutdown that returns in time ends with the same code as before.
+  Seen in a test on 2026-10-11: with the start held, after SIGTERM, the drain's limit, a second
+  SIGTERM, a SIGINT and 1.5 seconds, `run` was still running with the lock held. Not measured:
+  whether a real Claude Code start can hang.
 - A close that does not drain ends the reply of a turn whose end it cut (`ThreadSession.finish`,
   `ThreadSession.cutBeforeClose`). SIGINT, a second signal, the drain's limit and the stop after
   an uncaught exception could land between a turn's `turn_ended` and the reply's last write (the

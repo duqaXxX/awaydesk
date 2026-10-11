@@ -41,12 +41,12 @@ import {
   cleanEvery,
   DRAIN_LIMIT_SECONDS,
   deferred,
-  FAILURE_STOP_SECONDS,
   installProcessHandlers,
   logger,
   main,
   type RunOptions,
   run,
+  SHUTDOWN_LIMIT_SECONDS,
   type SignalSource,
   type Stop,
   StopSignals,
@@ -816,7 +816,7 @@ function mainOf(d: Daemon, events: EventEmitter = new EventEmitter()) {
   return { exits, timers, running, events };
 }
 
-test("a stop ends the process as soon as the daemon has stopped, with no timer", async (t) => {
+test("a stop ends the process as soon as the daemon has stopped, and the deadline never fires", async (t) => {
   const d = new Daemon(t);
   const { exits, timers, running } = mainOf(d);
   const warnings = written(t, logger, "warning");
@@ -825,7 +825,11 @@ test("a stop ends the process as soon as the daemon has stopped, with no timer",
   assert.deepEqual(exits, []); // not before the stop is over
   await running;
   assert.deepEqual(exits, [0]);
-  assert.deepEqual(timers, []);
+  // Armed when the shutdown began, and beaten by it.
+  assert.deepEqual(
+    timers.map((timer) => timer.seconds),
+    [SHUTDOWN_LIMIT_SECONDS],
+  );
   assert.deepEqual(warnings(), []);
   // Everything the daemon made was closed first: the lock is free for the next one.
   await (await singleInstance(d.dir)).release();
@@ -895,7 +899,7 @@ test("an uncaught exception stops the daemon as a SIGINT does and exits with 1",
   // The only timer is the deadline of the stop, which the stop beat.
   assert.deepEqual(
     timers.map((timer) => timer.seconds),
-    [FAILURE_STOP_SECONDS],
+    [SHUTDOWN_LIMIT_SECONDS],
   );
 });
 
@@ -933,13 +937,85 @@ test("a stop after a failure that does not finish ends the process with 1", asyn
   assert.deepEqual(exits, []);
   assert.deepEqual(
     timers.map((timer) => timer.seconds),
-    [FAILURE_STOP_SECONDS],
+    [SHUTDOWN_LIMIT_SECONDS],
   );
   timers[0]?.action();
   assert.deepEqual(exits, [1]);
   assert.ok(errors().some((line) => line.includes("did not finish")));
   hung.set(); // let the test's own run end
   await running;
+});
+
+// C7: a stop by a signal has the limit a failure's stop has, from the end of the drain on. A word
+// of the daemon (`!status`, the setup of a thread) starts the agent outside the worker, and
+// `ThreadSession.close` waits for that start without a signal.
+
+/** A daemon with a thread whose `!status` started the agent and has not been answered. */
+async function holdingAStart(t: TestContext) {
+  const starting = new AsyncEvent();
+  const d = new Daemon(t, { scripts: [{ startGate: starting }] });
+  const thread = "1780000000.000001";
+  const state = new StateStore(d.path);
+  state.bind(CHANNEL, d.dir);
+  state.openThread(CHANNEL, thread, "some-id");
+  d.backend.listed = [{ id: "some-id" } as never];
+  const made = mainOf(d);
+  await d.connected.wait();
+  void d.deliver(reply("!status", thread)).catch(() => undefined);
+  await d.until(() => d.backend.sessions.length === 1);
+  return { d, starting, ...made };
+}
+
+test("a stop by a signal that waits on a start of the agent ends the process after the limit", async (t) => {
+  const errors = written(t, logger, "error");
+  const { d, starting, exits, timers, running } = await holdingAStart(t);
+  t.after(async () => {
+    starting.set(); // a failed assertion must not leave the stop waiting on the start
+    await running;
+  });
+  d.signals.emit("SIGTERM");
+  await d.until(() => timers.length > 0);
+  // The stop is stuck on the start: the process is not ended, and the deadline is armed.
+  assert.deepEqual(exits, []);
+  assert.deepEqual(
+    timers.map((timer) => timer.seconds),
+    [SHUTDOWN_LIMIT_SECONDS],
+  );
+  timers[0]?.action();
+  assert.deepEqual(exits, [1]);
+  assert.ok(errors().some((line) => line.includes("did not finish")));
+});
+
+test("the limit of a stop by a signal starts once the drain is over", async (t) => {
+  const messages = sdkMessages("tools");
+  const thread = "1780000000.000001";
+  const d = new Daemon(t, { scripts: [{ turns: [messages.slice(0, -1)] }] });
+  const state = new StateStore(d.path);
+  state.bind(CHANNEL, d.dir);
+  state.openThread(CHANNEL, thread, "some-id");
+  d.backend.listed = [{ id: "some-id" } as never];
+  const { exits, timers, running } = mainOf(d);
+  t.after(async () => {
+    d.signals.emit("SIGINT"); // a failed assertion must not leave the drain waiting
+    await running;
+  });
+  await d.connected.wait();
+  void d.deliver(reply("go", thread)).catch(() => undefined);
+  await d.until(() => d.backend.sessions[0]?.queries.join() === "go");
+  d.signals.emit("SIGTERM"); // the turn never ends: the drain waits
+  await d.clock.advance(0); // the drain has started its limit
+  await d.clock.advance(DRAIN_LIMIT_SECONDS - 1);
+  // Past the limit a failure's stop has, and no deadline: the drain is not cut by it.
+  assert.equal(timers.length, 0);
+  assert.equal(exits.length, 0);
+  await d.clock.advance(2); // the drain's limit
+  await d.until(() => exits.length > 0); // the replies' last writes wait on the clock
+  await running;
+  assert.deepEqual(exits, [0]);
+  assert.deepEqual(
+    timers.map((timer) => timer.seconds),
+    [SHUTDOWN_LIMIT_SECONDS],
+  );
 });
 
 test("a failure during the drain ends it as a second signal does", async () => {

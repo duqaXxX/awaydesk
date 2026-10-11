@@ -35,9 +35,13 @@
  *   frame is sent, and `@slack/socket-mode` 3.1.0 ends it only when its own ping goes
  *   unanswered (measured on 2026-10-10: 5.9 seconds after the stop, three times out of three).
  *   In that time the lock is already free, and launchd, which sees a live job, starts nothing.
- *   A stop that a failure asked for and that has not returned after `FAILURE_STOP_SECONDS` ends
- *   the process with 1 on a timer that does not keep it alive (`deferred`): a shutdown stuck on
- *   a connection would leave the daemon deaf.
+ *   A shutdown that has not returned after `SHUTDOWN_LIMIT_SECONDS` ends the process with 1 on
+ *   a timer that does not keep it alive (`deferred`): a shutdown stuck on a connection, or on a
+ *   start of the agent that a word of the daemon made and that never answers (`!status`, the
+ *   setup of a thread: `ThreadSession.close` waits for it), would leave the daemon deaf, still
+ *   holding the single-instance lock, with nobody to Ctrl-C it. The limit starts when the
+ *   shutdown does: for a stop that a failure asked for, at the failure; for a signal's, once the
+ *   drain is over, since the drain's own wait is `DRAIN_LIMIT_SECONDS` and is never shortened.
  * - The entry point. `import.meta.main` (Node 22.18, `@since v22.18.0` in `@types/node`, and
  *   run on 22.23 and 26.5) is true only for the module the process started with, a symlink in
  *   `node_modules/.bin` included: Node runs the real path. Comparing `process.argv[1]` with
@@ -73,9 +77,10 @@ export const logger = getLogger("awaydesk.main");
 // `kickstart -k`) kills the process after ExitTimeOut, which launchd caps at 60 seconds.
 export const DRAIN_LIMIT_SECONDS = 1740;
 
-// How long the stop that a failure asked for may take before `main` ends the process with 1: a
-// stop that hangs on a connection or a child leaves the daemon deaf, with nobody to Ctrl-C it.
-export const FAILURE_STOP_SECONDS = 30;
+// How long a shutdown may take before `main` ends the process with 1: one that hangs on a
+// connection, a child or a start of the agent leaves the daemon deaf, with nobody to Ctrl-C it.
+// It runs from the failure that asked for the stop, or from the end of the drain.
+export const SHUTDOWN_LIMIT_SECONDS = 30;
 
 /** `action` after `seconds`, on a timer that does not keep the process alive. */
 export function deferred(seconds: number, action: () => void): NodeJS.Timeout {
@@ -111,6 +116,8 @@ export interface RunOptions {
    * a SIGINT does, and `run` answers 1.
    */
   readonly failure?: AbortSignal;
+  /** Called once, when the shutdown begins: after the drain of a signal's stop, if it had one. */
+  readonly shuttingDown?: () => void;
   /** Every wait of the daemon; the system clock for wall time and the monotonic one for pauses. */
   readonly clock?: Clock;
   /** `process`. */
@@ -355,6 +362,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
       }
     } finally {
       logger.info("shutting down");
+      options.shuttingDown?.();
       cleaning.abort();
       if (cleaned !== null) await step("stop the cleanup", () => cleaned);
       // The connection, and the clips' waits, whose timers would keep the process alive.
@@ -401,16 +409,23 @@ export async function main(options: MainOptions = {}): Promise<void> {
   const exit = options.exit ?? ((code: number) => process.exit(code));
   const later = options.later ?? deferred;
   const failure = new AbortController();
+  // Armed once, by whichever comes first: the failure, or the start of the shutdown.
+  let deadline = false;
+  const armDeadline = (): void => {
+    if (deadline) return;
+    deadline = true;
+    later(SHUTDOWN_LIMIT_SECONDS, () => {
+      logger.error("the shutdown did not finish: ending the process");
+      exit(1);
+    });
+  };
   installProcessHandlers(options.process ?? process, () => {
     if (failure.signal.aborted) return;
     failure.abort();
-    later(FAILURE_STOP_SECONDS, () => {
-      logger.error("the stop after a failure did not finish: ending the process");
-      exit(1);
-    });
+    armDeadline();
   });
   try {
-    const code = await run({ ...options, failure: failure.signal });
+    const code = await run({ ...options, failure: failure.signal, shuttingDown: armDeadline });
     // At once: the Socket Mode connection outlives the stop (see the header).
     exit(code);
   } catch (error) {
