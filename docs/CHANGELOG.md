@@ -813,6 +813,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `listing.aliveSessions` answers "cannot tell" (null) when the `stat` of a folder's transcripts
+  directory fails for any reason but the directory not being there (`ENOENT`, `ENOTDIR`). The
+  check turned every failed `stat` into "not there" and returned the SDK's listing alone, which
+  reads an unreadable folder as empty: with the projects directory closed (`EACCES`), the cleanup
+  at start and every 6 hours found no session alive, logged `pruned 1 stale thread(s)` at INFO
+  and removed every thread of the folder, which then could not resume (measured 2026-10-11, Node
+  26.5.1). The pass now keeps them.
 - A table's delimiter row in a reply is recognised in linear time (`markdown.markdownStarts`).
   One pattern read the whole row, and on a line of spaces around a single dash, under a line
   holding a `|`, it backtracked in cubic time: 200 ms at 800 spaces a side and 3.1 s at 2,000

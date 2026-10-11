@@ -28,6 +28,11 @@ import {
 import type { ListedSession } from "../../../src/agent/seam.ts";
 
 const LIMIT = { timeout: 10_000 };
+// A superuser reads a closed folder anyway, and Windows has no such mode.
+const NEEDS_PERMISSIONS = {
+  ...LIMIT,
+  skip: process.platform === "win32" || process.getuid?.() === 0,
+};
 const HOUR = 3_600_000;
 const NOW = new Date(2026, 8, 25, 12, 0).getTime();
 
@@ -251,6 +256,28 @@ test("a transcripts folder that cannot be read cannot tell", LIMIT, async (t) =>
     return t.skip("no unreadable folder");
   assert.equal(await aliveSessions(project), null);
 });
+
+test(
+  "a projects folder that cannot be searched cannot tell, though a transcript is on disk",
+  NEEDS_PERMISSIONS,
+  async (t) => {
+    const { config, project } = await workspace(t);
+    const sid = "68da9311-0000-4000-8000-0000000000f4";
+    await writeTranscript(config, project, sid, [
+      message("user", "2026-09-20T10:00:00.000Z", sid, "A question"),
+    ]);
+    assert.deepEqual(await aliveSessions(project), new Set([sid]));
+    // The transcripts folder is there, but the stat of it fails with EACCES: the listing reads
+    // the closed folder as empty, and every session would look gone.
+    const projects = join(config, "projects");
+    await chmod(projects, 0o000);
+    try {
+      assert.equal(await aliveSessions(project), null);
+    } finally {
+      await chmod(projects, 0o755);
+    }
+  },
+);
 
 test("a long folder name keeps its first 200 characters and a hash", LIMIT, async (t) => {
   const { project } = await workspace(t);
