@@ -185,10 +185,10 @@ named in the message, and an `ALLOWED_ROOT` that is not a directory.
 | `AWAYDESK_AGENT` | optional: the agent awaydesk drives; `claude` when absent, the only one this release has |
 | `AWAYDESK_CHAT` | optional: the chat awaydesk is driven from; `slack` when absent, the only one this release has |
 
-Leave `AWAYDESK_AGENT` and `AWAYDESK_CHAT` out unless a release adds a second agent or chat. A
-value awaydesk does not know stops the start, and the message lists the valid ones. The variables
-of the agent and of the chat you select are the ones this table lists for them; a variable of a
-module you did not select is not read.
+Leave `AWAYDESK_AGENT` and `AWAYDESK_CHAT` out: `claude` and `slack` are the only agent and chat
+this release has, and a file without them works as one with them. A value awaydesk does not know
+stops the start, and the message lists the valid ones. A variable that belongs to a module you did
+not select is not read.
 
 The workspace ID is not configured: awaydesk reads it from Slack at startup with the bot
 token and rejects events from any other workspace.
@@ -848,10 +848,10 @@ Detail that the install sequence links to, kept out of its way.
 ```
 
 `state.json` belongs to the agent and the chat named in it, since a session id and a thread's name
-mean nothing to another. A file written before `AWAYDESK_AGENT` and `AWAYDESK_CHAT` existed names
-neither; awaydesk takes it for the ones running and writes the names on its next save. If you
-select other modules than the file names, awaydesk does not start and the message names both
-pairs: select the ones the file names again, or delete the file and bind the channels again.
+mean nothing to another. A file of version 2 names neither; awaydesk takes it for the ones running
+and writes the names, as version 3, on its next save. If you select modules other than the ones the
+file names, awaydesk does not start and the message names both pairs: select the ones the file
+names again, or delete the file and bind the channels again.
 
 awaydesk keeps `state.json` clean on its own, when it starts and then every 6 hours. It
 forgets a channel Slack answers `channel_not_found` about, with its threads, and a thread whose

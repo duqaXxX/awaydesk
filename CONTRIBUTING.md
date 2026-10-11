@@ -26,11 +26,52 @@ sessions. A vulnerability goes to the **Security** tab, never to an issue (see
    `test/docs.test.ts`): describe a feature in [docs/setup.md](docs/setup.md), and change the
    README only when one of its lines stops being true.
 
+## Adding an agent or a chat
+
+An agent and a chat are modules, chosen by name in the configuration ("Modules" in
+[docs/architecture.md](docs/architecture.md)). No second real agent or chat ships. The seams were
+shaped on the Claude back end, the Slack provider and two test modules, so the first real module
+may find a seam that needs a change: open an issue before writing one.
+
+1. Implement the seam: `AgentBackend` and `AgentSession` of `src/agent/seam.ts`, or `ChatProvider`,
+   `ThreadChat` and `ChannelChat` of `src/chat/seam.ts`. A chat provider checks that it was the
+   owner on every inbound path before it calls `ChatInbound`, and reaches the core through
+   `src/core/port.ts` alone.
+2. Declare the capabilities truthfully (`Capabilities`, `ChatCapabilities`). A capability left
+   false means the feature is not offered; the conformance suite checks the declarations it can
+   against what the module does (a member present exactly when it is declared, a list that matches
+   the capabilities) and runs the checks of a capability only for a module that declares it.
+3. Export an entry (`AgentEntry` or `ChatEntry`): the variables the module reads, `required` and
+   `optional`, and `build`. `src/agent/claude/module.ts` and `src/chat/slack/module.ts` are the two
+   that exist.
+4. Run the conformance suite against it. In `test/conformance/agent.test.ts`, call
+   `agentConformance` with a harness that creates an instance of the agent and plays it: the suite
+   asks it to say a text, call a tool, ask a question or die, and reads the events. In
+   `test/conformance/chat.test.ts`, call `chatConformance` with a function that builds a rig: the
+   provider, a channel and a thread, the owner and somebody else as people who write and click, and
+   a way to read what the chat shows. A check that needs a capability the module does not declare
+   is skipped by name. `node --test test/conformance/agent.test.ts` runs one file.
+5. Add the entry to `REGISTRY` in `src/registry.ts`.
+6. Name its variables in [docs/setup.md](docs/setup.md); `test/docs.test.ts` fails on a variable
+   of any entry that the page does not name.
+
+`test/support/plain-agent.ts` and `test/support/memory-chat.ts` are the worked examples: each is
+written against its seam alone and declares few capabilities, and the scenario under
+`test/scenario/` runs the daemon with the two selected by name.
+
+Two tests refuse what a module must not do. `test/imports.test.ts` fails when a module imports
+the other module, when a chat provider imports anything of the core but its port, and when the
+core imports a module or a library of one. `test/vocabulary.test.ts` fails on an identifier or a
+string outside `src/agent/claude/`, `src/chat/slack/` and `src/registry.ts` that names an agent or
+a chat, so a module's own words stay in its directory and a text of the core takes the module's
+name from `AgentBackend.name` or `ChatProvider.name`.
+
 ## Checks
 
 The daemon is TypeScript on Node 22.18 or later, in three layers: `src/agent/` (the Claude back
-end), `src/core/` and `src/chat/` (the Slack provider), with `src/main.ts` joining them.
-`test/imports.test.ts` fails when a layer imports what it must not. Run from the repository root:
+end), `src/core/` and `src/chat/` (the Slack provider), with `src/registry.ts` and `src/main.ts`
+joining them. `test/imports.test.ts` fails when a layer imports what it must not. Run from the
+repository root:
 
 ```bash
 npm ci
