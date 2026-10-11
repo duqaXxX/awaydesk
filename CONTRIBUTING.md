@@ -63,12 +63,18 @@ may find a seam that needs a change: open an issue before writing one.
 written against its seam alone and declares few capabilities, and the scenario under
 `test/scenario/` runs the daemon with the two selected by name.
 
-Two tests refuse what a module must not do. `test/imports.test.ts` fails when a module imports
-the other module, when a chat provider imports anything of the core but its port, and when the
-core imports a module or a library of one. `test/vocabulary.test.ts` fails on an identifier or a
-string outside `src/agent/claude/`, `src/chat/slack/` and `src/registry.ts` that names an agent or
-a chat, so a module's own words stay in its directory and a text of the core takes the module's
-name from `AgentBackend.name` or `ChatProvider.name`.
+Two tests refuse what a module must not do, by layer, so that they hold for a module that is not
+there yet. `test/imports.test.ts` fails when the core imports a module, when a module imports
+another module (of its layer or the other), when anything but `src/main.ts` imports
+`src/registry.ts`, when anything imports `src/main.ts`, when a chat provider imports anything of
+the core but its port, and when a package is imported by a module that does not list it; it also
+fails on an `import()` whose specifier is not a literal and on `createRequire`, which it cannot
+read. A new module adds its package to `LIBRARIES` in that test. `test/vocabulary.test.ts` fails on
+an identifier or a string outside the module directories under `src/agent/` and `src/chat/` and
+`src/registry.ts` that names an agent or a chat: the name of each module directory is one of the
+words, read from the disk, so a module's own words stay in its directory and a text of the core
+takes the module's name from `AgentBackend.name` or `ChatProvider.name`. A new module adds the
+words only it has (its library, what it calls things) to `MODULE_WORDS` in that test.
 
 ## Checks
 

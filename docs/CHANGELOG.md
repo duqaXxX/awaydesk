@@ -327,6 +327,30 @@ All notable changes to this project are documented here. The format follows
   LaunchAgent row no longer names a test that does not cover it. `README.md` lists the message ids
   among what `state.json` stores. The header of `src/core/lock.ts` no longer speaks of the Python
   daemon. No behaviour changes.
+- A second agent or chat meets fewer gaps in the core and in the checks that guard the seams
+  (found by the review of 2026-10-11, each proven with one of the two test modules changed in a
+  way the seam allows). `SessionEvent` `session_started` now says that an id is announced only
+  once a start that resumes it would succeed, and the agent conformance suite checks it
+  (`AgentHarness.refusesUnrecordedResume`): the plain agent patched to name its session at start
+  passed 61 of 61 checks and failed 21 of 26 scenario tests, and now fails the suite; the Claude
+  harness skips the check, since its fake query accepts any resume. The Slack provider draws a
+  setup as its request says (`setup.setupBlocks` takes the models, the `efforts` and
+  `bypassOffered`): no Bypass checkbox when the agent has no bypass mode, the agent's own efforts
+  as the Effort control when it lists no model, and no Effort control when it has none; the
+  redraw after a model is picked uses what the request said (`SlackChat.drawnSetup`). The folder
+  list of `!bind` is withdrawn through `ChannelChat.withdraw`, as the `!resume` list is, in place
+  of a `ThreadRef` made from a message id, and the memory chat records a thread it did not issue.
+  The notice of an unbound channel (`texts.UNBOUND_ANY`) and the `!bind` line of `!help`
+  (`texts.HELP_WORDS_ANY`) say nothing of trust for an agent without `folderTrust`; the texts
+  of an agent with it are unchanged. `test/imports.test.ts` and `test/vocabulary.test.ts` are
+  written by layer: the core imports no module, a module imports no other module, only
+  `src/main.ts` imports `src/registry.ts`, nothing imports `src/main.ts`, a package belongs to
+  the module that lists it in `LIBRARIES`, a backtick specifier is read, and an `import()` with a
+  specifier that is not a literal or a `createRequire` fails; the homes and the module names are
+  read from the directories under `src/agent/` and `src/chat/`. With Claude and Slack nothing
+  changes for the owner; the golden files did not move. Not changed: the unbound notice that
+  the Slack provider sends for an audio clip still speaks of trust, since the provider cannot read
+  the agent's capabilities.
 - The daemon's own git (footer, `!status`, `!open`) runs only in a repository the owner trusted
   in Claude Code by its own key (`trust.trustedRepository`). A repository inside the folder a
   session started in was covered by that folder's trust, so one that reached a trusted folder in

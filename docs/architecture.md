@@ -19,7 +19,13 @@ registry. The agent module (`src/agent/claude/`) implements the agent seam; the 
 `main`. Four files sit above them and any layer imports them: `src/clock.ts`, `src/log.ts`,
 `src/text.ts` (Python's whitespace and its order of strings, where JavaScript's differ) and
 `src/values.ts` (reading a parsed value or a caught error by what it is). `test/imports.test.ts`
-reads the imports of every source file and fails on one the table does not allow.
+reads the imports of every source file and fails on one the table does not allow. The rules are
+written by layer, so that they hold for a module that is not there yet: the core imports no
+module, a module imports no other module, only `src/main.ts` imports `src/registry.ts` and
+nothing imports `src/main.ts`, and a package is imported only by the module that lists it in
+`LIBRARIES` (`@anthropic-ai/claude-agent-sdk` for `agent/claude`, `@slack/` for `chat/slack`).
+The scan reads a specifier written as a string or a plain template, and fails on an `import()` or
+`require()` whose specifier is not a literal and on `createRequire`, which it cannot read.
 
 | Layer | Holds | Imports |
 |---|---|---|
@@ -31,10 +37,10 @@ reads the imports of every source file and fails on one the table does not allow
 
 The core talks to the two libraries through the seams alone. No type of the Agent SDK appears in
 `src/agent/seam.ts` and no type of a Slack package in `src/chat/seam.ts`. The same holds for
-words: `test/vocabulary.test.ts` fails on an identifier or a string outside `src/agent/claude/`,
-`src/chat/slack/` and `src/registry.ts` that names an agent, a chat or what only one of them has
-(`claude`, `anthropic`, `slack`, `bolt`, `threadTs`, `mrkdwn`, `modal`, `ephemeral`, `emoji`;
-comments are exempt). A text of the core that names the agent or the chat takes the name from the
+words: `test/vocabulary.test.ts` fails on an identifier or a string outside the module directories
+(`src/agent/<name>/`, `src/chat/<name>/`, read from the disk) and `src/registry.ts` that names an
+agent, a chat or what only one of them has: the name of each module directory, and `anthropic`,
+`bolt`, `threadTs`, `mrkdwn`, `modal`, `ephemeral`, `emoji` (comments are exempt). A text of the core that names the agent or the chat takes the name from the
 module (`texts.Named`, `texts.named`, `texts.namesOf`); the Slack provider's own words are in
 `src/chat/slack/texts.ts`.
 
@@ -229,8 +235,10 @@ values of the core that a provider's own code works with.
 
 Two tests hold the boundary. `test/imports.test.ts` allows a chat provider to import the chat seam,
 the agent seam's types and the core's port, and refuses any other import of the core, an import of
-the other module and an import of a library outside its own. `test/vocabulary.test.ts` refuses a
-word of one module outside it.
+any other module, of the registry or of `src/main.ts`, and an import of a package outside the
+module that lists it. `test/vocabulary.test.ts` refuses a word of one module outside it. A new
+module adds its package to `LIBRARIES` in the first test, and the words only it has (not its
+name, which comes from its directory) to `MODULE_WORDS` in the second.
 
 A conformance suite per seam runs the same checks against both implementations of that seam:
 `test/conformance/agent.ts` against the Claude back end (over the recorded SDK streams) and the

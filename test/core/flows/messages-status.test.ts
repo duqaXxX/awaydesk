@@ -8,10 +8,10 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { ago } from "../../../src/core/flows/status.ts";
 import * as texts from "../../../src/core/texts.ts";
-import { fill, named } from "../../../src/core/texts.ts";
+import { fill } from "../../../src/core/texts.ts";
 import { OWNER } from "../../support/memory-chat.ts";
 import { call, hold, type PlainAgent } from "../../support/plain-agent.ts";
-import { MessagesWorld, PLAIN_NAMES, WithBypass } from "./messages-world.ts";
+import { MessagesWorld, WithBypass } from "./messages-world.ts";
 
 const header = (directory: string): string => fill(texts.STATUS_CHANNEL_HEADER, { directory });
 const linkTo = (thread: string): string =>
