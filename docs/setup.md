@@ -450,11 +450,11 @@ The bot answers one person, and the rest of this list protects what that person 
 - With Chrome enabled by default in Claude Code, a session from Slack acts in your browser with
   your sign-ins, and a thread in bypass may do so without asking. Leave it off in `/chrome` if
   you do not want that reachable from Slack.
-- The footer, `!status` and `!open` run git in a repository inside the folder a session started in
-  without a trust of its own for it. A repository that ends up there (one Claude clones during the
-  session, say) can name filters in its config that git then runs, outside the approval prompt.
-  A repository outside that folder runs no git unless you trusted it, and a repository inside
-  whose `.git` leads outside it is treated as outside.
+- The footer, `!status` and `!open` run git only in a repository you trusted in Claude Code by
+  itself. A repository inside a trusted folder (one Claude clones during the session, or one
+  unpacked from an archive) can name filters in its config that git would run outside the approval
+  prompt, so it shows no branch and lists no changed files until you open `claude` in it once and
+  accept the trust dialog. Accept it only for a repository whose config you know.
 - With a static public IP, you can also restrict the tokens to it under **OAuth & Permissions**,
   **Restrict API Token Usage**. With a dynamic IP, the first address change stops the bot with
   `invalid_auth`.
@@ -927,14 +927,11 @@ refuses it, the refusal is logged and the line is skipped.
 A worktree is covered by its main checkout while git registers it there: after moving a
 worktree's folder by hand, run `git worktree repair` in it. The footer and `!status` show the
 branch and the uncommitted lines, and `!open` lists the changed files, only where git may run: in
-a repository you trusted, or in one inside the folder the session started in, which that folder's
-trust covers (Claude Code launched in a trusted folder works in its subfolders too). A repository
-outside the session's folder needs its own trust, since the agent may move anywhere. A repository
-inside the folder is covered only if everything git reads for it lies inside the folder too: a
-`.git` file or symlink that names a git dir elsewhere, a worktree of a checkout elsewhere (one
-moved in by hand, say) and a `commondir` that leads out are not covered. That covers a bound
-folder that is not a repository itself and holds one a level or two below it. Binding a channel is
-not widened: a repository that Claude Code does not trust is still refused.
+a repository you trusted in Claude Code. A trusted folder does not stand for a repository inside
+it. A bound folder that is not a repository itself and holds one a level or two below it shows
+them for that repository once you open `claude` in it and accept the trust dialog. Without that
+trust the footer leaves the branch and the lines out, `!open` lists no changed files there, and
+its search still reads the folder from disk.
 
 ### Upgrading from one session per channel
 

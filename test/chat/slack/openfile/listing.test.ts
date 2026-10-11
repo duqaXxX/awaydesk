@@ -40,7 +40,11 @@ function app(): string {
   return committed(join(tmp.dir, "app"));
 }
 
-/** A session's folder: not a repository, trusted in Claude Code, repositories inside it. */
+/**
+ * A session's folder: not a repository, trusted in Claude Code, repositories inside it. The
+ * folder's trust covers none of them: a test records the trust of each it wants usable
+ * (`trustAlso`).
+ */
 function work(): { work: string; home: string; lookup: RepositoryLookup } {
   const home = join(tmp.dir, "home");
   mkdirSync(home, { recursive: true });
@@ -51,7 +55,12 @@ function work(): { work: string; home: string; lookup: RepositoryLookup } {
 }
 
 function lookupIn(home: string): RepositoryLookup {
-  return (directory, sessionFolder) => trustedRepository(directory, sessionFolder, home);
+  return (directory) => trustedRepository(directory, home);
+}
+
+/** The owner's trust of `repositories`, each on its own, beside the session's folder. */
+function trustAlso(folder: string, home: string, ...repositories: string[]): void {
+  trust(home, [folder, ...repositories]);
 }
 
 async function roots(folder: string, lookup: RepositoryLookup): Promise<string[]> {
@@ -161,20 +170,32 @@ test("a folder inside a repository has that repository", GIT_LAYOUT, async () =>
 });
 
 test("a plain folder has the usable repositories two levels below it", GIT_LAYOUT, async () => {
-  const { work: folder, lookup } = work();
+  const { work: folder, home, lookup } = work();
   const one = gitInit(join(folder, "one"));
   const two = gitInit(join(folder, "group", "two"));
-  gitInit(join(folder, "group", "deeper", "three")); // three levels down: not found
+  const three = gitInit(join(folder, "group", "deeper", "three")); // three levels down: not found
+  trustAlso(folder, home, one, two, three);
   assert.deepEqual(await roots(folder, lookup), [one, two].toSorted());
+});
+
+test("a repository below a folder is kept only with its own trust", GIT_LAYOUT, async () => {
+  const { work: folder, home, lookup } = work();
+  const trusted = gitInit(join(folder, "trusted"));
+  gitInit(join(folder, "group", "other"));
+  trustAlso(folder, home, trusted);
+  assert.deepEqual(await roots(folder, lookup), [trusted]); // the folder's trust is not theirs
+  trust(home, [folder]);
+  assert.deepEqual(await roots(folder, lookup), []);
 });
 
 test("the repositories below a folder are looked up together", GIT_LAYOUT, async () => {
   const { work: folder } = work();
   for (const name of ["a", "b", "c", "d"]) gitInit(join(folder, name));
+  // Every lookup answers for itself here: the trust is not what this test is about.
   let active = 0;
   let peak = 0;
-  const slow: RepositoryLookup = async (directory, sessionFolder) => {
-    if (directory === sessionFolder) return null;
+  const slow: RepositoryLookup = async (directory) => {
+    if (directory === folder) return null;
     active += 1;
     peak = Math.max(peak, active);
     // A turn of the event loop: the lookups that run together are all started by now.
@@ -190,24 +211,27 @@ test("the repositories below a folder are looked up together", GIT_LAYOUT, async
 });
 
 test("a repository that is not usable is left out", BOTH, async () => {
-  const { work: folder, lookup } = work();
-  gitInit(join(folder, "a"));
+  const { work: folder, home, lookup } = work();
+  const kept = gitInit(join(folder, "a"));
   mkdirSync(join(folder, "broken"));
   writeFileSync(join(folder, "broken", ".git"), "not a gitfile\n"); // a `.git` that names no git dir
-  symlinkSync(gitInit(join(tmp.dir, "elsewhere")), join(folder, "link"));
+  const elsewhere = gitInit(join(tmp.dir, "elsewhere"));
+  symlinkSync(elsewhere, join(folder, "link"));
+  trustAlso(folder, home, kept, join(folder, "broken"), elsewhere);
   assert.deepEqual(await roots(folder, lookup), [join(folder, "a")]);
 });
 
 test("the search never goes into a repository for more", GIT_LAYOUT, async () => {
-  const { work: folder, lookup } = work();
+  const { work: folder, home, lookup } = work();
   const outer = gitInit(join(folder, "outer"));
-  gitInit(join(outer, "vendored"));
+  const vendored = gitInit(join(outer, "vendored"));
+  trustAlso(folder, home, outer, vendored);
   assert.deepEqual(await roots(folder, lookup), [outer]);
 });
 
 test("hidden folders are not searched for a repository", GIT_LAYOUT, async () => {
-  const { work: folder, lookup } = work();
-  gitInit(join(folder, ".hidden"));
+  const { work: folder, home, lookup } = work();
+  trustAlso(folder, home, gitInit(join(folder, ".hidden")));
   assert.deepEqual(await roots(folder, lookup), []);
 });
 
@@ -267,13 +291,14 @@ test(
   "the files of nested repositories come from git and the rest from disk",
   GIT_LAYOUT,
   async () => {
-    const { work: folder, lookup } = work();
+    const { work: folder, home, lookup } = work();
     const nested = gitInit(join(folder, "awaydesk-workspace"));
     write(nested, ".gitignore", ".venv/\n");
     writeAll(nested, "docs/setup.md", ".venv/lib/pkg.py");
     commitAll(nested);
     writeAll(nested, "docs/new.md", ".venv/lib/more.py");
     const deep = gitInit(join(folder, "a", "b", "c")); // three levels down: walked like any folder
+    trustAlso(folder, home, nested, deep);
     writeAll(deep, "x.txt", ".venv/y.txt");
     writeAll(folder, "notes.md", "a/readme.md");
     const listing = new Listings(lookup);
@@ -294,6 +319,7 @@ test("the files of a repository that is not usable are walked", BOTH, async () =
   // A symlinked folder is not entered, so a repository behind a link is not listed at all.
   const elsewhere = committed(join(tmp.dir, "elsewhere"));
   symlinkSync(elsewhere, join(folder, "link"));
+  trustAlso(folder, home, elsewhere);
   write(folder, "plain.txt");
   assert.deepEqual(await filesOf(new Listings(lookupIn(home)), folder), ["plain.txt"]);
 });
@@ -551,14 +577,14 @@ test("a search checks files only until the limit and counts by name past it", as
 });
 
 test("the repositories of a folder are kept for a short while", GIT_LAYOUT, async () => {
-  const { work: folder, lookup } = work();
-  gitInit(join(folder, "one"));
+  const { work: folder, home, lookup } = work();
+  trustAlso(folder, home, gitInit(join(folder, "one")));
   const asked: string[] = [];
   const clock = new FakeClock();
   clock.now = 100;
-  const counting: RepositoryLookup = async (directory, sessionFolder) => {
+  const counting: RepositoryLookup = async (directory) => {
     asked.push(directory);
-    return lookup(directory, sessionFolder);
+    return lookup(directory);
   };
   const listing = new Listings(counting, { repositoriesTtl: 5, clock });
   const first = await listing.repositories(folder);

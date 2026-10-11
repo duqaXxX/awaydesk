@@ -616,9 +616,9 @@ test("stricter than git where only the names match", POSIX, async () => {
   assert.ok(!(await workspaceTrusted(dangling, home)));
 });
 
-// --- the daemon's own git in a repository inside the session's folder ---
+// --- the daemon's own git runs in a repository the owner trusted, and in no other ---
 
-/** The folder a session started in: not a repository, and trusted in Claude Code. */
+/** A folder the owner trusted in Claude Code: not a repository. */
 function makeWork(): string {
   const folder = join(tmp, "work");
   mkdirSync(folder);
@@ -626,287 +626,104 @@ function makeWork(): string {
   return realpathSync(folder);
 }
 
-for (const depth of [1, 2, 3]) {
+for (const depth of [1, 2]) {
   for (const [id, inside] of [
     ["at-the-root", "."],
     ["in-a-subfolder", "src"],
   ] as const) {
-    test(`a repository inside the session s folder is usable without its own trust [${id}-${depth}]`, async () => {
+    test(`a repository inside a trusted folder is usable only with its own trust [${id}-${depth}]`, async () => {
+      // A trusted folder does not stand for a repository inside it: the repository can reach the
+      // folder in an archive or a clone, and git would run the `clean` filter its own config names.
       const work = makeWork();
-      const repo = gitInit(join(work, ...["a", "b", "c"].slice(0, depth)));
+      const repo = gitInit(join(work, ...["a", "b"].slice(0, depth)));
       mkdirSync(join(repo, "src"));
-      assert.ok(!(await workspaceTrusted(repo, home))); // the start gate does not take it
-      const found = await trustedRepository(join(repo, inside), work, home);
+      assert.ok(!(await workspaceTrusted(repo, home)));
+      assert.equal(await trustedRepository(join(repo, inside), home), null);
+      trust(home, [work, repo]);
+      const found = await trustedRepository(join(repo, inside), home);
       assert.ok(found !== null && found.root === realpathSync(repo));
     });
   }
 }
 
-test("a repository outside the session s folder needs its own trust", async () => {
-  // The agent may `cd` anywhere: only what lies inside the folder it started in is covered.
+test("a repository outside a trusted folder needs its own trust as well", async () => {
   const work = makeWork();
   const outside = gitInit(join(tmp, "elsewhere"));
-  const sibling = gitInit(join(tmp, "work-sibling")); // the same prefix, not inside `work`
-  assert.equal(await trustedRepository(outside, work, home), null);
-  assert.equal(await trustedRepository(sibling, work, home), null);
+  assert.equal(await trustedRepository(outside, home), null);
   trust(home, [work, outside]);
-  assert.notEqual(await trustedRepository(outside, work, home), null);
+  assert.notEqual(await trustedRepository(outside, home), null);
 });
 
-test("an untrusted session folder covers nothing inside it", async () => {
-  const folder = join(tmp, "work");
-  const repo = gitInit(join(folder, "app"));
-  assert.equal(await trustedRepository(repo, folder, home), null); // no record at all
-  trust(home, [folder], false);
-  assert.equal(await trustedRepository(repo, folder, home), null);
-  trust(home, [folder]);
-  assert.notEqual(await trustedRepository(repo, folder, home), null); // the control
+test("trusting one repository does not cover the one beside it", async () => {
+  const first = gitInit(join(tmp, "code", "first"));
+  const second = gitInit(join(tmp, "code", "second"));
+  trust(home, [first]);
+  assert.notEqual(await trustedRepository(first, home), null);
+  assert.equal(await trustedRepository(second, home), null);
 });
 
-test("a session folder that is a repository does not cover itself", async () => {
-  // Claude Code keys a repository on its own root: a trusted parent does not cover it, and the
-  // folder's own root is not "inside" it.
+test("a repository the owner refused or never recorded is not usable", async () => {
+  const repo = gitInit(join(tmp, "work", "app"));
+  assert.equal(await trustedRepository(repo, home), null); // no record at all
+  trust(home, [repo], false);
+  assert.equal(await trustedRepository(repo, home), null);
+  trust(home, [repo]);
+  assert.notEqual(await trustedRepository(repo, home), null); // the control
+});
+
+test("a trusted parent does not cover a repository for the daemon's git either", async () => {
+  // Claude Code keys a repository on its own root, and so does the daemon's lookup.
   const repo = gitInit(join(tmp, "code", "app"));
   trust(home, [join(tmp, "code")]);
-  assert.equal(await trustedRepository(repo, repo, home), null);
-  assert.equal(await trustedRepository(join(repo, ".git"), repo, home), null);
+  assert.equal(await trustedRepository(repo, home), null);
+  assert.equal(await trustedRepository(join(repo, ".git"), home), null);
   trust(home, [repo]);
-  assert.notEqual(await trustedRepository(repo, repo, home), null);
+  assert.notEqual(await trustedRepository(repo, home), null);
 });
 
-test("a session folder inside a repository covers only what that repository trusts", async () => {
-  // A session in a subfolder of a repository the owner never trusted: the folder fails the start
-  // gate, so a repository inside it is not covered either.
+test("a repository inside a trusted repository needs its own trust", async () => {
   const outer = gitInit(join(tmp, "outer"));
-  const folder = join(outer, "packages");
-  const inner = gitInit(join(folder, "lib"));
-  assert.equal(await trustedRepository(inner, folder, home), null);
+  const inner = gitInit(join(outer, "packages", "lib"));
   trust(home, [outer]);
-  assert.notEqual(await trustedRepository(inner, folder, home), null);
+  assert.notEqual(await trustedRepository(outer, home), null);
+  assert.equal(await trustedRepository(inner, home), null);
+  trust(home, [outer, inner]);
+  assert.notEqual(await trustedRepository(inner, home), null);
 });
 
-test(
-  "a symlink in the session s folder to a repository elsewhere is not inside",
-  POSIX,
-  async () => {
-    const work = makeWork();
-    const elsewhere = gitInit(join(tmp, "elsewhere", "repo"));
-    mkdirSync(join(elsewhere, "src"));
-    symlinkSync(elsewhere, join(work, "link"));
-    assert.equal(await trustedRepository(join(work, "link"), work, home), null);
-    assert.equal(await trustedRepository(join(work, "link", "src"), work, home), null);
-    // The control: the same repository really inside the folder.
-    gitInit(join(work, "real"));
-    assert.notEqual(await trustedRepository(join(work, "real"), work, home), null);
-  },
-);
-
-test("a session folder reached through a symlink covers what is inside it", POSIX, async () => {
+test("a worktree is usable when its main checkout is trusted, wherever the worktree lies", async () => {
   const work = makeWork();
-  const repo = gitInit(join(work, "app"));
-  symlinkSync(work, join(tmp, "via"));
-  const found = await trustedRepository(join(tmp, "via", "app"), join(tmp, "via"), home);
-  assert.ok(found !== null && found.root === realpathSync(repo));
-});
-
-test("a worktree is inside only when its main checkout is", async () => {
-  // A worktree is keyed on its main checkout, wherever the worktree itself is.
-  const work = makeWork();
-  const mainOutside = gitInit(join(tmp, "main"));
-  const away = addWorktree(mainOutside, join(work, "wt-of-an-outside-main"));
-  assert.equal(await trustedRepository(away, work, home), null);
-  const mainInside = gitInit(join(work, "main"));
-  const beside = addWorktree(mainInside, join(work, "wt-of-an-inside-main"));
-  const found = await trustedRepository(beside, work, home);
-  assert.ok(found !== null && found.key === realpathSync(mainInside));
-  // The main checkout trusted by the owner covers its worktree wherever it is.
-  trust(home, [work, mainOutside]);
-  assert.notEqual(await trustedRepository(away, work, home), null);
-});
-
-type Layout = (work: string, outside: string) => string;
-
-const aGitfileNamingAnOutsideGitDir: Layout = (work, outside) => {
-  const folder = join(work, "gitfile");
-  mkdirSync(folder);
-  writeFileSync(join(folder, ".git"), `gitdir: ${outside}/.git\n`);
-  return folder;
-};
-
-const aGitfileNamingAnOutsideGitDirByARelativePath: Layout = (work, outside) => {
-  const folder = join(work, "gitfile");
-  mkdirSync(folder);
-  writeFileSync(join(folder, ".git"), `gitdir: ${relative(folder, join(outside, ".git"))}\n`);
-  return folder;
-};
-
-const aGitSymlinkToAnOutsideGitDir: Layout = (work, outside) => {
-  const folder = join(work, "gitlink");
-  mkdirSync(folder);
-  symlinkSync(join(outside, ".git"), join(folder, ".git"));
-  return folder;
-};
-
-const aWorktreeOfAnOutsideCheckoutMovedInByHand: Layout = (work, outside) => {
-  const moved = join(work, "wt-moved");
-  renameSync(addWorktree(outside, join(outside, "..", "wt")), moved);
-  return moved;
-};
-
-const aGitDirWhoseCommondirNamesAnOutsideRepository: Layout = (work, outside) => {
-  const folder = join(work, "commondir");
-  mkdirSync(join(folder, ".git"), { recursive: true });
-  writeFileSync(join(folder, ".git", "HEAD"), "ref: refs/heads/main\n");
-  writeFileSync(join(folder, ".git", "commondir"), `${outside}/.git\n`);
-  return folder;
-};
-
-const aGitDirWhoseCommondirIsASymlinkToAnOutsideName: Layout = (work, outside) => {
-  const folder = join(work, "commondir-link");
-  mkdirSync(join(folder, ".git"), { recursive: true });
-  writeFileSync(join(folder, ".git", "HEAD"), "ref: refs/heads/main\n");
-  writeFileSync(join(folder, "..", "names-outside"), `${outside}/.git\n`);
-  symlinkSync(join(folder, "..", "names-outside"), join(folder, ".git", "commondir"));
-  return folder;
-};
-
-function aCommondirNamingAnOutsideRepositoryByALinkAndALineEnd(
-  work: string,
-  outside: string,
-  name: string,
-  lineEnd: string,
-): string {
-  // git strips every trailing CR and LF from `commondir` (setup.c, get_common_dir_noenv,
-  // v2.54.0), so `link` is the name whatever follows it; a name that kept its `\r` would be a
-  // path that does not exist, which resolves to a place inside the folder.
-  const folder = join(work, name);
-  mkdirSync(join(folder, ".git"), { recursive: true });
-  writeFileSync(join(folder, ".git", "HEAD"), "ref: refs/heads/main\n");
-  symlinkSync(join(outside, ".git"), join(folder, ".git", "link"));
-  writeFileSync(join(folder, ".git", "commondir"), `link${lineEnd}`);
-  return folder;
-}
-
-const aGitDirWhoseCommondirEndsInCrlf: Layout = (work, outside) =>
-  aCommondirNamingAnOutsideRepositoryByALinkAndALineEnd(work, outside, "commondir-crlf", "\r\n");
-
-const aGitDirWhoseCommondirEndsInTwoLineFeeds: Layout = (work, outside) =>
-  aCommondirNamingAnOutsideRepositoryByALinkAndALineEnd(work, outside, "commondir-lflf", "\n\n");
-
-const LEADING_OUTSIDE: [string, Layout][] = [
-  ["a_gitfile_naming_an_outside_git_dir", aGitfileNamingAnOutsideGitDir],
-  [
-    "a_gitfile_naming_an_outside_git_dir_by_a_relative_path",
-    aGitfileNamingAnOutsideGitDirByARelativePath,
-  ],
-  ["a_git_symlink_to_an_outside_git_dir", aGitSymlinkToAnOutsideGitDir],
-  ["a_worktree_of_an_outside_checkout_moved_in_by_hand", aWorktreeOfAnOutsideCheckoutMovedInByHand],
-  [
-    "a_git_dir_whose_commondir_names_an_outside_repository",
-    aGitDirWhoseCommondirNamesAnOutsideRepository,
-  ],
-  [
-    "a_git_dir_whose_commondir_is_a_symlink_to_an_outside_name",
-    aGitDirWhoseCommondirIsASymlinkToAnOutsideName,
-  ],
-  ["a_git_dir_whose_commondir_ends_in_crlf", aGitDirWhoseCommondirEndsInCrlf],
-  ["a_git_dir_whose_commondir_ends_in_two_line_feeds", aGitDirWhoseCommondirEndsInTwoLineFeeds],
-];
-
-for (const [id, layout] of LEADING_OUTSIDE) {
-  test(
-    `a layout inside the folder that leads git outside it is not covered [${id}]`,
-    POSIX,
-    async () => {
-      // The folder's trust covers a repository inside it, and git must read that repository's own
-      // config: a `.git` that points elsewhere makes git read someone else's.
-      const work = makeWork();
-      const outside = committed(join(tmp, "outside"));
-      assert.equal(await trustedRepository(outside, work, home), null); // the control: nothing trusted
-      const folder = layout(work, outside);
-      assert.equal(await trustedRepository(folder, work, home), null);
-      // The owner's own trust of the folder itself is the first way in, and stays as it was.
-      trust(home, [work, folder]);
-      assert.notEqual(await trustedRepository(folder, work, home), null);
-    },
-  );
-}
-
-for (const [id, layout] of [
-  ["a_git_dir_whose_commondir_ends_in_crlf", aGitDirWhoseCommondirEndsInCrlf],
-  ["a_git_dir_whose_commondir_ends_in_two_line_feeds", aGitDirWhoseCommondirEndsInTwoLineFeeds],
-] as const) {
-  test(`git reads the common dir through those line ends [${id}]`, POSIX, () => {
-    // The control of the layouts above: git itself ends up in the outside repository.
-    const work = makeWork();
-    const outside = realpathSync(committed(join(tmp, "outside")));
-    const folder = layout(work, outside);
-    assert.ok(gitTakesItFor(folder, "--git-common-dir", join(outside, ".git")));
-  });
-}
-
-test("a commondir git cannot read covers nothing", async () => {
-  // An empty `commondir` is a fatal error in git ("failed to read"): not a layout to guess at.
-  const work = makeWork();
-  const folder = join(work, "commondir-empty");
-  mkdirSync(join(folder, ".git"), { recursive: true });
-  writeFileSync(join(folder, ".git", "HEAD"), "ref: refs/heads/main\n");
-  writeFileSync(join(folder, ".git", "commondir"), Buffer.alloc(0));
-  assert.ok(!gitFindsARepository(folder));
-  assert.equal(await trustedRepository(folder, work, home), null);
-});
-
-test("a git dir outside the folder that the owner trusted is not a second way in", async () => {
-  const work = makeWork();
-  const outside = committed(join(tmp, "outside"));
-  trust(home, [work, outside]);
-  const folder = aGitfileNamingAnOutsideGitDir(work, outside);
-  // The folder is no repository the owner trusted, and its git dir is not the folder's.
-  assert.equal(await trustedRepository(folder, work, home), null);
-  assert.notEqual(await trustedRepository(outside, work, home), null);
-});
-
-test("layouts that stay inside the folder are covered", POSIX, async () => {
-  const work = makeWork();
-  const gitfile = gitInit(join(work, "elsewhere-inside", "store"));
-  mkdirSync(join(work, "viafile"));
-  writeFileSync(join(work, "viafile", ".git"), `gitdir: ${join(gitfile, ".git")}\n`);
-  mkdirSync(join(work, "vialink"));
-  symlinkSync(join(gitfile, ".git"), join(work, "vialink", ".git"));
-  for (const folder of [join(work, "viafile"), join(work, "vialink")]) {
-    assert.notEqual(await trustedRepository(folder, work, home), null);
+  const main = gitInit(join(tmp, "main"));
+  const away = addWorktree(main, join(tmp, "wt-away"));
+  const beside = addWorktree(main, join(work, "wt-inside-a-trusted-folder"));
+  // The worktree's own path is no key, and neither is the folder holding it.
+  trust(home, [work, away]);
+  assert.equal(await trustedRepository(away, home), null);
+  assert.equal(await trustedRepository(beside, home), null);
+  trust(home, [main]);
+  for (const worktree of [away, beside]) {
+    const found = await trustedRepository(worktree, home);
+    assert.ok(found !== null && found.key === realpathSync(main));
   }
-  // A worktree whose main checkout is inside: its git dir and its common dir are too.
-  const main = committed(join(work, "main"));
-  const beside = addWorktree(main, join(work, "wt"));
-  const found = await trustedRepository(beside, work, home);
-  assert.ok(found !== null && found.key === realpathSync(main));
 });
 
-test("the start gate still refuses a repository the owner did not trust", async () => {
-  const work = makeWork();
-  const repo = gitInit(join(work, "app"));
-  assert.notEqual(await trustedRepository(repo, work, home), null);
-  assert.ok(!(await workspaceTrusted(repo, home))); // `!bind` and a session's start stay as they were
-  assert.ok(await workspaceTrusted(work, home));
-});
-
-test("a layout with no key is not covered inside the session s folder", async () => {
+test("a layout with no key is not usable, whatever is trusted", async () => {
   const work = makeWork();
   const layout = bareLayout(join(work, "vendor"));
-  assert.equal(await trustedRepository(layout, work, home), null);
-  assert.equal(await trustedRepository(join(layout, "refs"), work, home), null);
+  trust(home, [work, layout]);
+  assert.equal(await trustedRepository(layout, home), null);
+  assert.equal(await trustedRepository(join(layout, "refs"), home), null);
 });
 
-test("the inside check needs no git", async () => {
-  const work = makeWork();
-  const repo = gitInit(join(work, "app"));
-  const outside = gitInit(join(tmp, "elsewhere"));
+test("the lookup needs no git", async () => {
+  const repo = gitInit(join(tmp, "work", "app"));
+  const other = gitInit(join(tmp, "elsewhere"));
+  trust(home, [repo]);
   const path = process.env.PATH;
   process.env.PATH = join(tmp, "empty"); // no git anywhere
   try {
-    assert.notEqual(await trustedRepository(repo, work, home), null);
-    assert.equal(await trustedRepository(outside, work, home), null);
+    assert.notEqual(await trustedRepository(repo, home), null);
+    assert.equal(await trustedRepository(other, home), null);
   } finally {
     if (path === undefined) {
       delete process.env.PATH;
@@ -946,30 +763,16 @@ test(
   "a dot dot after a symlink in a gitfile is resolved from where the symlink leads",
   POSIX,
   async () => {
-    // No repository: the git dir is `out/outgit`, outside the session's folder.
-    const work = makeWork();
+    // The git dir is `out/outgit`, not `x/outgit`, where the lexical reading lands.
+    const x = join(tmp, "x");
     mkdirSync(join(tmp, "out", "deep"), { recursive: true });
     mkdirSync(join(tmp, "out", "outgit"));
-    mkdirSync(join(work, "x", "outgit"), { recursive: true }); // where the lexical reading lands
-    symlinkSync(join(tmp, "out", "deep"), join(work, "x", "link"));
-    writeFileSync(join(work, "x", ".git"), "gitdir: link/../outgit\n");
-    assert.equal(await trustedRepository(join(work, "x"), work, home), null);
-  },
-);
-
-test(
-  "a dot dot after a symlink in a commondir is resolved from where the symlink leads",
-  POSIX,
-  async () => {
-    // No repository: the common dir is `out/common`, outside the session's folder.
-    const work = makeWork();
-    const dotGit = gitDirAt(join(work, "x", ".git"));
-    mkdirSync(join(tmp, "out", "deep"), { recursive: true });
-    mkdirSync(join(tmp, "out", "common"));
-    mkdirSync(join(dotGit, "common")); // where the lexical reading lands
-    symlinkSync(join(tmp, "out", "deep"), join(dotGit, "link"));
-    writeFileSync(join(dotGit, "commondir"), "link/../common\n");
-    assert.equal(await trustedRepository(join(work, "x"), work, home), null);
+    mkdirSync(join(x, "outgit"), { recursive: true });
+    symlinkSync(join(tmp, "out", "deep"), join(x, "link"));
+    writeFileSync(join(x, ".git"), "gitdir: link/../outgit\n");
+    trust(home, [x]);
+    const found = await trustedRepository(x, home);
+    assert.equal(found?.gitDir, join(tmp, "out", "outgit"));
   },
 );
 
@@ -991,7 +794,7 @@ test(
     writeFileSync(join(worktree, ".git"), "gitdir: hop/../../M/.git/worktrees/w\n");
     trust(home, [main]);
     assert.ok(!(await workspaceTrusted(worktree, home)));
-    assert.equal(await trustedRepository(worktree, tmp, home), null);
+    assert.equal(await trustedRepository(worktree, home), null);
   },
 );
 
@@ -1038,18 +841,6 @@ test(
   },
 );
 
-test("a commondir with an invalid byte covers nothing", POSIX, async () => {
-  // The bytes are kept, so the commondir names a path no folder of ours can have.
-  const work = makeWork();
-  const dotGit = gitDirAt(join(work, "x", ".git"));
-  mkdirSync(join(work, "x", `c${"\ufffd"}`));
-  writeFileSync(
-    join(dotGit, "commondir"),
-    Buffer.concat([Buffer.from("../c"), Buffer.from([0xff]), Buffer.from("\n")]),
-  );
-  assert.equal(await trustedRepository(join(work, "x"), work, home), null);
-});
-
 test(
   "a recorded path with a lone surrogate does not stand for a folder with a replacement character",
   POSIX,
@@ -1075,18 +866,6 @@ function chainTo(target: string, name: string, length: number): string {
   }
   return previous;
 }
-
-test(
-  "a session folder behind a very long chain of symlinks covers nothing, and does not reject",
-  POSIX,
-  async () => {
-    // 300 links are past the 255-link cap, which answers closed.
-    const work = makeWork();
-    const repo = gitInit(join(work, "app"));
-    const head = chainTo(work, "c", 300);
-    assert.equal(await trustedRepository(repo, head, home), null);
-  },
-);
 
 test(
   "a recorded path behind a very long chain of symlinks stands for nothing, and does not reject",
@@ -1115,33 +894,22 @@ test(
 );
 
 test("a gitfile path that ends in a space is not read without it", POSIX, async () => {
-  // No repository: git strips line ends only, so `g ` (a symlink out) is the git dir, not `g`.
-  const work = makeWork();
-  const x = join(work, "x");
+  // git strips line ends only, so `g ` (a symlink out) is the git dir, not `g`.
+  const x = join(tmp, "x");
   mkdirSync(x);
-  gitDirAt(join(tmp, "out", "o"));
-  symlinkSync(join(tmp, "out", "o"), join(x, "g "));
+  const out = gitDirAt(join(tmp, "out", "o"));
+  symlinkSync(out, join(x, "g "));
   gitDirAt(join(x, "g"));
   writeFileSync(join(x, ".git"), "gitdir: g \n");
-  assert.equal(await trustedRepository(x, work, home), null);
-});
-
-test("a commondir path that ends in a space is not read without it", POSIX, async () => {
-  // No repository: `../.git ` leads to the symlink `.git ` out of the folder.
-  const work = makeWork();
-  const x = join(work, "x");
-  const dotGit = gitDirAt(join(x, ".git"));
-  gitDirAt(join(tmp, "out", "o"));
-  symlinkSync(join(tmp, "out", "o"), join(x, ".git "));
-  writeFileSync(join(dotGit, "commondir"), "../.git \n");
-  assert.equal(await trustedRepository(x, work, home), null);
+  trust(home, [x]);
+  const found = await trustedRepository(x, home);
+  assert.equal(found?.gitDir, out);
 });
 
 test("a file that grows after its size was read is read up to git s limit", POSIX, async () => {
   // The read goes up to GITFILE_BYTES whatever size was read first: a prefix of the grown file
   // names another path (`a/` for `a/b`).
-  const work = makeWork();
-  const x = join(work, "x");
+  const x = join(tmp, "x");
   gitDirAt(join(x, "a", "b"));
   writeFileSync(join(x, ".git"), "gitdir: a\n");
   const handle = await open(join(x, ".git"));
@@ -1157,7 +925,8 @@ test("a file that grows after its size was read is read up to git s limit", POSI
     }
     return found;
   });
-  const found = await trustedRepository(x, work, home);
+  trust(home, [x]);
+  const found = await trustedRepository(x, home);
   assert.ok(grown);
   assert.equal(found?.gitDir, join(x, "a", "b"));
 });

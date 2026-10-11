@@ -2287,28 +2287,24 @@ test("the footer leaves out the branch of a repository not trusted", GIT_LAYOUT,
 });
 
 test(
-  "the footer asks for the repository with the folder the session started in",
+  "the footer asks for the repository in the folder the agent moved to",
   GIT_LAYOUT,
   async (t) => {
-    // The agent moved into `repo`: the repository is looked up there, for the session whose
-    // folder is the bound one (a repository inside that folder is covered by its trust).
+    // The agent moved into `repo`: the repository is looked up there.
     const make = harnessFor(t);
     const repo = repoUnder(make.tmpPath);
-    const asked: Array<readonly [string, string]> = [];
+    const asked: string[] = [];
     const moved = { ...(sdkJson("stop-hook") as JsonObject), cwd: repo };
     const h = make({ turns: [withStopHook(sdkMessages("tools"), moved)] });
-    h.backend.repository = async (folder, sessionFolder) => {
-      asked.push([folder, sessionFolder]);
+    h.backend.repository = async (folder) => {
+      asked.push(folder);
       return anyRepository(folder);
     };
     const session = h.session();
     await (await session.submit("list the files")).done.wait();
     await session.status();
     assert.ok(asked.length > 0);
-    assert.deepEqual(
-      new Set(asked.map((pair) => pair.join("\n"))),
-      new Set([`${repo}\n${session.directory}`]),
-    );
+    assert.deepEqual(new Set(asked), new Set([repo]));
     assert.notEqual(session.directory, repo);
   },
 );

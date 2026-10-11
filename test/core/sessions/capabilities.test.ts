@@ -180,7 +180,7 @@ test("folderTrust off: a session starts in an untrusted folder and no trust is a
   await h.idle();
   assert.equal(h.clients.length, 1);
   assert.equal(await h.manager.unavailable(h.tmpPath), null);
-  assert.equal(await h.manager.repository(h.tmpPath, h.tmpPath), null);
+  assert.equal(await h.manager.repository(h.tmpPath), null);
   assert.ok(!h.backend.called.includes("folderTrusted"), h.backend.called.join());
   assert.ok(!h.backend.called.includes("trustedRepository"), h.backend.called.join());
   assert.ok(!(await session.status()).includes("Branch:"));

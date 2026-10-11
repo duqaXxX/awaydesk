@@ -1014,8 +1014,8 @@ a first commit), which never write the index: `git diff` refreshes it under `ind
 killed at `footer.GIT_TIMEOUT` would leave the lock behind and stop every commit. The branch and the
 changes show only where that folder is in a repository the daemon's git may run in
 (`AgentBackend.trustedRepository`, for Claude `trust.trustedRepository`: one the owner trusted in
-Claude Code, or one inside the folder the session started in, `ThreadSession.directory`, when that
-folder passes `trust.workspaceTrusted`); anywhere else no git runs and the footer leaves both out,
+Claude Code by its own key, since a trusted folder does not stand for a repository inside it);
+anywhere else no git runs and the footer leaves both out,
 since a diff runs the `clean` filters a repository's config names. git is given the repository with
 `--git-dir` and started at the repository's root (`footer.runGit`), so it searches for nothing from
 the folder: a planted `.git` file, a bare layout or a `core.worktree` there is never read.
@@ -1072,7 +1072,7 @@ the name and its path from the folder as the title, and nothing posted on succes
 
 The search reads the folder from disk, and the changed files come from git. Which repositories the
 folder has is `listing.repositoriesOf`: the one holding the folder when `SessionManager.repository`
-(the footer's own `trustedRepository` lookup, given the session's folder) finds it usable, otherwise
+(the footer's own `trustedRepository` lookup) finds it usable, otherwise
 the usable ones found at most two levels below it, by `folders.foldersWithin`, the walk `!bind`
 uses, which never enters a repository; the lookups of those candidates run together.
 `Listings.repositories` keeps the answer for a folder for `listing.REPOSITORIES_TTL` seconds, so the
@@ -1216,16 +1216,12 @@ closed when the start returns (`ThreadSession.connect`).
   repository outside the root's own `.git` has no key and counts as untrusted, with everything below
   it. That is told by the names of its entries alone (a `HEAD`, with `objects` and `refs` or a
   `commondir`), so a folder that only looks like a git dir counts too. The check runs no command, so
-  nothing in a folder can hold it. The daemon's own git (footer, `!status`, `!open`) has a second
-  way in beside a trusted key: a repository whose key, git dir and common dir all lie strictly
-  inside the folder the session started in, when that folder passes `trust.workspaceTrusted`
-  (`trust.trustedRepository`; the paths resolved, so a symlink that leads elsewhere and a worktree
-  whose main checkout is elsewhere are not inside; a `.git` file or symlink naming a git dir
-  elsewhere, a worktree moved in by hand and a `commondir` that leads out are not either, since git
-  would read that repository's config). The small files read there (a `.git` file, a `commondir`, a
-  worktree's `gitdir`) are cut at their line ends as git cuts them, and an empty `commondir`, which
-  git refuses, covers nothing. The gate for a session's start and for `!bind` is
-  `trust.workspaceTrusted` alone and does not take it. Trust is by path, as in Claude Code: a folder
+  nothing in a folder can hold it. The daemon's own git (footer, `!status`, `!open`) runs only in
+  a repository whose key is trusted (`trust.trustedRepository`): a trusted folder does not stand
+  for a repository inside it, since git would run the filters that repository's config names. The
+  small files read there (a `.git` file and a worktree's `gitdir`) are cut at their line ends as
+  git cuts them. The gate for a session's start and for `!bind` is `trust.workspaceTrusted`. Trust
+  is by path, as in Claude Code: a folder
   placed at a path the owner trusted, or at the path of a worktree deleted and not pruned, passes
   for it, and a repository placed at a trusted path covers the worktrees it registers. A path in the
   record that passes through a symlink trusts nothing. An untrusted folder starts nothing, and the

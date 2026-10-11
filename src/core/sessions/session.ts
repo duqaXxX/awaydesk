@@ -2626,10 +2626,10 @@ export class ThreadSession {
     return says ? data : null;
   }
 
-  /** The footer's git lookup: for the folder this session started in (`directory`). */
+  /** The footer's git lookup. */
   private async repository(folder: string): Promise<Repository | null> {
     if (!this.deps.agent.capabilities.folderTrust) return null;
-    return this.deps.agent.trustedRepository(folder, this.directory);
+    return this.deps.agent.trustedRepository(folder);
   }
 
   /**

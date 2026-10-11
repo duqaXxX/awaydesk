@@ -942,7 +942,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         await world.trust(world.folder);
         assert.equal(await world.backend.folderTrusted(world.folder), true);
         assert.equal(await world.backend.folderTrusted(world.otherFolder), false);
-        assert.equal(await world.backend.trustedRepository(world.folder, world.folder), null);
+        assert.equal(await world.backend.trustedRepository(world.folder), null);
       },
     );
   });

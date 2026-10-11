@@ -237,9 +237,9 @@ function until<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 /**
  * The branch and the changes of the repository holding `here`, each null when unknown.
  *
- * `repository` answers only for a repository the owner trusted in Claude Code, or one inside the
- * folder the session started in (`trustedRepository`): anywhere else no git runs, since a diff
- * runs the filters a repository's config names. Every call shares one `timeout` (milliseconds).
+ * `repository` answers only for a repository the owner trusted in Claude Code
+ * (`trustedRepository`): anywhere else no git runs, since a diff runs the filters a repository's
+ * config names. Every call shares one `timeout` (milliseconds).
  */
 export async function gitState(
   here: string,

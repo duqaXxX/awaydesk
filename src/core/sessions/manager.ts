@@ -51,14 +51,13 @@ export class SessionManager {
   }
 
   /**
-   * The repository holding `directory` when the daemon's git may run in it for a session
-   * started in `sessionFolder`: the footer's own lookup, so what runs git for `!open` is what
-   * runs it for the footer. Null for an agent with no record of trust (`folderTrust`): the
-   * daemon's git runs in no folder then.
+   * The repository holding `directory` when the daemon's git may run in it: the footer's own
+   * lookup, so what runs git for `!open` is what runs it for the footer. Null for an agent with
+   * no record of trust (`folderTrust`): the daemon's git runs in no folder then.
    */
-  async repository(directory: string, sessionFolder: string): Promise<Repository | null> {
+  async repository(directory: string): Promise<Repository | null> {
     if (!this.deps.agent.capabilities.folderTrust) return null;
-    return this.deps.agent.trustedRepository(directory, sessionFolder);
+    return this.deps.agent.trustedRepository(directory);
   }
 
   /**
