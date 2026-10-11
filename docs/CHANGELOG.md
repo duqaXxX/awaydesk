@@ -295,6 +295,19 @@ All notable changes to this project are documented here. The format follows
   nothing else of the core, and `test/vocabulary.test.ts` fails on an identifier or a string
   outside `src/agent/claude/`, `src/chat/slack/` and `src/registry.ts` that names an agent or a
   chat.
+- Four clauses of invariants 2 and 3 now have a test. A mutation run of 2026-10-11 broke each
+  clause of the seven invariants with a one-line change and ran the whole suite (3,884 tests);
+  these four left it green. `test/agent/claude/session.test.ts` asks the Claude back end about
+  seven tool names (a built-in tool, an MCP-style name and a name nobody has seen) and checks
+  that `RequestHandler.permission` is called once and that the callback returns the owner's allow
+  or deny, so a back end that approves a tool by itself fails.
+  `test/core/sessions/capabilities.test.ts` checks that a stored bypass on an agent whose `permissionModes.bypass` is null makes the connect
+  fail with `BypassUnavailable`, with no `setPermissionMode` call and the client closed
+  (`modeFor`). `test/core/config.test.ts` checks that a `.env` owned by another user is refused.
+  `test/chat/slack/app/no-content-in-logs.test.ts` sends a prompt, the agent's reply, a thread
+  reply, a stranger's message, `!bind`, `!help` and a form's free text through the app, captures
+  every log line at `DEBUG`, and fails on a line that holds any of them. No file under `src/`
+  changes.
 
 ### Changed
 

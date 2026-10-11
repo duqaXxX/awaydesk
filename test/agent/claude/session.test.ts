@@ -311,6 +311,50 @@ test("a deny reaches the SDK with the owner's message", LIMIT, async (t) => {
   ]);
 });
 
+// Invariant 2: the project owns no permission rule, so no tool is answered without the owner.
+// Found by a mutation run of 2026-10-11: a callback that allowed `Read` by itself failed nothing,
+// since only `Bash` was ever asked about.
+const CALLS: readonly { readonly toolName: string; readonly input: Record<string, unknown> }[] = [
+  { toolName: "Read", input: { file_path: `${FOLDER}/notes.txt` } },
+  { toolName: "Bash", input: BASH },
+  { toolName: "Edit", input: { file_path: `${FOLDER}/a.ts`, old_string: "a", new_string: "b" } },
+  { toolName: "Write", input: { file_path: `${FOLDER}/b.ts`, content: "b" } },
+  { toolName: "Glob", input: { pattern: "*.ts" } },
+  { toolName: "mcp__alice-server__lookup", input: { term: "ok" } },
+  { toolName: "ToolNobodyHasSeen", input: { anything: 1 } },
+];
+
+for (const { toolName, input } of CALLS) {
+  for (const answer of [
+    { allow: true },
+    { allow: false, message: "No: the owner refused." },
+  ] satisfies PermissionAnswer[]) {
+    test(
+      `a call of ${toolName} is asked once and the owner's ${answer.allow ? "allow" : "deny"} is the result`,
+      LIMIT,
+      async (t) => {
+        const handler = handlerOf(answer);
+        const { session, query, events } = await started(
+          t,
+          { turns: [[...TOOLS.slice(0, 2), ask({ toolName, input }), ...TOOLS.slice(-1)]] },
+          {},
+          handler,
+        );
+        await session.send(PROMPT);
+        await until(events, "turn_ended");
+        assert.equal(handler.asked.length, 1, "the owner is asked, once");
+        assert.equal(handler.asked[0]?.toolName, toolName);
+        assert.deepEqual(
+          query.permissionResults,
+          answer.allow
+            ? [{ behavior: "allow", updatedInput: input }]
+            : [{ behavior: "deny", message: answer.message }],
+        );
+      },
+    );
+  }
+}
+
 test("the stream waits for an answer the owner has not given", LIMIT, async (t) => {
   let answer: (value: PermissionAnswer) => void = () => undefined;
   const handler: RequestHandler = {
