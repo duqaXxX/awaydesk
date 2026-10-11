@@ -26,17 +26,25 @@ export function summaryLine(models: readonly ModelInfo[], choice: Choice): strin
 }
 
 /**
- * The effort levels a setup offers when the agent lists no model: the agent's own. With models,
+ * The effort levels a setup offers by themselves: the agent's own, for an agent that lists no
+ * models. An agent that lists models offers none here, even when its list came back empty:
  * each model names the levels it takes.
  */
-export function effortsOffered(deps: FlowDeps, models: readonly ModelInfo[]): readonly string[] {
-  return models.length === 0 ? deps.agent.capabilities.effortLevels : [];
+export function effortsOffered(deps: FlowDeps): readonly string[] {
+  const { capabilities } = deps.agent;
+  return capabilities.models ? [] : capabilities.effortLevels;
+}
+
+/** Whether the agent has a mode that skips permission requests, which a setup then offers. */
+export function bypassOffered(deps: FlowDeps): boolean {
+  return deps.agent.capabilities.permissionModes.bypass !== null;
 }
 
 /**
  * The owner's choice from the controls they left, held to what the request offered: a model the
- * agent did not list reads as its default, and an effort the model (or, with no model list, the
- * agent) does not take reads as `Default`.
+ * agent did not list reads as its default, an effort the model (or, for an agent with no model
+ * list, the agent) does not take reads as `Default`, and bypass reads as off when none was
+ * offered.
  */
 export function chosen(
   deps: FlowDeps,
@@ -44,9 +52,14 @@ export function chosen(
   selection: SetupSelection,
 ): Choice {
   const choice = choiceOf(models, selection);
-  const efforts = effortsOffered(deps, models);
-  if (efforts.length === 0) return choice;
-  return { ...choice, effort: efforts.includes(selection.effort) ? selection.effort : DEFAULT };
+  const efforts = effortsOffered(deps);
+  const effort =
+    efforts.length === 0
+      ? choice.effort
+      : efforts.includes(selection.effort)
+        ? selection.effort
+        : DEFAULT;
+  return { ...choice, effort, bypass: choice.bypass && bypassOffered(deps) };
 }
 
 export function setupFlow(deps: FlowDeps, talk: Talk): SetupFlow {
@@ -61,7 +74,7 @@ export function setupFlow(deps: FlowDeps, talk: Talk): SetupFlow {
     ref: ThreadRef,
     asked: ThreadSession,
   ): Promise<ThreadSession | null> {
-    const { sessions, state, agent } = deps;
+    const { sessions, state } = deps;
     let session = asked;
     try {
       // First what an earlier, unsent Start left: the session it changed is dropped, so the
@@ -114,8 +127,8 @@ export function setupFlow(deps: FlowDeps, talk: Talk): SetupFlow {
         type: "setup",
         requestId,
         models,
-        efforts: effortsOffered(deps, models),
-        bypassOffered: agent.capabilities.permissionModes.bypass !== null,
+        efforts: effortsOffered(deps),
+        bypassOffered: bypassOffered(deps),
         selection: { ...DEFAULT_CHOICE, bypass: ticked },
       }),
       settle,

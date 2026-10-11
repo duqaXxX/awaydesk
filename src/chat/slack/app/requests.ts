@@ -73,7 +73,8 @@ export class Requests {
       { channel, thread: threadTs },
       str(action.value),
       { type: "hold", send: action.action_id === HOLD_CONTINUE },
-      messageTs(body),
+      // A click that names no message is still answered: nothing is removed for it.
+      text(record(body.message).ts),
     );
   };
 
@@ -155,7 +156,7 @@ export class Requests {
       { channel, thread: threadTs },
       str(action.value),
       answer,
-      messageTs(body),
+      text(record(body.message).ts),
     );
   };
 

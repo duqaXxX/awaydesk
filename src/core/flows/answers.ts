@@ -93,6 +93,7 @@ export function answersFlow(deps: FlowDeps, talk: Talk): AnswersFlow {
         const held = holds.get(requestId);
         if (holds.resolve(requestId, ref.channel, ref.thread, given.send ? true : null) === null) {
           logRefused("hold decision", ref, message, {
+            send: given.send,
             held: held !== null,
             decided: held?.decided ?? false,
           });

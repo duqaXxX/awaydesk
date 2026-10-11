@@ -99,7 +99,7 @@ test("a hold answered twice is refused the second time, and the log says why", a
   assert.equal(again, false);
   assert.deepEqual(world.shown(ref).slice(-1), [texts.HOLD_GONE]);
   assert.deepEqual(lines, [
-    `refused a click (hold decision) in ${ref.channel}/${ref.thread} on message ${open.message}; held=False, decided=False`,
+    `refused a click (hold decision) in ${ref.channel}/${ref.thread} on message ${open.message}; send=True, held=False, decided=False`,
   ]);
 });
 
@@ -291,6 +291,48 @@ test("a setup reads what the owner left against what was offered", async (t) => 
       .shown(ref)
       .includes(fill(texts.SETUP_SUMMARY, { model: "default", effort: "Default", bypass: "off" })),
   );
+});
+
+test("a setup holds bypass to what was offered: an agent with no bypass mode gets none", async (t) => {
+  const world = await AskingWorld.make(t);
+  const { ref, session } = world.thread();
+  const asked = world.flows.setup.beforeSending(ref, session);
+  const open = await world.asked(ref, "setup");
+  assert.equal((open.request as SetupRequest).bypassOffered, false);
+  // The controls offered no bypass: an answer that ticks it anyway reads as off.
+  await world.answers(open.requestId, {
+    type: "setup",
+    selection: { model: "default", effort: "full", bypass: true },
+  });
+  await asked;
+  assert.notEqual(world.state.thread(ref.channel, ref.thread)?.bypass, true);
+  assert.ok(
+    world
+      .shown(ref)
+      .includes(fill(texts.SETUP_SUMMARY, { model: "default", effort: "full", bypass: "off" })),
+  );
+});
+
+test("an agent that lists models and gave none offers no effort, and takes none", async (t) => {
+  // The capability says the agent lists models; this session's list came back empty.
+  const agent = new FakeAgentBackend([
+    { info: { models: [], commands: [], permissionMode: "default" } },
+  ]);
+  const world = await AskingWorld.make(t, { agent });
+  const { ref, session } = world.thread();
+  const asked = world.flows.setup.beforeSending(ref, session);
+  const open = await world.asked(ref, "setup");
+  const request = open.request as SetupRequest;
+  assert.deepEqual(request.models, []);
+  assert.deepEqual(request.efforts, []);
+  // No effort was offered: one of the agent's own levels in the answer reads as the default.
+  await world.answers(open.requestId, {
+    type: "setup",
+    selection: { model: "default", effort: "high", bypass: false },
+  });
+  await asked;
+  assert.equal(world.state.thread(ref.channel, ref.thread)?.effort, null);
+  assert.equal(agent.sessions.at(-1)?.options.effort ?? null, null);
 });
 
 test("a setup of an agent with models offers them with bypass, and checks the choice", async (t) => {
