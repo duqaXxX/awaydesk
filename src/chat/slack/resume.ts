@@ -120,7 +120,7 @@ function row(session: ListedSession, now: Date, threadTs: string): ResumeRow {
 
 /**
  * The picker: the newest RESUME_ROWS of `sessions`, the ones of `directory` that can be resumed.
- * `openElsewhere` counts the sessions a thread already holds (D6: one session lives in one
+ * `openElsewhere` counts the sessions a thread already holds (one session lives in one
  * thread): they are left out of the rows, since resuming one is refused anyway, and named by one
  * line under the list, so the limit applies to what the owner can act on. Each Resume button
  * carries `threadTs`, the thread of the owner's `!resume` message, where the session is resumed.

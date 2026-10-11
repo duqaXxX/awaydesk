@@ -1,5 +1,5 @@
 /**
- * One reaction on a session's root message (Decision D10): working, waiting for the owner,
+ * One reaction on a session's root message: working, waiting for the owner,
  * everything ended, error, or stopped/restarted. Adding or removing a reaction on the owner's own
  * message notifies nobody and only shows in the channel list on iOS (measured 2026-09-28, Slack
  * free plan). Arguments and error codes read from docs.slack.dev/reference/methods/reactions.add
@@ -131,7 +131,7 @@ export class StatusReaction {
         } else {
           // A fresh instance: an earlier session's reaction may still sit on this
           // root (an idle close's DONE, a restart's ERROR). Strip every other name so
-          // the root carries exactly this one (D10).
+          // the root carries exactly this one.
           for (const other of Object.values(Status)) {
             if (other !== state) {
               await this.#remove(other);
@@ -154,7 +154,7 @@ export class StatusReaction {
 
   /**
    * Remove the current reaction, leaving the root bare: for a caller with nothing to
-   * revert to (D8's Cancel on a session that had shown no reaction yet).
+   * revert to (the same-folder hold's Cancel on a session that had shown no reaction yet).
    */
   async clear(): Promise<void> {
     this.#wanted = null;
