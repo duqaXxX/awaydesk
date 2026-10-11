@@ -13,6 +13,7 @@ import {
   resetStatusFlags,
   logger as statusLogger,
   THREAD_STATUS_AFTER_WRITE_SECONDS,
+  THREAD_STATUS_REFRESH_SECONDS,
 } from "../../../src/chat/slack/reply/status.ts";
 import {
   answeredBlocks,
@@ -298,6 +299,33 @@ test("the activity line is refused once slack says the token cannot set one", as
     warnings.mock.restore();
   }
   assert.equal(thread.activityRefused, true);
+});
+
+test("the status line counts its refresh on the steady clock, not on the wall clock", async () => {
+  // Python counted it on `loop.time()`: a step of the system clock must neither bring a
+  // refresh forward nor put it off.
+  const slack = new FakeSlack();
+  const wall = new FakeClock();
+  const steady = new FakeClock();
+  const chat = new SlackChat({
+    slack,
+    replies: slack,
+    identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
+    limiter: new CountingLimiter(slack),
+    clock: wall,
+    steady,
+  });
+  const thread = chat.thread(CHANNEL, THREAD);
+  const shown = () => slack.callsTo("assistant.threads.setStatus").length;
+  thread.showActivity("Working…", "is working…");
+  await steady.advance(0);
+  assert.equal(shown(), 1);
+  await wall.advance(10 * THREAD_STATUS_REFRESH_SECONDS);
+  await steady.advance(0);
+  assert.equal(shown(), 1); // an hour of wall time and no refresh
+  await steady.advance(THREAD_STATUS_REFRESH_SECONDS);
+  assert.equal(shown(), 2);
+  await thread.close();
 });
 
 test("the provider gives each thread its own object and shares one budget", async () => {

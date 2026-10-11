@@ -11,7 +11,7 @@
  */
 import type { KnownBlock, WebClient } from "@slack/web-api";
 import type { PermissionRequest, Question, QuestionRequest } from "../../agent/seam.ts";
-import { type Clock, systemClock } from "../../clock.ts";
+import { type Clock, monotonicClock, systemClock } from "../../clock.ts";
 import * as texts from "../../core/texts.ts";
 import { getLogger } from "../../log.ts";
 import {
@@ -60,8 +60,14 @@ export interface SlackChatOptions {
   readonly identity: SlackIdentity;
   /** Shared by every reply in the process and by every `chat.update` made beside them. */
   readonly limiter: Limiter;
-  /** Wall-clock seconds and every pause of a reply and of the status line. */
+  /** Wall-clock seconds and every pause of a reply. */
   readonly clock?: Clock;
+  /**
+   * The clock the status line counts its refreshes on: a monotonic one, as Python's
+   * `loop.time()` was, so that a step of the system clock neither delays nor repeats a refresh.
+   * A test's one clock serves for both.
+   */
+  readonly steady?: Clock;
   /** `sinks.DEBOUNCE_SECONDS`, unless a test shortens it. */
   readonly debounceSeconds?: number;
   /** `sinks.FINAL_RETRY_SECONDS`, unless a test shortens it. */
@@ -111,7 +117,7 @@ export class SlackThread implements ThreadChat {
     this.line = new ThreadStatus(this.slack, {
       channel: channelId,
       threadTs,
-      clock: this.clock,
+      clock: options.steady ?? options.clock ?? monotonicClock,
     });
   }
 

@@ -383,6 +383,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
       identity,
       limiter: new UpdateLimiter({ clock: steady }),
       clock: wall,
+      steady,
     });
     const sessions = new SessionManager({
       chat,
