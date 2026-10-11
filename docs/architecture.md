@@ -745,7 +745,7 @@ client's `apiCall`:
 | Failure | What is sent again |
 |---|---|
 | Slack rate limited the call (HTTP 429) | every method, after the `Retry-After` Slack gave, up to `clients.RATE_LIMIT_RETRIES` (3) times: a rate limited call never ran. A 429 with no valid `Retry-After` is not sent again |
-| the connection failed before an answer (a reset, a refused or unreachable host), or Slack answered with HTTP 500 or 503 (`clients.SERVER_ERROR_STATUSES`) | once, after a backoff pause, while no retry of the call was made yet. `clients.sharedClient` does so for every method. `clients.repliesClient`, the one replies are written with, does so for every method but the four of `clients.CREATING_METHODS`, `chat.postMessage` and the three stream calls: they are not idempotent, and a reset or a server error can come after Slack applied the call |
+| the connection failed before an answer (a reset, a refused or unreachable host), or Slack answered with HTTP 500 or 503 (`clients.SERVER_ERROR_STATUSES`) | once, after a backoff pause, while no retry of the call was made yet. `clients.sharedClient` does so for every method. `clients.repliesClient`, the one replies are written with, does so for every method but the four of `clients.CREATING_METHODS`, `chat.postMessage` and the three stream calls: they are not idempotent, and a reset can come after Slack applied the call; whether a 500 or a 503 can was not measured, and they are left out for those too |
 | anything else | never: an error Slack answered with, any other HTTP status, and the client's own timeout (`clients.REQUEST_TIMEOUT_MS`, 30 seconds), since a timed out call may have run |
 
 For the four creating calls the sink reads the thread back and adopts what landed

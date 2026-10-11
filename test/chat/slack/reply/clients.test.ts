@@ -311,6 +311,21 @@ test("a server error and a connection failure spend the one retry between them",
     WebAPIHTTPError,
   );
   assert.equal(afterReset.length, 2);
+  // A rate limit retry is still allowed after it, and none of its own after a rate limit.
+  const thenRateLimited: string[] = [];
+  const clock = new Pauses();
+  const result = await shared(network(thenRateLimited, "503", "429", "ok"), clock).apiCall(
+    "chat.update",
+    {},
+  );
+  assert.equal(result.ok, true);
+  assert.deepEqual(clock.slept, [0.5, 30]);
+  const afterRateLimit: string[] = [];
+  await assert.rejects(
+    shared(network(afterRateLimit, "429", "503", "ok")).apiCall("chat.update", {}),
+    WebAPIHTTPError,
+  );
+  assert.equal(afterRateLimit.length, 2);
 });
 
 test("a call Slack refused, a timeout and any other HTTP error are never sent again", async () => {

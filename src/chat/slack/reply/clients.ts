@@ -13,9 +13,11 @@
  *   instead, and adopts what landed.
  * - a call Slack answered with HTTP 500 or 503 (`SERVER_ERROR_STATUSES`) is sent again as one
  *   that failed on the connection is: once, after the same pause, by the same client for the
- *   same methods, since such an answer says no more than a reset about whether the call ran.
- *   The statuses and the one retry are those of slack-sdk's `ServerErrorRetryHandler`
- *   (`slack_sdk/http_retry/builtin_handlers.py`, read 2026-10-11).
+ *   same methods. The statuses and the one retry are those of slack-sdk's
+ *   `ServerErrorRetryHandler` (`slack_sdk/http_retry/builtin_handlers.py`, read 2026-10-11).
+ *   The sink reads an HTTP status as a call that did not run (`unknownOutcome` in `errors.ts`),
+ *   which would let the four creating calls be sent again too; they are left out, since whether
+ *   Slack can answer 500 or 503 after it applied a call was not measured.
  * - nothing else is sent again: Slack answering with an error (`WebAPIPlatformError`), any other
  *   HTTP status, a timeout (a timed out call may have run).
  *
@@ -45,7 +47,10 @@ import {
 import { type Clock, systemClock } from "../../../clock.ts";
 import { silentLogger } from "../quiet-logger.ts";
 
-/** The four calls that create or grow a message: never sent again after a failed connection. */
+/**
+ * The four calls that create or grow a message: the replies client never sends one again after a
+ * failed connection or a server error.
+ */
 export const CREATING_METHODS = [
   "chat.startStream",
   "chat.appendStream",
@@ -64,7 +69,8 @@ export const SENT_ONCE = {
   rejectRateLimitedCalls: true,
 } as const satisfies WebClientOptions;
 
-// `AsyncRateLimitErrorRetryHandler(max_retry_count=3)` and slack-sdk's connection handler default.
+// `AsyncRateLimitErrorRetryHandler(max_retry_count=3)`, and the default of slack-sdk's connection
+// handler and of its server error one: the one retry of a call covers both kinds of failure.
 export const RATE_LIMIT_RETRIES = 3;
 export const CONNECTION_RETRIES = 1;
 /** The HTTP statuses a call is sent again after, as after a failed connection. */
