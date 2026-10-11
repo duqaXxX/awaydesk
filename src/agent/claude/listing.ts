@@ -74,12 +74,21 @@ export async function projectKey(directory: string): Promise<string> {
   return `${sanitized.slice(0, LONG_PROJECT_KEY)}-${Math.abs(stringHash(path)).toString(36)}`;
 }
 
-async function isDirectory(path: string): Promise<boolean> {
+/**
+ * Whether `path` is a directory; null when its `stat` fails for a reason other than the path not
+ * being there (`ENOENT`, `ENOTDIR`), such as `EACCES`: the folder may well be there.
+ */
+async function directoryState(path: string): Promise<boolean | null> {
   try {
     return (await stat(path)).isDirectory();
-  } catch {
-    return false;
+  } catch (error) {
+    const code = isRecord(error) ? error.code : undefined;
+    return code === "ENOENT" || code === "ENOTDIR" ? false : null;
   }
+}
+
+async function isDirectory(path: string): Promise<boolean> {
+  return (await directoryState(path)) === true;
 }
 
 /**
@@ -215,8 +224,8 @@ function newestFirst(sessions: readonly ListedSession[]): ListedSession[] {
  * must never be pruned just because it has not built up a title yet. Null is "cannot tell", and
  * the pruning then keeps the folder's threads: past `LONG_PROJECT_KEY` characters the CLI names
  * the folder with a hash we may not reproduce, so a missing folder there proves nothing; and a
- * folder that is there and cannot be read cannot tell either (a listing reads an unreadable
- * folder as an empty one, and every session would look gone).
+ * folder that is there and cannot be read, or whose presence cannot be checked, cannot tell either
+ * (a listing reads an unreadable folder as an empty one, and every session would look gone).
  */
 export async function aliveSessions(
   directory: string,
@@ -225,7 +234,9 @@ export async function aliveSessions(
   const alive = new Set((await directorySessions(directory)).map((session) => session.id));
   const key = await projectKey(directory);
   const folder = join(projects, key);
-  if (!(await isDirectory(folder))) return key.length > LONG_PROJECT_KEY ? null : alive;
+  const there = await directoryState(folder);
+  if (there === null) return null;
+  if (!there) return key.length > LONG_PROJECT_KEY ? null : alive;
   let names: string[];
   try {
     names = await readdir(folder);

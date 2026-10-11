@@ -501,7 +501,9 @@ removes only what an answer makes certain:
   lists, with every transcript file in the folder's transcript directory) and a no-session thread
   that the chat (`ChatProvider.openedAt`) says was opened more than a day ago; one it cannot
   date is kept. A folder the back end cannot tell about keeps its
-  threads: one whose transcript directory is there and cannot be read, and one whose name passes
+  threads: one whose transcript directory is there and cannot be read, one whose directory cannot be
+  checked for (a `stat` that fails with anything but `ENOENT` or `ENOTDIR`, such as `EACCES` on the
+  projects directory above it), and one whose name passes
   `listing.LONG_PROJECT_KEY` characters and has no directory under the name the daemon derives (see
   "Slack handlers" for how that name is derived).
 
