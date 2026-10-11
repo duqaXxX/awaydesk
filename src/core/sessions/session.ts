@@ -53,7 +53,6 @@ import type {
   Question,
   QuestionAnswer,
   QuestionRequest,
-  Repository,
   SessionEvent,
 } from "../../agent/seam.ts";
 import { ResumeRefused } from "../../agent/seam.ts";
@@ -98,7 +97,7 @@ import {
   UNKNOWN_KIND,
 } from "./constants.ts";
 import type { SessionDeps } from "./deps.ts";
-import { checkDirectory, terminalLine, trustedBy } from "./directory.ts";
+import { checkDirectory, repositoryBy, terminalLine, trustedBy } from "./directory.ts";
 import { BypassUnavailable, DirectoryUnavailable, SessionClosed, SessionGone } from "./errors.ts";
 import { Cancelled, cancellable, Event, Mutex, Queue, Task } from "./tasks.ts";
 import { type ActiveTurn, notSent, Turn, takenNote } from "./turn.ts";
@@ -2436,7 +2435,9 @@ export class ThreadSession {
       if (result.sessionId) {
         this.deps.state.setSession(this.channelId, this.threadId, result.sessionId);
       }
-      const prompt = active.turn?.prompt;
+      // The prompt this result answers, as `settle` reads it: none in a turn the agent started,
+      // and the first one waiting when the turn was guessed to be a report.
+      const prompt = injected ? undefined : (active.turn ?? this.sent[0])?.prompt;
       const [changed, effort] =
         prompt !== undefined && setsEffort(prompt)
           ? effortChange(result.finalText ?? "")
@@ -2626,12 +2627,6 @@ export class ThreadSession {
     return says ? data : null;
   }
 
-  /** The footer's git lookup. */
-  private async repository(folder: string): Promise<Repository | null> {
-    if (!this.deps.agent.capabilities.folderTrust) return null;
-    return this.deps.agent.trustedRepository(folder);
-  }
-
   /**
    * The footer's values from what the session knows now and `tokens`: the one source for both
    * the footer and `!status`, so the two never disagree.
@@ -2649,7 +2644,7 @@ export class ThreadSession {
       }
     }
     const here = this.workingDirectory || this.directory;
-    const [branch, changes] = await gitState(here, (folder) => this.repository(folder));
+    const [branch, changes] = await gitState(here, repositoryBy(this.deps.agent));
     const usage = this.usage?.current ?? null;
     return {
       bypass: this.bypass,

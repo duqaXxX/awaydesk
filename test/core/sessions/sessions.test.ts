@@ -101,6 +101,7 @@ import {
   systemRecord,
   taskCards,
   toolUseOf,
+  withResult,
   withTaskStatus,
 } from "./helpers.ts";
 
@@ -1815,13 +1816,6 @@ function statuses(h: Harness): string[] {
     }
   }
   return lasts;
-}
-
-/** A recorded turn that ends with another result text, as a command's output would. */
-function withResult(turn: readonly Item[], result: string): Item[] {
-  const last = recordOf(turn.at(-1));
-  assert.ok(last !== null && isResult(turn.at(-1)));
-  return [...turn.slice(0, -1), { record: { ...last, result } }];
 }
 
 test("the footer follows an effort set from slack", async (t) => {

@@ -931,7 +931,7 @@ a repository you trusted in Claude Code. A trusted folder does not stand for a r
 it. A bound folder that is not a repository itself and holds one a level or two below it shows
 them for that repository once you open `claude` in it and accept the trust dialog. Without that
 trust the footer leaves the branch and the lines out, `!open` lists no changed files there, and
-its search still reads the folder from disk.
+its search reads that repository from disk, the files its `.gitignore` names included.
 
 ### Upgrading from one session per channel
 
