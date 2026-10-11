@@ -1,0 +1,633 @@
+{
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "final": {
+  "message_blocks": [
+   [
+    {
+     "type": "divider"
+    },
+    {
+     "elements": [
+      {
+       "text": "footer",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    }
+   ]
+  ],
+  "message_cards": [
+   [
+    {
+     "details": "Bash: ls /home/dev/project/.claude/skills/list-files\nRead: /home/dev/project/.claude/skills/list-files/notes.txt",
+     "id": "fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
+     "status": "complete",
+     "title": "Skill: list-files · 2 calls"
+    }
+   ]
+  ],
+  "message_texts": [
+   "I've run the list-files skill. The result shows that the working directory `/home/dev/project/.claude/skills/list-files` contains only a `SKILL.md` file. There is no `notes.txt` file in that location.\n\nIf you'd like to list the files in the primary working directory or any other specific directory, please let me know!"
+  ],
+  "pushes": 1
+ },
+ "recording": "skill-fork",
+ "slack_calls": [
+  {
+   "after_sink_call": 0,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
+      "status": "in_progress",
+      "title": "Skill: list-files",
+      "type": "task_update"
+     }
+    ],
+    "recipient_team_id": "T000TEAM",
+    "recipient_user_id": "U000ALICE",
+    "task_display_mode": "timeline",
+    "thread_ts": "1780000000.000001"
+   },
+   "method": "chat.startStream"
+  },
+  {
+   "after_sink_call": 1,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "Bash: ls /home/dev/project/.claude/skills/list-files",
+      "id": "fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
+      "status": "in_progress",
+      "title": "Skill: list-files · 1 call",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 2,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "details": "\nRead: /home/dev/project/.claude/skills/list-files/notes.txt",
+      "id": "fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
+      "status": "in_progress",
+      "title": "Skill: list-files · 2 calls",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 3,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
+      "status": "complete",
+      "title": "Skill: list-files · 2 calls",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 5,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "I've run ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 6,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "the list-",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 7,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "files ski",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 8,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ll. The r",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 9,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "esult sho",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 10,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ws that t",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 11,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "he workin",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 12,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "g directo",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 13,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ry `/home",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 14,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "/dev/proj",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 15,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ect/.clau",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 16,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "de/skills",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 17,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "/list-fil",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 18,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "es` conta",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 19,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ins only ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 20,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "a `SKILL.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 21,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "md` file.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 22,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " There is",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 23,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " no `note",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 24,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "s.txt` fi",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 25,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "le in tha",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 26,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "t locatio",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 27,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "n.\n\nIf yo",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 28,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "u'd like ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 29,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "to list t",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 30,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "he files ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 31,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "in the pr",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 32,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "imary wor",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 33,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "king dire",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 34,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ctory or ",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 35,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "any other",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 36,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " specific",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 37,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " director",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 38,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "y, please",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 39,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " let me k",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 40,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "now!",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 42,
+   "args": {
+    "blocks": [
+     {
+      "type": "divider"
+     },
+     {
+      "elements": [
+       {
+        "text": "footer",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     }
+    ],
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  }
+ ]
+}

@@ -4,10 +4,10 @@
 #
 # The issue is the state: there is no counter to keep, so a missed run costs nothing and a run that
 # happens twice writes the same thing. The body is rewritten every time, which notifies nobody; a
-# comment comes only when sdk_release_report.py writes one.
+# comment comes only when sdk-release-report.mjs writes one.
 #
-#   GH_TOKEN=... REPO=owner/name PINNED=0.2.158 LATEST=0.2.160 LATEST_CLI=2.1.285 \
-#   FIXTURE_CLI=2.1.280 OUTCOME=pass bash .github/scripts/watch-sdk-release.sh
+#   GH_TOKEN=... REPO=owner/name PINNED=0.3.296 LATEST=0.3.298 LATEST_CLI=2.1.298 \
+#   FIXTURE_CLI=2.1.296 OUTCOME=pass bash .github/scripts/watch-sdk-release.sh
 #
 # DRY_RUN=1 reads the repository and prints what it would write, touching nothing.
 set -euo pipefail
@@ -22,13 +22,13 @@ number="$(gh issue list --repo "$REPO" --label "$LABEL" --state open --limit 1 \
 last_commented=""
 if [ -n "$number" ]; then
   last_commented="$(gh issue view "$number" --repo "$REPO" --json comments \
-    --jq '[.comments[].body | capture("claude-agent-sdk (?<v>[0-9]+(\\.[0-9]+)+)").v] | last // empty')"
+    --jq '[.comments[].body | capture("@anthropic-ai/claude-agent-sdk (?<v>[0-9]+(\\.[0-9]+)+)").v] | last // empty')"
 fi
 
-# The machine's own python3, never `uv run`: this script holds a token that writes issues, and the
-# project's environment is where the workflow installs a release nobody has reviewed. The report
-# imports the standard library only, so it needs nothing from that environment.
-report="$(LAST_COMMENTED="$last_commented" python3 .github/scripts/sdk_release_report.py)"
+# The machine's own node, never `npm run` or `npx`: this script holds a token that writes issues,
+# and the project's node_modules is where the workflow installs a release nobody has reviewed. The
+# report imports Node's standard library only, so it needs nothing from that directory.
+report="$(LAST_COMMENTED="$last_commented" node .github/scripts/sdk-release-report.mjs)"
 if [ "$report" = "null" ]; then
   echo "the latest release is the pinned one; nothing to report"
   exit 0

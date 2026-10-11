@@ -1,6 +1,7 @@
-# awaydesk pins claude-agent-sdk and runs the Claude Code CLI it bundles, whose message
-# shapes the tests' fixtures record. This asks, every day, whether the suite still passes on the
-# SDK release PyPI serves now, and keeps one issue with the answer and the checks left to do by hand.
+# awaydesk pins @anthropic-ai/claude-agent-sdk and runs the Claude Code CLI it bundles, whose
+# message shapes the tests' fixtures record. This asks, every day, whether the suite still passes on
+# the SDK release npm serves now, and keeps one issue with the answer and the checks left to do by
+# hand.
 # Dependabot's weekly pull request still moves the pin; this is the checklist beside it.
 #
 # Two jobs, because the release under test is code nobody here has reviewed: `test` installs and
@@ -35,16 +36,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      # No npm cache here: this job installs a release nobody has reviewed, and a cache it saved
+      # would be one the CI workflow restores.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
 
-      # PyPI's JSON API names the latest release in info.version (docs.pypi.org/api/json).
+      # `npm view <package> version` prints the release the registry tags `latest`
+      # (docs.npmjs.com/cli/commands/npm-view).
       - name: Read the pinned and the latest versions
         id: versions
         run: |
           set -euo pipefail
-          latest="$(curl -fsSL https://pypi.org/pypi/claude-agent-sdk/json | jq -r .info.version)"
-          pinned="$(grep -oE 'claude-agent-sdk==[0-9.]+' pyproject.toml | cut -d= -f3)"
-          fixture_cli="$(grep -rhoE '"claude_code_version": "[0-9.]+"' tests/fixtures/sdk \
+          latest="$(npm view @anthropic-ai/claude-agent-sdk version)"
+          pinned="$(jq -r '.dependencies["@anthropic-ai/claude-agent-sdk"]' package.json)"
+          fixture_cli="$(grep -rhoE '"claude_code_version": "[0-9.]+"' test/fixtures/sdk \
             | grep -oE '[0-9]+(\.[0-9]+)+' | sort -u | tail -1)"
           for v in "$latest" "$pinned" "$fixture_cli"; do
             [[ "$v" =~ ^[0-9]+(\.[0-9]+)+$ ]] || { echo "not a version: '$v'" >&2; exit 1; }
@@ -58,14 +64,15 @@ jobs:
           LATEST: ${{ steps.versions.outputs.latest }}
         run: |
           set -uo pipefail
-          sed -i -E "s/claude-agent-sdk==[0-9.]+/claude-agent-sdk==$LATEST/" pyproject.toml
-          if ! uv lock --quiet || ! uv sync --quiet; then
+          if ! npm ci --silent ||
+            ! npm install --silent --save-exact "@anthropic-ai/claude-agent-sdk@$LATEST"; then
             echo "outcome=install failed" >> "$GITHUB_OUTPUT"; echo "cli=0.0.0" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          cli="$(uv run python -c 'from claude_agent_sdk._cli_version import __cli_version__; print(__cli_version__)')"
+          # The SDK's package.json names the Claude Code CLI it bundles.
+          cli="$(jq -r .claudeCodeVersion node_modules/@anthropic-ai/claude-agent-sdk/package.json)"
           echo "cli=$cli" >> "$GITHUB_OUTPUT"
-          if uv run pytest -q; then
+          if npm test; then
             echo "outcome=pass" >> "$GITHUB_OUTPUT"
           else
             echo "outcome=fail" >> "$GITHUB_OUTPUT"
@@ -78,10 +85,10 @@ jobs:
       contents: read
       issues: write
     steps:
-      # A clean checkout, and neither uv nor the project's environment: with the token in reach,
+      # A clean checkout, and neither npm nor the project's node_modules: with the token in reach,
       # nothing runs that the `test` job could have written. That job's outputs are text it could
-      # have written, so they arrive through the environment and sdk_release_report.py refuses any
-      # that is not a version or a known outcome.
+      # have written, so they arrive through the environment and sdk-release-report.mjs refuses
+      # any that is not a version or a known outcome.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -103,5 +110,5 @@ jobs:
           LATEST: ${{ needs.test.outputs.latest }}
           OUTCOME: ${{ needs.test.outputs.outcome }}
         run: |
-          echo "claude-agent-sdk $LATEST: $OUTCOME" >&2
+          echo "@anthropic-ai/claude-agent-sdk $LATEST: $OUTCOME" >&2
           exit 1

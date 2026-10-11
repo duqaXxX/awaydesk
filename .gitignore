@@ -1,13 +1,5 @@
-# Python and tool output. The tools' caches (.pytest_cache, .ruff_cache, .mypy_cache) also carry
-# an ignore file of their own.
-__pycache__/
-*.py[cod]
-/.venv/
+# What `npm run build` writes.
 /dist/
-/build/
-*.egg-info/
-.coverage
-htmlcov/
 
 # Secrets. awaydesk reads its configuration from ~/.config/awaydesk/, never from
 # the repository; these lines only catch a copy made here by mistake.
@@ -18,3 +10,8 @@ htmlcov/
 .DS_Store
 /.claude/settings.local.json
 /.superpowers/
+
+/node_modules/
+
+# The tarball `npm pack` builds for the install.
+/awaydesk-*.tgz
