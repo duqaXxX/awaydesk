@@ -51,6 +51,7 @@ import {
   StopSignals,
 } from "../src/main.ts";
 import {
+  AGENT,
   AsyncEvent,
   BOT,
   CHANNEL,
@@ -525,6 +526,7 @@ function chatOver(slack: FakeSlack): SlackChat {
     slack,
     replies: slack,
     identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
+    agent: () => AGENT,
     limiter: { acquire: async () => {}, refund: async () => {} },
   });
 }
