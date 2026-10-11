@@ -311,6 +311,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The architecture reference is two pages, cut along the module boundary. `docs/architecture.md`
+  keeps the overview, the modules, the core's parts and the measured platform behaviour;
+  `docs/slack-provider.md` holds the four sections that describe the Slack provider alone
+  (writing to Slack, opening a file, the session index, the Slack handlers), moved as they were.
+  The references between the two are links. The Claude back end has no page of its own: its
+  facts stay in "Sessions" and "Rendering" (#267).
 - `ChatCapabilities` loses `homeIndex` and `ownerOnlyNotices`, which no code of the core read. A
   chat with no index of the sessions leaves `ChatProvider.index` out; whether a chat can show a
   line to the owner alone is stated by the conformance rig (`ChatRig.ownerOnlyNotices` in
