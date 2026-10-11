@@ -317,6 +317,22 @@ test("a network failure keeps its detail", async () => {
   });
 });
 
+test("the detail of a failure is cut in characters, never through a surrogate pair", async () => {
+  // "TypeError: " is 11 units, so the emoji's two units sit at 199 and 200: a cut at 200 UTF-16
+  // units keeps only its high surrogate.
+  const refused: FetchFn = async () => {
+    throw new TypeError(`${"x".repeat(188)}\u{1F600}${"y".repeat(50)}`);
+  };
+  await assert.rejects(
+    download(URL_OF_FILE, TOKEN, "text/plain", 100, { fetch: refused }),
+    (error: Error) => {
+      assert.ok(error.message.isWellFormed(), "a lone surrogate in the detail");
+      assert.equal([...error.message].length, 200);
+      return true;
+    },
+  );
+});
+
 test("a folder that is not private is logged at start", WINDOWS, async (t) => {
   const folder = join(folderIn(t), "uploads");
   mkdirSync(folder, { mode: 0o777 });
