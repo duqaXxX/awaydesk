@@ -292,38 +292,32 @@ function settled(repo: string): void {
 
 // Only a touched file makes git want to refresh the index: a clean, an edited or an untracked
 // one cannot tell a command that writes it from one that does not.
-const CHANGES: Record<string, (repo: string) => void> = {
-  touched,
-};
-
-for (const [name, change] of Object.entries(CHANGES)) {
-  test(`no command of open writes the index or leaves a lock [${name}]`, GIT_LAYOUT, async () => {
-    const folder = app();
-    write(folder, "sub/more.py");
-    commitAll(folder);
-    const start = git(folder, "rev-parse", "HEAD");
-    write(folder, "sub/after.py");
-    commitAll(folder);
-    settled(folder);
-    change(folder);
-    const before = indexState(folder);
-    const found = await repository(folder);
-    // Each command ran and answered, so that an unchanged index is not a command that failed:
-    // a thread that began before this repository was made runs every command of `startCommit`
-    // (the time, the entries up to it, all the entries, the first one's old value, the empty tree).
-    assert.equal(await startCommit(found, started(1)), emptyTree(folder));
-    assert.equal(
-      await startCommit(found, started(Math.trunc(Date.now() / 1000) + 1)),
-      git(folder, "rev-parse", "HEAD"),
-    );
-    await projectFiles(found, folder);
-    await projectFiles(found, join(folder, "sub"));
-    await changedSince(found, folder, start);
-    await changedSince(found, join(folder, "sub"), start);
-    assert.deepEqual(indexState(folder), before);
-    assert.ok(!existsSync(join(folder, ".git", "index.lock")));
-  });
-}
+test("no command of open writes the index or leaves a lock", GIT_LAYOUT, async () => {
+  const folder = app();
+  write(folder, "sub/more.py");
+  commitAll(folder);
+  const start = git(folder, "rev-parse", "HEAD");
+  write(folder, "sub/after.py");
+  commitAll(folder);
+  settled(folder);
+  touched(folder);
+  const before = indexState(folder);
+  const found = await repository(folder);
+  // Each command ran and answered, so that an unchanged index is not a command that failed:
+  // a thread that began before this repository was made runs every command of `startCommit`
+  // (the time, the entries up to it, all the entries, the first one's old value, the empty tree).
+  assert.equal(await startCommit(found, started(1)), emptyTree(folder));
+  assert.equal(
+    await startCommit(found, started(Math.trunc(Date.now() / 1000) + 1)),
+    git(folder, "rev-parse", "HEAD"),
+  );
+  await projectFiles(found, folder);
+  await projectFiles(found, join(folder, "sub"));
+  await changedSince(found, folder, start);
+  await changedSince(found, join(folder, "sub"), start);
+  assert.deepEqual(indexState(folder), before);
+  assert.ok(!existsSync(join(folder, ".git", "index.lock")));
+});
 
 test("a file that was only touched is not reported as changed", GIT_LAYOUT, async () => {
   const folder = app();

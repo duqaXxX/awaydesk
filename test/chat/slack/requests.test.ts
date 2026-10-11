@@ -307,23 +307,23 @@ test("a header of blanks alone never leaves the choice an empty label", () => {
   assert.equal(choices[0]?.label.text, "Answer");
 });
 
-for (const [shown, blank] of [["[ \\n\\t]", " \n\t"]] as const) {
-  test(`a preview or a description of blanks alone counts as none ${shown}`, () => {
-    const asked = question({
-      question: "Colour?",
-      options: [{ label: "red", description: blank, preview: blank }, { label: "blue" }],
-    });
-    const view = questionView(draftOf(), [asked]);
-    // Nothing more to show than the choices hold: the form it always had, and no empty text.
-    assert.equal(view.blocks.length, 2);
-    const [choice] = view.blocks;
-    assert.equal(choice.label.text, "Colour?");
-    assert.deepEqual(choice.element.options[0], {
-      text: { type: "plain_text", text: "red" },
-      value: "0",
-    });
+const BLANK = " \n\t";
+
+test("a preview or a description of blanks alone counts as none", () => {
+  const asked = question({
+    question: "Colour?",
+    options: [{ label: "red", description: BLANK, preview: BLANK }, { label: "blue" }],
   });
-}
+  const view = questionView(draftOf(), [asked]);
+  // Nothing more to show than the choices hold: the form it always had, and no empty text.
+  assert.equal(view.blocks.length, 2);
+  const [choice] = view.blocks;
+  assert.equal(choice.label.text, "Colour?");
+  assert.deepEqual(choice.element.options[0], {
+    text: { type: "plain_text", text: "red" },
+    value: "0",
+  });
+});
 
 test("a preview keeps the spaces that draw it", () => {
   const asked = question({

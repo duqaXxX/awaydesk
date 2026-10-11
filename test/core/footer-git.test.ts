@@ -315,19 +315,17 @@ beforeEach(() => {
   mkdirSync(join(tmp, "work"));
 });
 
-for (const depth of [1]) {
-  test(`the footer shows a repository inside the folder only with its own trust [${depth}]`, async () => {
-    const { folder, home } = work();
-    const lookup = lookupFor(home);
-    const repo = committed(join(folder, ...["a", "b", "c"].slice(0, depth)));
-    mkdirSync(join(repo, "src"));
-    assert.deepEqual(await gitState(repo, lookup), [null, null]);
-    trust(home, [folder, repo]);
-    assert.deepEqual(await gitState(repo, lookup), ["main", [0, 0]]);
-    writeFileSync(join(repo, "README"), "one\nmore\n");
-    assert.deepEqual(await gitState(join(repo, "src"), lookup), ["main", [1, 0]]);
-  });
-}
+test("the footer shows a repository inside the folder only with its own trust", async () => {
+  const { folder, home } = work();
+  const lookup = lookupFor(home);
+  const repo = committed(join(folder, "a"));
+  mkdirSync(join(repo, "src"));
+  assert.deepEqual(await gitState(repo, lookup), [null, null]);
+  trust(home, [folder, repo]);
+  assert.deepEqual(await gitState(repo, lookup), ["main", [0, 0]]);
+  writeFileSync(join(repo, "README"), "one\nmore\n");
+  assert.deepEqual(await gitState(join(repo, "src"), lookup), ["main", [1, 0]]);
+});
 
 test("the footer runs no filter of a repository inside the folder it has no trust for", async () => {
   // A trusted folder does not stand for a repository inside it: one that was cloned or unpacked

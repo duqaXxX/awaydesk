@@ -343,13 +343,11 @@ for (const name of ["TodoWrite", "mcp__srv__do_thing"]) {
 }
 
 // One recording is the runtime check: `TaskStatus` is a closed union, which `tsc` holds for the rest.
-for (const name of ["background"]) {
-  test(`statuses are only the ones slack accepts [${name}]`, async () => {
-    const [sink] = await render(recordedEvents(name));
-    const closing = sink.finished ?? [];
-    for (const update of [...sink.tasks, ...closing]) assert.ok(ALLOWED.has(update.status));
-  });
-}
+test("statuses are only the ones slack accepts", async () => {
+  const [sink] = await render(recordedEvents("background"));
+  const closing = sink.finished ?? [];
+  for (const update of [...sink.tasks, ...closing]) assert.ok(ALLOWED.has(update.status));
+});
 
 test("the renderer never branches on a tool name", () => {
   const source = readFileSync(

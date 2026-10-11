@@ -809,32 +809,34 @@ for (const user of [OWNER, STRANGER]) {
   });
 }
 
-for (const actionId of [CHANNEL_ACTION]) {
-  test(`a home filter is read from the pages state and published [${actionId}]`, async (t) => {
-    const world = worldOf(t);
-    // Whichever of the four controls was used, the payload carries the state of them all.
-    const values = {
-      [FILTERS_BLOCK]: {
-        [CHANNEL_ACTION]: chosenOption(CHANNEL),
-        [STATUS_ACTION]: chosenOption("raised_hand"),
-      },
-      [SEARCH_BLOCK]: { [SEARCH_ACTION]: { type: "plain_text_input", value: "Footer" } },
-    };
-    const action = { type: "static_select", action_id: actionId, ...chosenOption("raised_hand") };
-    const response = await world.dispatch(homeAction(action, OWNER, values));
-    assert.equal(response.status, 200);
-    const chosen = homeFilter({ channel: CHANNEL, status: "raised_hand", search: "Footer" });
-    await world.until(
-      () =>
-        isDeepStrictEqual(world.home.chosen, chosen) &&
-        world.slack.callsTo("views.publish").length > 0,
-    );
-    assert.deepEqual(
-      new Set(world.slack.callsTo("views.publish").map((call) => call.user_id)),
-      new Set([OWNER]),
-    );
-  });
-}
+test("a home filter is read from the pages state and published", async (t) => {
+  const world = worldOf(t);
+  // Whichever of the four controls was used, the payload carries the state of them all.
+  const values = {
+    [FILTERS_BLOCK]: {
+      [CHANNEL_ACTION]: chosenOption(CHANNEL),
+      [STATUS_ACTION]: chosenOption("raised_hand"),
+    },
+    [SEARCH_BLOCK]: { [SEARCH_ACTION]: { type: "plain_text_input", value: "Footer" } },
+  };
+  const action = {
+    type: "static_select",
+    action_id: CHANNEL_ACTION,
+    ...chosenOption("raised_hand"),
+  };
+  const response = await world.dispatch(homeAction(action, OWNER, values));
+  assert.equal(response.status, 200);
+  const chosen = homeFilter({ channel: CHANNEL, status: "raised_hand", search: "Footer" });
+  await world.until(
+    () =>
+      isDeepStrictEqual(world.home.chosen, chosen) &&
+      world.slack.callsTo("views.publish").length > 0,
+  );
+  assert.deepEqual(
+    new Set(world.slack.callsTo("views.publish").map((call) => call.user_id)),
+    new Set([OWNER]),
+  );
+});
 
 test("show all chooses that channel", async (t) => {
   const world = worldOf(t);

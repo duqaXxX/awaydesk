@@ -2281,6 +2281,20 @@ test("status gives the command that forks the session in the terminal", async (t
   assert.ok(lines[3]?.startsWith("Mode: "));
 });
 
+test("status escapes a terminal command that holds a backtick for a reference", async (t) => {
+  // The chat marks a notice and a reference up differently: as a notice the line would read
+  // `&amp;&amp;` and keep the backtick that ends a code span.
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
+  const folder = join(h.tmpPath, "my`proj");
+  mkdirSync(folder);
+  h.state.bind(CHANNEL, folder);
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  const line = (await session.status()).split("\n").find((l) => l.startsWith("Terminal: "));
+  assert.ok(line?.includes("my\\`proj"), line);
+  assert.ok(line?.includes("\\&\\& claude --resume"), line);
+});
+
 // The shell line of the Claude back end (`AgentWords.terminal`), written out.
 const TERMINAL = "cd {directory} && claude --resume {session} --fork-session";
 

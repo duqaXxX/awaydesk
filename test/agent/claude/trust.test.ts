@@ -142,6 +142,20 @@ test("the answer needs no git", async () => {
   }
 });
 
+test("the trust record is read again only when it changes", async () => {
+  const folder = join(tmp, "notes");
+  mkdirSync(folder);
+  trust(home, [folder]);
+  const parses = countRecordParses();
+  assert.ok((await workspaceTrusted(folder, home)) && (await workspaceTrusted(folder, home)));
+  assert.equal(parses(), 1); // a `!bind` list checks many folders against one record
+  // The one case that goes from trusted to revoked: a verdict kept past a change of the record
+  // would start a session in a folder the owner no longer trusts.
+  trust(home, [folder], false);
+  utimesSync(join(home, ".claude.json"), 1, 1); // a different mtime, as a real write gives
+  assert.ok(!(await workspaceTrusted(folder, home)));
+});
+
 test("a batch of checks parses the record once", async () => {
   const folders = Array.from({ length: 8 }, (_, i) => join(tmp, `f${i}`));
   for (const folder of folders) {

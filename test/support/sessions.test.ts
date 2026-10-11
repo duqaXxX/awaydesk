@@ -13,7 +13,6 @@ import type {
 } from "../../src/agent/seam.ts";
 import { type JsonObject, sdkJson } from "./fixtures.ts";
 import {
-  type Batch,
   canUseToolCall,
   END_OF_STREAM,
   FakeAgentBackend,
@@ -79,12 +78,6 @@ async function read(session: FakeAgentSession, turns: number): Promise<SessionEv
     if (next.value.type === "process_lost") break;
   }
   return events;
-}
-
-async function _played(batch: Batch): Promise<SessionEvent[]> {
-  const session = await started({});
-  session.inject([...batch, END_OF_STREAM]);
-  return read(session, Number.POSITIVE_INFINITY);
 }
 
 // What the session tests rely on beyond the recordings: the scripted steps that are no record.
