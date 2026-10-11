@@ -317,6 +317,8 @@ test("a network failure keeps its detail", async () => {
   });
 });
 
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
 test("the detail of a failure is cut in characters, never through a surrogate pair", async () => {
   // "TypeError: " is 11 units, so the emoji's two units sit at 199 and 200: a cut at 200 UTF-16
   // units keeps only its high surrogate.
@@ -326,7 +328,7 @@ test("the detail of a failure is cut in characters, never through a surrogate pa
   await assert.rejects(
     download(URL_OF_FILE, TOKEN, "text/plain", 100, { fetch: refused }),
     (error: Error) => {
-      assert.ok(error.message.isWellFormed(), "a lone surrogate in the detail");
+      assert.doesNotMatch(error.message, LONE_SURROGATE, "a lone surrogate in the detail");
       assert.equal([...error.message].length, 200);
       return true;
     },
