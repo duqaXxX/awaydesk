@@ -259,6 +259,46 @@ export class FakeMessage {
   }
 }
 
+// A line of words with no mark any markdown reads (emphasis, code, heading, link, quote, table,
+// escape, list bullet), then nothing or one blank line.
+const PLAIN_RUN =
+  /^(?![-+]\s|\d+[.)]\s)[^\s*_`~#[\]<>|\\](?:[^\n*_`~#[\]<>|\\]*[^\s*_`~#[\]<>|\\])?(\n\n)?$/;
+
+/**
+ * The blocks Slack returns for a stopped stream whose chunks are all `markdown_text` and make one
+ * run of plain words, or null for any other stream. Follows `api-conversations-replies-stream`
+ * (recorded 2026-09-29): a run of words is one `rich_text` block, whose `rich_text_section` holds
+ * the words as a `text` element, and the blank line that ended the paragraph, when there was one,
+ * as a `text` element of its own ("\n\n"). The recording does not hold the chunks that made it:
+ * the pairing is read from its `text` field, which keeps the blank lines of what was streamed.
+ * Not modelled, because no recording shows what Slack returns: marks (emphasis, code, headings,
+ * links, lists, tables), several lines or paragraphs in one stream, `task_update` and `blocks`
+ * chunks, a stream still open, and a stream stopped with blocks of its own. The recording's
+ * `block_id` is random; this one is a fixed id.
+ */
+function plainRun(chunks: JsonObject[]): JsonObject[] | null {
+  if (chunks.length === 0 || chunks.some((chunk) => chunk.type !== "markdown_text")) return null;
+  const text = chunks.map((chunk) => str(need(chunk, "text"))).join("");
+  const match = PLAIN_RUN.exec(text);
+  if (match === null) return null;
+  const words = match[1] === undefined ? text : text.slice(0, -2);
+  return [
+    {
+      type: "rich_text",
+      block_id: "fake-run",
+      elements: [
+        {
+          type: "rich_text_section",
+          elements: [
+            { type: "text", text: words },
+            ...(match[1] === undefined ? [] : [{ type: "text", text: "\n\n" }]),
+          ],
+        },
+      ],
+    },
+  ];
+}
+
 /** A task card as one plain object, whether it came as a `task_update` chunk (strings) or a
  * `task_card` block (rich text, as Slack reads it back). */
 export function cardOf(blockOrChunk: JsonObject): JsonObject {
@@ -544,13 +584,29 @@ export class FakeSlack extends WebClient {
         user: BOT,
         type: "message",
         text: message.text || this.#streamText(message.ts),
-        blocks: message.blocks,
+        blocks: this.#blocksRead(message),
         ...(this.streamTs.includes(message.ts)
           ? { streaming_state: message.streaming ? "in_progress" : "completed" }
           : {}),
       });
     }
     return { ok: true, messages: found, has_more: false };
+  }
+
+  /**
+   * The `blocks` of a message as `conversations.replies` reads it back. A message that was
+   * posted, updated, or stopped with blocks of its own reads back the blocks it holds. A stream
+   * that was stopped with none reads back the blocks Slack made of what it streamed, for the one
+   * shape `plainRun` follows; any other stream, and a stream still open, reads back none, as
+   * before (nothing recorded says what Slack returns for them).
+   */
+  #blocksRead(message: FakeMessage): JsonObject[] {
+    const stopped =
+      this.streamTs.includes(message.ts) &&
+      !message.streaming &&
+      !message.updated &&
+      message.blocks.length === 0;
+    return (stopped ? plainRun(message.chunks) : null) ?? message.blocks;
   }
 
   /**

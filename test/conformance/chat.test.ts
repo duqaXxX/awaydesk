@@ -333,9 +333,4 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
 
 chatConformance("the memory chat", memoryRig);
 
-chatConformance("the Slack provider", slackRig, {
-  todo: {
-    endReplyBody:
-      "FakeSlack's chat.stopStream keeps no blocks, so what a stream showed is not read back (test/support/fake-slack.ts)",
-  },
-});
+chatConformance("the Slack provider", slackRig);

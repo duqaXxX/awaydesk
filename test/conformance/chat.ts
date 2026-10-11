@@ -114,8 +114,6 @@ export interface ChatConformanceOptions {
   readonly todo?: {
     /** The owner check and every check of what reaches `ChatInbound`. */
     readonly inbound?: string;
-    /** `endReply` keeps what the reply showed before the note. */
-    readonly endReplyBody?: string;
   };
 }
 
@@ -679,23 +677,19 @@ export function chatConformance(
         await s.provider.thread(s.ref).endReply(open, "Stopped before the end"); // twice is fine
       });
 
-      check(
-        "keeps what the reply showed when endReply ends it",
-        async (s) => {
-          let open: MessageId | null = null;
-          const reply = s.provider.thread(s.ref).openReply((_old, fresh) => {
-            open = fresh ?? open;
-          });
-          await reply.text("The turn was running");
-          await reply.settle();
-          await s.rig.settle();
-          assert.ok(open, "told of the message");
-          await s.provider.thread(s.ref).endReply(open, "Stopped before the end");
-          const shown = s.rig.read(s.ref).filter((m) => m.id === open);
-          assert.match(shown[0]?.text ?? "", /The turn was running/);
-        },
-        { todo: todo.endReplyBody },
-      );
+      check("keeps what the reply showed when endReply ends it", async (s) => {
+        let open: MessageId | null = null;
+        const reply = s.provider.thread(s.ref).openReply((_old, fresh) => {
+          open = fresh ?? open;
+        });
+        await reply.text("The turn was running");
+        await reply.settle();
+        await s.rig.settle();
+        assert.ok(open, "told of the message");
+        await s.provider.thread(s.ref).endReply(open, "Stopped before the end");
+        const shown = s.rig.read(s.ref).filter((m) => m.id === open);
+        assert.match(shown[0]?.text ?? "", /The turn was running/);
+      });
 
       gated("shows a text as it is written", "nativeStreaming", async (s) => {
         const reply = s.provider.thread(s.ref).openReply(() => {});

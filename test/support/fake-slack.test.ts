@@ -28,7 +28,7 @@ import {
   THREAD,
   timedOut,
 } from "./fake-slack.ts";
-import type { JsonObject } from "./fixtures.ts";
+import { type JsonObject, slackPayload } from "./fixtures.ts";
 
 test("fake slack returns recorded responses", async () => {
   const slack = new FakeSlack();
@@ -651,4 +651,97 @@ test("a sleep that is aborted rejects and is not woken later", async () => {
   await assert.rejects(sleeping, /cancelled/);
   await clock.advance(10);
   await assert.rejects(clock.sleep(1, abort.signal), /cancelled/);
+});
+
+// The blocks of a stopped stream, read back. The recording of a stopped stream
+// (api-conversations-replies-stream, 2026-09-29) is the expectation; the text each of its plain
+// runs was streamed as is read from the recording's own `text` field, which keeps the blank lines.
+async function readBlocks(slack: FakeSlack, ts: string): Promise<JsonObject[]> {
+  const read = (await slack.conversations.replies({ channel: CHANNEL, ts })) as unknown as {
+    messages: { ts: string; blocks: JsonObject[] }[];
+  };
+  const found = read.messages.find((message) => message.ts === ts);
+  assert.ok(found);
+  return found.blocks;
+}
+
+/** A block without its `block_id`, which Slack picks at random. */
+function withoutId(block: JsonObject | undefined): JsonObject {
+  assert.ok(block);
+  const { block_id, ...rest } = block;
+  assert.equal(typeof block_id, "string");
+  return rest;
+}
+
+test("a stopped stream of plain words reads back the blocks the recording shows", async () => {
+  const recorded = slackPayload("api-conversations-replies-stream").messages as {
+    text: string;
+    blocks: JsonObject[];
+  }[];
+  const blocks = recorded[0]?.blocks ?? [];
+  const runs: [string, JsonObject | undefined][] = [
+    ["Let me look at the repository.\n\n", blocks[0]],
+    ["Done.", blocks.at(-1)],
+  ];
+  for (const [streamed, expected] of runs) {
+    assert.ok(recorded[0]?.text.includes(streamed.trim()));
+    const slack = new FakeSlack();
+    await slack.apiCall("chat.startStream", {
+      ...START,
+      chunks: [{ type: "markdown_text", text: streamed.slice(0, 5) }],
+    });
+    const ts = "1790000000.000001";
+    await slack.chat.appendStream({
+      channel: CHANNEL,
+      ts,
+      chunks: [{ type: "markdown_text", text: streamed.slice(5) }],
+    });
+    // open: nothing is recorded for it, so none are returned
+    assert.deepEqual(await readBlocks(slack, ts), []);
+    await slack.chat.stopStream({ channel: CHANNEL, ts });
+    assert.deepEqual(withoutId((await readBlocks(slack, ts))[0]), withoutId(expected));
+    assert.equal((await readBlocks(slack, ts)).length, 1);
+  }
+});
+
+test("a stream that expired reads back its blocks like one that was stopped", async () => {
+  const slack = new FakeSlack();
+  await slack.apiCall("chat.startStream", START);
+  slack.expire("1790000000.000001");
+  assert.equal((await readBlocks(slack, "1790000000.000001")).length, 1);
+});
+
+test("a stream the recording does not cover reads back no blocks, as before", async () => {
+  const uncovered: JsonObject[][] = [
+    [{ type: "markdown_text", text: "some **bold** words" }],
+    [{ type: "markdown_text", text: "one line\nanother line" }],
+    [{ type: "markdown_text", text: "- a list" }],
+    [{ type: "markdown_text", text: "first\n\nsecond" }],
+    [
+      { type: "markdown_text", text: "words" },
+      { type: "task_update", id: "t1", title: "Bash", status: "complete" },
+    ],
+    [],
+  ];
+  for (const chunks of uncovered) {
+    const slack = new FakeSlack();
+    await slack.apiCall("chat.startStream", { ...START, chunks });
+    const ts = "1790000000.000001";
+    await slack.chat.stopStream({ channel: CHANNEL, ts });
+    assert.deepEqual(await readBlocks(slack, ts), [], JSON.stringify(chunks));
+  }
+});
+
+test("blocks a stop or an update wrote are read back as they are", async () => {
+  const footer = [{ type: "context", elements: [{ type: "mrkdwn", text: "footer" }] }];
+  const slack = new FakeSlack();
+  await slack.apiCall("chat.startStream", START);
+  const ts = "1790000000.000001";
+  await slack.chat.stopStream({ channel: CHANNEL, ts, blocks: footer });
+  assert.deepEqual(await readBlocks(slack, ts), footer);
+  const other = new FakeSlack();
+  await other.apiCall("chat.startStream", START);
+  await other.chat.stopStream({ channel: CHANNEL, ts });
+  await other.chat.update({ channel: CHANNEL, ts, text: "x", blocks: footer });
+  assert.deepEqual(await readBlocks(other, ts), footer);
 });
