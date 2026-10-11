@@ -75,6 +75,15 @@ for (const text of ["!help", "!status", "!bypass on", "hello"]) {
   });
 }
 
+test("a message still waiting for its place in the thread when the daemon stops calls nothing", async (t) => {
+  const { world, gate } = await held(t, reply("first", THREAD));
+  // Two more replies of the thread: each waits for the place of the one before it.
+  await world.dispatch(reply("second", THREAD));
+  await world.dispatch(reply("third", THREAD));
+  await stop(world);
+  assert.deepEqual(await release(world, gate), ["conversations.members"]);
+});
+
 test("a top-level message whose channel check ends after the stop does nothing", async (t) => {
   const { world, gate } = await held(t, message("hello", { ts: "1790000000.000044" }));
   await stop(world);

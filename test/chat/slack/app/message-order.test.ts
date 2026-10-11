@@ -60,7 +60,12 @@ test("two messages of one thread reach the queue in the order they were sent, th
   assert.deepEqual(seen, ["first", "second"]);
 });
 
-test("a stop typed right after a prompt does not run before the prompt is queued", async (t) => {
+// What is guaranteed is the order of the handover: the prompt reaches the core, and takes its
+// place in the thread's queue, before the `!stop` is handed over. Whether the prompt has reached
+// `submit` by the time the stop runs is the core's: the `!stop`'s own channel check gives a plain
+// prompt time to get there, but a prompt that reads files is submitted after the stop (measured,
+// the same before this change).
+test("a stop typed right after a prompt is handed to the core after the prompt", async (t) => {
   const world = worldOf(t);
   await inAThread(world);
   const seen = reached(world);

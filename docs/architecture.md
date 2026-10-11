@@ -101,6 +101,8 @@ One message's way from the chat to the agent and back, with Slack and Claude Cod
    (`messages.inboundMessage`). The place is taken before the channel check and left when the
    listener has called `ChatInbound.message`, so two messages of one thread are handed over in the
    order their listeners were called although the check takes longer for one than for the other.
+   A clip whose transcript is in the file's `vtt` is the exception: `Clips.takeClip` hands it over
+   after the download of that file, and a typed reply sent after it can be handed over first.
 3. The listener calls `ChatInbound.message`. The message flow (`messages.messages`) reads a message
    that starts with `!` with `commands.parseBang`, as one of the daemon's words (`words.wordFlow`)
    or as a passthrough to a command of the agent. Anything else is a prompt. A top-level message
@@ -1707,9 +1709,11 @@ taken before it, runs the channel check (`Answers.channelAllowed`) inside it and
 on that call's return, before the core's work on the message ends, so a later message never waits
 for a turn, a download or a setup the owner has not answered. A refused check leaves the place too.
 Threads do not wait for each other, and a thread's entry is dropped when its last place is left.
-Without the place, the channel checks of two messages ran side by side and the one that finished
-first was handed over first. The buttons and forms keep no such order: each names the message
-it answers.
+A later message of a thread waits for the checks of the messages before it. A check is two calls,
+each bounded by the client's 30 seconds (`clients.REQUEST_TIMEOUT_MS`), so about 60 seconds per
+message ahead with no network, plus the pause of the one connection retry and any `Retry-After`
+Slack sends; a message with none ahead waits for nothing. Other threads are not affected.
+The buttons and forms keep no such order: each names the message it answers.
 
 | The owner | The listener reads | The core decides |
 |---|---|---|

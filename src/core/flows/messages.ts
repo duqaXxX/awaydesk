@@ -8,8 +8,7 @@
  * (`Mutex.acquire` inside `arrival`), nothing is awaited except a call to the chat (the
  * old-folder notice). The stretches are marked `(sync)`; the provider keeps its side of it: it
  * hands the messages of a thread over in the order its listeners were called, whatever its
- * channel check takes (`ThreadOrder` in `chat/slack/app/order.ts`), with nothing awaited between
- * its last check and the call.
+ * checks take, with nothing awaited between its last check and the call.
  */
 
 import type { CommandInfo } from "../../agent/seam.ts";

@@ -10,7 +10,11 @@
 export interface Place {
   /** Settles when every place entered before this one has been left. */
   readonly turn: Promise<void>;
-  /** Gives the place up: the next one's turn comes. Calling it again does nothing. */
+  /**
+   * Gives the place up: the next one's turn comes. Called only after `turn` has settled (a place
+   * left before its turn would release the next one while an earlier place is still held), and
+   * calling it again does nothing.
+   */
   leave(): void;
 }
 

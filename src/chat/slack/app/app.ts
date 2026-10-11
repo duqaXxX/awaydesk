@@ -265,16 +265,22 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     const ts = str(message.ts);
     const threadTs = str(message.thread_ts || ts);
     // The owner and the workspace first, with nothing awaited: anyone else takes no place.
-    if (!answers.fromOwner(user, team, channel)) return;
+    if (!answers.fromOwner(user, team, channel) || channel === null) return;
     // (sync) The place among the thread's messages is taken in the order the listeners were
     // called, before the first await: the channel check below takes longer for one message than
     // for the next, and a message that passed it first would be handed over first. The place is
     // left once the message is handed over (`arrival` in `core/flows/messages.ts` orders it from
     // there), never held through the turn, a download or a setup the owner has not answered.
+    // The exception is a clip whose transcript is in the file's `vtt`: `Clips.takeClip` hands it
+    // over after the download of that file, so a typed reply sent after it can be handed over
+    // first.
     const place = order.enter(`${channel}\n${threadTs}`);
     let handed: Promise<void>;
     try {
       await place.turn;
+      // The daemon can have stopped while this message waited for the ones before it: calling
+      // Slack then would break the contract of a listener in flight after the stop.
+      if (answers.stopped) return;
       if (!(await answers.channelAllowed(channel, threadTs))) return;
       // (sync) From the check to the call that hands the message over, nothing is awaited.
       const spoken = voice.clip(filesOf(message));

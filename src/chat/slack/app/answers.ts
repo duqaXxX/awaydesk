@@ -229,7 +229,7 @@ export class Answers {
     channel: string | null,
     threadTs: string,
   ): Promise<boolean> {
-    if (!this.fromOwner(user, team, channel)) return false;
+    if (!this.fromOwner(user, team, channel) || channel === null) return false;
     return this.channelAllowed(channel, threadTs);
   }
 
@@ -239,7 +239,7 @@ export class Answers {
    * startup. A listener that keeps an order takes its place only after it, so that anyone else
    * takes none.
    */
-  fromOwner(user: string | null, team: string | null, channel: string | null): channel is string {
+  fromOwner(user: string | null, team: string | null, channel: string | null): boolean {
     if (this.stopped) return false;
     if (!channel || !isOwner(this.parts.identity, user, team)) {
       logger.info("ignored an inbound event from someone other than the owner");
