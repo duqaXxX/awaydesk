@@ -113,6 +113,23 @@ for (const mode of [0o640, 0o604, 0o660, 0o644]) {
   );
 }
 
+test("refuses an env owned by another user", POSIX_ONLY, (t) => {
+  const directory = scratch();
+  writeEnv(directory, directory);
+  // A test cannot chown a file without root: the file stays ours and the process answers with
+  // another uid, which is the same inequality `loadConfig` checks.
+  // `getuid` is optional in the types (absent on Windows); POSIX_ONLY keeps this off there.
+  const posix = process as { getuid(): number };
+  const own = posix.getuid();
+  t.mock.method(posix, "getuid", () => own + 1);
+  assert.throws(
+    () => load(directory),
+    (error: unknown) =>
+      error instanceof ConfigError &&
+      /must belong to the user running awaydesk/.test(error.message),
+  );
+});
+
 test("refuses a symlinked env", POSIX_ONLY, () => {
   const directory = scratch();
   const real = writeEnv(directory, directory);

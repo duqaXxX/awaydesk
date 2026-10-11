@@ -349,6 +349,25 @@ test("bypass with no bypass mode: the word is refused and nothing is stored", as
   assert.deepEqual(h.clients[0]?.modes, []);
 });
 
+// Found by a mutation run of 2026-10-11: with the guard of `modeFor` gone, no test failed. A stored
+// bypass outlives a change of agent, so a connect can meet an agent that has no such mode.
+test("a stored bypass on an agent with no bypass mode: the connect fails and no mode is set", async (t) => {
+  const h = harnessFor(t)({});
+  lacking(h, {
+    permissionModes: { default: "default", auto: null, bypass: null },
+  });
+  const session = h.session();
+  h.state.setSession(CHANNEL, THREAD, "session-1");
+  h.state.setBypass(CHANNEL, THREAD, true);
+  assert.equal(session.bypassChoice, true);
+  await assert.rejects(session.ensureConnected(), BypassUnavailable);
+  // The mode the agent would be told is null: the call must not be made at all.
+  assert.deepEqual(h.clients[0]?.modes, []);
+  // The client the failed connect opened is closed, not left running.
+  assert.equal(h.clients[0]?.connected, false);
+  assert.equal(inside(session).client, null);
+});
+
 test("an agent that declares no optional capability runs a whole turn", async (t) => {
   // Every one off at once; the fake still lists models and commands, which the core ignores.
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
