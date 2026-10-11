@@ -1225,9 +1225,7 @@ export class ThreadSession {
       // afterward: a request whose handler ends first has left `Approvals` by then, and its
       // message must go either way. Deleting each message here does not depend on the handler
       // ever seeing a decision.
-      const requestsToDelete = this.deps.approvals
-        .pendingIn(this.channelId, this.threadId)
-        .map((pending) => pending.messageTs);
+      const requestsToDelete = this.requestMessages();
       // The worker may hold the connect lock while the agent starts: cancelled first.
       await this.cancelTasks();
       // A daemon word may be starting the client on its own. Its start finishes, then the
@@ -1239,10 +1237,7 @@ export class ThreadSession {
       } finally {
         release();
       }
-      this.deps.approvals.denyAll(this.channelId, this.threadId);
-      // The denial above resolves each handler of a request, and each is awaited to its end.
-      await Promise.allSettled([...this.asking]);
-      for (const messageTs of requestsToDelete) await this.deleteRequest(messageTs);
+      await this.settleRequests(requestsToDelete);
       // A turn the worker took but had not sent yet is in no queue.
       const taken = this.taken;
       this.taken = null;
@@ -1384,6 +1379,25 @@ export class ThreadSession {
     }
   }
 
+  /** The messages of this thread's open requests, read before anything settles them. */
+  private requestMessages(): Array<MessageId | null> {
+    return this.deps.approvals
+      .pendingIn(this.channelId, this.threadId)
+      .map((pending) => pending.messageTs);
+  }
+
+  /**
+   * Deny this thread's open requests and withdraw their messages (`messages`, a snapshot
+   * `requestMessages` took earlier: a handler that ends first has left `Approvals` by then, and
+   * its message must go either way).
+   */
+  private async settleRequests(messages: readonly (MessageId | null)[]): Promise<void> {
+    this.deps.approvals.denyAll(this.channelId, this.threadId);
+    // The denial above resolves each handler of a request, and each is awaited to its end.
+    await Promise.allSettled([...this.asking]);
+    for (const messageTs of messages) await this.deleteRequest(messageTs);
+  }
+
   /** A request handler in flight, tracked so that a close can wait for it. */
   private answering(request: PermissionRequest | QuestionRequest): Promise<Decision> {
     const answer = this.askOwner(request);
@@ -1480,6 +1494,13 @@ export class ThreadSession {
     logger.error(`session reader stopped in ${this.where}: ${reason}`);
     if (this.client === client) this.client = null;
     try {
+      // Nobody is left to take an answer: the requests of the lost process go as `close` sends
+      // them, with `interrupting` up so no handler's `finally` shows working again over the ❌
+      // (`abandon` clears it). A request that waited is a loss: `abandon` may find nothing else.
+      const requests = this.requestMessages();
+      if (requests.length > 0) this.reactError();
+      this.interrupting = true;
+      await this.settleRequests(requests);
       await this.abandon(
         texts.fill(texts.named(texts.ERROR_REPLY, this.names), { error: reason }),
         {

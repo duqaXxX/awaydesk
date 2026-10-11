@@ -1021,8 +1021,8 @@ shows on the subagent's line), the request is rewritten instead, with no buttons
 record (`ThreadChat.keepAnswers`, `requests.answeredBlocks`); if Slack refuses that rewrite, the
 request is deleted, so no button is left that no longer works. `!stop` denies every request still
 pending in the session's own thread and deletes its message, and a request still waiting when the
-session closes is answered as refused (`Approvals.denyAll`): a denial for a permission, a skip for a
-question. A request Slack does not accept is denied at once, with a message telling Claude Code that
+session closes or loses its process is answered as refused (`Approvals.denyAll`): a denial for a
+permission, a skip for a question. A request Slack does not accept is denied at once, with a message telling Claude Code that
 it could not be shown (`texts.APPROVAL_UNPOSTED`), and the tool's line records the denial.
 
 ## Footer
@@ -1313,8 +1313,10 @@ closed when the start returns (`ThreadSession.connect`).
   says how to grant access.
 - If the Claude Code process exits or its stream fails, the back end ends the session's events with
   `process_lost`, whose reason is its own words for a process that exited or the name of the
-  failure, never its message. The open reply ends with an error line, every waiting message is told,
-  and the next message starts a new process. A Slack failure while a reply is written never stops
+  failure, never its message. The requests the thread had open are denied and their messages
+  deleted, as a close does it (`ThreadSession.settleRequests`), so none is left with buttons
+  nobody can answer and the idle close is no longer held. The open reply ends with an error line,
+  every waiting message is told, and the next message starts a new process. A Slack failure while a reply is written never stops
   the session or the running turn.
 - Messages are queued and run one at a time; each gets its own reply in the thread. `!stop`
   interrupts the running turn, denies its pending approvals and stops the thread's background tasks
