@@ -298,6 +298,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The daemon's own git (footer, `!status`, `!open`) runs only in a repository the owner trusted
+  in Claude Code by its own key (`trust.trustedRepository`). A repository inside the folder a
+  session started in was covered by that folder's trust, so one that reached a trusted folder in
+  an archive or a clone ran the `clean` filters its config names: on the footer's `diff-files`
+  once the agent moved into it, and on the `status` of `!open`, which looks for repositories two
+  levels below the folder. A bound folder that holds a repository shows that repository's branch,
+  lines and changed files once `claude` was opened in it and the trust dialog accepted.
+  `AgentBackend.trustedRepository`, `SessionManager.repository` and `listing.RepositoryLookup`
+  take the folder alone. Found by a security scan of `src` and `.github` on 2026-10-11.
 - What a message, a word, an answer and a pick mean is decided in the core, as flows
   (`src/core/flows/`): a message and every word, the requests put to the owner (a tool's
   permission, the agent's questions, the same-folder hold, a session's setup), `!resume`, `!bind`,
@@ -804,6 +813,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A table's delimiter row in a reply is recognised in linear time (`markdown.markdownStarts`).
+  One pattern read the whole row, and on a line of spaces around a single dash, under a line
+  holding a `|`, it backtracked in cubic time: 200 ms at 800 spaces a side and 3.1 s at 2,000
+  (measured 2026-10-11, Node 26.5.1). The text is the agent's, so a page it read could shape such
+  a line and hold the event loop every thread shares. The row is now read cell by cell. Found by
+  a security scan of `src` and `.github` on 2026-10-11.
+- The effort level is read only from the output of `/effort` and `/model` (`footer.setsEffort`,
+  `ThreadSession.finish`). The final text of every turn was matched against those outputs, so a
+  reply that began with `Set effort level to low` stored that level for the thread, and the next
+  connect started Claude Code with it. That text is the model's, which what the agent read can
+  shape. Found by the same scan.
 - A clip's WebVTT transcript loses every tag of a cue (`voice.vttText`). A tag runs from `<` to
   the next `>`, a line end does not close it, and one that nothing closes takes the rest of its
   cue, as the cue text tokenizer of WebVTT 1 reads them. One pass over each line left a tag that

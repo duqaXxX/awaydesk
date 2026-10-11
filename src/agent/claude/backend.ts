@@ -117,8 +117,8 @@ export class ClaudeBackend implements AgentBackend {
     return workspaceTrusted(folder, this.#home);
   }
 
-  trustedRepository(folder: string, sessionFolder: string): Promise<Repository | null> {
-    return trustedRepository(folder, sessionFolder, this.#home);
+  trustedRepository(folder: string): Promise<Repository | null> {
+    return trustedRepository(folder, this.#home);
   }
 
   /** The limits `/usage` reports now, read by a session of the back end's own. */

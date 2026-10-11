@@ -112,25 +112,23 @@ test("a folder is trusted as Claude Code's record says", { ...LIMIT, ...GIT_LAYO
   assert.equal(await backend.folderTrusted(other), false);
 });
 
-test(
-  "a repository inside a trusted session folder may run the daemon's git",
-  GIT_LAYOUT,
-  async () => {
-    const folder = join(tmp, "session");
-    const repository = join(folder, "app");
-    await mkdir(folder);
-    gitInit(repository);
-    trust(home, [folder]);
-    const backend = new ClaudeBackend({ home });
-    assert.deepEqual(await backend.trustedRepository(repository, folder), {
-      root: repository,
-      key: repository,
-      gitDir: join(repository, ".git"),
-      insideGitDir: false,
-    });
-    assert.equal(await backend.trustedRepository(repository, join(tmp, "elsewhere")), null);
-  },
-);
+test("only a repository the owner trusted may run the daemon's git", GIT_LAYOUT, async () => {
+  const folder = join(tmp, "session");
+  const repository = join(folder, "app");
+  await mkdir(folder);
+  gitInit(repository);
+  trust(home, [folder]);
+  const backend = new ClaudeBackend({ home });
+  // The folder's trust does not stand for the repository inside it.
+  assert.equal(await backend.trustedRepository(repository), null);
+  trust(home, [folder, repository]);
+  assert.deepEqual(await backend.trustedRepository(repository), {
+    root: repository,
+    key: repository,
+    gitDir: join(repository, ".git"),
+    insideGitDir: false,
+  });
+});
 
 test(
   "the sessions of a folder are listed through the SDK, the ids alive through the files",

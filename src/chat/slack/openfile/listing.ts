@@ -50,20 +50,14 @@ export const LISTING_BUDGET = 2.0;
 export const LISTING_TTL = 30.0;
 export const LISTING_PARTIAL_TTL = 3.0;
 export const LISTING_KEPT = 16;
-// The repositories found in a folder are kept for a shorter time than its files: one made in the
-// session (by Claude Code, in a subfolder) should show within moments. At most GIT_CHAINS
+// The repositories found in a folder are kept for a shorter time than its files: one the owner
+// trusts while the session runs should show within moments. At most GIT_CHAINS
 // repositories are asked at once, the rest wait their turn.
 export const REPOSITORIES_TTL = 5.0;
 export const GIT_CHAINS = 4;
 
-/**
- * Answers for a repository: the one holding a directory, usable for a session started in a folder
- * (`trustedRepository`, whose arguments they are).
- */
-export type RepositoryLookup = (
-  directory: string,
-  sessionFolder: string,
-) => Promise<Repository | null>;
+/** Answers for a repository: the one holding a directory, when git may run in it (`trustedRepository`). */
+export type RepositoryLookup = (directory: string) => Promise<Repository | null>;
 
 /** `repository` when it has a work tree git can list, else null. */
 export function usable(repository: Repository | null): Repository | null {
@@ -138,10 +132,10 @@ export async function repositoriesOf(
   folder: string,
   lookup: RepositoryLookup,
 ): Promise<Repository[]> {
-  const held = usable(await lookup(folder, folder));
+  const held = usable(await lookup(folder));
   if (held !== null) return [held];
   const below = await repositoryFolders(folder);
-  const looked = await Promise.all(below.map((candidate) => lookup(candidate, folder)));
+  const looked = await Promise.all(below.map((candidate) => lookup(candidate)));
   const found = new Map<string, Repository>();
   for (const repository of looked.map(usable)) {
     if (repository !== null) found.set(repository.root, repository);

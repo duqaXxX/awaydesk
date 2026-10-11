@@ -10,8 +10,10 @@
  */
 import assert from "node:assert/strict";
 import {
+  existsSync,
   mkdirSync,
   realpathSync,
+  rmSync,
   symlinkSync,
   unlinkSync,
   utimesSync,
@@ -19,6 +21,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { type TestContext, test } from "node:test";
+import { trustedRepository } from "../../../../src/agent/claude/trust.ts";
 import type { Repository } from "../../../../src/agent/seam.ts";
 import { actionKey } from "../../../../src/chat/slack/app/app.ts";
 import {
@@ -51,7 +54,7 @@ import {
   TEAM,
   THREAD,
 } from "../../../support/fake-slack.ts";
-import { commitAt, committed, git, gitInit } from "../../../support/git-layouts.ts";
+import { commitAt, committed, git, gitInit, trust } from "../../../support/git-layouts.ts";
 import { NAMES } from "../../../support/names.ts";
 import { GIT_LAYOUT } from "../../../support/platform.ts";
 import {
@@ -112,9 +115,9 @@ function worldWith<L extends Listings>(
 ): World {
   keepAlive(t);
   let world: World | undefined;
-  const listings = make((directory, sessionFolder) => {
+  const listings = make((directory) => {
     if (world === undefined) throw new Error("the world is not made yet");
-    return world.sessions.repository(directory, sessionFolder);
+    return world.sessions.repository(directory);
   });
   world = worldFor(t)({ listings });
   return world;
@@ -155,9 +158,9 @@ class CutListings extends Listings {
 function counted(world: World): string[] {
   const asked: string[] = [];
   const real = world.backend.repository;
-  world.backend.repository = (directory, sessionFolder) => {
+  world.backend.repository = (directory) => {
     asked.push(directory);
-    return real(directory, sessionFolder);
+    return real(directory);
   };
   return asked;
 }
@@ -165,9 +168,9 @@ function counted(world: World): string[] {
 /** The lookup of the world's sessions, held until `release` is set (a repository that is slow). */
 function slowLookup(world: World, release: AsyncEvent): void {
   const real = world.backend.repository;
-  world.backend.repository = async (directory, sessionFolder): Promise<Repository | null> => {
+  world.backend.repository = async (directory): Promise<Repository | null> => {
     await release.wait();
-    return real(directory, sessionFolder);
+    return real(directory);
   };
 }
 
@@ -206,12 +209,12 @@ test(
     const real = world.backend.repository;
     const slow = new AsyncEvent();
     let first = true;
-    world.backend.repository = async (directory, sessionFolder) => {
+    world.backend.repository = async (directory) => {
       if (first) {
         first = false;
         await slow.wait();
       }
-      return real(directory, sessionFolder);
+      return real(directory);
     };
     await world.dispatch(reply("first", THREAD));
     await world.dispatch(reply("second", THREAD));
@@ -482,9 +485,9 @@ test("the files are listed while the channel is checked", GIT_LAYOUT, async (t) 
   await inAThread(world);
   const listingStarted = new AsyncEvent();
   const real = world.backend.repository;
-  world.backend.repository = (directory, sessionFolder) => {
+  world.backend.repository = (directory) => {
     listingStarted.set();
-    return real(directory, sessionFolder);
+    return real(directory);
   };
   const gate = new AsyncEvent();
   world.slack.gate = gate;
@@ -748,6 +751,66 @@ test(
     assert.deepEqual(modal.rows().toSorted(), ["setup-notes.txt", "workspace/docs/setup.md"]);
   },
 );
+
+/**
+ * A repository inside the channel's folder whose config names a `clean` filter, in a world where
+ * the folder is trusted and the repository is not. The filter leaves `marker` when git runs it,
+ * which `command` does here once, as the control.
+ */
+function plantedBelow(world: World, ...command: string[]): { nested: string; marker: string } {
+  const folder = join(world.root, "app");
+  const nested = realpathSync(committed(join(folder, "workspace")));
+  const marker = join(world.root, "filter-ran");
+  git(nested, "config", "filter.planted.clean", `sh -c 'touch "${marker}"; cat'`);
+  put(nested, ".git/info/attributes", "* filter=planted\n");
+  // A tracked file of the size it was committed with: `status` reads it to tell it changed.
+  put(nested, "README", "two\n");
+  git(nested, ...command);
+  assert.ok(existsSync(marker)); // the control: git left to itself runs the planted filter
+  rmSync(marker);
+  const home = join(world.root, "home");
+  mkdirSync(home);
+  trust(home, [realpathSync(folder)]);
+  world.backend.repository = (directory) => trustedRepository(directory, home);
+  return { nested, marker };
+}
+
+test(
+  "the picker runs no git in a nested repository the owner did not trust",
+  GIT_LAYOUT,
+  async (t) => {
+    // The changed files come from `git status`, which reads a changed file through the `clean`
+    // filter the repository's config names. One click would run it in every repository below the
+    // folder, also where the agent never went.
+    const world = openWorld(t);
+    const modal = new ModalSlack(world.slack);
+    const { marker } = plantedBelow(world, "status", "--porcelain");
+    await inAThread(world);
+    await world.dispatch(chooseClick());
+    await world.settle();
+    assert.ok(modal.rows().every((row) => !row.startsWith("workspace/")));
+    assert.ok(!existsSync(marker));
+  },
+);
+
+test("typing runs no git in a nested repository the owner did not trust", GIT_LAYOUT, async (t) => {
+  // The folder is trusted, the repository inside it is not: git would read the repository's own
+  // config. Its files come from the walk of the disk, the ones its `.gitignore` names too.
+  const world = openWorld(t);
+  const modal = new ModalSlack(world.slack);
+  const { nested, marker } = plantedBelow(world, "diff-files", "--shortstat");
+  put(nested, ".gitignore", ".venv/\n");
+  put(nested, "docs/guide.md");
+  put(nested, ".venv/lib/guide_tools.py");
+  await inAThread(world);
+  await world.dispatch(typing("guide", 1790000100.0, { viewHash: modal.hash }));
+  await world.settle();
+  assert.deepEqual(modal.rows().toSorted(), [
+    "workspace/.venv/lib/guide_tools.py",
+    "workspace/docs/guide.md",
+  ]);
+  assert.ok(!existsSync(marker));
+});
 
 test("typing makes no call to slack about the channel", GIT_LAYOUT, async (t) => {
   // Each character comes here: the checks are the owner and the workspace alone.

@@ -13,7 +13,6 @@ import {
   realpathSync,
   renameSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -34,13 +33,9 @@ let marker = "";
 let app = "";
 let repository: Lookup;
 
-/**
- * The footer's lookup of a session started in `sessionFolder`. The tests below plant their
- * repositories outside it, as a folder the agent moved to: only what lies inside the session's
- * folder has a way in beside the owner's own trust (`trust.test.ts`).
- */
-function lookupFor(home: string, sessionFolder: string): Lookup {
-  return (directory) => trustedRepository(directory, sessionFolder, home);
+/** The footer's lookup: git runs only in a repository whose own key the owner trusted. */
+function lookupFor(home: string): Lookup {
+  return (directory) => trustedRepository(directory, home);
 }
 
 /** A fresh home for `trust`, in the test's own directory. */
@@ -57,14 +52,12 @@ beforeEach(() => {
   // A repository the owner trusted, in a folder `code` trusted too.
   app = realpathSync(committed(join(tmp, "code", "app")));
   trust(newHome(), [app, dirname(app)]);
-  repository = lookupFor(join(tmp, "home"), join(tmp, "base"));
+  repository = lookupFor(join(tmp, "home"));
 });
 
 afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
-
-const POSIX = { skip: process.platform === "win32" };
 
 function cleanFilter(): string {
   return `sh -c 'touch "${marker}"; cat'`;
@@ -232,7 +225,7 @@ test("a bare layout shows nothing and a trusted bare container its branch", asyn
   mkdirSync(container);
   git(container, "clone", "-q", "--bare", app, ".git");
   trust(newHome(), [dirname(app), container]);
-  const lookup = lookupFor(join(tmp, "home"), join(tmp, "base"));
+  const lookup = lookupFor(join(tmp, "home"));
   assert.deepEqual(await gitState(layout, lookup), [null, null]);
   assert.deepEqual(await gitState(container, lookup), ["main", null]); // no work tree to diff
 });
@@ -275,7 +268,7 @@ test("a gitfile s trailing space belongs to the path", async () => {
   mkdirSync(folder);
   writeFileSync(join(folder, ".git"), "gitdir: ../store \n");
   trust(newHome(), [folder]);
-  const lookup = lookupFor(join(tmp, "home"), join(tmp, "base"));
+  const lookup = lookupFor(join(tmp, "home"));
   assert.equal((await gitState(folder, lookup))[0], "spaced");
 });
 
@@ -292,10 +285,7 @@ test("git is given the repository and never looks for one", async () => {
   filterRan();
   gitDiffsThere(kept);
   assert.ok(filterRan()); // the control
-  assert.deepEqual(await gitState(kept, lookupFor(join(tmp, "home"), join(tmp, "base"))), [
-    null,
-    null,
-  ]);
+  assert.deepEqual(await gitState(kept, lookupFor(join(tmp, "home"))), [null, null]);
   assert.ok(!filterRan());
 });
 
@@ -317,12 +307,12 @@ test("every git call shares one time limit", async () => {
 
 // --- a repository inside the folder the session started in ---
 
-/** The folder a session started in (trusted, not a repository), and its footer's lookup. */
-function work(): { folder: string; lookup: Lookup } {
+/** The folder a session started in (trusted, not a repository), and the home holding the trust. */
+function work(): { folder: string; home: string } {
   const home = newHome();
   const folder = realpathSync(join(tmp, "work"));
   trust(home, [folder]);
-  return { folder, lookup: lookupFor(home, folder) };
+  return { folder, home };
 }
 
 beforeEach(() => {
@@ -330,37 +320,27 @@ beforeEach(() => {
 });
 
 for (const depth of [1, 2, 3]) {
-  test(`the footer shows the branch and changes of a repository inside the folder [${depth}]`, async () => {
-    const { folder, lookup } = work();
+  test(`the footer shows a repository inside the folder only with its own trust [${depth}]`, async () => {
+    const { folder, home } = work();
+    const lookup = lookupFor(home);
     const repo = committed(join(folder, ...["a", "b", "c"].slice(0, depth)));
     mkdirSync(join(repo, "src"));
+    assert.deepEqual(await gitState(repo, lookup), [null, null]);
+    trust(home, [folder, repo]);
     assert.deepEqual(await gitState(repo, lookup), ["main", [0, 0]]);
     writeFileSync(join(repo, "README"), "one\nmore\n");
     assert.deepEqual(await gitState(join(repo, "src"), lookup), ["main", [1, 0]]);
   });
 }
 
-test("the footer shows nothing of a repository outside the folder", async () => {
-  const { lookup } = work();
-  const elsewhere = committed(join(tmp, "elsewhere"));
-  assert.deepEqual(await gitState(elsewhere, lookup), [null, null]);
-});
-
-test("the footer shows nothing of a symlink to a repository elsewhere", POSIX, async () => {
-  const { folder, lookup } = work();
-  symlinkSync(committed(join(tmp, "elsewhere")), join(folder, "link"));
-  assert.deepEqual(await gitState(join(folder, "link"), lookup), [null, null]);
-});
-
-test("known limit a repository inside the folder runs its own filters", async () => {
-  // The owner's decision (2026-10-05): a repository inside the folder a session started in is
-  // covered by that folder's trust, so a repository the agent clones there gets the footer's
-  // `diff-files` under its own config. This pins the consequence: it holds only while the
-  // decision does.
-  const { folder, lookup } = work();
-  planted(join(folder, "clone"));
+test("the footer runs no filter of a repository inside the folder it has no trust for", async () => {
+  // A trusted folder does not stand for a repository inside it: one that was cloned or unpacked
+  // there carries a config the owner never read, and `diff-files` would run its `clean` filter.
+  const { folder, home } = work();
+  const clone = planted(join(folder, "clone"));
   filterRan();
-  const [branch, changes] = await gitState(join(folder, "clone"), lookup);
-  assert.ok(branch === "main" && changes !== null); // `planted` edits a tracked file
-  assert.ok(filterRan());
+  gitDiffsThere(clone);
+  assert.ok(filterRan()); // the control: git left to itself runs the planted filter
+  assert.deepEqual(await gitState(clone, lookupFor(home)), [null, null]);
+  assert.ok(!filterRan());
 });

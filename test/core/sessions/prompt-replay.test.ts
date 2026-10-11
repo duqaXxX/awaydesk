@@ -39,6 +39,7 @@ import {
   said,
   send,
   toolUseOf,
+  withResult,
   workerHolds,
 } from "./helpers.ts";
 
@@ -477,6 +478,36 @@ test("a report turn that starts while a prompt waits does not take its reply", a
   await h.until(() => session.idle && inside(session).settled.isSet);
   assert.deepEqual(misrouted(warnings), []);
   assert.notEqual(replyWith(h, "PINEAPPLE"), replyWith(h, "REPORTED"));
+});
+
+// The effort level is read from the output of the command that sets it (`setsEffort`), and the
+// result says whose turn it was: the guess made at the turn's start can be wrong.
+
+test("a report turn is not read as the output of an effort command that waits", async (t) => {
+  // A command has no replay, so the report turn that starts while it waits is guessed to be its
+  // own. The report's text is the model's.
+  const { c, h, session } = crossed(t);
+  await firstTurn(h, session, c);
+  await send(h, session, "/effort high");
+  h.clients[0]?.inject(c.notice);
+  await h.sleep(0.05);
+  h.clients[0]?.inject(withResult(c.report, "Set effort level to low (this session only): Quick"));
+  await h.until(() => inside(session).active === null && inside(session).settled.isSet);
+  assert.equal(inside(session).effort, null);
+});
+
+test("an effort command s output is read in a turn guessed to be a report", async (t) => {
+  // The command is sent, and a report turn is awaited when its turn starts (the state is set
+  // here, not recorded): the turn is guessed to be the report, the result says the owner started
+  // it, and the command is the prompt that waited.
+  const h = harnessFor(t)({});
+  const session = h.session();
+  const command = await send(h, session, "/effort high");
+  inside(session).injectedExpected = true;
+  const output = "Set effort level to high (this session only): Comprehensive";
+  h.clients[0]?.inject(withResult(sdkMessages("usage"), output));
+  await command.done.wait();
+  assert.equal(inside(session).effort, "high");
 });
 
 test("a turn with no replay and no notification waiting is the prompt s", async (t) => {

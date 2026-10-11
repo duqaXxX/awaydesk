@@ -398,8 +398,7 @@ export class FakeAgentBackend implements AgentBackend {
   /** The members of the listing, the trust and the usage limits called, in order. */
   readonly called: string[] = [];
   trusted: (folder: string) => Promise<boolean> = async () => true;
-  repository: (folder: string, sessionFolder: string) => Promise<Repository | null> = (folder) =>
-    anyRepository(folder);
+  repository: (folder: string) => Promise<Repository | null> = (folder) => anyRepository(folder);
   readonly #scripts: Script[];
 
   constructor(scripts: readonly Script[]) {
@@ -439,9 +438,9 @@ export class FakeAgentBackend implements AgentBackend {
     return this.trusted(folder);
   }
 
-  trustedRepository(folder: string, sessionFolder: string): Promise<Repository | null> {
+  trustedRepository(folder: string): Promise<Repository | null> {
     this.called.push("trustedRepository");
-    return this.repository(folder, sessionFolder);
+    return this.repository(folder);
   }
 
   async close(): Promise<void> {}

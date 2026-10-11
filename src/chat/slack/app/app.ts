@@ -233,9 +233,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     clock: options.clock ?? monotonicClock,
     stopped: chat.stopped,
     now: options.now ?? (() => Date.now() / 1000),
-    listings:
-      options.listings ??
-      new Listings((directory, sessionFolder) => sessions.repository(directory, sessionFolder)),
+    listings: options.listings ?? new Listings((directory) => sessions.repository(directory)),
   };
   const answers = new Answers(parts);
   const requests = new Requests(parts, answers);

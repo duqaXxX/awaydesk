@@ -22,15 +22,15 @@
  * `hasTrustDialogAccepted` in those measurements; an interactive start that is not trusted writes
  * `false`.
  *
- * The daemon's own git (the footer, `!status`, `!open`) has a second way in, beside a trusted
- * repository key: a repository inside the folder the session started in (`trustedRepository`).
+ * The daemon's own git (the footer, `!status`, `!open`) runs under the first rule alone: in a
+ * repository whose key the owner trusted (`trustedRepository`).
  *
  * Which repository a folder belongs to is read from the filesystem and never asked of git there:
  * git would answer from the folder's own `.git` file, `commondir` and `core.worktree`, which
  * whoever supplied the folder wrote. The layout read here is the one gitrepository-layout(5) and
  * git-worktree(1) document, and the bare-repository test follows `is_git_directory` in git's
- * setup.c (git 2.54.0, read 2026-10-04). The three small files it reads (a `.git` file, a
- * `commondir`, a worktree's `gitdir`) are cut at their line ends as git cuts them (setup.c and
+ * setup.c (git 2.54.0, read 2026-10-04). The two small files it reads (a `.git` file and a
+ * worktree's `gitdir`) are cut at their line ends as git cuts them (setup.c and
  * worktree.c, git 2.54.0, read 2026-10-06): a different cut names a different path than git's.
  *
  * Every check runs on `node:fs/promises`, so a slow disk never holds the event loop. The paths
@@ -544,95 +544,18 @@ async function isTrusted(path: string, home: string): Promise<boolean> {
 }
 
 /**
- * Whether `path` lies strictly inside `folder`, both as they are on disk: a symlink in the
- * folder that leads elsewhere is not inside it.
- */
-async function isInside(path: string, folder: string): Promise<boolean> {
-  let real: string;
-  let resolved: string;
-  try {
-    real = await realpath(folder);
-    resolved = await realpath(path);
-  } catch (error) {
-    if (isFilesystemOddity(error)) {
-      return false;
-    }
-    throw error;
-  }
-  return resolved !== real && resolved.startsWith(real.endsWith("/") ? real : `${real}/`);
-}
-
-/**
- * The common git dir of `gitDir`: the directory its `commondir` file names, as git reads it
- * (relative to `gitDir`), else `gitDir` itself. Null when the file cannot be read as git would,
- * so the answer is never a guess: git dies on an empty `commondir`, and it strips every trailing
- * CR and LF from a name (`get_common_dir_noenv`, setup.c, v2.54.0).
- */
-async function commonDir(gitDir: string): Promise<string | null> {
-  if (!(await lexists(`${gitDir}/commondir`))) {
-    return gitDir;
-  }
-  const content = await regularFile(`${gitDir}/commondir`);
-  if (content === null || content.length === 0) {
-    return null;
-  }
-  const name = decodePath(stripEnd(content, [CR, LF]));
-  if (name === null) {
-    return null;
-  }
-  try {
-    return await realpath(joinPath(gitDir, name));
-  } catch (error) {
-    if (isFilesystemOddity(error)) {
-      return null;
-    }
-    throw error;
-  }
-}
-
-/**
- * Whether everything git would read for `repository` lies strictly inside `sessionFolder`: its
- * key, its git dir and its common dir (a worktree's config and hooks live in the main checkout's).
- * A `.git` that leads out of the folder makes git read someone else's config.
- */
-async function heldBy(repository: Repository, sessionFolder: string): Promise<boolean> {
-  const gitDir = repository.gitDir;
-  if (gitDir === null) {
-    return false;
-  }
-  const common = await commonDir(gitDir);
-  if (common === null) {
-    return false;
-  }
-  for (const path of [repository.key, gitDir, common]) {
-    if (!(await isInside(path, sessionFolder))) {
-      return false;
-    }
-  }
-  return true;
-}
-
-/**
  * The repository holding `directory` when the daemon's own git may run in it; null outside git,
- * where the layout has no key, and in a repository neither of these covers:
+ * where the layout has no key, and in a repository whose key is no path the owner trusted in
+ * Claude Code (a worktree's key is its main checkout).
  *
- * - its key is a path the owner trusted in Claude Code (a worktree's key is its main checkout);
- * - its key, its git dir and its common dir all lie strictly inside `sessionFolder`, the folder
- *   the session was started in, and that folder passes `workspaceTrusted`.
- *
- * The second is the owner's decision (2026-10-05): Slack is only an interface to Claude Code,
- * which, launched in a trusted folder, works in its subfolders. It reaches no further: a
- * repository outside `sessionFolder` needs its own trust since the agent may `cd` anywhere, and
- * `workspaceTrusted`, which gates a session's start and `!bind`, is not widened. Inside is
- * decided on resolved paths, so a symlink in the folder that leads to a repository elsewhere, and
- * a worktree whose main checkout is elsewhere, are not inside. The git dir and the common dir are
- * held to it too, since a `.git` file, a `.git` symlink, a moved worktree or a `commondir` inside
- * the folder can name a repository outside it, whose config git would then read. Nothing here
+ * A trusted folder does not stand for a repository inside it: git runs the commands a
+ * repository's own config names (a `clean` filter on `status` and `diff-files`), and a repository
+ * can reach a trusted folder in an archive or a clone, with a config the owner never read. The
+ * agent may `cd` into one, and `!open` looks for them below the session's folder. Nothing here
  * runs git.
  */
 export async function trustedRepository(
   directory: string,
-  sessionFolder: string,
   home: string = homedir(),
 ): Promise<Repository | null> {
   let repository: Repository | null;
@@ -647,14 +570,7 @@ export async function trustedRepository(
   if (repository === null) {
     return null;
   }
-  if (await isTrusted(repository.key, home)) {
-    return repository;
-  }
-  // The second way in, for a repository the session's folder holds.
-  if ((await heldBy(repository, sessionFolder)) && (await workspaceTrusted(sessionFolder, home))) {
-    return repository;
-  }
-  return null;
+  return (await isTrusted(repository.key, home)) ? repository : null;
 }
 
 /**

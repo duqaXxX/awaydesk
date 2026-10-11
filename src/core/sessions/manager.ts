@@ -10,7 +10,7 @@ import { bindableFolders } from "../folders.ts";
 import * as texts from "../texts.ts";
 import { DRAIN_POLL_SECONDS } from "./constants.ts";
 import type { SessionDeps } from "./deps.ts";
-import { checkDirectory, trustedBy } from "./directory.ts";
+import { checkDirectory, repositoryBy, trustedBy } from "./directory.ts";
 import { DirectoryUnavailable, SessionClosed } from "./errors.ts";
 import { logger, ThreadSession } from "./session.ts";
 import type { Event } from "./tasks.ts";
@@ -51,14 +51,11 @@ export class SessionManager {
   }
 
   /**
-   * The repository holding `directory` when the daemon's git may run in it for a session
-   * started in `sessionFolder`: the footer's own lookup, so what runs git for `!open` is what
-   * runs it for the footer. Null for an agent with no record of trust (`folderTrust`): the
-   * daemon's git runs in no folder then.
+   * The repository holding `directory` when the daemon's git may run in it: the footer's own
+   * lookup (`repositoryBy`), so what runs git for `!open` is what runs it for the footer.
    */
-  async repository(directory: string, sessionFolder: string): Promise<Repository | null> {
-    if (!this.deps.agent.capabilities.folderTrust) return null;
-    return this.deps.agent.trustedRepository(directory, sessionFolder);
+  repository(directory: string): Promise<Repository | null> {
+    return repositoryBy(this.deps.agent)(directory);
   }
 
   /**

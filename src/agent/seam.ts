@@ -495,9 +495,9 @@ export interface AgentBackend {
   folderTrusted(folder: string): Promise<boolean>;
   /**
    * The repository holding `folder` when the daemon's own git may run in it: one the owner
-   * trusted, or one inside `sessionFolder` when that folder is trusted. Null anywhere else.
+   * trusted in the agent, by itself. Null anywhere else.
    */
-  trustedRepository(folder: string, sessionFolder: string): Promise<Repository | null>;
+  trustedRepository(folder: string): Promise<Repository | null>;
   /**
    * The account's limits as the agent reports them now; it can take a while, and rejects when
    * the agent gave none. Present with `usageLimits`.

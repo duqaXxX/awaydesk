@@ -101,6 +101,7 @@ import {
   systemRecord,
   taskCards,
   toolUseOf,
+  withResult,
   withTaskStatus,
 } from "./helpers.ts";
 
@@ -1817,13 +1818,6 @@ function statuses(h: Harness): string[] {
   return lasts;
 }
 
-/** A recorded turn that ends with another result text, as a command's output would. */
-function withResult(turn: readonly Item[], result: string): Item[] {
-  const last = recordOf(turn.at(-1));
-  assert.ok(last !== null && isResult(turn.at(-1)));
-  return [...turn.slice(0, -1), { record: { ...last, result } }];
-}
-
 test("the footer follows an effort set from slack", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),
@@ -2287,28 +2281,24 @@ test("the footer leaves out the branch of a repository not trusted", GIT_LAYOUT,
 });
 
 test(
-  "the footer asks for the repository with the folder the session started in",
+  "the footer asks for the repository in the folder the agent moved to",
   GIT_LAYOUT,
   async (t) => {
-    // The agent moved into `repo`: the repository is looked up there, for the session whose
-    // folder is the bound one (a repository inside that folder is covered by its trust).
+    // The agent moved into `repo`: the repository is looked up there.
     const make = harnessFor(t);
     const repo = repoUnder(make.tmpPath);
-    const asked: Array<readonly [string, string]> = [];
+    const asked: string[] = [];
     const moved = { ...(sdkJson("stop-hook") as JsonObject), cwd: repo };
     const h = make({ turns: [withStopHook(sdkMessages("tools"), moved)] });
-    h.backend.repository = async (folder, sessionFolder) => {
-      asked.push([folder, sessionFolder]);
+    h.backend.repository = async (folder) => {
+      asked.push(folder);
       return anyRepository(folder);
     };
     const session = h.session();
     await (await session.submit("list the files")).done.wait();
     await session.status();
     assert.ok(asked.length > 0);
-    assert.deepEqual(
-      new Set(asked.map((pair) => pair.join("\n"))),
-      new Set([`${repo}\n${session.directory}`]),
-    );
+    assert.deepEqual(new Set(asked), new Set([repo]));
     assert.notEqual(session.directory, repo);
   },
 );
@@ -3060,6 +3050,21 @@ test("a result reporting an effort change stores it", async (t) => {
   const h = harnessFor(t)({ turns: [effortTurn] });
   await (await h.session().submit("/effort high")).done.wait();
   assert.equal(thread(h).effort, "high");
+});
+
+test("a reply that reads like an effort change stores nothing", async (t) => {
+  // The final text of an ordinary turn is the model's, and what the agent read can shape it:
+  // only the output of a command that sets the level is read for it.
+  const reply = withResult(
+    sdkMessages("tools"),
+    "Set effort level to low (this session only): Quick",
+  );
+  const h = harnessFor(t)({ turns: [reply] });
+  const session = h.session(); // opens the thread
+  h.state.setEffort(CHANNEL, THREAD, "high"); // the level the owner chose
+  await (await session.submit("summarise the page")).done.wait();
+  assert.equal(thread(h).effort, "high");
+  assert.ok(!statuses(h).at(-1)?.includes("*effort* low"));
 });
 
 test("setting effort back to auto stores the default", async (t) => {

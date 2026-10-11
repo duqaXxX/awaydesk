@@ -42,6 +42,7 @@ export interface Inside {
   unlanded: Set<Reply>;
   waiting: Set<string>;
   settled: Event;
+  effort: string | null;
   injectedExpected: boolean;
   notificationWaits: boolean;
   reportDue: boolean;
@@ -272,6 +273,13 @@ const TASK_SUBTYPES = ["task_started", "task_progress", "task_notification", "ta
 /** `isinstance(m, sessions.TASK_MESSAGES)`. */
 export function isTaskRecord(item: Item | undefined): boolean {
   return TASK_SUBTYPES.some((subtype) => isSystem(item, subtype));
+}
+
+/** A recorded turn that ends with another result text, as a command's output would. */
+export function withResult(turn: readonly Item[], result: string): Item[] {
+  const last = recordOf(turn.at(-1));
+  assert.ok(last !== null && isRecord(turn.at(-1), "result"));
+  return [...turn.slice(0, -1), { record: { ...last, result } }];
 }
 
 /** Until a turn is running and has shown the call. */

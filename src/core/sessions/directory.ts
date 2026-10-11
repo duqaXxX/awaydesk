@@ -2,7 +2,7 @@
 import { realpathSync, statSync } from "node:fs";
 import { opendir, stat } from "node:fs/promises";
 import { isAbsolute, sep } from "node:path";
-import type { AgentBackend } from "../../agent/seam.ts";
+import type { AgentBackend, Repository } from "../../agent/seam.ts";
 import { errorCode } from "../../values.ts";
 import { ABSENT, expandUser, resolvePath } from "../paths.ts";
 import * as texts from "../texts.ts";
@@ -14,6 +14,16 @@ import { DirectoryMissing, DirectoryUnreadable, DirectoryUntrusted } from "./err
  */
 export function trustedBy(agent: AgentBackend): (folder: string) => Promise<boolean> {
   return async (folder) => !agent.capabilities.folderTrust || agent.folderTrusted(folder);
+}
+
+/**
+ * `agent`'s answer for the repository holding a folder when the daemon's own git may run in it:
+ * the one lookup behind the footer and `!open`. Null for an agent with no record of trust
+ * (`folderTrust`): the daemon's git runs in no folder then.
+ */
+export function repositoryBy(agent: AgentBackend): (folder: string) => Promise<Repository | null> {
+  return async (folder) =>
+    agent.capabilities.folderTrust ? agent.trustedRepository(folder) : null;
 }
 
 /**
