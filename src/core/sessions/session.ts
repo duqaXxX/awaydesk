@@ -1074,7 +1074,12 @@ export class ThreadSession {
       for (const pending of this.deps.approvals.denyAll(this.channelId, this.threadId)) {
         await this.deleteRequest(pending.messageTs);
       }
-      await client.interrupt();
+      try {
+        await client.interrupt();
+      } catch (error) {
+        // A query already closed refuses the request; the tasks below still stop.
+        logger.warning(`could not interrupt ${this.where}: ${errorName(error)}`);
+      }
     }
     for (const taskId of tasks) {
       this.stopped.add(taskId);

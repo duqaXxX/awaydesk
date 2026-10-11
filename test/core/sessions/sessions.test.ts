@@ -2927,6 +2927,33 @@ test("a stop held by a background task says so and bang stop ends it", async (t)
   await drainEnds(h, drain);
 });
 
+test("a stop whose interrupt is refused still stops the background tasks", async (t) => {
+  // The SDK rejects a control request on a query it has cleaned up ("Query closed before
+  // response received", read in sdk.mjs 0.3.296) and one the CLI refuses with its own error.
+  const [first] = splitBackground();
+  const taskId = String(systemRecord(first, "task_started").task_id);
+  const warnings = logged(t, "warning");
+  const h = harnessFor(t)({
+    turns: [first, [canUseToolCall("Bash", { command: "rm -rf build" }), ...sdkMessages("tools")]],
+  });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await session.submit("clean"); // a turn that waits on an approval, with the command running
+  await h.until(() => pending(h.approvals).length > 0);
+  const client = h.clients[0];
+  assert.ok(client !== undefined);
+  client.interrupt = async () => {
+    throw new TypeError("Query closed before response received");
+  };
+  assert.equal(await session.stop(), true);
+  assert.deepEqual(client.stoppedTasks, [taskId]);
+  const refused = warnings.filter((line) => line.includes("could not interrupt"));
+  assert.equal(refused.length, 1, warnings.join("\n"));
+  const line = String(refused[0]);
+  assert.ok(line.includes(`${CHANNEL}/${THREAD}`) && line.includes("TypeError"));
+  assert.ok(!line.includes("Query closed")); // the error's name, never its text
+});
+
 test("a stop of a background task ends the reply like any other end", async (t) => {
   // `!stop` (S2): the task's own end lets the reply's stream stop, with the footer, as a
   // normal end does. Nothing is posted, and the ✅ is the stop's own.
