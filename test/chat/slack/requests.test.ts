@@ -56,7 +56,6 @@ function actionIds(blocks: Json[]): string[] {
 function permission(known: Partial<PermissionRequest> = {}): PermissionRequest {
   return {
     type: "permission",
-    requestId: "r",
     callId: "toolu_1",
     toolName: "Bash",
     input: {},
@@ -88,7 +87,7 @@ function question(known: {
 /** The questions of a recorded `AskUserQuestion` call, through the Claude back end's mapping. */
 function recordedQuestions(name: string): Question[] {
   const recorded = sdkJson(name) as { input: Record<string, unknown> };
-  const request = toRequest("r", QUESTION_TOOL, recorded.input, {});
+  const request = toRequest(QUESTION_TOOL, recorded.input, {});
   assert.equal(request.type, "question");
   return request.type === "question" ? [...request.questions] : [];
 }

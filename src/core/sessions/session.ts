@@ -54,6 +54,7 @@ import type {
   QuestionAnswer,
   QuestionRequest,
   SessionEvent,
+  TaskKind,
 } from "../../agent/seam.ts";
 import { ResumeRefused } from "../../agent/seam.ts";
 import type { FooterFields, MessageId, Reply, SessionStatus, ThreadChat } from "../../chat/seam.ts";
@@ -92,9 +93,9 @@ import {
   SUMMARY_IS_END_LINE,
   TASK_EVENTS,
   TASK_REPLIES_KEPT,
+  TASK_WORDS,
   TASKS_KEPT,
   TURN_EVENTS,
-  taskKind,
 } from "./constants.ts";
 import type { SessionDeps } from "./deps.ts";
 import { checkDirectory, repositoryBy, terminalLine, trustedBy } from "./directory.ts";
@@ -199,7 +200,7 @@ export class ThreadSession {
   // dropped, since they get no reply of their own.
   private endNotes: string[] = [];
   // Each task's type and description, for the footer's counts and its end line.
-  private readonly tasks = new Map<string, readonly [type: string, description: string]>();
+  private readonly tasks = new Map<string, readonly [kind: TaskKind, description: string]>();
   // Ended tasks not yet opened into a report turn's reply: (task id, its formatted end line).
   // The task id finds the reply that started it (the report renders there).
   private ended: Array<readonly [taskId: string, line: string]> = [];
@@ -1364,7 +1365,6 @@ export class ThreadSession {
         // The model set with `/model` survives a resume by itself (measured); the effort
         // `/effort` set does not, so the daemon stores it per thread and passes it back here.
         effort: valid,
-        permissionMode: null,
       },
       {
         permission: (request) => this.answering(request) as Promise<PermissionAnswer>,
@@ -1803,7 +1803,7 @@ export class ThreadSession {
   }
 
   private recordTask(event: TaskStarted): void {
-    this.tasks.set(event.taskId, [event.taskType ?? "", event.description]);
+    this.tasks.set(event.taskId, [event.kind, event.description]);
     if (this.mayHaveOrderedRestart) this.afterRestart.add(event.taskId);
     const kept = this.deps.tasksKept ?? TASKS_KEPT;
     for (const taskId of this.tasks.keys()) {
@@ -1830,14 +1830,14 @@ export class ThreadSession {
    * from the task's description, plus the duration when the task reports one.
    */
   private endedLine(event: TaskEnded): string {
-    const [taskType, description] = this.tasks.get(event.taskId) ?? ["", ""];
+    const [kind, description] = this.tasks.get(event.taskId) ?? ["other", ""];
     let text: string;
-    if (SUMMARY_IS_END_LINE.has(taskType) && event.summary) {
+    if (SUMMARY_IS_END_LINE.has(kind) && event.summary) {
       text = oneLine(event.summary, 200);
     } else {
       const origin = this.taskReplies.get(event.taskId);
       const label = description || (origin?.taskTitle(event.taskId) ?? null);
-      const name = taskKind(taskType)[1];
+      const name = TASK_WORDS[kind][1];
       const outcome = event.status === "completed" ? "finished" : event.status;
       text = `${name} "${oneLine(label || event.taskId, 120)}" ${outcome}`;
     }
@@ -2412,8 +2412,8 @@ export class ThreadSession {
     for (const [taskId, renderer] of this.taskReplies) {
       if (options.awaitedOnly && this.afterRestart.has(taskId)) continue;
       if (renderer.runningTasks.includes(taskId)) {
-        const kind = taskKind(this.tasks.get(taskId)?.[0] ?? "")[0];
-        counts.set(kind, (counts.get(kind) ?? 0) + 1);
+        const counted = TASK_WORDS[this.tasks.get(taskId)?.[0] ?? "other"][0];
+        counts.set(counted, (counts.get(counted) ?? 0) + 1);
       }
     }
     return [...counts].map(([kind, n]) => `${n} ${kind}${n > 1 ? "s" : ""}`).join(" · ");

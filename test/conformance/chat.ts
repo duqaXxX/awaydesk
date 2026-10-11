@@ -122,10 +122,9 @@ export interface ChatConformanceOptions {
 const OWN_WORDS = "please build the module";
 const FOLDER = "/work/notes";
 
-function permission(requestId: string): OwnerRequest {
+function permission(): OwnerRequest {
   return {
     type: "permission",
-    requestId,
     callId: "call-1",
     toolName: "Bash",
     input: { command: "ls" },
@@ -144,10 +143,9 @@ const QUESTION: Question = {
   ],
 };
 
-function question(requestId: string): OwnerRequest {
+function question(): OwnerRequest {
   return {
     type: "question",
-    requestId,
     callId: "call-2",
     toolName: "AskUserQuestion",
     title: null,
@@ -556,16 +554,14 @@ export function chatConformance(
       check("ask rejects with ChatError when it could not show the request", async (s) => {
         s.rig.refuseWrites();
         await assert.rejects(
-          s.provider
-            .thread(s.ref)
-            .ask("request-refused", permission("request-refused"), "A request"),
+          s.provider.thread(s.ref).ask("request-refused", permission(), "A request"),
           ChatError,
         );
       });
 
       check("keepAnswers leaves the record of the answers and nothing to press", async (s) => {
         const thread = s.provider.thread(s.ref);
-        const id = await thread.ask("request-answered", question("request-answered"), "A question");
+        const id = await thread.ask("request-answered", question(), "A question");
         await thread.keepAnswers(id, [QUESTION], { [QUESTION.text]: "blue" });
         const shown = s.rig.read(s.ref).find((m) => m.id === id);
         assert.ok(shown, "the record stays in the thread");
@@ -823,7 +819,7 @@ export function chatConformance(
 
       inbound("the owner's skip of a question arrives as null answers", async (s) => {
         const thread = s.provider.thread(s.ref);
-        const request = question("request-skipped");
+        const request = question();
         const message = await thread.ask("request-skipped", request, "A question");
         const skip: OwnerAnswer = { type: "question", answers: null };
         await s.rig.owner.answers(
@@ -838,7 +834,7 @@ export function chatConformance(
 
       inbound("the owner's denial of a permission arrives as a denial", async (s) => {
         const thread = s.provider.thread(s.ref);
-        const request = permission("request-denied");
+        const request = permission();
         const message = await thread.ask("request-denied", request, "A permission");
         const deny: OwnerAnswer = { type: "permission", allow: false };
         await s.rig.owner.answers(
@@ -898,7 +894,7 @@ export function chatConformance(
       inbound("nothing arrives after stop", async (s) => {
         const thread = s.provider.thread(s.ref);
         const requestId = "request-late";
-        const request = permission(requestId);
+        const request = permission();
         const message = await thread.ask(requestId, request, "A permission");
         const channel = s.provider.channel(s.rig.channel);
         await channel.offer(FOLDERS, "Pick a folder to bind");

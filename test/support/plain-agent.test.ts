@@ -42,7 +42,6 @@ const START: StartOptions = {
   settingsSources: ["user", "project", "local"],
   model: null,
   effort: null,
-  permissionMode: null,
 };
 let counter = 0;
 

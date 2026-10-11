@@ -311,6 +311,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The agent seam and the Slack provider lose what nothing read. In the seam: `requestId` on
+  `PermissionRequest` and `QuestionRequest`, `StartOptions.permissionMode`, `messageId` on the
+  message and text events, `compaction_ended.result`, and `parentCallId` on the three text events
+  (the translator now drops a subagent's text at the source, where the renderer used to). The
+  back end drops `EFFORT_LEVELS` and `PERMISSION_MODES` (a level or a mode is checked against
+  `CAPABILITIES`), the branch that logged an unrecognized effort level at a start (the core
+  already logs it), and the `unshownMessage` argument of `ClaudeSession`. The core counts and
+  words a task by the `kind` of `task_started` (`constants.TASK_WORDS`), no longer by Claude
+  Code's task types; what the owner reads is unchanged. In the Slack provider the re-exports at
+  the end of `sinks.ts` and of `app.ts`, `Tool.pieces`, `Message.refused` and the signal of
+  `endOut` are gone, and the rows of `docs/sdk-surface.md` for `Options.permissionMode`,
+  `CanUseTool.requestId` and the unused permission modes follow.
+
 - The docs say what the code does where they said otherwise. `docs/sdk-surface.md`: the probe
   (`probe/surface.ts`, `node probe/main.ts --surface`) reads the published reference and checks
   the table, and the table gains the six `SDKSessionInfo` fields `info.ts` reads.

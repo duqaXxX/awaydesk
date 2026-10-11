@@ -181,7 +181,6 @@ function startOptions(world: AgentWorld, override: Partial<StartOptions> = {}): 
     settingsSources: SETTINGS,
     model: null,
     effort: null,
-    permissionMode: null,
     ...override,
   };
 }
@@ -230,24 +229,23 @@ function ended(events: readonly SessionEvent[]): Extract<SessionEvent, { type: "
 
 /** The order the seam documents for a turn's events, and the shapes it asks of each. */
 function assertWellFormed(events: readonly SessionEvent[]): void {
-  const open = new Map<string | null, string | null>();
+  const open = new Set<string | null>();
   const started = new Set<string>();
   const finished = new Set<string>();
   let textOpen = false;
   for (const event of events) {
     switch (event.type) {
       case "message_started":
-        open.set(event.parentCallId, event.messageId);
+        open.add(event.parentCallId);
         textOpen = false;
         break;
       case "text_started":
-        assert.ok(open.has(event.parentCallId), "text_started inside a message");
+        assert.ok(open.has(null), "text_started inside a message");
         textOpen = true;
         break;
       case "text_delta":
         assert.notEqual(event.text, "", "a delta is never empty");
         assert.ok(textOpen, "a delta follows text_started");
-        assert.equal(event.messageId, open.get(event.parentCallId) ?? null);
         break;
       case "message_ended":
         assert.ok(open.has(event.parentCallId), "message_ended closes a message_started");
@@ -551,7 +549,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         const turn = await events.turn();
         assert.equal(requests.permissions.length, 1, "the owner is asked once");
         const [request] = requests.permissions;
-        assert.ok(request !== undefined && request.requestId !== "");
+        assert.ok(request !== undefined);
         assert.equal(request.toolName, played.toolName);
         assert.deepEqual(request.input, played.input);
         const started = turn.find((event) => event.type === "call_started");
@@ -612,7 +610,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         const turn = await events.turn();
         assert.equal(requests.questions.length, 1);
         const [request] = requests.questions;
-        assert.ok(request !== undefined && request.requestId !== "" && request.toolName !== "");
+        assert.ok(request !== undefined && request.toolName !== "");
         assert.deepEqual(
           request.questions.map((asked) => ({
             text: asked.text,
@@ -849,9 +847,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       "a permission mode the back end names is taken, another is refused",
       LIMIT,
       async (world, t) => {
-        const { session } = await open(t, world, new Requests(), {
-          permissionMode: caps.permissionModes.default,
-        });
+        const { session } = await open(t, world);
         for (const mode of Object.values(caps.permissionModes)) {
           if (mode !== null) await session.setPermissionMode(mode);
         }

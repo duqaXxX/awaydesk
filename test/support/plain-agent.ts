@@ -426,12 +426,7 @@ export class PlainSession implements AgentSession {
     const command = this.#command(text);
     const turn = new Turn();
     if (command !== null) {
-      this.#push({
-        type: "text",
-        messageId: this.#nextId("message"),
-        text: command,
-        parentCallId: null,
-      });
+      this.#push({ type: "text", text: command });
       turn.finalText = command;
     } else {
       this.#turn = new AbortController();
@@ -479,12 +474,7 @@ export class PlainSession implements AgentSession {
       } else if ("whole" in step) {
         const trimmed = step.whole.trim();
         if (trimmed !== "") {
-          this.#push({
-            type: "text",
-            messageId: this.#nextId("message"),
-            text: trimmed,
-            parentCallId: null,
-          });
+          this.#push({ type: "text", text: trimmed });
           turn.finalText = trimmed;
           turn.messages += 1;
         }
@@ -518,13 +508,12 @@ export class PlainSession implements AgentSession {
   }
 
   #say(text: string, turn: Turn): void {
-    const messageId = this.#nextId("message");
-    this.#push({ type: "message_started", messageId, parentCallId: null });
-    this.#push({ type: "text_started", messageId, parentCallId: null });
+    this.#push({ type: "message_started", parentCallId: null });
+    this.#push({ type: "text_started" });
     for (const piece of pieces(text)) {
-      this.#push({ type: "text_delta", messageId, text: piece, parentCallId: null });
+      this.#push({ type: "text_delta", text: piece });
     }
-    this.#push({ type: "message_ended", messageId, parentCallId: null });
+    this.#push({ type: "message_ended", parentCallId: null });
     const trimmed = text.trim();
     turn.messages += 1;
     if (trimmed !== "") turn.finalText = trimmed;
@@ -545,7 +534,6 @@ export class PlainSession implements AgentSession {
     if (options.permission === true) {
       const request: PermissionRequest = {
         type: "permission",
-        requestId: this.#nextId("request"),
         callId,
         toolName,
         input,
@@ -586,7 +574,6 @@ export class PlainSession implements AgentSession {
     });
     const request: QuestionRequest = {
       type: "question",
-      requestId: this.#nextId("request"),
       callId,
       toolName: "Ask",
       title: null,

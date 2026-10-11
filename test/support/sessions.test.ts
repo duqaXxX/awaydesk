@@ -32,7 +32,6 @@ const OPTIONS: StartOptions = {
   settingsSources: ["user", "project", "local"],
   model: null,
   effort: null,
-  permissionMode: null,
 };
 
 interface Asked {

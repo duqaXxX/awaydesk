@@ -26,7 +26,6 @@ test("the owner approves a permission, the tool runs and the request's message i
   assert.equal(asked.title, "Shell: rm x");
   assert.deepEqual(asked.request, {
     type: "permission",
-    requestId: asked.request.requestId,
     callId: asked.request.type === "permission" ? asked.request.callId : "",
     toolName: "Shell",
     input: { command: "rm x" },

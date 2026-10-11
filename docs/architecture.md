@@ -670,9 +670,9 @@ left unfinished does not hide the next turn's text.
 
 | Event | Made from | What the owner sees |
 |---|---|---|
-| `text_delta` with no parent call | a `stream_event` of type `content_block_delta` carrying a `text_delta` | the text, as it is written |
+| `text_delta` | a top-level `stream_event` of type `content_block_delta` carrying a `text_delta`; a subagent's gives none | the text, as it is written |
 | none | a top-level text block in an `assistant` record whose message id a `message_start` announced | nothing more: the same text already arrived as deltas |
-| `text` | the same in an `assistant` record whose message id no `message_start` announced | the text, where it arrives, a paragraph apart from text before it (note 1) |
+| `text` | the same in a top-level `assistant` record whose message id no `message_start` announced; a subagent's gives none | the text, where it arrives, a paragraph apart from text before it (note 1) |
 | `call_started` with no parent call | a `tool_use` or `server_tool_use` block | a new tool line, in progress, titled `Name: first string argument` |
 | the same with `parentCallId` set, from the record's `parent_tool_use_id` (a subagent, or a skill run in a forked context) | the same blocks | the parent's line counts the subagent's calls and holds its latest ones (note 2) |
 | `call_ended` for a line | a `tool_result` or `advisor_tool_result` block | the line completes, or shows an error with the output's first line when `isError`; a line whose task already ended as stopped keeps `Stopped` |
@@ -1496,7 +1496,7 @@ closed when the start returns (`ThreadSession.connect`).
   `summary`, which already reads `Background command "..." completed (exit code 0)`, or
   `Agent "<description>" finished` built from the task's `task_started` event, since an agent's
   `summary` is its result; plus the duration when the notification's `usage` reports `duration_ms`
-  (`constants.TASK_KINDS`, `constants.SUMMARY_IS_END_LINE`). No new message follows for it; only
+  (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; only
   when the reply it would render into is no longer tracked (a restart or an idle close dropped it)
   does the report get a reply of its own. The next queued message waits for it to finish.
   `texts.BACKGROUND_NOTICE` opens it only when no task end was seen. When a message was already sent
@@ -1515,9 +1515,9 @@ closed when the start returns (`ThreadSession.connect`).
   reply. A background subagent's own calls (a `parentCallId` pointing at a line of an ended turn) go
   under its line the same way and never open a reply. A notification for such a task still makes the
   next queued message wait for the turn Claude Code starts to report it.
-- What is still running is counted by each task's type as Claude Code names it
-  (`constants.TASK_KINDS`; a type not listed counts as a task) and said once, on the last line of
-  the thread. When the thread's latest reply has ended, the counts close its footer
+- What is still running is counted by each task's `kind`, which the back end sets from the type
+  Claude Code names (`constants.TASK_WORDS`; the kind `other` counts as a task) and said once, on
+  the last line of the thread. When the thread's latest reply has ended, the counts close its footer
   (`⏳ 1 shell · 1 agent`); a new reply takes them over and the previous one drops them, keeping its
   footer. When the latest reply is still open for its own task, and so has no footer yet, the
   thread's status line says them (`1 shell · 1 agent still running`). The two never show together,

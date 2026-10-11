@@ -95,7 +95,6 @@ export interface StartOptions {
   readonly settingsSources: readonly SettingsSource[];
   readonly model: string | null;
   readonly effort: string | null;
-  readonly permissionMode: PermissionMode | null;
 }
 
 export interface TextPart {
@@ -198,7 +197,8 @@ export interface ModelTokens {
  * What a back end tells the core. An event can arrive while no turn of the owner's runs:
  * `turn_ended` is an event like the others, not the answer to `send`.
  *
- * `parentCallId` names the call a subagent's event runs under, and is null at the top level.
+ * `parentCallId` names the call a subagent's event runs under, and is null at the top level. A
+ * subagent's text is never an event: the three text events carry no `parentCallId`.
  * The events of one message arrive in the order the agent produced them.
  */
 export type SessionEvent =
@@ -217,37 +217,21 @@ export type SessionEvent =
   /** The agent starts writing a message; its texts follow as `text_started` and `text_delta`. */
   | {
       readonly type: "message_started";
-      readonly messageId: string | null;
       readonly parentCallId: string | null;
     }
   | {
       readonly type: "message_ended";
-      readonly messageId: string | null;
       readonly parentCallId: string | null;
     }
   /** A text of the message being written starts; a message can hold several. */
-  | {
-      readonly type: "text_started";
-      readonly messageId: string | null;
-      readonly parentCallId: string | null;
-    }
+  | { readonly type: "text_started" }
   /** The next piece of the text being written, never empty. */
-  | {
-      readonly type: "text_delta";
-      readonly messageId: string | null;
-      readonly text: string;
-      readonly parentCallId: string | null;
-    }
+  | { readonly type: "text_delta"; readonly text: string }
   /**
    * The whole text of a message that was not written piece by piece (a command's own output),
    * trimmed and never empty. A text reaches the core once: as deltas or whole, never both.
    */
-  | {
-      readonly type: "text";
-      readonly messageId: string;
-      readonly text: string;
-      readonly parentCallId: string | null;
-    }
+  | { readonly type: "text"; readonly text: string }
   | {
       readonly type: "call_started";
       readonly callId: string;
@@ -270,7 +254,10 @@ export type SessionEvent =
       readonly type: "task_started";
       readonly taskId: string;
       readonly kind: TaskKind;
-      /** The agent's own word for the kind, as written; null when it gives none. */
+      /**
+       * The agent's own word for the kind, as written; null when it gives none. It names the
+       * task's line in the reply; the core counts and words a task by `kind`.
+       */
       readonly taskType: string | null;
       readonly description: string;
       readonly callId: string | null;
@@ -306,8 +293,8 @@ export type SessionEvent =
     }
   /** The agent is compacting the conversation. Not repeated while it lasts. */
   | { readonly type: "compaction_started" }
-  /** It no longer is: `result` is the agent's word for how it went, null when it gives none. */
-  | { readonly type: "compaction_ended"; readonly result: string | null }
+  /** It no longer is. */
+  | { readonly type: "compaction_ended" }
   /** The conversation continues from its summary. A count the agent does not give is null. */
   | {
       readonly type: "compacted";
@@ -366,7 +353,6 @@ export type SessionEventType = SessionEvent["type"];
 
 export interface PermissionRequest {
   readonly type: "permission";
-  readonly requestId: string;
   readonly callId: string | null;
   readonly toolName: string;
   readonly input: Readonly<Record<string, unknown>>;
@@ -397,7 +383,6 @@ export interface Question {
 
 export interface QuestionRequest {
   readonly type: "question";
-  readonly requestId: string;
   readonly callId: string | null;
   /** The tool that asks, which names the request in one line when the agent writes no title. */
   readonly toolName: string;

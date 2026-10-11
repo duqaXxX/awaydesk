@@ -188,7 +188,6 @@ test("the client is launched as the design says", async (t) => {
     settingsSources: ["user", "project", "local"],
     model: null,
     effort: null,
-    permissionMode: null,
   });
 });
 

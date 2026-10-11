@@ -107,7 +107,6 @@ export async function offeredNow(): Promise<Set<string>> {
         settingsSources: [],
         model: null,
         effort: null,
-        permissionMode: null,
       },
       NO_ANSWERS,
     );

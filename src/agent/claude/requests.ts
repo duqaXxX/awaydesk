@@ -71,9 +71,8 @@ function questionsOf(input: Input): Question[] | null {
   return questions;
 }
 
-/** One call of the permission callback as the request the core shows, under `requestId`. */
+/** One call of the permission callback as the request the core shows. */
 export function toRequest(
-  requestId: string,
   toolName: string,
   input: Input,
   context: CallContext,
@@ -83,7 +82,6 @@ export function toRequest(
   if (questions !== null) {
     return {
       type: "question",
-      requestId,
       callId,
       toolName,
       title: words(context.title),
@@ -92,7 +90,6 @@ export function toRequest(
   }
   return {
     type: "permission",
-    requestId,
     callId,
     toolName,
     input,

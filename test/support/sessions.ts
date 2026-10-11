@@ -351,7 +351,7 @@ export class FakeAgentSession implements AgentSession {
 
   /** The request the back end makes of a permission callback, put to the core's handler. */
   #ask(call: CanUseToolCall): Promise<PermissionAnswer | QuestionAnswer> {
-    const mapped = toRequest(`request-${call.callId}`, call.toolName, call.input, {
+    const mapped = toRequest(call.toolName, call.input, {
       toolUseID: call.callId,
     });
     if (mapped.type === "question") {

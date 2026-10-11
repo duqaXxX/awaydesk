@@ -127,8 +127,8 @@ test("promptDuringTurn off: a prompt waits for the turn the agent started by its
   await session.ensureConnected();
   // The agent starts a turn of its own while the session expects none.
   h.clients[0]?.inject([
-    event({ type: "message_started", messageId: "m1", parentCallId: null }),
-    event({ type: "text", messageId: "m1", text: "reporting", parentCallId: null }),
+    event({ type: "message_started", parentCallId: null }),
+    event({ type: "text", text: "reporting" }),
   ]);
   await h.until(() => inside(session).active !== null);
   const prompt = await session.submit("and now this");
@@ -146,8 +146,8 @@ test("promptDuringTurn on: a prompt is handed to the agent while its own turn ru
   const session = h.session();
   await session.ensureConnected();
   h.clients[0]?.inject([
-    event({ type: "message_started", messageId: "m1", parentCallId: null }),
-    event({ type: "text", messageId: "m1", text: "reporting", parentCallId: null }),
+    event({ type: "message_started", parentCallId: null }),
+    event({ type: "text", text: "reporting" }),
   ]);
   await h.until(() => inside(session).active !== null);
   await session.submit("and now this");
@@ -206,7 +206,7 @@ test("folderTrust on: an untrusted folder starts no session", async (t) => {
 /** The events of an owner's turn in which an agent runs a subagent that calls a tool. */
 function subagentTurn(): Item[] {
   return [
-    event({ type: "message_started", messageId: "m1", parentCallId: null }),
+    event({ type: "message_started", parentCallId: null }),
     event({
       type: "call_started",
       callId: "agent-1",
@@ -254,7 +254,7 @@ function subagentTurn(): Item[] {
       fileChange: null,
       parentCallId: null,
     }),
-    event({ type: "message_ended", messageId: "m1", parentCallId: null }),
+    event({ type: "message_ended", parentCallId: null }),
     event(OWNER_TURN_ENDED),
   ];
 }
