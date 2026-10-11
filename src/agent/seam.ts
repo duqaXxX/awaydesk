@@ -33,8 +33,8 @@ export interface PermissionModes {
 
 /**
  * What differs between back ends and the core adapts to. A capability is here because the core
- * reads it, but for the two that say so: without one the feature it names is not offered, and
- * the core never calls what serves it. What every back end does alike needs none.
+ * reads it: without one the feature it names is not offered (`!help` and `!guide` leave it
+ * out), and the core never calls what serves it. What every back end does alike needs none.
  */
 export interface Capabilities {
   /**
@@ -53,14 +53,10 @@ export interface Capabilities {
   readonly compaction: boolean;
   /**
    * The agent asks the owner questions (`RequestHandler.question`). The core offers nothing of
-   * its own for a question, so nothing of it reads this: it says what a back end may call.
+   * its own for a question, so the only thing that reads this is `!guide`, which names the
+   * answer form when it is declared.
    */
   readonly questions: boolean;
-  /**
-   * A permission can be granted with the call's input changed (`PermissionAnswer`). The core
-   * builds no changed input, so nothing of it reads this either.
-   */
-  readonly changedInput: boolean;
   /** `AgentBackend.usageLimits`. */
   readonly usageLimits: boolean;
   /** `AgentInfo.models` lists what `setModel` takes. */
@@ -81,6 +77,8 @@ export interface AgentWords {
   readonly author: string;
   /** The command that opens the agent in a terminal on the host. */
   readonly command: string;
+  /** Two of its commands as the owner types them in the chat, for the guide. */
+  readonly examples: string;
   /**
    * The shell line that continues a session in a terminal; `{directory}` and `{session}` are
    * filled in, each quoted for a shell.
@@ -372,7 +370,7 @@ export interface PermissionRequest {
 }
 
 export type PermissionAnswer =
-  | { readonly allow: true; readonly changedInput?: Readonly<Record<string, unknown>> }
+  | { readonly allow: true }
   | { readonly allow: false; readonly message: string };
 
 export interface QuestionOption {

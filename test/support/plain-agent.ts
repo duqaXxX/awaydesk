@@ -5,9 +5,9 @@
  *
  * It declares two effort levels that cannot change on a live session, one permission mode,
  * questions, two commands of its own and session listing. It lacks subagents, background tasks,
- * compaction, usage limits, a model list, a changed input, a prompt during a turn and folder
- * trust. A session is named (`session_started`) with its first prompt, as Claude's is: until
- * then it has no id the core could resume.
+ * compaction, usage limits, a model list, a prompt during a turn and folder trust. A session is
+ * named (`session_started`) with its first prompt, as Claude's is: until then it has no id the
+ * core could resume.
  *
  * A test scripts what each prompt does with `agent.next(...steps)`: one turn per call, played by
  * the next prompt of any session, in order (a prompt past the script gets `say("ok")`). A prompt
@@ -54,6 +54,7 @@ export const PLAIN_NAME = "Plain";
 export const PLAIN_WORDS: AgentWords = Object.freeze({
   author: "Plain",
   command: "plain",
+  examples: "`!echo hello`, `!count one two`",
   terminal: "cd {directory} && plain --resume {session}",
 });
 
@@ -68,7 +69,6 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   backgroundTasks: false,
   compaction: false,
   questions: true,
-  changedInput: false,
   usageLimits: false,
   models: false,
   commands: true,

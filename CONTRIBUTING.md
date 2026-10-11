@@ -18,8 +18,8 @@ sessions. A vulnerability goes to the **Security** tab, never to an issue (see
    `ThreadSession.mode`), and on a variable, a Slack scope or a word that
    [docs/setup.md](docs/setup.md) does not name.
 4. A new `!word` of the daemon is a member of the `Word` union of `src/core/commands.ts` with its
-   entry in `WORD`, and needs a line in `texts.GUIDE` (the `!guide` text) and in
-   `texts.HELP_WORDS`: `test/core/commands.test.ts` fails until both explain it. Change the guide
+   entry in `WORD`, and needs a line in the `!guide` text (the `GUIDE_` parts of `src/core/texts.ts`, which
+   `src/core/guide.ts` assembles) and in `texts.HELP_WORDS`: `test/core/commands.test.ts` fails until both explain it. Change the guide
    whenever a behaviour it describes changes. The word also needs a row in the Commands table of
    [README.md](README.md), which `test/docs.test.ts` checks against `WORD`.
 5. The README is the landing page and has a word limit (`README_WORD_LIMIT` in

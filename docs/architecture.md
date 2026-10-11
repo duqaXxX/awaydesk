@@ -187,6 +187,11 @@ and never calls what serves it. The core invents no substitute, except the one i
 the chat table. What every module does alike needs no capability. `effortLevels` and
 `permissionModes` are values, not switches, and their rows say what the core reads them for.
 
+`!guide` is made of parts (`src/core/guide.ts`, `guideText`), and the words `!help` lists follow
+the same capabilities. A part appears when the pair declares what it describes: `folderTrust`,
+`models`, an agent with effort levels, a `bypass` mode, `commands`, `questions`,
+`backgroundTasks` and `sessionListing` of the agent, and `fileUpload` of the chat.
+
 | Agent capability | What the core does without it |
 |---|---|
 | `effortLevels` | the levels `StartOptions.effort` and `AgentSession.setEffort` take; a stored level outside them is dropped, with a line in the log, and the setup offers them as its Effort control when `models` is not declared |
@@ -195,8 +200,7 @@ the chat table. What every module does alike needs no capability. `effortLevels`
 | `subagents` | an event that runs under a call of its own, or a task that is a subagent's, is ignored, with a warning in the log |
 | `backgroundTasks` | a task that outlives its turn, and the turn the agent starts to report it, are ignored; the session tracks and waits for none |
 | `compaction` | the compaction events are ignored |
-| `questions` | no code of the core reads it; the conformance suite runs its question checks only for a back end that declares it |
-| `changedInput` | no code of the core reads it; the conformance suite runs its check only for a back end that declares it |
+| `questions` | `!guide` leaves out the sentence about the question form and titles its approvals section "Approvals"; no other code of the core reads it, and the conformance suite runs its question checks only for a back end that declares it |
 | `usageLimits` | `AgentBackend.usageLimits` is absent and the footer shows no limit |
 | `models` | `AgentInfo.models` is ignored: the setup has no Model select and `AgentSession.setModel` is never called |
 | `commands` | `AgentInfo.commands` is ignored: a `!name` that is no word of the daemon is sent as typed, and `!help` lists no command of the agent |
@@ -233,12 +237,10 @@ plain agent, `test/conformance/chat.ts` against the Slack provider (over its fak
 memory chat. The plain agent (`test/support/plain-agent.ts`) declares few capabilities: no
 subagents, background tasks, compaction, usage limits, model list, bypass mode or record of trust,
 and one permission mode. The memory chat (`test/support/memory-chat.ts`) declares none. A scenario under
-`test/scenario/` runs the daemon with the two selected by name. One check of the chat suite is
-marked `todo` for the Slack provider: that `ThreadChat.endReply` keeps what the reply showed. The
-fake workspace keeps no blocks of a stopped stream, so the check cannot read them back; the
-tests of the provider's own `endReply` cover it with a recorded read. One test of the scenario is
-marked `todo` too: `!guide` shows one text, written for an agent with models, bypass and
-commands and a chat with buttons, a form and a file viewer, whatever the two modules declare.
+`test/scenario/` runs the daemon with the two selected by name. The fake workspace reads a
+stopped stream back as Slack does for one run of plain words (the recording
+`api-conversations-replies-stream`); marks, cards and other chunk shapes read back no blocks, and
+the tests of the provider's own `endReply` cover them with recorded reads.
 
 Not tested: a module other than these. No second real agent or chat ships, and the seams were
 shaped on the two test modules, so a first real one may need a seam change. With Claude and Slack

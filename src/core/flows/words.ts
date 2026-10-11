@@ -7,6 +7,7 @@
  */
 import type { MessageId, ThreadRef } from "../../chat/seam.ts";
 import { helpText, WORD, type Word } from "../commands.ts";
+import { guideText } from "../guide.ts";
 import { BypassUnavailable } from "../sessions/errors.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
@@ -71,9 +72,22 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
         );
         return;
       }
-      case "guide":
-        await talk.say(channel, where, named(texts.GUIDE, names), { ownerOnly: quiet });
+      case "guide": {
+        const have = agent.capabilities;
+        const offered = {
+          folderTrust: have.folderTrust,
+          models: have.models,
+          efforts: have.effortLevels.length > 0,
+          bypass: have.permissionModes.bypass !== null,
+          commands: have.commands,
+          questions: have.questions,
+          backgroundTasks: have.backgroundTasks,
+          sessionListing: have.sessionListing,
+          fileUpload: chat.capabilities.fileUpload,
+        };
+        await talk.say(channel, where, guideText(names, offered), { ownerOnly: quiet });
         return;
+      }
       case "bind":
         if (session !== null || (outside && command.path)) {
           await talk.tell(ref, fill(texts.WORD_IN_THREAD, { word: WORD.bind }));

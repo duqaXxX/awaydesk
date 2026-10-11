@@ -10,8 +10,10 @@ import {
   refusedInThread,
   WORD,
 } from "../../src/core/commands.ts";
+import { guideText } from "../../src/core/guide.ts";
 import * as texts from "../../src/core/texts.ts";
 import { sdkJson } from "../support/fixtures.ts";
+import { EVERYTHING_OFFERED } from "../support/guide-offer.ts";
 import { NAMES } from "../support/names.ts";
 
 /**
@@ -167,9 +169,10 @@ test("the guide and the help explain every word of the daemon", () => {
   }
   // A WORD the parser does not answer would document a word that reaches Claude instead.
   for (const word of words) assert.notEqual(parseBang(`!${word}`)?.kind, "passthrough", word);
+  const guide = guideText(NAMES, EVERYTHING_OFFERED);
   const helpLines = texts.HELP_WORDS.map((line) => texts.named(line, NAMES)).join("\n");
   for (const word of words) {
-    assert.ok(texts.named(texts.GUIDE, NAMES).includes(`\`!${word}`), word);
+    assert.ok(guide.includes(`\`!${word}`), word);
     assert.ok(helpLines.includes(`\`!${word}`), word);
   }
 });

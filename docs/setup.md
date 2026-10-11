@@ -185,8 +185,8 @@ named in the message, and an `ALLOWED_ROOT` that is not a directory.
 | `AWAYDESK_AGENT` | optional: the agent awaydesk drives; `claude` when absent, the only one this release has |
 | `AWAYDESK_CHAT` | optional: the chat awaydesk is driven from; `slack` when absent, the only one this release has |
 
-Leave `AWAYDESK_AGENT` and `AWAYDESK_CHAT` out: `claude` and `slack` are the only agent and chat
-this release has, and a file without them works as one with them. A value awaydesk does not know
+`AWAYDESK_AGENT` and `AWAYDESK_CHAT` can be set or left out: `claude` and `slack` are the only
+agent and chat this release has, and a file without them works as one with them. A value awaydesk does not know
 stops the start, and the message lists the valid ones. A variable that belongs to a module you did
 not select is not read.
 

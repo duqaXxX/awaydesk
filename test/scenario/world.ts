@@ -45,6 +45,7 @@ export const NAMES: Names = {
   author: "Plain",
   cli: "plain",
   chat: "Memory chat",
+  examples: "`!echo hello`, `!count one two`",
 };
 
 /** A date, in seconds: threads the memory chat opens are dated by it. */

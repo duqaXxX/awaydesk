@@ -7,6 +7,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { helpText } from "../../../src/core/commands.ts";
+import { type GuideOffer, guideText } from "../../../src/core/guide.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { fill, named } from "../../../src/core/texts.ts";
 import { hold, PLAIN_COMMANDS, type PlainAgent } from "../../support/plain-agent.ts";
@@ -63,13 +64,35 @@ test("a mistyped word gets the full list", async (t) => {
   ]);
 });
 
+// What the plain agent and the memory chat can serve, written out.
+const PLAIN_OFFER: GuideOffer = {
+  folderTrust: false,
+  models: false,
+  efforts: true,
+  bypass: false,
+  commands: true,
+  questions: true,
+  backgroundTasks: false,
+  sessionListing: true,
+  fileUpload: false,
+};
+
 test("!guide is answered where it was typed", async (t) => {
   const world = await MessagesWorld.make(t);
   const ref = await world.opened();
   await world.says("!guide");
-  assert.equal(world.inChannel().at(-1), named(texts.GUIDE, PLAIN_NAMES));
+  assert.equal(world.inChannel().at(-1), guideText(PLAIN_NAMES, PLAIN_OFFER));
   await world.says("!guide", ref.thread);
-  assert.equal(world.shown(ref).at(-1), named(texts.GUIDE, PLAIN_NAMES));
+  assert.equal(world.shown(ref).at(-1), guideText(PLAIN_NAMES, PLAIN_OFFER));
+});
+
+test("!guide offers what the agent and the chat declare", async (t) => {
+  const world = await MessagesWorld.make(t, { agent: new WithBypass(), files: true });
+  await world.says("!guide");
+  assert.equal(
+    world.inChannel().at(-1),
+    guideText(PLAIN_NAMES, { ...PLAIN_OFFER, bypass: true, fileUpload: true }),
+  );
 });
 
 // --- !bind and !resume

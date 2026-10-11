@@ -11,29 +11,12 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import type { Capabilities, ListedSession, SessionEvent } from "../../../src/agent/seam.ts";
-import { APPROVE } from "../../../src/core/requests.ts";
 import { STORED_STATUS } from "../../../src/core/sessions/constants.ts";
 import { BypassUnavailable, DirectoryUntrusted } from "../../../src/core/sessions/errors.ts";
 import { DEFAULT } from "../../../src/core/setup.ts";
 import { CHANNEL, THREAD } from "../../support/fake-slack.ts";
-import {
-  canUseToolCall,
-  event,
-  type Harness,
-  harnessFor,
-  type Item,
-  sdkMessages,
-} from "../../support/sessions.ts";
-import {
-  inside,
-  logged,
-  pending,
-  play,
-  said,
-  send,
-  splitBackground,
-  statusLines,
-} from "./helpers.ts";
+import { event, type Harness, harnessFor, type Item, sdkMessages } from "../../support/sessions.ts";
+import { inside, logged, play, said, send, splitBackground, statusLines } from "./helpers.ts";
 
 /** The agent of `h` with `capabilities` changed, before its first session starts. */
 function lacking(h: Harness, capabilities: Partial<Capabilities>): void {
@@ -135,18 +118,6 @@ test("commands on: the session holds the agent's commands", async (t) => {
   const session = h.session();
   await session.ensureConnected();
   assert.ok(session.commands.some((command) => command.name === "compact"));
-});
-
-test("changedInput off: an approval is answered with the call as it was", async (t) => {
-  const ask = canUseToolCall("Bash", { command: "ls" });
-  const h = harnessFor(t)({ turns: [[ask, ...sdkMessages("tools")]] });
-  lacking(h, { changedInput: false });
-  const turn = await h.session().submit("list the files");
-  await h.until(() => pending(h.approvals).length === 1);
-  const [approvalId] = pending(h.approvals);
-  assert.notEqual(h.approvals.resolve(approvalId as string, CHANNEL, THREAD, APPROVE), null);
-  await turn.done.wait();
-  assert.deepEqual(h.clients[0]?.permissionResults, [{ allow: true }]);
 });
 
 test("promptDuringTurn off: a prompt waits for the turn the agent started by itself", async (t) => {
@@ -386,7 +357,6 @@ test("an agent that declares no optional capability runs a whole turn", async (t
     backgroundTasks: false,
     compaction: false,
     questions: false,
-    changedInput: false,
     usageLimits: false,
     models: false,
     commands: false,

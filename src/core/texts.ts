@@ -24,11 +24,13 @@ export interface Names {
   readonly cli: string;
   /** The chat's name (`ChatProvider.name`). */
   readonly chat: string;
+  /** Two of the agent's commands as the owner types them (`AgentWords.examples`). */
+  readonly examples: string;
 }
 
 /**
- * A template that names the agent or the chat, with the fields `{agent}`, `{author}`, `{cli}`
- * and `{chat}`. It is no string, and it throws where one is made of it: nothing can show it
+ * A template that names the agent or the chat, with the fields `{agent}`, `{author}`, `{cli}`,
+ * `{chat}` and `{examples}`. It is no string, and it throws where one is made of it: nothing can show it
  * before `named` filled the names in.
  */
 export class Named {
@@ -51,7 +53,7 @@ function naming(template: string): Named {
 /** `text` with the names filled in; its other `{name}` fields are left for `fill`. */
 export function named(text: Named, names: Names): string {
   return text.template.replace(
-    /\{(agent|author|cli|chat)\}/g,
+    /\{(agent|author|cli|chat|examples)\}/g,
     (_field, name: keyof Names) => names[name],
   );
 }
@@ -66,6 +68,7 @@ export function namesOf(
     author: agent.words.author,
     cli: agent.words.command,
     chat: chat.name,
+    examples: agent.words.examples,
   };
 }
 
@@ -357,62 +360,85 @@ export const RESUME_LISTED = "Resumed {title} in {link}.";
 // D6: a session held by any thread of any channel is never resumed a second time; `{link}` is the
 // holding thread's permalink (a plain fallback when Slack would not give one).
 export const RESUME_ELSEWHERE = "This session is already open in another thread: {link}.";
-// `!guide`: how to use the bot, in the owner's words. `test/core/commands.test.ts` fails when a
-// word of the daemon is missing here; keep the tone plain and every line true of the current
-// behaviour.
-export const GUIDE = naming(
+// `!guide`: how to use the bot, in the owner's words, as parts that `src/core/guide.ts` chooses
+// among and joins: a part appears only when the agent and the chat serve what it describes.
+// `test/core/commands.test.ts` fails when a word of the daemon is missing from the whole; keep
+// the tone plain and every line true of the current behaviour.
+export const GUIDE_INTRO = naming(
   "**awaydesk**\n" +
     "This channel runs {agent} on your Mac, in one folder, and answers you alone. One {chat} " +
     "thread is one {agent} session: a top-level message starts a new one, and a reply inside its " +
-    "thread continues it, even days later.\n" +
-    "\n" +
-    "**Get started**\n" +
-    "1. `!bind` lists the folders {agent} trusts, with a Bind button each; `!bind <folder>` " +
+    "thread continues it, even days later.",
+);
+export const GUIDE_START = "**Get started**";
+export const GUIDE_BIND_TRUSTED = naming(
+  "1. `!bind` lists the folders {agent} trusts, with a Bind button each; `!bind <folder>` " +
     "binds one by its path relative to your allowed root: `!bind my-project`. {agent} must trust " +
     "that folder first: open `{cli}` there once in the terminal and accept. `!bind` works only as a " +
-    "top-level message in the channel.\n" +
-    "2. Write a message in the channel: it opens a session, and its reply appears in a thread of its " +
+    "top-level message in the channel.",
+);
+export const GUIDE_BIND_ANY =
+  "1. `!bind` lists the folders under your allowed root, with a Bind button each; " +
+  "`!bind <folder>` binds one by its path relative to your allowed root: `!bind my-project`. " +
+  "`!bind` works only as a top-level message in the channel.";
+export const GUIDE_FIRST_MESSAGE = naming(
+  "2. Write a message in the channel: it opens a session, and its reply appears in a thread of its " +
     "own, growing as {author} works, with a line for each tool it uses. Reply inside that thread to " +
     "continue the same session. Attach images or files to a message: {author} sees a JPEG, PNG, GIF or " +
     "WebP image directly (other image types are refused) and reads a text, code, PDF, JSON, XML, YAML " +
-    "or notebook file from a copy saved on this Mac; other files are refused.\n" +
-    "3. Before that first message is sent, the thread asks for the **Model**, the **Effort** " +
-    "(`Default` leaves {agent}'s own choice) and **Bypass permissions**; **Start** sends your " +
-    "message with those choices, and `!stop` cancels it instead.\n" +
-    "\n" +
-    "**Commands**\n" +
-    "{agent}'s commands start with `!` instead of `/`: `!compact`, `!model opus`. They run inside " +
+    "or notebook file from a copy saved on this Mac; other files are refused.",
+);
+// Step 3 holds what the setup asks for; `{choices}` is the items on offer, joined as a list.
+export const GUIDE_SETUP =
+  "3. Before that first message is sent, the thread asks for {choices}; **Start** sends your " +
+  "message with those choices, and `!stop` cancels it instead.";
+export const GUIDE_SETUP_MODEL = "the **Model**";
+export const GUIDE_SETUP_EFFORT = naming("the **Effort** (`Default` leaves {agent}'s own choice)");
+export const GUIDE_SETUP_BYPASS = "**Bypass permissions**";
+export const GUIDE_COMMANDS = naming(
+  "**Commands**\n" +
+    "{agent}'s commands start with `!` instead of `/`: {examples}. They run inside " +
     "a session's thread, where `!help` lists every command that session offers, and `!help <text>` " +
     "filters the list; typed in the channel, `!help` lists awaydesk's own words instead. " +
     "`!clear` (`!reset`, `!new`) is refused inside a thread (one thread is one session): start a " +
-    "fresh session with a new top-level message instead.\n" +
-    "\n" +
-    "**Approvals and questions**\n" +
-    "When {agent} asks permission, the request shows what will run, with **Approve** and " +
-    "**Deny**; a very long one shows its start and its end and says how much it leaves out. A " +
-    "question from {author} comes with **Answer**, which opens a short form, and **Skip**.\n" +
-    "\n" +
-    "**Sessions**\n" +
-    "`!status` typed in the channel lists the folder and every session still live, each linked to " +
-    "its thread; inside a thread it shows that session's directory, mode and the footer's values. " +
-    "`!stop` typed in the channel stops every running session and its background tasks; inside a " +
-    "thread it stops only that one. `!resume`, typed in the channel only, lists this folder's twenty " +
-    "newest sessions, from the terminal too, each with the start of its id and a **Resume** button; " +
-    "`!resume <id>` (that start is enough), or `!resume <title>` for a session that has one, resumes " +
-    "it in the thread of your `!resume` message. To continue a session in the terminal, run the " +
-    "`Terminal:` command `!status` shows in its thread.\n" +
-    "\n" +
-    "**Files**\n" +
+    "fresh session with a new top-level message instead.",
+);
+export const GUIDE_APPROVALS = "**Approvals**";
+export const GUIDE_APPROVALS_AND_QUESTIONS = "**Approvals and questions**";
+export const GUIDE_PERMISSION = naming(
+  "When {agent} asks permission, the request shows what will run, with **Approve** and " +
+    "**Deny**; a very long one shows its start and its end and says how much it leaves out.",
+);
+export const GUIDE_QUESTION = naming(
+  "A question from {author} comes with **Answer**, which opens a short form, and **Skip**.",
+);
+// The Sessions section, sentence by sentence: `guide.ts` leaves out the tasks and the resume ones.
+export const GUIDE_SESSIONS_STATUS =
+  "**Sessions**\n" +
+  "`!status` typed in the channel lists the folder and every session still live, each linked to " +
+  "its thread; inside a thread it shows that session's directory, mode and the footer's values. " +
+  "`!stop` typed in the channel stops every running session";
+export const GUIDE_SESSIONS_TASKS = " and its background tasks";
+export const GUIDE_SESSIONS_STOP = "; inside a thread it stops only that one.";
+export const GUIDE_SESSIONS_RESUME =
+  "`!resume`, typed in the channel only, lists this folder's twenty " +
+  "newest sessions, from the terminal too, each with the start of its id and a **Resume** button; " +
+  "`!resume <id>` (that start is enough), or `!resume <title>` for a session that has one, resumes " +
+  "it in the thread of your `!resume` message.";
+export const GUIDE_SESSIONS_TERMINAL =
+  "To continue a session in the terminal, run the `Terminal:` command `!status` shows in its thread.";
+export const GUIDE_FILES = naming(
+  "**Files**\n" +
     "`!open`, sent inside a session's thread, offers the files changed in that session and a search " +
     "over the folder's files; choosing one shares it into the thread, where {chat} opens it in its " +
     "file viewer, with Markdown rendered. `!open <path>` opens that file, and `!open <words>` the file " +
     "whose path contains them, or lists the files that do. The search reads the folder from disk and " +
-    "leaves out what `.gitignore` excludes inside a git repository. A file over 1 MB is not opened.\n" +
-    "\n" +
-    "**Bypass**\n" +
+    "leaves out what `.gitignore` excludes inside a git repository. A file over 1 MB is not opened.",
+);
+export const GUIDE_BYPASS = naming(
+  "**Bypass**\n" +
     "`!bypass on`, sent inside a session's thread, lets {agent} run every tool without asking in " +
     "that session, until `!bypass off`; a restart of awaydesk keeps it. The footer shows ⚡ " +
-    "bypass while it is on.\n" +
-    "\n" +
-    "`!guide` shows this text again.",
+    "bypass while it is on.",
 );
+export const GUIDE_END = "`!guide` shows this text again.";

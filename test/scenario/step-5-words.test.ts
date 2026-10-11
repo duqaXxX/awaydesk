@@ -5,6 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { guideText } from "../../src/core/guide.ts";
 import { shellQuote } from "../../src/core/sessions/directory.ts";
 import * as texts from "../../src/core/texts.ts";
 import { fill, named } from "../../src/core/texts.ts";
@@ -293,16 +294,45 @@ test("!resume lists the folder's sessions, a pick resumes one in a thread and th
   await world.finish();
 });
 
-test("!guide describes only what this agent and this chat can serve", {
-  todo: "the guide is one text written for an agent with models, bypass and commands and a chat with buttons, a form and a file viewer (GUIDE in src/core/texts.ts): saying less of it is a text the owner approves",
-}, async (t) => {
+test("!guide describes only what this agent and this chat can serve", async (t) => {
   const world = World.make(t);
   await world.start();
   await world.owner.says(world.channel, "!guide");
   const guide = channelLines(world).at(-1)?.[1] ?? "";
-  // No bypass mode, no file upload, no model list: the guide names none of them.
+  // What the two modules declare: `PLAIN_CAPABILITIES` has two effort levels, questions, commands
+  // and session listing, and no model list, bypass mode, background task or record of trust; the
+  // memory chat has no file upload.
+  assert.equal(
+    guide,
+    guideText(NAMES, {
+      folderTrust: false,
+      models: false,
+      efforts: true,
+      bypass: false,
+      commands: true,
+      questions: true,
+      backgroundTasks: false,
+      sessionListing: true,
+      fileUpload: false,
+    }),
+  );
+  // No bypass mode, no file upload, no model list, no record of trust: the guide names none.
   assert.ok(!/bypass/i.test(guide), "the guide names bypass");
-  assert.ok(!guide.includes("`!open`"), "the guide names !open");
+  assert.ok(!guide.includes("`!open`") && !guide.includes("**Files**"), "the guide names !open");
   assert.ok(!/\*\*Model\*\*/.test(guide), "the guide names the model");
+  assert.ok(!/trust/i.test(guide), "the guide names trust");
+  assert.ok(!guide.includes("background task"), "the guide names background tasks");
+  // What they do declare is there, in the words of the pair.
+  for (const sentence of [
+    "1. `!bind` lists the folders under your allowed root, with a Bind button each;",
+    "the thread asks for the **Effort** (`Default` leaves Plain's own choice); **Start** sends",
+    "Plain's commands start with `!` instead of `/`: `!echo hello`, `!count one two`.",
+    "**Approvals and questions**",
+    "A question from Plain comes with **Answer**",
+    "`!stop` typed in the channel stops every running session; inside a thread it stops only that one.",
+    "`!resume`, typed in the channel only, lists",
+  ]) {
+    assert.ok(guide.includes(sentence), sentence);
+  }
   await world.finish();
 });

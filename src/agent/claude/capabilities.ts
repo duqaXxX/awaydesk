@@ -17,7 +17,6 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   backgroundTasks: true,
   compaction: true,
   questions: true,
-  changedInput: true,
   usageLimits: true,
   models: true,
   commands: true,

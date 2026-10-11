@@ -38,6 +38,7 @@ import {
   SECTION_LIMIT,
 } from "../../../../src/chat/slack/requests.ts";
 import * as slackTexts from "../../../../src/chat/slack/texts.ts";
+import { guideText } from "../../../../src/core/guide.ts";
 import { STOP_TAIL_WAIT } from "../../../../src/core/sessions/constants.ts";
 import type { ThreadSession } from "../../../../src/core/sessions/session.ts";
 import * as texts from "../../../../src/core/texts.ts";
@@ -54,6 +55,7 @@ import {
   TEAM,
   THREAD,
 } from "../../../support/fake-slack.ts";
+import { EVERYTHING_OFFERED } from "../../../support/guide-offer.ts";
 import { NAMES } from "../../../support/names.ts";
 import { canUseToolCall, sdkMessages, splitTurns } from "../../../support/sessions.ts";
 import {
@@ -1341,8 +1343,10 @@ test("bang guide works in an unbound channel", async (t) => {
   // The block holds the whole guide; `text` is its fallback, cut at FALLBACK_LIMIT.
   const posts = world.slack.callsTo("chat.postMessage") as Body[];
   assert.equal(posts.length, 1);
-  assert.deepEqual(posts[0]?.blocks, [{ type: "markdown", text: namedText(texts.GUIDE, NAMES) }]);
-  assert.equal(posts[0]?.text, take(namedText(texts.GUIDE, NAMES), FALLBACK_LIMIT));
+  assert.deepEqual(posts[0]?.blocks, [
+    { type: "markdown", text: guideText(NAMES, EVERYTHING_OFFERED) },
+  ]);
+  assert.equal(posts[0]?.text, take(guideText(NAMES, EVERYTHING_OFFERED), FALLBACK_LIMIT));
   assert.deepEqual(world.clients, []);
 });
 
@@ -1350,7 +1354,7 @@ test("bang guide inside a thread is for the owner alone", async (t) => {
   const world = worldOf(t);
   await world.dispatch(message("hi", { ts: THREAD }));
   await world.dispatch(reply("!guide", THREAD));
-  assert.ok(!said(world).includes(namedText(texts.GUIDE, NAMES)));
+  assert.ok(!said(world).includes(guideText(NAMES, EVERYTHING_OFFERED)));
   const guides = world.slack.callsTo("chat.postEphemeral") as Body[];
   assert.equal(guides.length, 1);
   assert.equal(guides[0]?.thread_ts, THREAD);

@@ -342,6 +342,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       const { backend } = world;
       assert.ok(backend.name.trim() !== "");
       assert.ok(backend.words.author.trim() !== "" && backend.words.command.trim() !== "");
+      assert.ok(backend.words.examples.trim() !== "");
       assert.ok(backend.words.terminal.includes("{directory}"));
       assert.ok(backend.words.terminal.includes("{session}"));
       assert.deepEqual(backend.capabilities, caps);
@@ -587,25 +588,6 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       assert.equal(ended(turn).ending, "done");
       assertWellFormed(turn);
     });
-
-    check(
-      "an allow may change the call's input",
-      lacks(caps.changedInput, "changedInput"),
-      async (world, t) => {
-        const played = world.callTool("allow", "Changed.");
-        const changed = { ...played.input, changed: true };
-        const requests = new Requests({
-          permission: async () => ({ allow: true, changedInput: changed }),
-        });
-        const { session, events } = await open(t, world, requests);
-        await session.send(prompt());
-        await events.turn();
-        assert.deepEqual(
-          world.told().map((told) => told.input),
-          [changed],
-        );
-      },
-    );
 
     check(
       "a question reaches the owner with its options, and the answers go back",

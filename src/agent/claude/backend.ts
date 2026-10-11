@@ -27,6 +27,7 @@ export const NAME = "Claude Code";
 export const WORDS: AgentWords = Object.freeze({
   author: "Claude",
   command: "claude",
+  examples: "`!compact`, `!model opus`",
   terminal: "cd {directory} && claude --resume {session} --fork-session",
 });
 

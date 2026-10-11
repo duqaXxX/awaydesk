@@ -10,4 +10,5 @@ export const NAMES: Names = {
   author: "Claude",
   cli: "claude",
   chat: "Slack",
+  examples: "`!compact`, `!model opus`",
 };

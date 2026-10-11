@@ -29,14 +29,20 @@ import { Holds } from "../../../src/core/hold.ts";
 import { Approvals } from "../../../src/core/requests.ts";
 import { SessionManager } from "../../../src/core/sessions/manager.ts";
 import { StateStore } from "../../../src/core/state.ts";
-import { namesOf } from "../../../src/core/texts.ts";
+import { type Names, namesOf } from "../../../src/core/texts.ts";
 import { FakeClock } from "../../support/fake-slack.ts";
 import { type MemoryChat, memoryChat, OWNER } from "../../support/memory-chat.ts";
 import { PLAIN_CAPABILITIES, PlainAgent, type PlainSession } from "../../support/plain-agent.ts";
 import { settledTurn } from "../../support/sessions.ts";
 
 /** The names the texts take when the plain agent and the memory chat are the two modules. */
-export const PLAIN_NAMES = { agent: "Plain", author: "Plain", cli: "plain", chat: "Memory chat" };
+export const PLAIN_NAMES: Names = {
+  agent: "Plain",
+  author: "Plain",
+  cli: "plain",
+  chat: "Memory chat",
+  examples: "`!echo hello`, `!count one two`",
+};
 
 /** A plain agent that offers no command of its own. */
 export class NoCommands extends PlainAgent {

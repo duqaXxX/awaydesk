@@ -32,7 +32,7 @@ const LINK = /\[[^\]]*\]\(([^)\s]+)\)/g;
 const LINE_POINTER = /\b[\w./-]+\.(?:ts|py|md|sh|ya?ml|json|toml):\d+/;
 const REPO_PATH = /`((?:src|test|tests|docs|probe|\.github)\/[\w./-]+)`/g;
 const BACKTICKS = /`[^`]*`/g;
-// A code span that is nothing but a dotted name: `texts.GUIDE`, `ClaudeSession.query`.
+// A code span that is nothing but a dotted name: `texts.GUIDE_INTRO`, `ClaudeSession.query`.
 const SYMBOL = /`([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)`/g;
 // `state.json` and `config.ts` are files, not attributes of the modules of the same name.
 const FILE_SUFFIXES = new Set([
@@ -388,7 +388,7 @@ test("the scan of the sources reads comments, strings and templates as the compi
 });
 
 test("a dotted name is checked against the module, then the export's members", () => {
-  assert.equal(unresolved("texts.GUIDE"), false);
+  assert.equal(unresolved("texts.GUIDE_INTRO"), false);
   assert.equal(unresolved("texts.NO_SUCH_TEXT"), true);
   assert.equal(unresolved("commands.WORD.help"), false);
   assert.equal(unresolved("commands.WORD.nothing"), true);

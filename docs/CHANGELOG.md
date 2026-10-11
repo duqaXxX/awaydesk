@@ -283,7 +283,8 @@ All notable changes to this project are documented here. The format follows
   request and a pick from a list. A feature a module does not declare is not offered. Two texts
   appear only for such a module: `!resume` says the agent keeps no list of its sessions, and the
   folder list of `!bind` names no trust in its title when the agent keeps no record of it. With
-  Claude and Slack every capability is declared and neither text is shown.
+  Claude and Slack every capability is declared and neither text is shown. `!help` and `!guide`
+  leave out what the selected agent and chat cannot serve.
 - Two test modules prove the seams: a plain agent (`test/support/plain-agent.ts`) and a chat held
   in memory (`test/support/memory-chat.ts`). A conformance suite per seam
   (`test/conformance/agent.ts`, `test/conformance/chat.ts`) runs against both implementations of

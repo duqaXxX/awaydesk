@@ -15,7 +15,6 @@ test("the Claude back end declares what the core adapts to", () => {
     backgroundTasks: true,
     compaction: true,
     questions: true,
-    changedInput: true,
     usageLimits: true,
     models: true,
     commands: true,

@@ -43,6 +43,7 @@ const OTHER_AGENT = {
   words: {
     author: "Other",
     command: "other",
+    examples: "`!one`, `!two`",
     terminal: "cd {directory} && other --resume {session}",
   },
 };
@@ -59,7 +60,13 @@ test("the names are the agent's and the chat's, read when first needed and once"
   chat.thread({ channel: CHANNEL, thread: THREAD });
   chat.channel(CHANNEL);
   assert.equal(reads, 0);
-  const expected = { agent: "Other Agent", author: "Other", cli: "other", chat: "Slack" };
+  const expected = {
+    agent: "Other Agent",
+    author: "Other",
+    cli: "other",
+    chat: "Slack",
+    examples: "`!one`, `!two`",
+  };
   assert.deepEqual(chat.names(), expected);
   assert.deepEqual(chat.names(), expected);
   assert.equal(reads, 1);
