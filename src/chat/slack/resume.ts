@@ -20,7 +20,9 @@ import * as slackTexts from "./texts.ts";
 export const RESUME_ROWS = 20;
 export const RESUME_ACTION = "session_resume";
 export const TITLE_LIMIT = 80;
-export const ID_SHOWN = 8; // the first characters of a session id the list shows, and `!resume` takes
+// The first characters of a session id the list shows, and the fewest `!resume` takes as an id:
+// the core's `ID_PREFIX_MIN`.
+export const ID_SHOWN = 8;
 const SLACK_TS = /^\d+\.\d+$/;
 
 /** One session of the picker: its columns as text, and the button that resumes it. */
@@ -53,19 +55,6 @@ export function parseResumeValue(value: string): [sessionId: string, threadTs: s
   const threadTs = value.slice(at + 1);
   if (sessionId === "" || !SLACK_TS.test(threadTs)) return null;
   return [sessionId, threadTs];
-}
-
-/**
- * The sessions `!resume <target>` names: those whose id is `target` or starts with it, when it is
- * at least as long as the ID_SHOWN characters the list shows (so a short title such as "add" is
- * not read as an id), else those whose title (set with /rename or generated, the SDK's
- * `custom_title`) is `target`.
- */
-export function matching(sessions: readonly ListedSession[], target: string): ListedSession[] {
-  const byId = sessions.filter(
-    (s) => Array.from(target).length >= ID_SHOWN && s.id.startsWith(target),
-  );
-  return byId.length > 0 ? byId : sessions.filter((s) => s.customTitle === target);
 }
 
 /** As the terminal's picker writes it ("2 days ago", seen 2026-09-25). */

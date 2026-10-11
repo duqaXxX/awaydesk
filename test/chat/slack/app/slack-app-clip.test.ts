@@ -1,9 +1,7 @@
 /**
  * The log lines of issue #142, and an audio clip as a prompt (issue #35).
  *
- * `app` is what the Slack app's exported logger and the core flows' were asked to write (the
- * answers to a request are the core's: a refused one is logged there, with no action id, which
- * only the provider knows), through `mock.method`, and
+ * `app` is what the module's exported logger was asked to write, through `mock.method`, and
  * `text` is every line the daemon's log wrote, through the log's own writer. A clip's wait
  * (`voice.WAIT_SECONDS`) is crossed by advancing the handlers' clock: nothing waits on the wall
  * clock.
@@ -16,7 +14,6 @@ import { HOLD_CONTINUE } from "../../../../src/chat/slack/hold.ts";
 import { SETUP_MODEL, SETUP_START } from "../../../../src/chat/slack/setup.ts";
 import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import * as voice from "../../../../src/chat/slack/voice.ts";
-import { logger as flowsLogger } from "../../../../src/core/flows/talk.ts";
 import * as texts from "../../../../src/core/texts.ts";
 import { fill, named } from "../../../../src/core/texts.ts";
 import { setWriter } from "../../../../src/log.ts";
@@ -52,14 +49,12 @@ import {
  */
 function captureLog(t: TestContext): { readonly app: string[]; readonly text: () => string } {
   const app: string[] = [];
-  for (const speaker of [logger, flowsLogger]) {
-    for (const level of ["info", "warning", "error"] as const) {
-      const write = speaker[level].bind(speaker);
-      t.mock.method(speaker, level, (line: string) => {
-        app.push(line);
-        write(line);
-      });
-    }
+  for (const level of ["info", "warning", "error"] as const) {
+    const write = logger[level].bind(logger);
+    t.mock.method(logger, level, (line: string) => {
+      app.push(line);
+      write(line);
+    });
   }
   const lines: string[] = [];
   setWriter((line) => {
@@ -92,7 +87,11 @@ test("a second start is logged as accepted then refused", async (t) => {
   const lines = log.app.filter((line) => line.includes("setup start"));
   assert.ok(lines[0]?.startsWith("accepted a setup start"));
   assert.ok(lines[1]?.startsWith("refused a click (setup start, not "));
-  assert.ok(lines[1]?.includes(`in ${CHANNEL}/${THREAD} on message ${body.message.ts}`));
+  assert.ok(
+    lines[1]?.includes(
+      `action ${SETUP_START} in ${CHANNEL}/${THREAD} on message ${body.message.ts}`,
+    ),
+  );
   assert.ok(!log.text().includes("SECRET-PROMPT-CONTENT"));
 });
 
@@ -153,7 +152,7 @@ test("a second hold click is logged", async (t) => {
   assert.equal(lines.length, 1);
   const line = lines[0] as string;
   assert.ok(line.includes("(hold decision)"));
-  assert.ok(line.includes(`in ${CHANNEL}/${THREAD}`));
+  assert.ok(line.includes(`action ${HOLD_CONTINUE} in ${CHANNEL}/${THREAD}`));
   assert.ok(!log.text().includes(holdId));
   assert.ok(!log.text().includes("hello"));
 });

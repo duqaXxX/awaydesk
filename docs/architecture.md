@@ -1028,9 +1028,9 @@ channel. A top-level message opens one in the channel's current folder (`Session
 reply inside a thread hands back its existing one, rebuilding it first if a restart, an idle close
 or a gone resume dropped it (`SessionManager.get`); a Resume click or `!resume <id or title>` opens
 one already set to a chosen session id, in the thread of the owner's `!resume` message
-(`SessionManager.resume`); `ResumeBind.resumeIntoThread` posts the confirmation, then deletes the
-list the click came from (`ResumeBind.showResumed`); when the confirmation did not post, or the
-delete fails, the list is edited into a line that says what was resumed, so buttons never outlive a
+(`SessionManager.resume`); the resume flow of the core (`resume.resuming`) posts the confirmation,
+then removes the list the pick came from; when the confirmation did not post, or the removal
+fails, the list is edited into a line that says what was resumed, so buttons never outlive a
 resume and a failure there never blocks the confirmation. Each thread keeps the folder it was opened
 in for as long as it exists: `!bind` changes only where the *next* thread starts, and refuses while
 any of the channel's threads is not idle (`SessionManager.bind`).
@@ -1140,7 +1140,7 @@ closed when the start returns (`ThreadSession.connect`).
   live session of any other thread, of any channel, whose resolved folder is the same and is not
   idle (`SessionManager.workingIn`) makes the daemon ask first:
   `Another session is working in this folder: <link>. Send anyway?`, with the buttons `Send anyway`
-  and `Don't send` (`hold.holdFlow`, kept in `hold.Holds`, memory only). The wait runs
+  and `Don't send` (`Requests.holdBeforeSending`, kept in `hold.Holds`, memory only). The wait runs
   inside the thread's own arrival lock (`Messages.arrival`), so a later message of the same thread
   queues behind it and opens no second hold. `!stop` inside the held thread or a top-level `!stop`
   of its channel cancels the wait the same way `Don't send` does (`Holds.cancel`); so does
@@ -1152,7 +1152,7 @@ closed when the start returns (`ThreadSession.connect`).
   sent: a top-level message that opens a session (a prompt, files, or a `!name` passthrough), and a
   reply in a thread where nothing was ever sent (`ThreadSession.neverRan`: no turn queued and no
   stored session id), as after a cancelled setup or a same-folder hold's `Don't send`.
-  `setup.setupFlow` starts the agent session, then posts one message in the thread
+  `Requests.setupBeforeSending` starts the agent session, then posts one message in the thread
   (`setup.setupBlocks`): a header (`texts.SETUP_HEADER`) and one `actions` block (block_id `setup`,
   one row that Slack wraps on a narrow screen) holding the four controls. A Model select lists the
   CLI's own models (the models of `AgentSession.info`, kept as `ThreadSession.models` and stored
@@ -1163,11 +1163,10 @@ closed when the start returns (`ThreadSession.connect`).
   `Effort: <level>` for the chosen model's `supportedEffortLevels`. A Bypass checkbox is ticked when
   the folder's own Claude Code settings start the process in bypassPermissions, so unticking is an
   explicit off, with `!bypass off`'s semantics. Start carries the setup id. `state.values` is keyed
-  by that block_id, then by each control's action_id (`setup.readSelection`). Changing the model
+  by that block_id, then by each control's action_id (`setup.readChoice`). Changing the model
   rewrites the message (`chat.update`, which never notifies, and is skipped once the setup is
   decided) with the new model's levels. Start reads every control from the click's `state.values`
-  (`setup.readSelection`), the core reads that against the models and efforts the request offered
-  (`setup.chosen`), and `ThreadSession.applySetup` applies it, and Start is authoritative:
+  (`setup.readChoice`), and `ThreadSession.applySetup` applies it, and Start is authoritative:
   effort and bypass are written from the choice whatever `state.json` held (a restart can have left
   either; `!bypass` in the thread is refused before Start, `ThreadSession.beforeStart` and
   `texts.BYPASS_BEFORE_START`, and one typed while Start is applied waits for it,
@@ -1181,7 +1180,7 @@ closed when the start returns (`ThreadSession.connect`).
   choice differs from what the live session effectively runs (`ThreadSession.clientBypass`: the
   choice, or the folder's own bypass). The message then becomes one summary line, written inside the
   same wait (a cancel that already deleted the message skips the edit), and stays; the held message
-  goes on unchanged. The wait shares `askOwner` and `hold.Holds` with the same-folder hold.
+  goes on unchanged. The wait shares `Requests.askOwner` and `hold.Holds` with the same-folder hold.
   The entry stays in `Holds` while the answer is applied, so `!stop`, a top-level `!stop` and a
   drain cancel it then too (`Pending.cancelled`): nothing is sent, the message is deleted, the owner
   gets `Not sent.` and `!stop` does not say nothing is running. An answer that arrives before
@@ -1575,7 +1574,7 @@ because `!resume` takes a full id or any start of one at least 8 characters long
 (`resume.ID_SHOWN`). A session a thread already holds takes no row, and a line under the rows counts
 them. The list is posted in the channel, and each button carries the session id and the ts of the
 `!resume` message (`resume.parseResumeValue`). A Resume click or a typed `!resume <id or name>`
-(`ResumeBind.resumeIntoThread`) opens the chosen session in the thread of that message
+(`resume.resuming`) opens the chosen session in the thread of that message
 (`SessionManager.resume`), with a fresh thread entry: bypass never chosen (the folder's own mode)
 and no `/effort` level, whatever the session had before. It is refused, with no `await` between the
 checks and the `resume` call they guard so nothing can change in between, when that thread already

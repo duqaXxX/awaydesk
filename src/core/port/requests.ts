@@ -1,8 +1,7 @@
 /**
- * The port of the requests: what the Slack provider still reads to draw them (the open request a
- * click names, a setup's model list) and what every answer to the owner needs (the threads a
- * stop waits for, a request's message recorded for crash repair). What the owner's answer
- * decides is the core's: `ChatInbound.answer`.
+ * The port of the requests flow: the owner's answer to a permission and to a question, a
+ * session's setup before its first prompt, and what every answer to the owner needs (the
+ * threads a stop waits for, a request's message recorded for crash repair).
  */
 import type { Holds } from "../hold.ts";
 import type { Approvals } from "../requests.ts";
@@ -17,12 +16,19 @@ export type RequestsSessions = Pick<
 
 export type RequestsSession = Pick<
   ThreadSession,
-  "channelId" | "threadId" | "directory" | "ensureConnected" | "forgetSetup"
+  | "channelId"
+  | "threadId"
+  | "directory"
+  | "models"
+  | "bypass"
+  | "ensureConnected"
+  | "applySetup"
+  | "forgetSetup"
 >;
 
 export type RequestsState = Pick<StateStore, "thread" | "addRequest" | "removeRequest">;
 
-export type RequestsApprovals = Pick<Approvals, "get">;
+export type RequestsApprovals = Pick<Approvals, "get" | "resolve">;
 
-/** A setup waits for its Start as a hold does; the model picked redraws the open one. */
-export type RequestsHolds = Pick<Holds, "get" | "atMessage">;
+/** A setup waits for its Start as a hold does. */
+export type RequestsHolds = Pick<Holds, "get" | "resolve" | "atMessage">;

@@ -10,9 +10,9 @@ import {
   SETUP_MODEL,
   SETUP_START,
   setupBlocks,
+  summary,
 } from "../../../src/chat/slack/setup.ts";
 import * as slackTexts from "../../../src/chat/slack/texts.ts";
-import { summaryLine as summary } from "../../../src/core/flows/setup.ts";
 import { type Choice, DEFAULT, DEFAULT_CHOICE, effortLevels } from "../../../src/core/setup.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { sdkJson } from "../../support/fixtures.ts";
@@ -176,7 +176,7 @@ test("a model the cli did not list reads as default", () => {
 test("the summary names the model by its display name", () => {
   assert.equal(
     summary(MODELS, { model: "opus", effort: "high", bypass: true }),
-    texts.fill(texts.SETUP_SUMMARY, { model: "Opus 5.5", effort: "high", bypass: "on" }),
+    texts.fill(slackTexts.SETUP_SUMMARY, { model: "Opus 5.5", effort: "high", bypass: "on" }),
   );
   assert.ok(summary(MODELS, DEFAULT_CHOICE).endsWith("Effort: Default · Bypass: off"));
 });

@@ -6,7 +6,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ListedSession } from "../../../src/agent/seam.ts";
 import {
-  matching,
   parseResumeValue,
   RESUME_ROWS,
   resumeBlocks,
@@ -154,29 +153,6 @@ test("no session yet says so", () => {
     texts.fill(slackTexts.RESUME_EMPTY, { directory: "/srv/dev/app" }),
   );
   assert.deepEqual(rows(blocks), []);
-});
-
-test("a session is found by id or by its name", () => {
-  const named = info("68da9311-0000-4000-8000-000000000001", "trust", 1, { customTitle: "trust" });
-  const other = info("68da9311-0000-4000-8000-000000000002", "Other", 2);
-  const twin = info("68da9311-0000-4000-8000-000000000003", "twin", 3, { customTitle: "twin" });
-  const twin2 = info("68da9311-0000-4000-8000-000000000004", "twin", 4, { customTitle: "twin" });
-  const sessions = [named, other, twin, twin2];
-  assert.deepEqual(matching(sessions, other.id), [other]);
-  assert.deepEqual(matching(sessions, "trust"), [named]);
-  assert.deepEqual(matching(sessions, "Other"), []); // a summary with no title (a first prompt) is no name
-  assert.deepEqual(matching(sessions, "twin"), [twin, twin2]);
-});
-
-test("a session is found by the start of its id the list shows", () => {
-  const first = info("1b4b42a0-0000-4000-8000-000000000001", "first", 1);
-  const second = info("1b4b42a1-0000-4000-8000-000000000002", "second", 2);
-  const added = info("add00000-0000-4000-8000-000000000003", "add", 3, { customTitle: "add" });
-  const sessions = [first, second, added];
-  assert.deepEqual(matching(sessions, "1b4b42a0"), [first]);
-  assert.deepEqual(matching(sessions, "1b4b42a"), []); // shorter than the list shows: not read as an id
-  assert.deepEqual(matching(sessions, "add"), [added]); // a short title that is also hex stays a title
-  assert.deepEqual(matching(sessions, "1b4b42a0-0000"), [first]);
 });
 
 test("the branch and the folder are shown as written", () => {
