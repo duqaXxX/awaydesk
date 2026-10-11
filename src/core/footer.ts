@@ -1,6 +1,6 @@
 /** The context line under every reply as data: git state, usage limits, tokens and the fields. */
 import { spawn } from "node:child_process";
-import type { ModelTokens, Repository } from "../agent/seam.ts";
+import type { ModelTokens, PromptContent, Repository } from "../agent/seam.ts";
 import type { FooterFields, UsageLimit } from "../chat/seam.ts";
 import { getLogger } from "../log.ts";
 import { errorName } from "../values.ts";
@@ -14,6 +14,8 @@ export const GIT_TIMEOUT = 5_000;
 // ccstatusline reads from transcripts.
 const EFFORT_OUTPUT = /^(?:Set effort level to|Effort level set to) ([a-z0-9-]+)/i;
 const MODEL_OUTPUT = /^Set model to\b(?:.*? with ([a-z0-9-]+) effort)?/is;
+// The commands that write those outputs.
+const EFFORT_COMMAND = /^\/(?:effort|model)(?:\s|$)/;
 // ` 2 files changed, 42 insertions(+), 10 deletions(-)`, as every --shortstat writes it, git 2.54
 // (2026-09-27).
 const SHORTSTAT_INSERTIONS = /(\d+) insertions?\(\+\)/;
@@ -287,6 +289,14 @@ export function effortChange(output: string): [changed: boolean, effort: string 
     return [true, model[1] ? model[1].toLowerCase() : null];
   }
   return [false, null];
+}
+
+/**
+ * Whether `prompt` runs a command whose output `effortChange` reads. The final text of any other
+ * turn is the model's, which what the agent read can shape: it is never read as an output.
+ */
+export function setsEffort(prompt: PromptContent): boolean {
+  return typeof prompt === "string" && EFFORT_COMMAND.test(prompt.trimStart());
 }
 
 /** The tokens of a turn summed over its models; null when it used none. */

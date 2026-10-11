@@ -66,6 +66,7 @@ import {
   formatStatusFields,
   gitState,
   sessionTokens,
+  setsEffort,
   type UsageCache,
 } from "../footer.ts";
 import { resolvePath } from "../paths.ts";
@@ -2435,7 +2436,11 @@ export class ThreadSession {
       if (result.sessionId) {
         this.deps.state.setSession(this.channelId, this.threadId, result.sessionId);
       }
-      const [changed, effort] = effortChange(result.finalText ?? "");
+      const prompt = active.turn?.prompt;
+      const [changed, effort] =
+        prompt !== undefined && setsEffort(prompt)
+          ? effortChange(result.finalText ?? "")
+          : [false, null];
       if (changed) {
         this.effort = effort;
         this.effortReported = true;

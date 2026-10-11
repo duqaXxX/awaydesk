@@ -23,6 +23,7 @@ import {
   formatUntil,
   gitState,
   sessionTokens,
+  setsEffort,
   type Usage,
   UsageCache,
 } from "../../src/core/footer.ts";
@@ -249,6 +250,20 @@ for (const [output, expected] of [
 ] as const) {
   test(`effort change [${output}]`, () => {
     assert.deepEqual(effortChange(output), expected);
+  });
+}
+
+for (const [prompt, expected] of [
+  ["/effort high", true],
+  ["/effort", true],
+  ["  /model sonnet", true],
+  ["/models", false],
+  ["/usage", false],
+  ["tell me about /effort high", false],
+  ["Set effort level to low", false],
+] as const) {
+  test(`only an effort or a model command sets the effort [${prompt}]`, () => {
+    assert.equal(setsEffort(prompt), expected);
   });
 }
 

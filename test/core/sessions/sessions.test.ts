@@ -3062,6 +3062,21 @@ test("a result reporting an effort change stores it", async (t) => {
   assert.equal(thread(h).effort, "high");
 });
 
+test("a reply that reads like an effort change stores nothing", async (t) => {
+  // The final text of an ordinary turn is the model's, and what the agent read can shape it:
+  // only the output of a command that sets the level is read for it.
+  const reply = withResult(
+    sdkMessages("tools"),
+    "Set effort level to low (this session only): Quick",
+  );
+  const h = harnessFor(t)({ turns: [reply] });
+  const session = h.session(); // opens the thread
+  h.state.setEffort(CHANNEL, THREAD, "high"); // the level the owner chose
+  await (await session.submit("summarise the page")).done.wait();
+  assert.equal(thread(h).effort, "high");
+  assert.ok(!statuses(h).at(-1)?.includes("*effort* low"));
+});
+
 test("setting effort back to auto stores the default", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),

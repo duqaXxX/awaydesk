@@ -810,6 +810,11 @@ All notable changes to this project are documented here. The format follows
   (measured 2026-10-11, Node 26.5.1). The text is the agent's, so a page it read could shape such
   a line and hold the event loop every thread shares. The row is now read cell by cell. Found by
   a security scan of `src` and `.github` on 2026-10-11.
+- The effort level is read only from the output of `/effort` and `/model` (`footer.setsEffort`,
+  `ThreadSession.finish`). The final text of every turn was matched against those outputs, so a
+  reply that began with `Set effort level to low` stored that level for the thread, and the next
+  connect started Claude Code with it. That text is the model's, which what the agent read can
+  shape. Found by the same scan.
 - A clip's WebVTT transcript loses every tag of a cue (`voice.vttText`). A tag runs from `<` to
   the next `>`, a line end does not close it, and one that nothing closes takes the rest of its
   cue, as the cue text tokenizer of WebVTT 1 reads them. One pass over each line left a tag that
