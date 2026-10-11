@@ -4,6 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { RESUME_ROWS as DATED_ROWS } from "../../../src/agent/claude/listing.ts";
 import type { ListedSession } from "../../../src/agent/seam.ts";
 import {
   parseResumeValue,
@@ -119,6 +120,9 @@ test("only the newest sessions are listed", () => {
   const listed = rows(blocks);
   assert.equal(listed.length, RESUME_ROWS);
   assert.equal(RESUME_ROWS, 20); // the maintainer, 2026-09-25: ten were too few
+  // The Claude back end dates only the sessions that can enter that many rows, and the two
+  // modules cannot share the number: one changed alone sorts the rows past it by another key.
+  assert.equal(DATED_ROWS, RESUME_ROWS);
   const first = parseResumeValue(listed[0]?.accessory.value);
   assert.ok(first?.[0].endsWith("000000000000"));
   assert.equal(

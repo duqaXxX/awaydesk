@@ -424,7 +424,7 @@ test("a question the owner skips is a deny with what the agent is told", LIMIT, 
 // SDK 0.3.296 answers a callback that rejects with a `control_response` of subtype `error`
 // (`handleControlRequest`, sdk.mjs), which is not a deny.
 
-const UNSHOWN = "awaydesk could not show this request in Slack, so nobody approved it.";
+const UNSHOWN = "awaydesk could not show this request to the owner, so nobody approved it.";
 const SECRET = "a secret sentence from the tool's input";
 
 /** One Bash call against `handler`, with the error log recorded; what the SDK was answered. */

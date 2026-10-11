@@ -75,8 +75,9 @@ function underItsName(error: unknown): unknown {
   return name === errorName(error) ? error : new ProcessLostError(name, error);
 }
 // What a call is told when nobody could be asked about it. This layer does not import
-// `src/core/`, so the core's own text for it (`APPROVAL_UNPOSTED`) is not reused.
-const REQUEST_UNSHOWN = "awaydesk could not show this request in Slack, so nobody approved it.";
+// `src/core/`, so the core's own text for it (`APPROVAL_UNPOSTED`) is not reused, and it knows
+// no chat, so it names none.
+const REQUEST_UNSHOWN = "awaydesk could not show this request to the owner, so nobody approved it.";
 
 /** The members of the SDK's `Query` this class calls: a test passes a fake that has these. */
 export interface QueryHandle extends AsyncIterable<unknown> {

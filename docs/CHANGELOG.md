@@ -319,6 +319,10 @@ All notable changes to this project are documented here. The format follows
   reference escapes, which the core no longer copies: `directory.terminalLine` takes the chat's
   `ChatProvider.escape` for a command that holds a backtick. What the owner reads in Slack is
   unchanged (#266).
+- The Claude back end names no chat: a call nobody could be asked about is denied with
+  `awaydesk could not show this request to the owner, so nobody approved it.`, a text only Claude
+  reads. `test/chat/slack/resume.test.ts` fails when the rows the Slack picker shows and the rows
+  the back end dates sessions for (`RESUME_ROWS` in each module) differ (#239).
 - The agent seam and the Slack provider lose what nothing read. In the seam: `requestId` on
   `PermissionRequest` and `QuestionRequest`, `StartOptions.permissionMode`, `messageId` on the
   message and text events, `compaction_ended.result`, and `parentCallId` on the three text events
