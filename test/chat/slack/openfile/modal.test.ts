@@ -17,7 +17,7 @@ import {
   Target,
   typedIn,
 } from "../../../../src/chat/slack/openfile/modal.ts";
-import * as texts from "../../../../src/core/texts.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import { fill } from "../../../../src/core/texts.ts";
 
 type Path = Array<string | number>;
@@ -164,7 +164,7 @@ test("one match is said in the singular and a cut listing is said last", () => {
     cut.map((block) => block.type),
     ["section", "actions", "context"],
   );
-  assert.equal(at(cut[2], "elements", 0, "text"), texts.OPEN_PARTIAL);
+  assert.equal(at(cut[2], "elements", 0, "text"), slackTexts.OPEN_PARTIAL);
   const tooLong = matchesBlocks("zz", ["e".repeat(200)], false);
   assert.deepEqual(
     tooLong.map((block) => block.type),
@@ -179,7 +179,7 @@ test("matches none of which fits a row are said and get no button", () => {
     ["section", "context"],
   );
   assert.ok(String(at(blocks[0], "text", "text")).includes("2 files match"));
-  assert.equal(at(blocks[1], "elements", 0, "text"), texts.OPEN_MATCHES_TOO_LONG);
+  assert.equal(at(blocks[1], "elements", 0, "text"), slackTexts.OPEN_MATCHES_TOO_LONG);
   // The control: one that fits is a button again.
   const fits = matchesBlocks("zz", ["d".repeat(151), "ok.py"]);
   assert.deepEqual(
@@ -310,7 +310,7 @@ test("more than ten matches list ten and say how many there are", () => {
   assert.equal(at(choice, "label", "text"), "137 files match");
   assert.equal(
     at(capped, "elements", 0, "text"),
-    fill(texts.OPEN_MATCHES_CAPPED, { shown: 10, count: 137 }),
+    fill(slackTexts.OPEN_MATCHES_CAPPED, { shown: 10, count: 137 }),
   );
 });
 
@@ -321,20 +321,20 @@ test("the count past the rows is the one given and a cut listing is said", () =>
   assert.equal(at(choice, "label", "text"), "137 files match");
   assert.equal(
     at(capped, "elements", 0, "text"),
-    fill(texts.OPEN_MATCHES_CAPPED, { shown: 10, count: 137 }),
+    fill(slackTexts.OPEN_MATCHES_CAPPED, { shown: 10, count: 137 }),
   );
   const cut = modalView(TARGET, "part", paths.slice(0, 1), { complete: false });
   assert.deepEqual(
     cut.blocks.map((block) => block.type),
     ["input", "input", "context"],
   );
-  assert.equal(at(cut.blocks[2], "elements", 0, "text"), texts.OPEN_PARTIAL);
+  assert.equal(at(cut.blocks[2], "elements", 0, "text"), slackTexts.OPEN_PARTIAL);
   const nothing = modalView(TARGET, "zz", [], { complete: false });
   assert.deepEqual(
     nothing.blocks.map((block) => block.type),
     ["input", "context", "context"],
   );
-  assert.equal(at(nothing.blocks[2], "elements", 0, "text"), texts.OPEN_PARTIAL);
+  assert.equal(at(nothing.blocks[2], "elements", 0, "text"), slackTexts.OPEN_PARTIAL);
   assert.deepEqual(modalView(TARGET, "zz", []), modalView(TARGET, "zz", [], { complete: true }));
 });
 
@@ -345,7 +345,7 @@ test("matches none of which fits a row get the line and no group", () => {
     ["input", "context", "context"],
   );
   assert.equal(at(view.blocks[1], "elements", 0, "text"), "1 file matches");
-  assert.equal(at(view.blocks[2], "elements", 0, "text"), texts.OPEN_MATCHES_TOO_LONG);
+  assert.equal(at(view.blocks[2], "elements", 0, "text"), slackTexts.OPEN_MATCHES_TOO_LONG);
 });
 
 test("a view stays inside what slack allows", () => {

@@ -11,6 +11,7 @@ import { test } from "node:test";
 import { fileChange } from "../../../src/agent/claude/translate.ts";
 import type { FileChange } from "../../../src/agent/seam.ts";
 import { answered, folded, preview } from "../../../src/core/reply/previews.ts";
+import { NAMES } from "../../support/names.ts";
 import { recordedEvents } from "../../support/replay.ts";
 
 const CWD = "/home/dev/project";
@@ -168,7 +169,7 @@ const QUESTIONS = [{ text: "Colour?" }, { text: "Sizes?" }];
 
 test("an answered question shows each answer as the terminal", () => {
   // The answers as the core sends them back: a label, or a list for a multi-select.
-  assert.deepEqual(answered(QUESTIONS, { "Colour?": "blue", "Sizes?": ["s", "xl"] }), {
+  assert.deepEqual(answered(QUESTIONS, { "Colour?": "blue", "Sizes?": ["s", "xl"] }, NAMES), {
     title: "User answered Claude's questions:",
     summary: "",
     body: "· Colour? → blue\n· Sizes? → s, xl",
@@ -178,13 +179,17 @@ test("an answered question shows each answer as the terminal", () => {
 });
 
 test("a question with no answer has no line and none has no preview", () => {
-  const shown = answered(QUESTIONS, { "Sizes?": "s" });
+  const shown = answered(QUESTIONS, { "Sizes?": "s" }, NAMES);
   assert.ok(shown !== null && shown.body === "· Sizes? → s");
-  assert.equal(answered(QUESTIONS, {}), null);
+  assert.equal(answered(QUESTIONS, {}, NAMES), null);
 });
 
 test("a question written on several lines keeps one line", () => {
-  const shown = answered([{ text: "Colour?\nPick one." }], { "Colour?\nPick one.": "dark\nblue" });
+  const shown = answered(
+    [{ text: "Colour?\nPick one." }],
+    { "Colour?\nPick one.": "dark\nblue" },
+    NAMES,
+  );
   assert.ok(shown !== null && shown.body === "· Colour? Pick one. → dark blue");
 });
 

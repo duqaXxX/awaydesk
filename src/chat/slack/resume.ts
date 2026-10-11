@@ -9,17 +9,20 @@
  * 2026-09-25). The rows come from the agent's session listing, newest first. Ordering that list
  * by the sessions' last message belongs to the Claude back end, which reads the transcripts.
  */
+
 import type { ListedSession } from "../../agent/seam.ts";
-import { oneLine } from "../../core/reply/words.ts";
-import * as texts from "../../core/texts.ts";
+import { oneLine, texts } from "../../core/port.ts";
 import { type ContextBlock, contextBlock } from "./reply/blocks.ts";
 import { take } from "./reply/chars.ts";
 import { shownAsWritten } from "./reply/escape.ts";
+import * as slackTexts from "./texts.ts";
 
 export const RESUME_ROWS = 20;
 export const RESUME_ACTION = "session_resume";
 export const TITLE_LIMIT = 80;
-export const ID_SHOWN = 8; // the first characters of a session id the list shows, and `!resume` takes
+// The first characters of a session id the list shows, and the fewest `!resume` takes as an id:
+// the core's `ID_PREFIX_MIN`.
+export const ID_SHOWN = 8;
 const SLACK_TS = /^\d+\.\d+$/;
 
 /** One session of the picker: its columns as text, and the button that resumes it. */
@@ -52,19 +55,6 @@ export function parseResumeValue(value: string): [sessionId: string, threadTs: s
   const threadTs = value.slice(at + 1);
   if (sessionId === "" || !SLACK_TS.test(threadTs)) return null;
   return [sessionId, threadTs];
-}
-
-/**
- * The sessions `!resume <target>` names: those whose id is `target` or starts with it, when it is
- * at least as long as the ID_SHOWN characters the list shows (so a short title such as "add" is
- * not read as an id), else those whose title (set with /rename or generated, the SDK's
- * `custom_title`) is `target`.
- */
-export function matching(sessions: readonly ListedSession[], target: string): ListedSession[] {
-  const byId = sessions.filter(
-    (s) => Array.from(target).length >= ID_SHOWN && s.id.startsWith(target),
-  );
-  return byId.length > 0 ? byId : sessions.filter((s) => s.customTitle === target);
 }
 
 /** As the terminal's picker writes it ("2 days ago", seen 2026-09-25). */
@@ -123,7 +113,7 @@ function row(session: ListedSession, now: Date, threadTs: string): ResumeRow {
       type: "button",
       action_id: RESUME_ACTION,
       value: resumeValue(session.id, threadTs),
-      text: { type: "plain_text", text: texts.RESUME_BUTTON },
+      text: { type: "plain_text", text: slackTexts.RESUME_BUTTON },
     },
   };
 }
@@ -145,11 +135,11 @@ export function resumeBlocks(
   // The list's own lines are the daemon's notices, small and grey; the rows keep their button.
   const shown = shownAsWritten(directory);
   let held: ContextBlock[] = [];
-  if (openElsewhere === 1) held = [contextBlock(texts.RESUME_OPEN_ONE)];
+  if (openElsewhere === 1) held = [contextBlock(slackTexts.RESUME_OPEN_ONE)];
   else if (openElsewhere)
-    held = [contextBlock(texts.fill(texts.RESUME_OPEN_MANY, { count: openElsewhere }))];
+    held = [contextBlock(texts.fill(slackTexts.RESUME_OPEN_MANY, { count: openElsewhere }))];
   if (sessions.length === 0) {
-    const empty = held.length > 0 ? texts.RESUME_NONE_LEFT : texts.RESUME_EMPTY;
+    const empty = held.length > 0 ? slackTexts.RESUME_NONE_LEFT : slackTexts.RESUME_EMPTY;
     return [contextBlock(texts.fill(empty, { directory: shown })), ...held];
   }
   const blocks: ResumeBlock[] = [
@@ -157,7 +147,7 @@ export function resumeBlocks(
     ...sessions.slice(0, RESUME_ROWS).map((s) => row(s, now, threadTs)),
   ];
   if (sessions.length > RESUME_ROWS) {
-    blocks.push(contextBlock(texts.fill(texts.RESUME_MORE, { rows: RESUME_ROWS })));
+    blocks.push(contextBlock(texts.fill(slackTexts.RESUME_MORE, { rows: RESUME_ROWS })));
   }
   return [...blocks, ...held];
 }

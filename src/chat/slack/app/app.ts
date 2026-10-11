@@ -38,11 +38,14 @@
 import { App, LogLevel, type Receiver, SocketModeReceiver } from "@slack/bolt";
 import type { WebClient, WebClientOptions } from "@slack/web-api";
 import { type Clock, monotonicClock } from "../../../clock.ts";
-import type { Config } from "../../../core/config.ts";
-import type { Holds } from "../../../core/hold.ts";
-import type { Approvals } from "../../../core/requests.ts";
-import type { SessionManager } from "../../../core/sessions/manager.ts";
-import type { StateStore } from "../../../core/state.ts";
+import type {
+  ApprovalsPort,
+  HoldsPort,
+  Names,
+  SessionsPort,
+  StatePort,
+} from "../../../core/port.ts";
+import type { ChatInbound } from "../../seam.ts";
 import { download } from "../attachments.ts";
 import { BIND_ACTION } from "../bind.ts";
 import { HOLD_CANCEL, HOLD_CONTINUE } from "../hold.ts";
@@ -60,7 +63,6 @@ import { OPEN_BUTTON_ACTION, OPEN_FORM, QUERY_ACTION } from "../openfile/modal.t
 import { levelLogger } from "../quiet-logger.ts";
 import { REQUEST_TIMEOUT_MS } from "../reply/clients.ts";
 import { describe } from "../reply/errors.ts";
-import type { Limiter } from "../reply/limiter.ts";
 import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
@@ -70,21 +72,20 @@ import {
 } from "../requests.ts";
 import { RESUME_ACTION } from "../resume.ts";
 import { SETUP_BYPASS, SETUP_EFFORT, SETUP_MODEL, SETUP_START } from "../setup.ts";
+import type { SlackChat } from "../thread.ts";
 import * as voice from "../voice.ts";
-import { Answers, type AppParts, type Fetch, logger } from "./answers.ts";
+import { Answers, type AppConfig, type AppParts, type Fetch, logger } from "./answers.ts";
 import { Clips } from "./clip.ts";
 import { type ChannelGuard, type Identity, isPromptMessage, messageActor } from "./guards.ts";
 import { HomeControls } from "./home-controls.ts";
-import { filesOf, Messages } from "./messages.ts";
+import { filesOf, inboundMessage } from "./messages.ts";
 import { Open } from "./open.ts";
 import { Requests } from "./requests.ts";
 import { ResumeBind } from "./resume-bind.ts";
 import { type Ack, type Payload, str, text } from "./wire.ts";
 
-export type { Fetch, Report } from "./answers.ts";
-export { logger, RESTART_WAIT_ROWS } from "./answers.ts";
-export { ago, isClear, slackUnescape } from "./messages.ts";
-export { boundText } from "./resume-bind.ts";
+export type { Fetch } from "./answers.ts";
+export { logger } from "./answers.ts";
 export { actionKey, clickThread } from "./wire.ts";
 
 export const DECISION_ACTIONS = [APPROVAL_ALLOW, APPROVAL_DENY, QUESTION_SKIP] as const;
@@ -93,18 +94,25 @@ export const DECISION_ACTIONS = [APPROVAL_ALLOW, APPROVAL_DENY, QUESTION_SKIP] a
 export interface BuildAppOptions {
   /** The shared client every handler calls Slack with. */
   readonly slack: WebClient;
-  readonly config: Config;
+  /**
+   * The provider the handlers answer through: its `chat.update` budget every reply draws from
+   * and the stop signal every listener checks.
+   */
+  readonly chat: SlackChat;
+  readonly config: AppConfig;
   readonly identity: Identity;
-  readonly sessions: SessionManager;
-  readonly approvals: Approvals;
-  readonly holds: Holds;
+  readonly sessions: SessionsPort;
+  readonly approvals: ApprovalsPort;
+  readonly holds: HoldsPort;
   readonly guard: ChannelGuard;
-  readonly state: StateStore;
+  readonly state: StatePort;
+  /** The agent's and the chat's names, which the texts that name them take. */
+  readonly names: Names;
+  /** What the listeners tell the core of what the owner did. */
+  readonly inbound: ChatInbound;
   /** The folder a message's files that are no image are saved in (`attachments.uploadsDir`). */
   readonly uploads: string;
   readonly home: Home;
-  /** The `chat.update` budget every reply draws from: `SlackChat.limiter`. */
-  readonly limiter: Limiter;
   /** Where Slack's payloads come from: `socketReceiver(config.appToken)` in the daemon. */
   readonly receiver: Receiver;
   /** How a file is downloaded; `attachments.download` with the bot token when absent. */
@@ -135,11 +143,14 @@ export interface BuiltApp {
    */
   readonly registered: readonly Registration[];
   /**
-   * Tells every listener the daemon is stopping, and gives up the clips still waiting for a
-   * transcript, whose timers would keep the process alive. A listener still in flight does
-   * nothing from its next step on: it posts, opens a modal, submits and writes nothing.
+   * Tells every listener the daemon is stopping (`SlackChat.halt`), and gives up the clips
+   * still waiting for a transcript, whose timers would keep the process alive. A listener still
+   * in flight does nothing from its next step on: it posts, opens a modal, submits and writes
+   * nothing.
    */
   close(): void;
+  /** `!open` typed in a session's thread, for the folder the session works in. */
+  openFile(channel: string, threadTs: string, folder: string, words: string): Promise<void>;
 }
 
 // The longest wait between two tries to get the connection back.
@@ -200,10 +211,10 @@ function thrown(error: unknown): unknown {
 
 /** The Bolt app, with one listener per inbound path. */
 export function buildApp(options: BuildAppOptions): BuiltApp {
-  const { config, identity, sessions } = options;
-  const stopping = new AbortController();
+  const { chat, config, identity, sessions } = options;
   const parts: AppParts = {
     slack: options.slack,
+    chat,
     config,
     identity,
     sessions,
@@ -211,14 +222,16 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     holds: options.holds,
     guard: options.guard,
     state: options.state,
+    names: options.names,
+    inbound: options.inbound,
     uploads: options.uploads,
     home: options.home,
-    limiter: options.limiter,
+    limiter: chat.limiter,
     fetch:
       options.fetch ??
       (({ url, mimetype, limit }) => download(url, config.botToken, mimetype, limit)),
     clock: options.clock ?? monotonicClock,
-    stopped: stopping.signal,
+    stopped: chat.stopped,
     now: options.now ?? (() => Date.now() / 1000),
     listings:
       options.listings ??
@@ -228,8 +241,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   const requests = new Requests(parts, answers);
   const open = new Open(parts, answers);
   const resumeBind = new ResumeBind(parts, answers);
-  const messages = new Messages(parts, answers, { requests, open, resumeBind });
-  const clips = new Clips(parts, answers, messages);
+  const clips = new Clips(parts, answers);
   const home = new HomeControls(parts);
 
   const app = new App({
@@ -253,7 +265,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     const ts = str(message.ts);
     const threadTs = str(message.thread_ts || ts);
     if (!(await answers.admitted(user, team, channel, threadTs)) || channel === null) return;
-    // (sync) From here to the turn the message takes among its thread's (`Messages.arrival`).
+    // (sync) From here to the turn the message takes among its thread's (`arrival` in
+    // `core/flows/messages.ts`): nothing is awaited between the checks above and the call.
     const spoken = voice.clip(filesOf(message));
     if (spoken !== null) {
       await answers.replyOnFailure(channel, threadTs, () =>
@@ -262,10 +275,9 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
       return;
     }
     // A failure of the prompt itself (or of the session it starts) lands in that session's
-    // thread: it is the turn's one push. A word answers where it was typed instead.
-    await answers.replyOnFailure(channel, threadTs, () =>
-      messages.handleMessage(channel, threadTs, ts, message),
-    );
+    // thread: it is the turn's one push. A word answers where it was typed instead. The core
+    // tells the owner of a failure of its own.
+    await parts.inbound.message(inboundMessage(parts, answers, channel, threadTs, ts, message));
   });
 
   app.event("file_change", ({ event }) => clips.onFileChange(event as unknown as Payload));
@@ -330,8 +342,9 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     app,
     registered,
     close: () => {
-      stopping.abort();
+      chat.halt();
       clips.close();
     },
+    openFile: (channel, threadTs, folder, words) => open.openWord(channel, threadTs, folder, words),
   };
 }

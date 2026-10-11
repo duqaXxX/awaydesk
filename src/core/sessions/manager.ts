@@ -4,22 +4,24 @@
  * `session.ts`.
  */
 import type { ListedSession, Repository } from "../../agent/seam.ts";
+import type { ThreadChat, ThreadRef } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
 import { bindableFolders } from "../folders.ts";
 import * as texts from "../texts.ts";
 import { DRAIN_POLL_SECONDS } from "./constants.ts";
 import type { SessionDeps } from "./deps.ts";
-import { checkDirectory } from "./directory.ts";
+import { checkDirectory, trustedBy } from "./directory.ts";
 import { DirectoryUnavailable, SessionClosed } from "./errors.ts";
 import { logger, ThreadSession } from "./session.ts";
 import type { Event } from "./tasks.ts";
 
-function keyOf(channelId: string, threadTs: string): string {
-  return `${channelId}\n${threadTs}`;
+function keyOf(channelId: string, threadId: string): string {
+  return `${channelId}\n${threadId}`;
 }
 
 export class SessionManager {
   private readonly deps: SessionDeps;
+  private readonly names: texts.Names;
   private readonly sessions = new Map<string, ThreadSession>();
   /** The threads being deleted (`release`): no session is handed out or built in one. */
   private readonly heldThreads = new Set<string>();
@@ -33,6 +35,7 @@ export class SessionManager {
 
   constructor(deps: SessionDeps) {
     this.deps = deps;
+    this.names = texts.namesOf(deps.agent, deps.chat);
   }
 
   /**
@@ -40,19 +43,21 @@ export class SessionManager {
    * and its live session. Null when the channel is unbound; `SessionClosed` once a stop closed
    * the sessions, before anything is written.
    */
-  open(channelId: string, threadTs: string): ThreadSession | null {
+  open(channelId: string, threadId: string): ThreadSession | null {
     this.refuseWhenClosed();
     if (this.deps.state.channel(channelId) === null) return null;
-    const thread = this.deps.state.openThread(channelId, threadTs);
-    return this.session(channelId, threadTs, thread.directory);
+    const thread = this.deps.state.openThread(channelId, threadId);
+    return this.session(channelId, threadId, thread.directory);
   }
 
   /**
    * The repository holding `directory` when the daemon's git may run in it for a session
    * started in `sessionFolder`: the footer's own lookup, so what runs git for `!open` is what
-   * runs it for the footer.
+   * runs it for the footer. Null for an agent with no record of trust (`folderTrust`): the
+   * daemon's git runs in no folder then.
    */
-  repository(directory: string, sessionFolder: string): Promise<Repository | null> {
+  async repository(directory: string, sessionFolder: string): Promise<Repository | null> {
+    if (!this.deps.agent.capabilities.folderTrust) return null;
     return this.deps.agent.trustedRepository(directory, sessionFolder);
   }
 
@@ -61,8 +66,19 @@ export class SessionManager {
    * word, a notice): the live session's activity line, which that post cleared, is set again.
    * Nothing for a thread with no live session: it shows none.
    */
-  wrote(channelId: string, threadTs: string): void {
-    this.sessions.get(keyOf(channelId, threadTs))?.threadWritten();
+  wrote(channelId: string, threadId: string): void {
+    this.sessions.get(keyOf(channelId, threadId))?.threadWritten();
+  }
+
+  /**
+   * The thread as a flow answers in it: the live session's own, so that what is posted there
+   * sets its activity line again, or the chat's for a thread with no live session.
+   */
+  chatOf(channelId: string, threadId: string): ThreadChat {
+    return (
+      this.sessions.get(keyOf(channelId, threadId))?.threadChat ??
+      this.deps.chat.thread({ channel: channelId, thread: threadId })
+    );
   }
 
   /**
@@ -75,19 +91,19 @@ export class SessionManager {
    * await, however slow (a download, a slow call to the chat). Null for every thread once a stop
    * closed the sessions.
    */
-  get(channelId: string, threadTs: string): ThreadSession | null {
+  get(channelId: string, threadId: string): ThreadSession | null {
     if (this.closed) return null;
-    const thread = this.deps.state.thread(channelId, threadTs);
-    if (thread === null || this.heldThreads.has(keyOf(channelId, threadTs))) return null;
-    return this.session(channelId, threadTs, thread.directory);
+    const thread = this.deps.state.thread(channelId, threadId);
+    if (thread === null || this.heldThreads.has(keyOf(channelId, threadId))) return null;
+    return this.session(channelId, threadId, thread.directory);
   }
 
   private refuseWhenClosed(): void {
     if (this.closed) throw new SessionClosed();
   }
 
-  private session(channelId: string, threadTs: string, directory: string): ThreadSession {
-    const key = keyOf(channelId, threadTs);
+  private session(channelId: string, threadId: string, directory: string): ThreadSession {
+    const key = keyOf(channelId, threadId);
     let session = this.sessions.get(key) ?? null;
     let predecessor: Event | null = null;
     if (session?.closed) {
@@ -100,7 +116,7 @@ export class SessionManager {
       session = null;
     }
     if (session === null) {
-      const built = new ThreadSession(channelId, threadTs, directory, this.deps, { predecessor });
+      const built = new ThreadSession(channelId, threadId, directory, this.deps, { predecessor });
       built.draining = this.draining;
       built.onClosed = () => this.evictIfCurrent(key, built);
       this.sessions.set(key, built);
@@ -122,13 +138,13 @@ export class SessionManager {
   }
 
   /**
-   * The (channelId, threadTs) of every thread with a session object that is not closed: what
-   * the cleanup of `state.json` must not remove under a running session.
+   * Every thread with a session object that is not closed: what the cleanup of `state.json`
+   * must not remove under a running session.
    */
-  liveThreads(): Array<readonly [channelId: string, threadTs: string]> {
+  liveThreads(): ThreadRef[] {
     return [...this.sessions.values()]
       .filter((session) => !session.closed)
-      .map((session) => [session.channelId, session.threadTs] as const);
+      .map((session) => ({ channel: session.channelId, thread: session.threadId }));
   }
 
   /**
@@ -196,9 +212,9 @@ export class SessionManager {
    * is being deleted is told it holds no session. False once a stop closed the sessions: no
    * thread is held for a delete the stop would cut short.
    */
-  async release(channelId: string, threadTs: string): Promise<boolean> {
+  async release(channelId: string, threadId: string): Promise<boolean> {
     if (this.closed) return false;
-    const key = keyOf(channelId, threadTs);
+    const key = keyOf(channelId, threadId);
     const session = this.sessions.get(key);
     const inUse =
       session !== undefined && !session.closed && (session.waitingForOwner || !session.idle);
@@ -214,13 +230,13 @@ export class SessionManager {
   }
 
   /** Whether the thread is being deleted: it still has its entry, and takes no session. */
-  held(channelId: string, threadTs: string): boolean {
-    return this.heldThreads.has(keyOf(channelId, threadTs));
+  held(channelId: string, threadId: string): boolean {
+    return this.heldThreads.has(keyOf(channelId, threadId));
   }
 
   /** End the hold `release` put on a thread: its delete ended, either way. */
-  free(channelId: string, threadTs: string): void {
-    this.heldThreads.delete(keyOf(channelId, threadTs));
+  free(channelId: string, threadId: string): void {
+    this.heldThreads.delete(keyOf(channelId, threadId));
   }
 
   /**
@@ -241,29 +257,31 @@ export class SessionManager {
   }
 
   /**
-   * `!resume`: opens a thread at `threadTs` (the `!resume` message's own ts) in the channel's
+   * `!resume`: opens a thread at `threadId` (the `!resume` message's own ts) in the channel's
    * folder, already on `sessionId`. Null when the channel is unbound; `SessionClosed` once a
    * stop closed the sessions.
    */
   async resume(
     channelId: string,
-    threadTs: string,
+    threadId: string,
     sessionId: string,
   ): Promise<ThreadSession | null> {
     this.refuseWhenClosed();
     if (this.deps.state.channel(channelId) === null) return null;
-    const thread = this.deps.state.openThread(channelId, threadTs, sessionId);
-    return this.session(channelId, threadTs, thread.directory);
+    const thread = this.deps.state.openThread(channelId, threadId, sessionId);
+    return this.session(channelId, threadId, thread.directory);
   }
 
   /**
    * Every session of `directory`, the one the caller read for its channel; `dated`, by their
-   * last message, newest first, as the terminal's picker shows them.
+   * last message, newest first, as the terminal's picker shows them. None for an agent that
+   * lists none (`sessionListing`).
    */
   async sessionsIn(
     directory: string,
     options: { readonly dated?: boolean } = {},
   ): Promise<readonly ListedSession[]> {
+    if (!this.deps.agent.capabilities.sessionListing) return [];
     const found = await this.deps.agent.listSessions(directory);
     return options.dated ? this.dated(directory, found) : found;
   }
@@ -272,7 +290,8 @@ export class SessionManager {
    * `found`, sessions of `directory`, by their last message, newest first. Dating reads files,
    * so a caller that shows only some of a folder's sessions passes those alone.
    */
-  dated(directory: string, found: readonly ListedSession[]): Promise<ListedSession[]> {
+  async dated(directory: string, found: readonly ListedSession[]): Promise<ListedSession[]> {
+    if (!this.deps.agent.capabilities.sessionListing) return [];
     return this.deps.agent.datedSessions(directory, found);
   }
 
@@ -282,7 +301,7 @@ export class SessionManager {
    */
   async unavailable(directory: string): Promise<DirectoryUnavailable | null> {
     try {
-      await checkDirectory(directory, (folder) => this.deps.agent.folderTrusted(folder));
+      await checkDirectory(directory, trustedBy(this.deps.agent), this.names);
     } catch (error) {
       if (error instanceof DirectoryUnavailable) return error;
       throw error;
@@ -292,7 +311,7 @@ export class SessionManager {
 
   /** The folders under `root` where a session can start, as `bindableFolders` finds them. */
   foldersIn(root: string): Promise<string[]> {
-    return bindableFolders(root, (folder) => this.deps.agent.folderTrusted(folder));
+    return bindableFolders(root, trustedBy(this.deps.agent));
   }
 
   /**
@@ -348,7 +367,7 @@ export class SessionManager {
       } catch (error) {
         // one session's failure must not skip the rest
         logger.error(
-          `could not close ${session.channelId}/${session.threadTs}: ${errorName(error)}`,
+          `could not close ${session.channelId}/${session.threadId}: ${errorName(error)}`,
         );
       }
     }

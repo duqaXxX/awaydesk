@@ -9,15 +9,17 @@
  * terminal does. A file past a limit, or one that fails to download, stops the whole message: a
  * prompt without its attachment would mislead Claude.
  */
+
 import { lstatSync } from "node:fs";
 import { lstat, mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ImagePart, PromptContent, TextPart } from "../../agent/seam.ts";
-import * as texts from "../../core/texts.ts";
+import { type Names, named, texts } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import { mrkdwnEscape } from "./reply/escape.ts";
+import * as slackTexts from "./texts.ts";
 
 /** A Slack file object, read field by field since it is wire data. */
 export type SlackFile = object;
@@ -130,19 +132,21 @@ function slackFileUrl(raw: string): URL | null {
 }
 
 /** Why `file` cannot reach Claude, as the end of `UPLOAD_FAILED`; null when it can. */
-export function refusal(file: SlackFile): string | null {
+export function refusal(file: SlackFile, names: Names): string | null {
   const access = field(file, "file_access");
-  if ((access === undefined ? "visible" : access) !== "visible") return texts.UPLOAD_NOT_SHARED;
+  if ((access === undefined ? "visible" : access) !== "visible")
+    return slackTexts.UPLOAD_NOT_SHARED;
   if (slackFileUrl(String(field(file, "url_private_download") || "")) === null) {
-    return texts.UPLOAD_NOT_SHARED;
+    return slackTexts.UPLOAD_NOT_SHARED;
   }
   const mimetype = String(field(file, "mimetype") || "");
   const size = declaredSize(field(file, "size"));
-  if (size === null) return texts.UPLOAD_NOT_SHARED;
+  if (size === null) return slackTexts.UPLOAD_NOT_SHARED;
   if (mimetype.startsWith("image/")) {
-    if (!IMAGE_TYPES.has(mimetype)) return texts.fill(texts.UPLOAD_IMAGE_TYPE, { mimetype });
+    if (!IMAGE_TYPES.has(mimetype))
+      return texts.fill(named(slackTexts.UPLOAD_IMAGE_TYPE, names), { mimetype });
     if (size > IMAGE_LIMIT) {
-      return texts.fill(texts.UPLOAD_IMAGE_SIZE, {
+      return texts.fill(named(slackTexts.UPLOAD_IMAGE_SIZE, names), {
         size: megabytes(size),
         limit: megabytes(IMAGE_LIMIT),
       });
@@ -150,15 +154,15 @@ export function refusal(file: SlackFile): string | null {
     const width = field(file, "original_w");
     const height = field(file, "original_h");
     if (integer(width) > IMAGE_SIDE || integer(height) > IMAGE_SIDE) {
-      return texts.fill(texts.UPLOAD_IMAGE_SIDE, {
+      return texts.fill(named(slackTexts.UPLOAD_IMAGE_SIDE, names), {
         width: String(width ?? "None"),
         height: String(height ?? "None"),
       });
     }
   } else if (!(mimetype.startsWith("text/") || FILE_TYPES.has(mimetype))) {
-    return texts.fill(texts.UPLOAD_FILE_TYPE, { mimetype: mimetype || "unknown" });
+    return texts.fill(slackTexts.UPLOAD_FILE_TYPE, { mimetype: mimetype || "unknown" });
   } else if (size > FILE_LIMIT) {
-    return texts.fill(texts.UPLOAD_FILE_SIZE, {
+    return texts.fill(slackTexts.UPLOAD_FILE_SIZE, {
       size: megabytes(size),
       limit: megabytes(FILE_LIMIT),
     });
@@ -167,10 +171,10 @@ export function refusal(file: SlackFile): string | null {
 }
 
 /** Why the images of one message, together, cannot reach Claude; null when they can. */
-export function imagesRefusal(files: readonly SlackFile[]): string | null {
+export function imagesRefusal(files: readonly SlackFile[], names: Names): string | null {
   const images = files.filter(isImage);
   if (images.length > IMAGES_PER_MESSAGE) {
-    return texts.fill(texts.UPLOAD_TOO_MANY, {
+    return texts.fill(named(slackTexts.UPLOAD_TOO_MANY, names), {
       count: images.length,
       limit: IMAGES_PER_MESSAGE,
     });
@@ -181,15 +185,15 @@ export function imagesRefusal(files: readonly SlackFile[]): string | null {
     // `refusal` speaks for one file; the images together are told as a whole sentence.
     if (size === null) {
       const name = field(file, "name") || field(file, "id");
-      return texts.fill(texts.UPLOAD_FAILED, {
+      return texts.fill(named(slackTexts.UPLOAD_FAILED, names), {
         name: mrkdwnEscape(String(name ?? "None")),
-        reason: texts.UPLOAD_NOT_SHARED,
+        reason: slackTexts.UPLOAD_NOT_SHARED,
       });
     }
     total += size;
   }
   if (total > IMAGES_LIMIT) {
-    return texts.fill(texts.UPLOAD_TOO_HEAVY, {
+    return texts.fill(named(slackTexts.UPLOAD_TOO_HEAVY, names), {
       size: megabytes(total),
       limit: megabytes(IMAGES_LIMIT),
     });

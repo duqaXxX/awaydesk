@@ -10,12 +10,12 @@ import fs, {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
+import type { ThreadRef } from "../../src/chat/seam.ts";
 import {
   channelRecord,
   parseThread,
   StateError,
   StateStore,
-  type ThreadKey,
   threadState,
   UnknownChannel,
 } from "../../src/core/state.ts";
@@ -27,6 +27,9 @@ const OTHER_CHANNEL = "C000OTHR";
 const THREAD_TS = "1790549806.565369";
 const OTHER_THREAD_TS = "1790549900.100000";
 const SESSION = "4e8c1111-2222-3333-4444-555566667777";
+
+/** A thread's name read as its opening time in epoch seconds, as a chat whose names are times does. */
+const opened = (ref: ThreadRef): number | null => Number(ref.thread);
 
 const made: string[] = [];
 
@@ -181,7 +184,7 @@ test("holder finds a session across channels", () => {
   store.openThread(CHANNEL, THREAD_TS);
   store.openThread(OTHER_CHANNEL, OTHER_THREAD_TS);
   store.setSession(OTHER_CHANNEL, OTHER_THREAD_TS, SESSION);
-  assert.deepEqual(store.holder(SESSION), [OTHER_CHANNEL, OTHER_THREAD_TS]);
+  assert.deepEqual(store.holder(SESSION), { channel: OTHER_CHANNEL, thread: OTHER_THREAD_TS });
   assert.equal(store.holder("no-such-session"), null);
 });
 
@@ -284,11 +287,102 @@ test("clear notice", () => {
 
 test("an unknown version is refused", () => {
   const path = join(scratch(), "state.json");
-  writeFileSync(path, JSON.stringify({ version: 3, channels: {} }));
+  writeFileSync(path, JSON.stringify({ version: 4, channels: {} }));
   assert.throws(
     () => new StateStore(path),
     (error: unknown) => error instanceof StateError && /state\.json/.test(error.message),
   );
+});
+
+// Version 3 is version 2 plus the names of the agent and the chat that wrote the file.
+
+const MODULES = { agent: "agent-a", chat: "chat-a" };
+
+/** A version 2 file with one bound channel, and the keys it holds at the top. */
+function writeV2(path: string, directory: string): void {
+  writeFileSync(
+    path,
+    JSON.stringify({ version: 2, channels: { [CHANNEL]: { directory, notice_pending: false } } }),
+  );
+}
+
+test("a v2 file is read for the modules running and written as v3 on the first save", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  writeV2(path, dir);
+  const before = readFileSync(path, "utf8");
+
+  const store = new StateStore(path, { modules: MODULES });
+  assert.equal(store.channel(CHANNEL)?.directory, dir);
+  assert.equal(readFileSync(path, "utf8"), before); // reading writes nothing
+  store.openThread(CHANNEL, THREAD_TS);
+  assert.deepEqual(Object.keys(read(path)), ["version", "agent", "chat", "channels"]);
+  assert.deepEqual(
+    { ...read(path), channels: undefined },
+    { version: 3, agent: "agent-a", chat: "chat-a", channels: undefined },
+  );
+  // And it is read back by the same modules.
+  assert.notEqual(new StateStore(path, { modules: MODULES }).thread(CHANNEL, THREAD_TS), null);
+});
+
+test("a v3 file written for other modules stops the start naming both pairs", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  new StateStore(path, { modules: MODULES }).bind(CHANNEL, dir);
+  const before = readFileSync(path, "utf8");
+
+  for (const other of [
+    { agent: "agent-b", chat: "chat-a" },
+    { agent: "agent-a", chat: "chat-b" },
+  ]) {
+    assert.throws(
+      () => new StateStore(path, { modules: other }),
+      (error: unknown) =>
+        error instanceof StateError &&
+        error.message.includes("belongs to other modules") &&
+        error.message.includes(`agent "agent-a"`) &&
+        error.message.includes(`chat "chat-a"`) &&
+        error.message.includes(`agent "${other.agent}"`) &&
+        error.message.includes(`chat "${other.chat}"`),
+    );
+  }
+  assert.equal(readFileSync(path, "utf8"), before);
+});
+
+test("a v3 file whose names are missing or not text cannot be read", () => {
+  const path = join(scratch(), "state.json");
+  for (const names of [{}, { agent: "agent-a" }, { agent: 1, chat: "chat-a" }]) {
+    writeFileSync(path, JSON.stringify({ version: 3, ...names, channels: {} }));
+    assert.throws(
+      () => new StateStore(path, { modules: MODULES }),
+      (error: unknown) => error instanceof StateError && /cannot be read/.test(error.message),
+    );
+  }
+});
+
+test("a store given no names writes no names it was not given and keeps those it read", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  writeV2(path, dir);
+  const plain = new StateStore(path);
+  plain.openThread(CHANNEL, THREAD_TS);
+  assert.deepEqual(Object.keys(read(path)), ["version", "channels"]);
+  assert.equal(read(path).version, 2);
+
+  new StateStore(path, { modules: MODULES }).openThread(CHANNEL, OTHER_THREAD_TS);
+  const open = new StateStore(path); // checks nothing
+  open.setSession(CHANNEL, THREAD_TS, SESSION);
+  assert.deepEqual(Object.keys(read(path)), ["version", "agent", "chat", "channels"]);
+  assert.equal(read(path).version, 3);
+});
+
+test("a v1 file is migrated to v3 when the store is given names", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  writeFileSync(path, JSON.stringify({ version: 1, channels: { [CHANNEL]: { directory: dir } } }));
+  new StateStore(path, { modules: MODULES });
+  assert.deepEqual(Object.keys(read(path)), ["version", "agent", "chat", "channels"]);
+  assert.equal(read(path).version, 3);
 });
 
 test("a corrupt file is refused not discarded", () => {
@@ -339,7 +433,7 @@ test("removes a thread whose session is gone", () => {
   store.openThread(CHANNEL, THREAD_TS);
   store.setSession(CHANNEL, THREAD_TS, SESSION);
 
-  const removed = store.prune(() => [], 1790549806.565369);
+  const removed = store.prune(() => [], opened, 1790549806.565369);
   assert.equal(removed, 1);
   assert.equal(store.thread(CHANNEL, THREAD_TS), null);
 });
@@ -351,7 +445,7 @@ test("keeps a thread whose session is alive", () => {
   store.openThread(CHANNEL, THREAD_TS);
   store.setSession(CHANNEL, THREAD_TS, SESSION);
 
-  const removed = store.prune(() => [SESSION], 1790549806.565369);
+  const removed = store.prune(() => [SESSION], opened, 1790549806.565369);
   assert.equal(removed, 0);
   assert.notEqual(store.thread(CHANNEL, THREAD_TS), null);
 });
@@ -363,7 +457,7 @@ test("removes a no session thread older than a day", () => {
   store.openThread(CHANNEL, THREAD_TS);
 
   const rootTime = Number(THREAD_TS);
-  const removed = store.prune(() => [], rootTime + 86_401);
+  const removed = store.prune(() => [], opened, rootTime + 86_401);
   assert.equal(removed, 1);
   assert.equal(store.thread(CHANNEL, THREAD_TS), null);
 });
@@ -375,7 +469,7 @@ test("keeps a young no session thread", () => {
   store.openThread(CHANNEL, THREAD_TS);
 
   const rootTime = Number(THREAD_TS);
-  const removed = store.prune(() => [], rootTime + 3_600);
+  const removed = store.prune(() => [], opened, rootTime + 3_600);
   assert.equal(removed, 0);
   assert.notEqual(store.thread(CHANNEL, THREAD_TS), null);
 });
@@ -395,7 +489,7 @@ test("calls alive once per distinct folder", () => {
   store.openThread(CHANNEL, OTHER_THREAD_TS);
   store.setSession(CHANNEL, OTHER_THREAD_TS, SESSION);
 
-  const removed = store.prune(alive, 1790549806.565369);
+  const removed = store.prune(alive, opened, 1790549806.565369);
   assert.equal(removed, 0);
   assert.deepEqual(calls, [join(dir, "project")]);
 });
@@ -413,7 +507,7 @@ test("alive raising leaves the file untouched", () => {
     throw new Error("folder is gone");
   };
 
-  assert.throws(() => store.prune(boom, 1790549806.565369), /folder is gone/);
+  assert.throws(() => store.prune(boom, opened, 1790549806.565369), /folder is gone/);
   assert.equal(readFileSync(path, "utf8"), before);
   assert.notEqual(store.thread(CHANNEL, THREAD_TS), null);
 });
@@ -596,7 +690,7 @@ test("prune keeps every thread of a folder it cannot decide", () => {
   const alive = (directory: string): Set<string> | null =>
     directory.endsWith("undecided") ? null : new Set();
 
-  assert.equal(store.prune(alive, 1700000000.0), 1);
+  assert.equal(store.prune(alive, opened, 1700000000.0), 1);
   assert.notEqual(store.thread("C000CHAN", "1700000000.000100"), null);
   assert.equal(store.thread("C000CHAN", "1700000000.000200"), null);
 });
@@ -739,7 +833,7 @@ test("threads lists every thread of every channel", () => {
 test("the observer hears what the session index shows and nothing else", () => {
   const dir = scratch();
   const store = new StateStore(join(dir, "state.json"));
-  const heard: (readonly ThreadKey[])[] = [];
+  const heard: (readonly ThreadRef[])[] = [];
   store.onSessionsChange = (changed) => heard.push(changed);
 
   store.bind(CHANNEL, join(dir, "project")); // a new channel is a new group on the page
@@ -752,9 +846,10 @@ test("the observer hears what the session index shows and nothing else", () => {
   store.setStatusPending(CHANNEL, THREAD_TS, null, "white_check_mark");
   assert.equal(heard.length, 6);
   // Each time, the thread the write touched and no other.
-  assert.deepEqual(heard[1], [[CHANNEL, THREAD_TS]]);
-  assert.deepEqual(heard[2], [[CHANNEL, OTHER_THREAD_TS]]);
-  for (const changed of heard.slice(3)) assert.deepEqual(changed, [[CHANNEL, THREAD_TS]]);
+  assert.deepEqual(heard[1], [{ channel: CHANNEL, thread: THREAD_TS }]);
+  assert.deepEqual(heard[2], [{ channel: CHANNEL, thread: OTHER_THREAD_TS }]);
+  for (const changed of heard.slice(3))
+    assert.deepEqual(changed, [{ channel: CHANNEL, thread: THREAD_TS }]);
 
   // What no row of the index shows: a reply's bookkeeping, a request, bypass, effort, a rebind.
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "1790549807.000001");
@@ -765,7 +860,7 @@ test("the observer hears what the session index shows and nothing else", () => {
   assert.equal(heard.length, 6);
 
   store.removeThread(CHANNEL, THREAD_TS);
-  assert.deepEqual(heard.slice(6), [[[CHANNEL, THREAD_TS]]]);
+  assert.deepEqual(heard.slice(6), [[{ channel: CHANNEL, thread: THREAD_TS }]]);
 });
 
 test("the observer hears a prune that removed something", () => {
@@ -773,19 +868,19 @@ test("the observer hears a prune that removed something", () => {
   const store = new StateStore(join(dir, "state.json"));
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD_TS, SESSION);
-  const heard: (readonly ThreadKey[])[] = [];
+  const heard: (readonly ThreadRef[])[] = [];
   store.onSessionsChange = (changed) => heard.push(changed);
 
   assert.equal(
-    store.prune(() => new Set([SESSION]), Number(THREAD_TS)),
+    store.prune(() => new Set([SESSION]), opened, Number(THREAD_TS)),
     0,
   );
   assert.deepEqual(heard, []);
   assert.equal(
-    store.prune(() => new Set(), Number(THREAD_TS)),
+    store.prune(() => new Set(), opened, Number(THREAD_TS)),
     1,
   );
-  assert.deepEqual(heard, [[[CHANNEL, THREAD_TS]]]);
+  assert.deepEqual(heard, [[{ channel: CHANNEL, thread: THREAD_TS }]]);
 });
 
 test("remove channel forgets the channel and its threads and says which", () => {
@@ -796,18 +891,18 @@ test("remove channel forgets the channel and its threads and says which", () => 
   store.bind(OTHER_CHANNEL, join(dir, "other"));
   store.openThread(CHANNEL, THREAD_TS, SESSION);
   store.openThread(OTHER_CHANNEL, OTHER_THREAD_TS);
-  const heard: (readonly ThreadKey[])[] = [];
+  const heard: (readonly ThreadRef[])[] = [];
   store.onSessionsChange = (changed) => heard.push(changed);
 
   store.removeChannel(CHANNEL);
   assert.deepEqual(store.channels(), [OTHER_CHANNEL]);
   assert.equal(store.thread(CHANNEL, THREAD_TS), null);
   assert.deepEqual(Object.keys(read(path).channels), [OTHER_CHANNEL]);
-  assert.deepEqual(heard, [[[CHANNEL, THREAD_TS]]]);
+  assert.deepEqual(heard, [[{ channel: CHANNEL, thread: THREAD_TS }]]);
   assert.deepEqual(new StateStore(path).channels(), [OTHER_CHANNEL]); // it stays forgotten after a restart
 
   store.removeChannel(CHANNEL); // not there any more: nothing written, nothing announced
-  assert.deepEqual(heard, [[[CHANNEL, THREAD_TS]]]);
+  assert.deepEqual(heard, [[{ channel: CHANNEL, thread: THREAD_TS }]]);
 });
 
 test("prune leaves alone the threads it is told to keep", () => {
@@ -819,16 +914,16 @@ test("prune leaves alone the threads it is told to keep", () => {
   store.openThread(CHANNEL, THREAD_TS, SESSION);
   store.openThread(CHANNEL, OTHER_THREAD_TS);
   const later = Number(OTHER_THREAD_TS) + 2 * 24 * 60 * 60;
-  const keep: ThreadKey[] = [
-    [CHANNEL, THREAD_TS],
-    [CHANNEL, OTHER_THREAD_TS],
+  const keep: ThreadRef[] = [
+    { channel: CHANNEL, thread: THREAD_TS },
+    { channel: CHANNEL, thread: OTHER_THREAD_TS },
   ];
   assert.equal(
-    store.prune(() => new Set(), later, keep),
+    store.prune(() => new Set(), opened, later, keep),
     0,
   );
   assert.equal(
-    store.prune(() => new Set(), later, [[CHANNEL, THREAD_TS]]),
+    store.prune(() => new Set(), opened, later, [{ channel: CHANNEL, thread: THREAD_TS }]),
     1,
   );
   assert.notEqual(store.thread(CHANNEL, THREAD_TS), null);

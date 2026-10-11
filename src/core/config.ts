@@ -7,12 +7,13 @@ import { errorCode } from "../values.ts";
 import { expandUser, resolvePath } from "./paths.ts";
 
 export const CONFIG_DIR = join(homedir(), ".config", "awaydesk");
-export const REQUIRED = [
-  "SLACK_BOT_TOKEN",
-  "SLACK_APP_TOKEN",
-  "SLACK_OWNER_USER_ID",
-  "ALLOWED_ROOT",
-] as const;
+
+/** The variables that select the agent and the chat; absent, the registry's defaults hold. */
+export const SELECTORS = ["AWAYDESK_AGENT", "AWAYDESK_CHAT"] as const;
+const [AGENT_VARIABLE, CHAT_VARIABLE] = SELECTORS;
+
+/** The variables the core itself requires; each module names its own. */
+export const REQUIRED = ["ALLOWED_ROOT"] as const;
 
 /** The configuration is missing, unsafe or invalid; the message says what to fix. */
 export class ConfigError extends Error {
@@ -22,21 +23,42 @@ export class ConfigError extends Error {
   }
 }
 
+/** A module's variables: a lookup gives the value, and printing, spreading or `JSON.stringify` show nothing. */
+export type Variables = Readonly<Record<string, string>>;
+
+/** The variables one module reads. */
+export interface ModuleVariables {
+  /** The daemon does not start without these. */
+  readonly required: readonly string[];
+  readonly optional: readonly string[];
+}
+
 /**
- * The tokens are non-enumerable, so `util.inspect`, `JSON.stringify` and a log line that prints
- * the object never show them. A spread copy of a `Config` drops them.
+ * What `loadConfig` needs of the registry: the names a variable may select, their defaults, and the
+ * variables each module reads. `Registry` satisfies it; the core does not import the registry.
+ */
+export interface Modules {
+  readonly agents: Readonly<Record<string, ModuleVariables>>;
+  readonly chats: Readonly<Record<string, ModuleVariables>>;
+  readonly defaults: { readonly agent: string; readonly chat: string };
+}
+
+/**
+ * The two modules' variables are non-enumerable, so `util.inspect`, `JSON.stringify` and a log
+ * line that prints the object never show them (they hold the tokens). A spread copy of a `Config`
+ * drops them.
  */
 export interface Config {
-  readonly botToken: string;
-  readonly appToken: string;
-  readonly ownerUserId: string;
+  /** The name of the selected agent: a key of `Modules.agents`. */
+  readonly agent: string;
+  /** The name of the selected chat: a key of `Modules.chats`. */
+  readonly chat: string;
   readonly allowedRoot: string;
   readonly configDir: string;
-  /**
-   * The owner's own user token, optional: what deleting a thread's messages that are the
-   * owner's needs. null: the Home tab offers no delete.
-   */
-  readonly userToken: string | null;
+  /** The values of the agent's `required` and `optional` variables the file sets. */
+  readonly agentVariables: Variables;
+  /** The values of the chat's `required` and `optional` variables the file sets. */
+  readonly chatVariables: Variables;
 }
 
 /** The variables a `${NAME}` may name besides the file's own; the process environment by default. */
@@ -101,23 +123,49 @@ function isDirectory(path: string): boolean {
   }
 }
 
-function hiddenTokens(
-  config: Omit<Config, "botToken" | "appToken" | "userToken">,
-  secrets: {
-    botToken: string;
-    appToken: string;
-    userToken: string | null;
-  },
-): Config {
-  return Object.defineProperties(config, {
-    botToken: { value: secrets.botToken, enumerable: false },
-    appToken: { value: secrets.appToken, enumerable: false },
-    userToken: { value: secrets.userToken, enumerable: false },
-  }) as Config;
+/** The values of `names` that `values` holds, readable by lookup and shown by nothing. */
+function hiddenVariables(
+  names: readonly string[],
+  values: Readonly<Record<string, string>>,
+): Variables {
+  const hidden: Record<string, string> = Object.create(null);
+  for (const name of names) {
+    const value = values[name];
+    if (Object.hasOwn(values, name) && value !== undefined) {
+      Object.defineProperty(hidden, name, { value, enumerable: false });
+    }
+  }
+  return hidden;
 }
 
-/** Read and validate `.env`; throws ConfigError, never touches `process.env`. */
-export function loadConfig(configDir: string = CONFIG_DIR, env: Env = process.env): Config {
+/** The module `variable` selects (its default when the file does not set it), or a `ConfigError`. */
+function selected(
+  variable: string,
+  chosen: string | undefined,
+  fallback: string,
+  held: Readonly<Record<string, ModuleVariables>>,
+): readonly [name: string, module: ModuleVariables] {
+  const name = chosen ?? fallback;
+  const module = Object.hasOwn(held, name) ? held[name] : undefined;
+  if (module === undefined) {
+    throw new ConfigError(
+      `${variable} is "${name}", which this daemon does not hold; the valid names are: ` +
+        Object.keys(held).sort().join(", "),
+    );
+  }
+  return [name, module];
+}
+
+/**
+ * Read and validate `.env` for the modules it selects; throws ConfigError, never touches
+ * `process.env`. The values a module's own checks refuse (the shape of a token) are its to
+ * judge when it is built.
+ */
+export function loadConfig(
+  modules: Modules,
+  configDir: string = CONFIG_DIR,
+  env: Env = process.env,
+): Config {
   const envPath = join(configDir, ".env");
   let st: ReturnType<typeof lstatSync>;
   try {
@@ -149,32 +197,40 @@ export function loadConfig(configDir: string = CONFIG_DIR, env: Env = process.en
     const value = raw?.trim();
     if (value) values[key] = value;
   }
-  const missing = REQUIRED.filter((key) => !(key in values));
+  const [agent, agentModule] = selected(
+    AGENT_VARIABLE,
+    values[AGENT_VARIABLE],
+    modules.defaults.agent,
+    modules.agents,
+  );
+  const [chat, chatModule] = selected(
+    CHAT_VARIABLE,
+    values[CHAT_VARIABLE],
+    modules.defaults.chat,
+    modules.chats,
+  );
+  // The chat's, then the agent's, then the core's own.
+  const missing = [...chatModule.required, ...agentModule.required, ...REQUIRED].filter(
+    (key) => !Object.hasOwn(values, key),
+  );
   if (missing.length > 0) {
     throw new ConfigError(`missing in ${envPath}: ${missing.join(", ")}`);
-  }
-  const botToken = values.SLACK_BOT_TOKEN as string;
-  const appToken = values.SLACK_APP_TOKEN as string;
-  if (!botToken.startsWith("xoxb-")) {
-    throw new ConfigError("SLACK_BOT_TOKEN must be the Bot User OAuth Token (xoxb-...)");
-  }
-  if (!appToken.startsWith("xapp-")) {
-    throw new ConfigError("SLACK_APP_TOKEN must be the app-level token (xapp-...)");
-  }
-  const userToken = values.SLACK_USER_TOKEN ?? null;
-  if (userToken !== null && !userToken.startsWith("xoxp-")) {
-    throw new ConfigError("SLACK_USER_TOKEN must be the User OAuth Token (xoxp-...)");
   }
   const root = resolvePath(expandUser(values.ALLOWED_ROOT as string));
   if (!isDirectory(root)) {
     throw new ConfigError(`ALLOWED_ROOT is not a directory: ${root}`);
   }
-  return hiddenTokens(
+  return Object.defineProperties(
+    { agent, chat, allowedRoot: root, configDir },
     {
-      ownerUserId: values.SLACK_OWNER_USER_ID as string,
-      allowedRoot: root,
-      configDir,
+      agentVariables: {
+        value: hiddenVariables([...agentModule.required, ...agentModule.optional], values),
+        enumerable: false,
+      },
+      chatVariables: {
+        value: hiddenVariables([...chatModule.required, ...chatModule.optional], values),
+        enumerable: false,
+      },
     },
-    { botToken, appToken, userToken },
-  );
+  ) as Config;
 }

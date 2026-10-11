@@ -1,10 +1,9 @@
 /**
- * Repair what a crashed daemon left open (issue #19): a reply whose stream never stopped or
- * whose cards still run, an approval, question or hold request still carrying buttons, and the
- * ⏳/✋ reaction a turn mid-flight left on its root. Runs once on start, right after `auth.test`
- * and before opening the Socket Mode connection (the web client works without it) and before
- * `state.prune` (a pruned thread's leftovers must still be repaired); a graceful stop clears
- * these same fields itself, so a second start finds nothing to do.
+ * Ends a reply a crashed daemon left open (issue #19): a stream that never stopped or whose
+ * cards still run. The core's repair (`core/flows/repair.ts`) runs once on start, right after the
+ * provider is built and before the connection opens, and calls this for each open reply through
+ * `ThreadChat.endReply`; a graceful stop clears these same fields itself, so a second start finds
+ * nothing to do.
  *
  * A reply's message is stopped first (`chat.stopStream`; Slack ends a stream itself 5 minutes
  * after it started, and answers `message_not_in_streaming_state` to a stop then), which is the
@@ -20,82 +19,21 @@
  * the same ts instead returned the thread's root too).
  */
 import type { KnownBlock, WebClient } from "@slack/web-api";
-import type { StateStore, ThreadState } from "../../core/state.ts";
-import * as texts from "../../core/texts.ts";
 import { getLogger } from "../../log.ts";
 import { isRecord, records } from "../../values.ts";
 import { contextBlock } from "./reply/blocks.ts";
-import { deleteRequest, describe, NOT_STREAMING } from "./reply/errors.ts";
+import { describe, NOT_STREAMING } from "./reply/errors.ts";
 import type { Limiter } from "./reply/limiter.ts";
-import { Status, StatusReaction } from "./reply/status.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.repair");
 
 type Block = Record<string, unknown>;
 
-const STOPPED_BLOCK = contextBlock(texts.STOPPED_BEFORE_ANSWER);
 // What a card left running becomes: it never ended, and will not.
 const RUNNING_CARD = ["pending", "in_progress"];
 // Slack's own cap: the read-back count is Slack's (streamed markdown reads back as several
 // blocks), not the sink's, which keeps a margin under it for what it writes itself.
 export const SLACK_BLOCKS = 50;
-
-/**
- * Repair every thread state.json still shows as left open. One thread's failure (a deleted
- * message, a Slack error) is logged and does not stop the others; each of a thread's three
- * fields is cleared once its own repair has been attempted, successfully or not, so a second
- * start never retries what this one already gave up on.
- */
-export async function repairCrash(
-  slack: WebClient,
-  state: StateStore,
-  limiter: Limiter,
-): Promise<void> {
-  for (const [channelId, threadTs, thread] of state.repairsPending()) {
-    try {
-      await repairThread(slack, limiter, state, channelId, threadTs, thread);
-    } catch (error) {
-      logger.error(
-        `could not repair a crashed thread's state in ${channelId}/${threadTs}: ${describe(error)}`,
-      );
-    }
-  }
-}
-
-async function repairThread(
-  slack: WebClient,
-  limiter: Limiter,
-  state: StateStore,
-  channelId: string,
-  threadTs: string,
-  thread: ThreadState,
-): Promise<void> {
-  for (const messageTs of thread.openReplies) {
-    await repairReply(slack, limiter, channelId, threadTs, messageTs);
-    safe(() => state.replaceOpenReply(channelId, threadTs, messageTs, null));
-  }
-  for (const messageTs of thread.requests) {
-    await deleteRequest(slack, { channel: channelId, ts: messageTs }, { logger });
-    safe(() => state.removeRequest(channelId, threadTs, messageTs));
-  }
-  if (thread.status !== null) {
-    const ended = await repairStatus(slack, channelId, threadTs, thread.status);
-    safe(() => state.setStatusPending(channelId, threadTs, null, ended));
-  }
-}
-
-/**
- * A `StateStore` write is a plain synchronous file write, so it can throw like any other (disk
- * full, a permission problem): best-effort here, since repair itself must never crash the
- * daemon's startup over its own bookkeeping. Logged with the error name only.
- */
-function safe(write: () => void): void {
-  try {
-    write();
-  } catch (error) {
-    logger.warning(`could not update state.json during crash repair: ${describe(error)}`);
-  }
-}
 
 /**
  * Stop the reply's message, then rewrite it: its blocks as Slack keeps them, every card left
@@ -104,14 +42,16 @@ function safe(write: () => void): void {
  * the cap the line goes into the last context block (the footer), or is left out if there is
  * none; a block that holds content is never replaced. A failed read or a message already gone
  * is logged and left alone: never replaced with a shorter form that would lose its content.
+ * `note` is the line that says it stopped. Never rejects.
  */
-async function repairReply(
+export async function endReply(
   slack: WebClient,
   limiter: Limiter,
-  channelId: string,
-  threadTs: string,
+  place: { readonly channel: string; readonly threadTs: string },
   messageTs: string,
+  note: string,
 ): Promise<void> {
+  const { channel: channelId, threadTs } = place;
   try {
     await slack.chat.stopStream({ channel: channelId, ts: messageTs });
   } catch (error) {
@@ -142,14 +82,14 @@ async function repairReply(
       ? { ...block, status: "error" }
       : block,
   );
-  if (blocks.length < SLACK_BLOCKS) blocks.push({ ...STOPPED_BLOCK });
-  else blocks = sayStoppedInTheFooter(blocks);
+  if (blocks.length < SLACK_BLOCKS) blocks.push({ ...contextBlock(note) });
+  else blocks = sayStoppedInTheFooter(blocks, note);
   try {
     await limiter.acquire();
     await slack.chat.update({
       channel: channelId,
       ts: messageTs,
-      text: texts.STOPPED_BEFORE_ANSWER,
+      text: note,
       // Blocks as Slack read them back, sent back as they are: opaque to the library's types.
       blocks: blocks as unknown as KnownBlock[],
     });
@@ -164,7 +104,7 @@ async function repairReply(
  * The blocks with the stopped line added to the text of the last context block; unchanged when
  * the message has none: the edit's own `text` says it.
  */
-function sayStoppedInTheFooter(blocks: Block[]): Block[] {
+function sayStoppedInTheFooter(blocks: Block[], note: string): Block[] {
   const index = blocks.findLastIndex((block) => block.type === "context");
   const last = blocks[index];
   if (last === undefined) return blocks;
@@ -174,25 +114,7 @@ function sayStoppedInTheFooter(blocks: Block[]): Block[] {
     return blocks;
   }
   const text = typeof first.text === "string" ? first.text : "";
-  const joined = `${text} · ${texts.STOPPED_BEFORE_ANSWER}`.replace(/^[ ·]+/, "");
+  const joined = `${text} · ${note}`.replace(/^[ ·]+/, "");
   const rewritten = { ...last, elements: [{ ...first, text: joined }, ...elements.slice(1)] };
   return blocks.map((block, i) => (i === index ? rewritten : block));
-}
-
-/**
- * Set ❌ on a root left ⏳ or ✋, through the same `StatusReaction` a live session uses (issue
- * #19 fix round item 9): a fresh instance's first `show` also strips every other stray
- * reaction from the root on its own (D10), which is strictly more thorough than removing just
- * the one name state.json recorded. Returns the reaction asked for, the thread's ended one from
- * now on; null for a name that is neither.
- */
-async function repairStatus(
-  slack: WebClient,
-  channelId: string,
-  threadTs: string,
-  name: string,
-): Promise<string | null> {
-  if (name !== Status.WORKING && name !== Status.WAITING) return null;
-  await new StatusReaction(slack, { channel: channelId, rootTs: threadTs }).show(Status.ERROR);
-  return Status.ERROR;
 }

@@ -13,7 +13,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { inspect } from "node:util";
-import { ConfigError, expandEnv, loadConfig } from "../../src/core/config.ts";
+import {
+  ConfigError,
+  type Env,
+  expandEnv,
+  loadConfig,
+  type Modules,
+} from "../../src/core/config.ts";
+import { REGISTRY } from "../../src/registry.ts";
 
 const POSIX_ONLY = { skip: process.platform === "win32" };
 
@@ -21,6 +28,11 @@ const BOT = `${"xox"}b-000-fake`;
 const APP = `${"xap"}p-000-fake`;
 
 const made: string[] = [];
+
+/** `loadConfig` over the registry the daemon ships: the Slack and Claude variables. */
+function load(directory: string, env?: Env) {
+  return loadConfig(REGISTRY, directory, env);
+}
 
 function scratch(): string {
   const directory = realpathSync.native(mkdtempSync(join(tmpdir(), "awd-config-")));
@@ -61,8 +73,8 @@ function writeEnv(
 test("loads a private env", () => {
   const directory = scratch();
   writeEnv(directory, directory);
-  const config = loadConfig(directory);
-  assert.equal(config.ownerUserId, "U000ALICE");
+  const config = load(directory);
+  assert.equal(config.chatVariables.SLACK_OWNER_USER_ID, "U000ALICE");
   assert.equal(config.allowedRoot, directory);
   assert.equal(config.configDir, directory);
 });
@@ -72,23 +84,18 @@ test("reads an env that starts with a byte order mark", () => {
   const directory = scratch();
   const env = writeEnv(directory, directory);
   writeFileSync(env, `\ufeff${readFileSync(env, "utf8")}`, { mode: 0o600 });
-  assert.equal(loadConfig(directory).botToken, BOT);
+  assert.equal(load(directory).chatVariables.SLACK_BOT_TOKEN, BOT);
 });
 
-test("the owner s user token is optional and checked by its prefix", () => {
+test("the owner s user token is optional and never shown", () => {
   const directory = scratch();
   writeEnv(directory, directory);
-  assert.equal(loadConfig(directory).userToken, null);
+  assert.equal(load(directory).chatVariables.SLACK_USER_TOKEN, undefined);
   const user = `${"xox"}p-000-fake`;
   writeEnv(directory, directory, { SLACK_USER_TOKEN: user });
-  const config = loadConfig(directory);
-  assert.equal(config.userToken, user);
+  const config = load(directory);
+  assert.equal(config.chatVariables.SLACK_USER_TOKEN, user);
   assert.ok(!inspect(config).includes(user));
-  writeEnv(directory, directory, { SLACK_USER_TOKEN: BOT });
-  assert.throws(
-    () => loadConfig(directory),
-    (error: unknown) => error instanceof ConfigError && /SLACK_USER_TOKEN/.test(error.message),
-  );
 });
 
 for (const mode of [0o640, 0o604, 0o660, 0o644]) {
@@ -99,7 +106,7 @@ for (const mode of [0o640, 0o604, 0o660, 0o644]) {
       const directory = scratch();
       writeEnv(directory, directory, {}, mode);
       assert.throws(
-        () => loadConfig(directory),
+        () => load(directory),
         (error: unknown) => error instanceof ConfigError && /chmod 600/.test(error.message),
       );
     },
@@ -113,14 +120,14 @@ test("refuses a symlinked env", POSIX_ONLY, () => {
   mkdirSync(linkDirectory);
   symlinkSync(real, join(linkDirectory, ".env"));
   assert.throws(
-    () => loadConfig(linkDirectory),
+    () => load(linkDirectory),
     (error: unknown) => error instanceof ConfigError && /regular file/.test(error.message),
   );
 });
 
 test("missing env points to the setup guide", () => {
   assert.throws(
-    () => loadConfig(scratch()),
+    () => load(scratch()),
     (error: unknown) => error instanceof ConfigError && /docs\/setup\.md/.test(error.message),
   );
 });
@@ -129,19 +136,10 @@ test("names every missing variable", () => {
   const directory = scratch();
   writeEnv(directory, directory, { SLACK_APP_TOKEN: "", SLACK_OWNER_USER_ID: "" });
   assert.throws(
-    () => loadConfig(directory),
+    () => load(directory),
     (error: unknown) =>
       error instanceof ConfigError &&
       error.message.includes("SLACK_APP_TOKEN, SLACK_OWNER_USER_ID"),
-  );
-});
-
-test("rejects swapped tokens", () => {
-  const directory = scratch();
-  writeEnv(directory, directory, { SLACK_BOT_TOKEN: APP });
-  assert.throws(
-    () => loadConfig(directory),
-    (error: unknown) => error instanceof ConfigError && /SLACK_BOT_TOKEN/.test(error.message),
   );
 });
 
@@ -153,7 +151,7 @@ test("expands a tilde root", POSIX_ONLY, () => {
   process.env.HOME = directory;
   try {
     writeEnv(directory, "~/code");
-    assert.equal(loadConfig(directory).allowedRoot, join(directory, "code"));
+    assert.equal(load(directory).allowedRoot, join(directory, "code"));
   } finally {
     if (home === undefined) delete process.env.HOME;
     else process.env.HOME = home;
@@ -164,7 +162,7 @@ test("rejects a root that is not a directory", () => {
   const directory = scratch();
   writeEnv(directory, join(directory, "nowhere"));
   assert.throws(
-    () => loadConfig(directory),
+    () => load(directory),
     (error: unknown) => error instanceof ConfigError && /ALLOWED_ROOT/.test(error.message),
   );
 });
@@ -173,18 +171,18 @@ test("repr never shows a token", () => {
   // The closest ways a TypeScript object reaches a log line: `inspect` and JSON.
   const directory = scratch();
   writeEnv(directory, directory);
-  const config = loadConfig(directory);
+  const config = load(directory);
   for (const text of [inspect(config), JSON.stringify(config), `${JSON.stringify(config)}`]) {
     assert.ok(!text.includes(BOT) && !text.includes(APP));
   }
-  assert.equal(config.botToken, BOT);
-  assert.equal(config.appToken, APP);
+  assert.equal(config.chatVariables.SLACK_BOT_TOKEN, BOT);
+  assert.equal(config.chatVariables.SLACK_APP_TOKEN, APP);
 });
 
 test("does not touch the process environment", () => {
   const directory = scratch();
   writeEnv(directory, directory);
-  loadConfig(directory);
+  load(directory);
   assert.ok(!("SLACK_BOT_TOKEN" in process.env));
 });
 
@@ -204,7 +202,7 @@ test("a root with dot dot after a link is followed from the link s target", POSI
   const directory = linkLayout();
   // Written as text: `join` would fold the `..` before the disk is asked.
   writeEnv(directory, `${directory}/root/link/..`);
-  assert.equal(loadConfig(directory).allowedRoot, join(directory, "elsewhere"));
+  assert.equal(load(directory).allowedRoot, join(directory, "elsewhere"));
 });
 
 test(
@@ -216,7 +214,7 @@ test(
     process.env.HOME = join(directory, "root");
     try {
       writeEnv(directory, "~/link/..");
-      assert.equal(loadConfig(directory).allowedRoot, join(directory, "elsewhere"));
+      assert.equal(load(directory).allowedRoot, join(directory, "elsewhere"));
     } finally {
       if (home === undefined) delete process.env.HOME;
       else process.env.HOME = home;
@@ -230,7 +228,7 @@ test("a root whose tail does not exist keeps the link s target", POSIX_ONLY, () 
   const directory = linkLayout();
   writeEnv(directory, `${directory}/root/link/../nothere`);
   assert.throws(
-    () => loadConfig(directory),
+    () => load(directory),
     (error: unknown) =>
       error instanceof ConfigError &&
       error.message ===
@@ -243,7 +241,7 @@ test("a root whose missing part is followed by dot dot folds it as Python does",
   const directory = linkLayout();
   mkdirSync(join(directory, "root", "deep"));
   writeEnv(directory, `${directory}/root/missing/../deep`);
-  assert.equal(loadConfig(directory).allowedRoot, join(directory, "root", "deep"));
+  assert.equal(load(directory).allowedRoot, join(directory, "root", "deep"));
 });
 
 // Review round 2026-10-10: python-dotenv, whose reading the loader follows, expands `${NAME}` and
@@ -333,7 +331,7 @@ test("the root is read from the process environment by default", POSIX_ONLY, () 
   mkdirSync(join(directory, "code"));
   // biome-ignore lint/suspicious/noTemplateCurlyInString: a literal `${...}` of a .env value
   writeEnv(directory, "${HOME}/code");
-  assert.equal(loadConfig(directory, { HOME: directory }).allowedRoot, join(directory, "code"));
+  assert.equal(load(directory, { HOME: directory }).allowedRoot, join(directory, "code"));
 });
 
 test("a root named by a variable defined earlier in the file", () => {
@@ -346,11 +344,139 @@ test("a root named by a variable defined earlier in the file", () => {
     // biome-ignore lint/suspicious/noTemplateCurlyInString: a literal `${...}` of a .env value
     readFileSync(env, "utf8").replace(/^ALLOWED_ROOT=.*$/m, "ALLOWED_ROOT=${BASE}/code"),
   );
-  assert.equal(loadConfig(directory, {}).allowedRoot, join(directory, "code"));
+  assert.equal(load(directory, {}).allowedRoot, join(directory, "code"));
 });
 
 test("expanding an env never touches the process environment", () => {
   const before = { ...process.env };
   expandEnv(DOTENV_SAMPLE, PROC);
   assert.deepEqual({ ...process.env }, before);
+});
+
+// The agent and the chat are selected by name, and each gets only the variables it names.
+
+const MODULES: Modules = {
+  defaults: { agent: "alpha", chat: "delta" },
+  agents: {
+    alpha: { required: ["ALPHA_KEY"], optional: ["ALPHA_EXTRA"] },
+    beta: { required: [], optional: [] },
+  },
+  chats: {
+    delta: { required: ["DELTA_KEY", "DELTA_USER"], optional: ["DELTA_EXTRA"] },
+    gamma: { required: ["GAMMA_KEY"], optional: [] },
+  },
+};
+
+/** Writes a private `.env` holding `lines` and returns the directory (its own ALLOWED_ROOT). */
+function envWith(...lines: string[]): string {
+  const directory = scratch();
+  const env = join(directory, ".env");
+  writeFileSync(env, `${lines.join("\n")}\n`);
+  chmodSync(env, 0o600);
+  return directory;
+}
+
+/** What the file holds for the two modules `MODULES` selects by default. */
+function defaultLines(directory = "/", ...more: string[]): string[] {
+  return [
+    `ALLOWED_ROOT=${directory}`,
+    "ALPHA_KEY=a-secret",
+    "DELTA_KEY=d-secret",
+    "DELTA_USER=d-user",
+    ...more,
+  ];
+}
+
+test("absent selection variables mean the registry's defaults", () => {
+  const config = loadConfig(MODULES, envWith(...defaultLines()));
+  assert.equal(config.agent, "alpha");
+  assert.equal(config.chat, "delta");
+});
+
+test("the selection variables pick the modules and each gets only its own variables", () => {
+  const directory = envWith(
+    ...defaultLines("/", "AWAYDESK_AGENT=beta", "AWAYDESK_CHAT=gamma", "GAMMA_KEY=g-secret"),
+  );
+  const config = loadConfig(MODULES, directory);
+  assert.equal(config.agent, "beta");
+  assert.equal(config.chat, "gamma");
+  assert.equal(config.chatVariables.GAMMA_KEY, "g-secret");
+  assert.equal(config.chatVariables.DELTA_KEY, undefined);
+  assert.equal(config.agentVariables.ALPHA_KEY, undefined); // beta reads none
+});
+
+test("a blank selection variable counts as absent", () => {
+  const config = loadConfig(MODULES, envWith(...defaultLines("/", "AWAYDESK_AGENT=  ")));
+  assert.equal(config.agent, "alpha");
+});
+
+test("a name the registry does not hold stops the start with the variable, the value and the valid names", () => {
+  const refusal = (line: string): string => {
+    try {
+      loadConfig(MODULES, envWith(...defaultLines("/", line)));
+    } catch (error) {
+      assert.ok(error instanceof ConfigError);
+      return error.message;
+    }
+    return assert.fail("the start was not refused");
+  };
+  assert.equal(
+    refusal("AWAYDESK_AGENT=zeta"),
+    'AWAYDESK_AGENT is "zeta", which this daemon does not hold; the valid names are: alpha, beta',
+  );
+  assert.equal(
+    refusal("AWAYDESK_CHAT=toString"),
+    'AWAYDESK_CHAT is "toString", which this daemon does not hold; the valid names are: delta, gamma',
+  );
+});
+
+test("a missing module variable is named with the chat's first, then the agent's, then the root", () => {
+  const directory = envWith("AWAYDESK_CHAT=delta");
+  assert.throws(
+    () => loadConfig(MODULES, directory),
+    (error: unknown) =>
+      error instanceof ConfigError &&
+      error.message ===
+        `missing in ${join(directory, ".env")}: DELTA_KEY, DELTA_USER, ALPHA_KEY, ALLOWED_ROOT`,
+  );
+});
+
+test("the shipped registry misses its variables in the order of the old messages", () => {
+  const directory = envWith("# nothing set");
+  assert.throws(
+    () => load(directory),
+    (error: unknown) =>
+      error instanceof ConfigError &&
+      error.message ===
+        `missing in ${join(directory, ".env")}: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_OWNER_USER_ID, ALLOWED_ROOT`,
+  );
+});
+
+test("a module's variables give their value on lookup and show nothing otherwise", () => {
+  const config = loadConfig(MODULES, envWith(...defaultLines("/", "ALPHA_EXTRA=a-extra")));
+  for (const [variables, name, value] of [
+    [config.agentVariables, "ALPHA_KEY", "a-secret"],
+    [config.agentVariables, "ALPHA_EXTRA", "a-extra"],
+    [config.chatVariables, "DELTA_KEY", "d-secret"],
+    [config.chatVariables, "DELTA_USER", "d-user"],
+  ] as const) {
+    assert.equal(variables[name], value);
+    assert.deepEqual(Object.keys(variables), []);
+    assert.deepEqual(Object.entries({ ...variables }), []);
+    assert.equal(JSON.stringify(variables), "{}");
+    assert.ok(!inspect(variables).includes(value));
+    assert.ok(!inspect(variables, { depth: null }).includes(value));
+  }
+  // Nor does the object they hang on show them, in any of the ways a log line reaches it.
+  for (const text of [inspect(config), JSON.stringify(config), JSON.stringify({ ...config })]) {
+    for (const secret of ["a-secret", "a-extra", "d-secret", "d-user"]) {
+      assert.ok(!text.includes(secret), `${secret} is shown`);
+    }
+  }
+});
+
+test("a variable the module did not name is not handed to it", () => {
+  const config = loadConfig(MODULES, envWith(...defaultLines("/", "GAMMA_KEY=g-secret")));
+  assert.equal(config.chatVariables.GAMMA_KEY, undefined);
+  assert.equal(config.agentVariables.DELTA_KEY, undefined);
 });

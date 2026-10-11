@@ -11,6 +11,16 @@ test("the Claude back end declares what the core adapts to", () => {
     effortLevels: ["low", "medium", "high", "xhigh", "max"],
     liveEffort: true,
     permissionModes: { default: "default", auto: "auto", bypass: "bypassPermissions" },
+    subagents: true,
+    backgroundTasks: true,
+    compaction: true,
+    questions: true,
+    usageLimits: true,
+    models: true,
+    commands: true,
+    promptDuringTurn: true,
+    sessionListing: true,
+    folderTrust: true,
   });
 });
 

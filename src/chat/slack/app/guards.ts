@@ -4,11 +4,12 @@
  * Every inbound path calls these on its own: a button is never trusted because of the message it
  * sits on, and the channel is re-read from Slack each time, since membership can change.
  */
+
 import type { WebClient } from "@slack/web-api";
-import * as texts from "../../../core/texts.ts";
 import { getLogger, type Logger } from "../../../log.ts";
 import { isSpace } from "../../../text.ts";
 import { describe } from "../reply/errors.ts";
+import * as slackTexts from "../texts.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.app.guards");
 
@@ -154,18 +155,18 @@ export class ChannelGuard {
     } catch (error) {
       // A network failure too: an unread channel is never trusted.
       this.#log.warning(`could not read channel ${channelId}: ${describe(error)}`);
-      return texts.REASON_UNREADABLE;
+      return slackTexts.REASON_UNREADABLE;
     }
     if (!truthy(info.is_private) || truthy(info.is_im) || truthy(info.is_mpim)) {
-      return texts.REASON_NOT_PRIVATE;
+      return slackTexts.REASON_NOT_PRIVATE;
     }
-    if (SHARED_FLAGS.some((flag) => truthy(info[flag]))) return texts.REASON_SHARED;
+    if (SHARED_FLAGS.some((flag) => truthy(info[flag]))) return slackTexts.REASON_SHARED;
     const more = truthy(members.response_metadata?.next_cursor);
     if (members.members === undefined) throw new Error("conversations.members answered no members");
     const present = new Set(members.members);
     const expected = new Set([this.#identity.ownerUserId, this.#identity.botUserId]);
     const same = present.size === expected.size && [...present].every((id) => expected.has(id));
-    if (more || !same) return texts.REASON_MEMBERS;
+    if (more || !same) return slackTexts.REASON_MEMBERS;
     return null;
   }
 }

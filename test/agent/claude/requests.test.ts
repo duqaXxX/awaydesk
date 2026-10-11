@@ -156,14 +156,6 @@ test("an approval allows the call with the input it had", () => {
   });
 });
 
-test("an approval with a changed input allows the call with that input", () => {
-  const changedInput = { command: "echo changed" };
-  assert.deepEqual(permissionResult({ allow: true, changedInput }, BASH), {
-    behavior: "allow",
-    updatedInput: changedInput,
-  });
-});
-
 test("a denial tells the agent why", () => {
   const message = "The owner denied this from Slack.";
   assert.deepEqual(permissionResult({ allow: false, message }, BASH), {

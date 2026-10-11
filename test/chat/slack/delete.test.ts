@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { PAGE, ThreadDeleter } from "../../../src/chat/slack/delete.ts";
+import * as slackTexts from "../../../src/chat/slack/texts.ts";
 import { StateStore } from "../../../src/core/state.ts";
-import * as texts from "../../../src/core/texts.ts";
-import { fill } from "../../../src/core/texts.ts";
+import { fill, named } from "../../../src/core/texts.ts";
 import {
   type Answer,
   type Args,
@@ -16,6 +16,7 @@ import {
   rejected,
 } from "../../support/fake-slack.ts";
 import type { JsonObject } from "../../support/fixtures.ts";
+import { NAMES } from "../../support/names.ts";
 
 const ROOT = "1790000000.000001";
 const OWNER = "U000ALICE";
@@ -81,6 +82,7 @@ class World {
       botUserId: BOT,
       ownerUserId: OWNER,
       state: this.state,
+      names: () => NAMES,
       release: async (channelId, threadTs) => {
         this.released.push([channelId, threadTs]);
         return this.free;
@@ -127,7 +129,7 @@ test("each message is deleted by its author s token and the root last", async ()
 test("a thread in use is not deleted", async () => {
   const world = new World();
   world.free = false;
-  assert.equal(await world.deleter.delete(CHANNEL, ROOT), texts.HOME_DELETE_BUSY);
+  assert.equal(await world.deleter.delete(CHANNEL, ROOT), slackTexts.HOME_DELETE_BUSY);
   assert.deepEqual(world.bot.apiCalls, []);
   assert.deepEqual(world.owner.apiCalls, []);
   assert.notEqual(world.state.thread(CHANNEL, ROOT), null);
@@ -165,7 +167,7 @@ test("a failure stops the delete and keeps the thread", async () => {
   ]);
   world.bot.responses["chat.delete"] = rejected("internal_error");
   const notice = await world.deleter.delete(CHANNEL, ROOT);
-  assert.equal(notice, fill(texts.HOME_DELETE_FAILED, { error: "internal_error" }));
+  assert.equal(notice, fill(slackTexts.HOME_DELETE_FAILED, { error: "internal_error" }));
   assert.deepEqual(world.deleted(world.bot), ["1790000001.000001"]); // nothing after the failure
   assert.deepEqual(world.deleted(world.owner), []); // the root stays while a reply does
   assert.notEqual(world.state.thread(CHANNEL, ROOT), null); // asked again, it continues
@@ -183,7 +185,7 @@ test("messages slack refuses to delete are counted and the root stays", async ()
   ]);
   world.owner.responses["chat.delete"] = rejected("cant_delete_message");
   const notice = await world.deleter.delete(CHANNEL, ROOT);
-  assert.equal(notice, fill(texts.HOME_DELETE_REFUSED, { count: 2 }));
+  assert.equal(notice, fill(named(slackTexts.HOME_DELETE_REFUSED, NAMES), { count: 2 }));
   assert.deepEqual(world.deleted(world.bot), ["1790000002.000001"]); // the rest still goes
   // the root was never tried: no reply is left under a deleted root
   assert.ok(!world.deleted(world.owner).includes(ROOT));
@@ -347,7 +349,7 @@ test("a thread that cannot be asked about stops the clean up", async () => {
   world.bot.responses["conversations.replies"] = rejected("ratelimited");
   assert.equal(
     await world.deleter.clean(CHANNEL),
-    fill(texts.HOME_CLEAN_FAILED, { error: "ratelimited" }),
+    fill(slackTexts.HOME_CLEAN_FAILED, { error: "ratelimited" }),
   );
   assert.deepEqual(world.deleted(world.owner), []);
 });
@@ -367,7 +369,7 @@ test("a clean up that slack stops says so", async () => {
   ]);
   world.owner.responses["chat.delete"] = rejected("internal_error");
   const notice = await world.deleter.clean(CHANNEL);
-  assert.equal(notice, fill(texts.HOME_CLEAN_FAILED, { error: "internal_error" }));
+  assert.equal(notice, fill(slackTexts.HOME_CLEAN_FAILED, { error: "internal_error" }));
   assert.deepEqual(world.deleted(world.bot), []); // it stopped at the failure
 });
 
@@ -378,6 +380,9 @@ test("a clean up counts what slack refuses and deletes the rest", async () => {
     loose("1790000011.000001", BOT, "Stopped."),
   ]);
   world.owner.responses["chat.delete"] = rejected("cant_delete_message");
-  assert.equal(await world.deleter.clean(CHANNEL), fill(texts.HOME_CLEAN_REFUSED, { count: 1 }));
+  assert.equal(
+    await world.deleter.clean(CHANNEL),
+    fill(named(slackTexts.HOME_CLEAN_REFUSED, NAMES), { count: 1 }),
+  );
   assert.deepEqual(world.deleted(world.bot), ["1790000011.000001"]);
 });

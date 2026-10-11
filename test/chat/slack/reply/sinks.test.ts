@@ -44,6 +44,7 @@ import {
   THREAD,
 } from "../../../support/fake-slack.ts";
 import { golden, type Json, type JsonObject, sdkRecords } from "../../../support/fixtures.ts";
+import { NAMES } from "../../../support/names.ts";
 import { recordedEvents } from "../../../support/replay.ts";
 
 const WRITE_METHODS = [
@@ -1641,7 +1642,7 @@ test("an edit and a write show as the terminal shows them", async () => {
   // the file. The terminal showed each Edit and Write whole, with its sentence and its lines.
   const slack = new FakeSlack();
   const sink = reply(slack);
-  const renderer = new TurnRenderer(sink, "/home/dev/project");
+  const renderer = new TurnRenderer(sink, NAMES, "/home/dev/project");
   for (const event of recordedEvents("edit-write")) await renderer.feed(event);
   await renderer.close(null);
   const chunks = allChunks(slack);
@@ -1717,7 +1718,7 @@ test("an answered question shows in the reply where it was answered", async () =
   // and a line per answer where the question was asked, before what Claude says next.
   const slack = new FakeSlack();
   const sink = reply(slack);
-  const renderer = new TurnRenderer(sink, "/home/dev/project");
+  const renderer = new TurnRenderer(sink, NAMES, "/home/dev/project");
   // The answers the owner gave, as Claude Code echoed them in the result of the call: the
   // session holds them itself, and no event carries them.
   const echoed = sdkRecords("ask-answered").find(
@@ -1761,7 +1762,7 @@ test("an answered question shows in the reply where it was answered", async () =
 });
 
 test("answers to a call the reply has no line for are not kept", () => {
-  const renderer = new TurnRenderer(reply(new FakeSlack()));
+  const renderer = new TurnRenderer(reply(new FakeSlack()), NAMES);
   assert.ok(!renderer.answered("toolu_unseen", [{ text: "Colour?" }], { "Colour?": "blue" }));
 });
 

@@ -99,6 +99,8 @@ export class TurnRenderer<Footer = FooterFields> {
   readonly #sink: Sink<Footer>;
   /** The session's folder, which previews name paths from. */
   readonly #cwd: string | null;
+  /** The names the texts that name the agent or the chat take. */
+  readonly #names: texts.Names;
   readonly #lines = new Map<string, TaskUpdate>();
   readonly #rootOf = new Map<string, string>();
   readonly #children = new Map<string, string[]>();
@@ -125,6 +127,10 @@ export class TurnRenderer<Footer = FooterFields> {
   /** A question's answers, until its call ends. */
   readonly #answers = new Map<string, Preview>();
   #wroteText = false;
+  /** Whether the chat shows a text as it is written; without it a text is held until it ends. */
+  readonly #streaming: boolean;
+  /** The pieces of the text being written, not yet handed to the sink (`streaming` off). */
+  #held = "";
   /** The agent's text is the last thing in the reply, no card since. */
   #afterText = false;
   /** The text that just started follows text directly. */
@@ -139,9 +145,11 @@ export class TurnRenderer<Footer = FooterFields> {
   #footer: Footer | null = null;
   #closedOut = false;
 
-  constructor(sink: Sink<Footer>, cwd: string | null = null) {
+  constructor(sink: Sink<Footer>, names: texts.Names, cwd: string | null = null, streaming = true) {
     this.#sink = sink;
+    this.#names = names;
     this.#cwd = cwd;
+    this.#streaming = streaming;
   }
 
   /** One event of the session into the reply. An event that shows nothing is left out. */
@@ -151,14 +159,20 @@ export class TurnRenderer<Footer = FooterFields> {
         // Two texts with no card between them (a goal's inner turns, a Stop hook that
         // continues the turn) would run together: the break waits for the first piece, so a
         // text that stays empty adds none. A subagent's text never reaches the reply.
-        if (event.parentCallId === null) this.#breakDue = this.#afterText;
+        if (event.parentCallId === null) {
+          await this.#handOver(); // the text before this one has ended
+          this.#breakDue = this.#afterText;
+        }
         break;
       case "text_delta":
         if (event.parentCallId === null) {
           const broken = this.#breakDue;
           this.#breakDue = false;
-          await this.#text(broken ? `\n\n${event.text}` : event.text);
+          await this.#text(broken ? `\n\n${event.text}` : event.text, { piece: true });
         }
+        break;
+      case "message_ended":
+        if (event.parentCallId === null) await this.#handOver();
         break;
       case "text":
         // Text that came whole is a command's own output (`Goal set: …` before a goal's first
@@ -203,7 +217,10 @@ export class TurnRenderer<Footer = FooterFields> {
         if (!this.#wroteText && event.finalText) {
           await this.#text(event.finalText);
         } else if (!this.#wroteText && this.error !== null) {
-          await this.#text(texts.fill(texts.ERROR_REPLY, { error: this.error }), { notice: true });
+          await this.#text(
+            texts.fill(texts.named(texts.ERROR_REPLY, this.#names), { error: this.error }),
+            { notice: true },
+          );
         }
         break;
       default:
@@ -257,7 +274,7 @@ export class TurnRenderer<Footer = FooterFields> {
     questions: readonly Pick<Question, "text">[],
     answers: Readonly<Record<string, string | readonly string[]>>,
   ): boolean {
-    const shown = answered(questions, answers);
+    const shown = answered(questions, answers, this.#names);
     if (shown === null || !this.#lines.has(callId)) return false;
     this.#answers.set(callId, shown);
     return true;
@@ -277,9 +294,12 @@ export class TurnRenderer<Footer = FooterFields> {
    */
   async close(footer: Footer | null, signal?: AbortSignal): Promise<void> {
     const interrupted = this.result !== null && this.result.ending === "interrupted";
+    await this.#handOver();
     if (!this.#wroteText && this.#lines.size === 0) {
       // A command that prints nothing (a local one, say) still gets a visible answer.
-      await this.#text(interrupted ? texts.STOPPED : texts.NO_OUTPUT, { notice: true });
+      await this.#text(interrupted ? texts.STOPPED : texts.named(texts.NO_OUTPUT, this.#names), {
+        notice: true,
+      });
     }
     const running = new Set(this.#running.values());
     const closing: TaskUpdate[] = [];
@@ -311,6 +331,7 @@ export class TurnRenderer<Footer = FooterFields> {
    * in the chat. A second call is a no-op of the sink's.
    */
   async closeOut(signal?: AbortSignal): Promise<boolean> {
+    await this.#handOver();
     this.#closedOut = true;
     return this.#sink.closeOut(this.#footer, signal);
   }
@@ -335,6 +356,7 @@ export class TurnRenderer<Footer = FooterFields> {
   async feedNotice(text: string): Promise<void> {
     const prefix = this.#wroteText || this.#lines.size > 0 ? "\n\n" : "";
     this.#afterText = false;
+    await this.#handOver();
     await this.#sink.text(`${prefix}${text}\n\n`, { notice: true, ending: false });
   }
 
@@ -372,7 +394,7 @@ export class TurnRenderer<Footer = FooterFields> {
     }
     if (event.kind === "authentication") {
       this.authFailed = true;
-      await this.#text(texts.AUTH_FAILED, { notice: true });
+      await this.#text(texts.named(texts.AUTH_FAILED, this.#names), { notice: true });
       return;
     }
     // The agent wrote this message itself: its words name the failure and what to do next, as
@@ -566,17 +588,35 @@ export class TurnRenderer<Footer = FooterFields> {
       this.#afterText = false;
     }
     this.#lines.set(update.id, update);
+    await this.#handOver();
     await this.#sink.task(update);
   }
 
+  /**
+   * Hand the sink the text held since it began, whole: before anything else the sink is given,
+   * so it lands in its place. Nothing is held when the chat shows a text as it is written.
+   */
+  async #handOver(): Promise<void> {
+    if (this.#held === "") return;
+    const text = this.#held;
+    this.#held = "";
+    await this.#sink.text(text, { notice: false, ending: false });
+  }
+
+  /** `piece`: the next piece of a text being written, which a chat with no streaming waits to have whole. */
   async #text(
     markdown: string,
-    options: { notice?: boolean; ending?: boolean } = {},
+    options: { notice?: boolean; ending?: boolean; piece?: boolean } = {},
   ): Promise<void> {
     if (markdown === "") return;
-    const { notice = false, ending = false } = options;
+    const { notice = false, ending = false, piece = false } = options;
     this.#wroteText = true;
     this.#afterText = !notice; // a notice ends with its own break
+    if (piece && !this.#streaming) {
+      this.#held += markdown;
+      return;
+    }
+    await this.#handOver();
     await this.#sink.text(markdown, { notice, ending });
   }
 }

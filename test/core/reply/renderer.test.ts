@@ -28,6 +28,7 @@ import {
 import { BACKGROUND, STOPPED } from "../../../src/core/reply/words.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { type JsonObject, sdkRecords } from "../../support/fixtures.ts";
+import { NAMES } from "../../support/names.ts";
 import {
   type EventOf,
   eventsOf,
@@ -82,7 +83,7 @@ async function render(
   footer: string | null = "footer",
 ): Promise<[RecordingSink, TurnRenderer<string>]> {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink);
+  const renderer = new TurnRenderer<string>(sink, NAMES);
   for (const event of events) await renderer.feed(event);
   await renderer.close(footer);
   await renderer.closeOut();
@@ -160,7 +161,7 @@ test("a local command shows its result text", async () => {
 test("logged out cli gets the login instructions", async () => {
   const [sink, renderer] = await render(recordedEvents("auth-failed"));
   assert.ok(renderer.authFailed);
-  assert.ok(sink.texts.join("").includes(texts.AUTH_FAILED));
+  assert.ok(sink.texts.join("").includes(texts.named(texts.AUTH_FAILED, NAMES)));
 });
 
 /** The reply Claude Code wrote itself after the API refused the turn. */
@@ -227,7 +228,7 @@ for (const status of [401, 403]) {
     const events = recordedEvents(`api-error-${status}`);
     assert.equal(errorReply(events).category, "authentication_failed");
     const [sink, renderer] = await render(events);
-    assert.ok(renderer.authFailed && sink.texts.join("") === texts.AUTH_FAILED);
+    assert.ok(renderer.authFailed && sink.texts.join("") === texts.named(texts.AUTH_FAILED, NAMES));
     assert.ok(renderer.result !== null);
     assert.equal(apiErrorStatus(`api-error-${status}`), status);
   });
@@ -286,7 +287,10 @@ test("an api error with no words anywhere shows its category", async () => {
     withBareError("server-error", (result) => ({ ...result, result: null })),
   );
   const [sink] = await render(silent);
-  assert.equal(sink.texts.join(""), texts.fill(texts.ERROR_REPLY, { error: "server_error" }));
+  assert.equal(
+    sink.texts.join(""),
+    texts.fill(texts.named(texts.ERROR_REPLY, NAMES), { error: "server_error" }),
+  );
 });
 
 test("an interrupted turn closes every open line without error", async () => {
@@ -372,7 +376,7 @@ test("task title uses the first string argument", () => {
 
 test("feed error appends to the reply", async () => {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink);
+  const renderer = new TurnRenderer<string>(sink, NAMES);
   await renderer.feedError("Claude Code reported an error: `ProcessError`");
   assert.deepEqual(sink.texts, ["\n\nClaude Code reported an error: `ProcessError`"]);
   assert.deepEqual(sink.notices, sink.texts);
@@ -381,7 +385,7 @@ test("feed error appends to the reply", async () => {
 
 test("feed ending marks the line on how the reply ended", async () => {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink);
+  const renderer = new TurnRenderer<string>(sink, NAMES);
   await renderer.feedEnding("Claude Code reported an error: `ProcessError`");
   assert.deepEqual(sink.endings, ["\n\nClaude Code reported an error: `ProcessError`"]);
   assert.deepEqual(sink.notices, sink.endings);
@@ -389,7 +393,7 @@ test("feed ending marks the line on how the reply ended", async () => {
 
 test("feed notice opens the reply", async () => {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink);
+  const renderer = new TurnRenderer<string>(sink, NAMES);
   await renderer.feedNotice("The previous session could not be resumed.");
   assert.deepEqual(sink.texts, ["The previous session could not be resumed.\n\n"]);
 });
@@ -428,14 +432,14 @@ test("a compaction says how many tokens it saved", async () => {
 
 test("a turn with no text and no tool says it is done", async () => {
   const [sink] = await render(translated([silentResult()]));
-  assert.equal(sink.texts.join(""), texts.NO_OUTPUT);
+  assert.equal(sink.texts.join(""), texts.named(texts.NO_OUTPUT, NAMES));
 });
 
 test("a turn with only tool lines gets no filler", async () => {
   const [sink] = await render(
     recordedEvents("tools").filter((event) => event.type !== "turn_ended"),
   );
-  assert.ok(!sink.texts.join("").includes(texts.NO_OUTPUT));
+  assert.ok(!sink.texts.join("").includes(texts.named(texts.NO_OUTPUT, NAMES)));
 });
 
 test("a silent turn that was stopped says so", async () => {
@@ -446,7 +450,7 @@ test("a silent turn that was stopped says so", async () => {
 
 test("a notice does not hide a local command s result", async () => {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink);
+  const renderer = new TurnRenderer<string>(sink, NAMES);
   await renderer.feedNotice("The previous session could not be resumed.");
   for (const event of recordedEvents("usage")) await renderer.feed(event);
   assert.ok(renderer.result?.finalText);
@@ -481,7 +485,7 @@ test("tool and task lines carry their name and kind", async () => {
 
 test("the daemon s own lines are notices and claude s words are not", async () => {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink);
+  const renderer = new TurnRenderer<string>(sink, NAMES);
   await renderer.feedNotice("The previous session could not be resumed.");
   await renderer.feedError("The process exited.");
   for (const event of recordedEvents("tools")) await renderer.feed(event);
@@ -494,7 +498,7 @@ test("the daemon s own lines are notices and claude s words are not", async () =
 
 test("a turn that says nothing gets a notice not words", async () => {
   const [sink] = await render(translated([silentResult()]));
-  assert.deepEqual(sink.notices, [texts.NO_OUTPUT]);
+  assert.deepEqual(sink.notices, [texts.named(texts.NO_OUTPUT, NAMES)]);
 });
 
 function streamEvents(wire: readonly JsonObject[], parent: string | null = null): JsonObject[] {
@@ -906,7 +910,7 @@ test("a note fed into a written reply is a paragraph of its own, and text follow
   // A report turn's opening line, fed into the reply that started the task: the note ends with
   // its own break, so the words after it add none.
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink);
+  const renderer = new TurnRenderer<string>(sink, NAMES);
   for (const event of translated(blockEvents(["one"]))) await renderer.feed(event);
   await renderer.feedNotice('✓ Agent "Scan" finished');
   for (const event of translated(blockEvents(["two"]))) await renderer.feed(event);
@@ -941,7 +945,7 @@ test("a card keeps the last ten lines of what runs under it and counts them all"
     }),
   );
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink);
+  const renderer = new TurnRenderer<string>(sink, NAMES);
   for (const event of [agent, ...inner]) await renderer.feed(event);
   const card = sink.tasks.at(-1);
   assert.deepEqual(ids(sink.tasks), new Set(["toolu_agent"]));
@@ -956,7 +960,7 @@ test("a card keeps the last ten lines of what runs under it and counts them all"
 test("a reply closed again with no footer ends with the footer it had", async () => {
   // A report turn closes the reply of the turn that started the task, and passes no footer.
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink);
+  const renderer = new TurnRenderer<string>(sink, NAMES);
   await renderer.close("footer");
   assert.equal(renderer.closedOut, false);
   await renderer.close(null);
@@ -975,7 +979,7 @@ test("a reply owns its calls and the calls of its subagents, and no other", asyn
 test("a reply keeps the answers of a question it holds the line of, and shows them at its end", async () => {
   const events = recordedEvents("ask-answered");
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink);
+  const renderer = new TurnRenderer<string>(sink, NAMES);
   const questions = [{ text: "Which color do you prefer?" }];
   const answers = { "Which color do you prefer?": "Blue" };
   assert.equal(renderer.answered("toolu_unseen", questions, answers), false);
@@ -991,4 +995,96 @@ test("a reply keeps the answers of a question it holds the line of, and shows th
     shown.map((t) => [t.status, t.preview?.body, t.preview?.plain]),
     [["complete", "· Which color do you prefer? → Blue", true]],
   );
+});
+
+/** What a sink was handed, in order: a text with its options, or a task line by its id. */
+class OrderedSink extends RecordingSink {
+  log: Array<readonly ["text", string] | readonly ["task", string]> = [];
+
+  override async text(
+    markdown: string,
+    options: { readonly notice?: boolean; readonly ending?: boolean } = {},
+  ): Promise<void> {
+    this.log.push(["text", `${options.notice ? "notice:" : ""}${markdown}`]);
+    await super.text(markdown, options);
+  }
+
+  override async task(update: TaskUpdate): Promise<void> {
+    this.log.push(["task", `${update.id}:${update.status}`]);
+    await super.task(update);
+  }
+
+  /** The log with the texts between two task lines put together as one. */
+  get whole(): Array<readonly [string, string]> {
+    const merged: Array<readonly [string, string]> = [];
+    for (const entry of this.log) {
+      const last = merged.at(-1);
+      if (entry[0] === "text" && last?.[0] === "text" && !entry[1].startsWith("notice:")) {
+        merged[merged.length - 1] = ["text", last[1] + entry[1]];
+      } else {
+        merged.push(entry);
+      }
+    }
+    return merged;
+  }
+}
+
+async function renderOrdered(
+  events: readonly SessionEvent[],
+  streaming: boolean,
+): Promise<OrderedSink> {
+  const sink = new OrderedSink();
+  const renderer = new TurnRenderer<string>(sink, NAMES, null, streaming);
+  for (const event of events) await renderer.feed(event);
+  await renderer.close("footer");
+  await renderer.closeOut();
+  return sink;
+}
+
+for (const name of ["tools", "foreground", "tool-error", "subagent", "ask"]) {
+  test(`without native streaming each text reaches the sink whole, in place [${name}]`, async () => {
+    const events = recordedEvents(name);
+    const streamed = await renderOrdered(events, true);
+    const whole = await renderOrdered(events, false);
+    // The same texts and lines in the same order; only the pieces of a text are put together.
+    assert.deepEqual(whole.log, streamed.whole);
+    assert.ok(whole.texts.length <= streamed.texts.length);
+    assert.deepEqual(whole.finished, streamed.finished);
+    assert.equal(whole.closedOut, streamed.closedOut);
+  });
+}
+
+test("without native streaming a text of several pieces is one write", async () => {
+  const events = recordedEvents("tools");
+  const streamed = await renderOrdered(events, true);
+  const whole = await renderOrdered(events, false);
+  const pieces = streamed.log.filter(([kind]) => kind === "text").length;
+  const texts = whole.log.filter(([kind]) => kind === "text").length;
+  assert.ok(pieces > texts, `${pieces} pieces became ${texts} texts`);
+  // Each text of the message once: none is cut in two, none repeated.
+  assert.equal(new Set(whole.texts).size, whole.texts.length);
+});
+
+test("without native streaming a text waits for its end, and a notice does not reorder it", async () => {
+  const sink = new OrderedSink();
+  const renderer = new TurnRenderer<string>(sink, NAMES, null, false);
+  await renderer.feed({ type: "text_started", messageId: "m", parentCallId: null });
+  await renderer.feed({ type: "text_delta", messageId: "m", text: "Hello ", parentCallId: null });
+  await renderer.feed({ type: "text_delta", messageId: "m", text: "there", parentCallId: null });
+  assert.deepEqual(sink.log, [], "nothing is handed over while the text is being written");
+  await renderer.feedError("what a restart dropped");
+  assert.deepEqual(sink.log, [
+    ["text", "Hello there"],
+    ["text", "notice:\n\nwhat a restart dropped"],
+  ]);
+});
+
+test("without native streaming the last text is handed over when the reply closes", async () => {
+  const sink = new OrderedSink();
+  const renderer = new TurnRenderer<string>(sink, NAMES, null, false);
+  await renderer.feed({ type: "text_started", messageId: "m", parentCallId: null });
+  await renderer.feed({ type: "text_delta", messageId: "m", text: "done", parentCallId: null });
+  await renderer.close(null);
+  assert.deepEqual(sink.log, [["text", "done"]]);
+  assert.notEqual(sink.finished, null);
 });

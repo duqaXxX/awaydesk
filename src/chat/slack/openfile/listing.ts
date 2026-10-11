@@ -27,13 +27,12 @@
  * So the committed changes come from `diff-tree` and the rest from `status`, which also lists the
  * untracked files. `test/chat/slack/openfile/changed.test.ts` repeats the measurement on every run.
  */
+
 import { lstat, readdir } from "node:fs/promises";
 import { join, sep } from "node:path";
 import type { Repository } from "../../../agent/seam.ts";
 import { type Clock, monotonicClock } from "../../../clock.ts";
-import { foldersWithin } from "../../../core/folders.ts";
-import { runGit } from "../../../core/footer.ts";
-import { cancellable, Semaphore } from "../../../core/sessions/tasks.ts";
+import { cancellable, foldersWithin, runGit, Semaphore } from "../../../core/port.ts";
 import { getLogger } from "../../../log.ts";
 import { compareCodePoints } from "../../../text.ts";
 import { len } from "../reply/chars.ts";

@@ -14,7 +14,8 @@ export interface SessionDeps {
   readonly agent: AgentBackend;
   readonly state: StateStore;
   readonly approvals: Approvals;
-  readonly usage: UsageCache;
+  /** The account's usage limits; null for an agent that has none (`usageLimits`). */
+  readonly usage: UsageCache | null;
   /** Kept in memory only, shared with the handlers of the hold's buttons. */
   readonly holds: Holds;
   /**

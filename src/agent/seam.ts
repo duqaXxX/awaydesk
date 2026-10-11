@@ -6,6 +6,7 @@
  * The one value declared here is `ResumeRefused`: the core has to tell that failure of a start
  * from every other, and it may import nothing of a back end.
  */
+import type { Clock } from "../clock.ts";
 
 /**
  * The agent refused to resume the session a start named (its transcript is gone): the thread
@@ -32,7 +33,8 @@ export interface PermissionModes {
 
 /**
  * What differs between back ends and the core adapts to. A capability is here because the core
- * reads it: what every back end does alike needs none.
+ * reads it: without one the feature it names is not offered (`!help` and `!guide` leave it
+ * out), and the core never calls what serves it. What every back end does alike needs none.
  */
 export interface Capabilities {
   /**
@@ -43,6 +45,45 @@ export interface Capabilities {
   /** `setEffort` changes the live session; without it the core restarts the session. */
   readonly liveEffort: boolean;
   readonly permissionModes: PermissionModes;
+  /** Calls run under a call of their own (`parentCallId`), and a task can be a subagent's. */
+  readonly subagents: boolean;
+  /** A task outlives the turn that started it, and the agent starts a turn to report it. */
+  readonly backgroundTasks: boolean;
+  /** The agent compacts a conversation (`compaction_started`, `compacted`). */
+  readonly compaction: boolean;
+  /**
+   * The agent asks the owner questions (`RequestHandler.question`). The core offers nothing of
+   * its own for a question, so the only thing that reads this is `!guide`, which names the
+   * answer form when it is declared.
+   */
+  readonly questions: boolean;
+  /** `AgentBackend.usageLimits`. */
+  readonly usageLimits: boolean;
+  /** `AgentInfo.models` lists what `setModel` takes. */
+  readonly models: boolean;
+  /** `AgentInfo.commands` lists commands of the agent's own, which a prompt can run. */
+  readonly commands: boolean;
+  /** A prompt sent while a turn runs is taken into that turn (`prompt_taken`). */
+  readonly promptDuringTurn: boolean;
+  /** `listSessions`, `datedSessions` and `aliveSessions`. */
+  readonly sessionListing: boolean;
+  /** `folderTrusted` and `trustedRepository` read a record of trust the owner keeps in the agent. */
+  readonly folderTrust: boolean;
+}
+
+/** The agent's own words, which the daemon's texts are filled with. */
+export interface AgentWords {
+  /** Who writes the replies, where a text names them and not the product. */
+  readonly author: string;
+  /** The command that opens the agent in a terminal on the host. */
+  readonly command: string;
+  /** Two of its commands as the owner types them in the chat, for the guide. */
+  readonly examples: string;
+  /**
+   * The shell line that continues a session in a terminal; `{directory}` and `{session}` are
+   * filled in, each quoted for a shell.
+   */
+  readonly terminal: string;
 }
 
 export type SettingsSource = "user" | "project" | "local";
@@ -329,7 +370,7 @@ export interface PermissionRequest {
 }
 
 export type PermissionAnswer =
-  | { readonly allow: true; readonly changedInput?: Readonly<Record<string, unknown>> }
+  | { readonly allow: true }
   | { readonly allow: false; readonly message: string };
 
 export interface QuestionOption {
@@ -414,7 +455,22 @@ export interface Repository {
   readonly insideGitDir: boolean;
 }
 
+/** The limits of the owner's account; one the account does not have, or the agent hid, is null. */
+export interface UsageLimits {
+  readonly session: UsageLimit | null;
+  readonly week: UsageLimit | null;
+}
+
+export interface UsageLimit {
+  readonly percent: number;
+  /** Milliseconds since the epoch. */
+  readonly resetsAt: number | null;
+}
+
 export interface AgentBackend {
+  /** The agent's name as the daemon's texts say it. */
+  readonly name: string;
+  readonly words: AgentWords;
   readonly capabilities: Capabilities;
   /**
    * Starts a session and resolves once the agent answered. Rejects with `ResumeRefused` when
@@ -442,4 +498,27 @@ export interface AgentBackend {
    * trusted, or one inside `sessionFolder` when that folder is trusted. Null anywhere else.
    */
   trustedRepository(folder: string, sessionFolder: string): Promise<Repository | null>;
+  /**
+   * The account's limits as the agent reports them now; it can take a while, and rejects when
+   * the agent gave none. Present with `usageLimits`.
+   */
+  usageLimits?(): Promise<UsageLimits>;
+  /** Ends what the back end keeps running besides its sessions. Safe to call again. */
+  close(): Promise<void>;
+}
+
+/** What a back end is built with. */
+export interface AgentContext {
+  /** The module's own variables as the owner's file gives them; one not set is absent. */
+  readonly variables: Readonly<Record<string, string>>;
+  /** Every wait of the back end. */
+  readonly clock: Clock;
+}
+
+/** One agent the daemon can drive, as the registry holds it. */
+export interface AgentEntry {
+  /** The variables the module reads; the daemon does not start without the `required` ones. */
+  readonly required: readonly string[];
+  readonly optional: readonly string[];
+  build(context: AgentContext): AgentBackend;
 }

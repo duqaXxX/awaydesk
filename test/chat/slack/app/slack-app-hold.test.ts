@@ -18,7 +18,7 @@ import { Status } from "../../../../src/chat/slack/reply/status.ts";
 import { IDLE_CLOSE_SECONDS } from "../../../../src/core/sessions/constants.ts";
 import type { ThreadSession } from "../../../../src/core/sessions/session.ts";
 import * as texts from "../../../../src/core/texts.ts";
-import { fill } from "../../../../src/core/texts.ts";
+import { fill, named } from "../../../../src/core/texts.ts";
 import {
   CHANNEL,
   OTHER_CHANNEL,
@@ -28,6 +28,7 @@ import {
   THREAD,
 } from "../../../support/fake-slack.ts";
 import { slackPayload } from "../../../support/fixtures.ts";
+import { NAMES } from "../../../support/names.ts";
 import { sdkMessages, splitTurns } from "../../../support/sessions.ts";
 import {
   assertHeldUnsent,
@@ -325,7 +326,7 @@ test("a session gone at continue time reacts error not a raised hand", async (t)
     await world.dispatch(clickIn(HOLD_CONTINUE, holdId, CHANNEL, THREAD));
     assert.deepEqual(world.clients.at(-1)?.queries, []); // never sent
     assert.deepEqual(standing(world, THREAD), [Status.ERROR]);
-    assert.ok(said(world).includes(texts.SESSION_GONE));
+    assert.ok(said(world).includes(named(texts.SESSION_GONE, NAMES)));
   } finally {
     // `closedFlag` was set directly above, bypassing the real teardown: finished properly here
     // even when an assertion fails, or the fixture's own `closeAll` waits for ever on this
@@ -460,7 +461,7 @@ test("an unpostable question fails closed", async (t) => {
   await world.dispatch(message("busy elsewhere", { ts: OTHER_THREAD }));
   await world.dispatch(message("hello", { ts: THREAD }));
   assertHeldUnsent(world);
-  assert.equal(world.ephemerals().at(-1), texts.HOLD_UNPOSTED);
+  assert.equal(world.ephemerals().at(-1), named(texts.HOLD_UNPOSTED, NAMES));
 });
 
 /** A stop under way: the drain runs until the test cuts it short. */

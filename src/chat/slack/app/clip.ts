@@ -2,17 +2,17 @@
  * An audio clip the owner sent: held until Slack has its transcript (`voice.ts`), then sent as
  * the message the owner would have typed.
  */
-import * as texts from "../../../core/texts.ts";
-import { fill } from "../../../core/texts.ts";
+import { fill, named, texts } from "../../../core/port.ts";
 import { strip } from "../../../text.ts";
 import { DownloadFailed } from "../attachments.ts";
 import { describe } from "../reply/errors.ts";
 import { mrkdwnEscape } from "../reply/escape.ts";
 import { Task } from "../reply/tasks.ts";
+import * as slackTexts from "../texts.ts";
 import * as voice from "../voice.ts";
 import { type Answers, type AppParts, isCancelled, logger } from "./answers.ts";
 import { isOwner } from "./guards.ts";
-import type { Messages } from "./messages.ts";
+import { inboundMessage } from "./messages.ts";
 import { type Payload, record, str, text } from "./wire.ts";
 
 /** An audio clip the owner sent, held until Slack has its transcript. */
@@ -28,15 +28,13 @@ export interface WaitingClip {
 export class Clips {
   private readonly parts: AppParts;
   private readonly answers: Answers;
-  private readonly messages: Messages;
   // Clips waiting for their transcript, by file id. In memory only: a restart forgets them,
   // and the owner sends the clip again.
   private readonly clips = new Map<string, WaitingClip>();
 
-  constructor(parts: AppParts, answers: Answers, messages: Messages) {
+  constructor(parts: AppParts, answers: Answers) {
     this.parts = parts;
     this.answers = answers;
-    this.messages = messages;
   }
 
   /**
@@ -53,7 +51,11 @@ export class Clips {
   ): Promise<void> {
     const { identity, sessions, state, config } = this.parts;
     if (!isOwner(identity, text(file.user), text(file.user_team))) {
-      await this.answers.tellOwner(channel, threadTs, texts.CLIP_NOT_YOURS);
+      await this.answers.tellOwner(
+        channel,
+        threadTs,
+        named(slackTexts.CLIP_NOT_YOURS, this.parts.names),
+      );
       return;
     }
     if (threadTs !== ts && sessions.get(channel, threadTs) === null) {
@@ -61,7 +63,10 @@ export class Clips {
       return;
     }
     if (threadTs === ts && state.channel(channel) === null) {
-      await this.answers.inChannel(channel, fill(texts.UNBOUND, { root: config.allowedRoot }));
+      await this.answers.inChannel(
+        channel,
+        fill(named(texts.UNBOUND, this.parts.names), { root: config.allowedRoot }),
+      );
       return;
     }
     const waiting: WaitingClip = { channel, threadTs, ts, event, expiry: null };
@@ -74,7 +79,11 @@ export class Clips {
     this.clips.get(fileId)?.expiry?.cancel();
     waiting.expiry = new Task((signal) => this.giveUp(fileId, signal));
     this.clips.set(fileId, waiting);
-    await this.answers.tellOwner(channel, threadTs, texts.CLIP_WAITING);
+    await this.answers.tellOwner(
+      channel,
+      threadTs,
+      named(slackTexts.CLIP_WAITING, this.parts.names),
+    );
   }
 
   private async giveUp(fileId: string, signal: AbortSignal): Promise<void> {
@@ -90,7 +99,7 @@ export class Clips {
     await this.answers.tellOwner(
       waiting.channel,
       waiting.threadTs,
-      fill(texts.CLIP_NOT_SENT, { minutes }),
+      fill(named(slackTexts.CLIP_NOT_SENT, this.parts.names), { minutes }),
     );
   }
 
@@ -110,7 +119,9 @@ export class Clips {
         await this.answers.tellOwner(
           waiting.channel,
           waiting.threadTs,
-          fill(texts.CLIP_UNREADABLE, { reason: mrkdwnEscape(error.message) }),
+          fill(named(slackTexts.CLIP_UNREADABLE, this.parts.names), {
+            reason: mrkdwnEscape(error.message),
+          }),
         );
         return;
       }
@@ -118,16 +129,28 @@ export class Clips {
       heard = voice.vttText(new TextDecoder("utf-8").decode(body));
     }
     if (!heard) {
-      await this.answers.tellOwner(waiting.channel, waiting.threadTs, texts.CLIP_EMPTY);
+      await this.answers.tellOwner(
+        waiting.channel,
+        waiting.threadTs,
+        named(slackTexts.CLIP_EMPTY, this.parts.names),
+      );
       return;
     }
     const typed = strip(text(waiting.event.text) ?? "");
     // the composer's blocks describe the typed text alone
     const { blocks: _blocks, ...rest } = waiting.event;
     const said: Payload = { ...rest, text: typed ? `${typed}\n\n${heard}` : heard, files: [] };
-    await this.messages.handleMessage(waiting.channel, waiting.threadTs, waiting.ts, said, {
-      spoken: true,
-    });
+    await this.parts.inbound.message(
+      inboundMessage(
+        this.parts,
+        this.answers,
+        waiting.channel,
+        waiting.threadTs,
+        waiting.ts,
+        said,
+        { spoken: true },
+      ),
+    );
   }
 
   /**
@@ -160,7 +183,11 @@ export class Clips {
     const user = text(file.user);
     const team = text(file.user_team);
     if (!isOwner(identity, user, team)) {
-      await this.answers.tellOwner(waiting.channel, waiting.threadTs, texts.CLIP_NOT_YOURS);
+      await this.answers.tellOwner(
+        waiting.channel,
+        waiting.threadTs,
+        named(slackTexts.CLIP_NOT_YOURS, this.parts.names),
+      );
       return;
     }
     // The channel is read again: its members can have changed while the clip waited.

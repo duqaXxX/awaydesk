@@ -8,13 +8,13 @@
  * to Slack with `&`, `<` and `>` escaped and a zero-width space after each backtick, so no
  * `<url|label>` can hide what it links and no text can close its code block.
  */
+
 import type { PermissionRequest, Question, QuestionOption } from "../../agent/seam.ts";
-import { oneLine } from "../../core/reply/words.ts";
-import { answerOf } from "../../core/requests.ts";
-import * as texts from "../../core/texts.ts";
+import { answerOf, type Names, named, oneLine, texts } from "../../core/port.ts";
 import { PY_SPACE, strip } from "../../text.ts";
 import { isRecord } from "../../values.ts";
 import { shownAsWritten } from "./reply/escape.ts";
+import * as slackTexts from "./texts.ts";
 
 export const SECTION_LIMIT = 3000;
 export const MESSAGE_BLOCKS = 50; // Slack's limit on blocks in one message
@@ -98,10 +98,16 @@ function code(chunk: string): Block {
  * The request the owner approves: everything the tool will run with, never cut silently, since
  * Approve hands the agent the whole input whatever was shown.
  */
-export function approvalBlocks(approvalId: string, request: PermissionRequest): Block[] {
+export function approvalBlocks(
+  approvalId: string,
+  request: PermissionRequest,
+  names: Names,
+): Block[] {
   const heading = request.title
     ? shownAsWritten(request.title)
-    : texts.fill(texts.APPROVAL_PROMPT, { tool: shownAsWritten(request.toolName) });
+    : texts.fill(named(slackTexts.APPROVAL_PROMPT, names), {
+        tool: shownAsWritten(request.toolName),
+      });
   const blocks: Block[] = [
     { type: "section", text: { type: "mrkdwn", text: head(heading, SECTION_LIMIT) } },
   ];
@@ -118,7 +124,7 @@ export function approvalBlocks(approvalId: string, request: PermissionRequest): 
     const shown = chunks.slice(0, room - 2);
     const tail = chunks.at(-1) as string;
     const hidden = chunks.slice(room - 2, -1).reduce((total, chunk) => total + length(chunk), 0);
-    const notice = texts.fill(texts.APPROVAL_CUT, { count: hidden.toLocaleString("en-US") });
+    const notice = texts.fill(slackTexts.APPROVAL_CUT, { count: hidden.toLocaleString("en-US") });
     codeBlocks = [...shown.map(code), context(notice), code(tail)];
   } else {
     codeBlocks = chunks.map(code);
@@ -141,8 +147,9 @@ export function approvalBlocks(approvalId: string, request: PermissionRequest): 
 export function answeredBlocks(
   questions: readonly Question[],
   answers: Readonly<Record<string, string | readonly string[]>>,
+  names: Names,
 ): Block[] {
-  const lines = [texts.ANSWERED];
+  const lines = [named(texts.ANSWERED, names)];
   for (const q of questions) {
     const answer = Object.hasOwn(answers, q.text) ? (answers[q.text] as string | string[]) : "";
     const shown = typeof answer === "string" ? answer : answer.join(", ");
@@ -156,12 +163,16 @@ export function answeredBlocks(
  * The request in the channel: one line naming the questions, with Answer (which opens the form)
  * and Skip. It stays one line however many questions the agent asks.
  */
-export function questionBlocks(approvalId: string, questions: readonly Question[]): Block[] {
+export function questionBlocks(
+  approvalId: string,
+  questions: readonly Question[],
+  names: Names,
+): Block[] {
   const headers = questions.map((q) => `*${shownAsWritten(q.header || q.text)}*`).join(" · ");
   const count =
     questions.length === 1
-      ? texts.QUESTIONS_ONE
-      : texts.fill(texts.QUESTIONS_MANY, { count: questions.length });
+      ? named(slackTexts.QUESTIONS_ONE, names)
+      : texts.fill(named(slackTexts.QUESTIONS_MANY, names), { count: questions.length });
   return [
     {
       type: "section",
@@ -170,7 +181,7 @@ export function questionBlocks(approvalId: string, questions: readonly Question[
     {
       type: "actions",
       elements: [
-        button(QUESTION_OPEN, texts.QUESTION_ANSWER, approvalId, "primary"),
+        button(QUESTION_OPEN, slackTexts.QUESTION_ANSWER, approvalId, "primary"),
         button(QUESTION_SKIP, "Skip", approvalId),
       ],
     },
@@ -388,7 +399,7 @@ function optionWhole(option: QuestionOption): Block {
  * option are shown whole above the choice, which keeps the labels alone under the question's
  * header (issue #47).
  */
-export function questionView(draft: Draft, questions: readonly Question[]): Block {
+export function questionView(draft: Draft, questions: readonly Question[], names: Names): Block {
   const blocks: Block[] = [];
   const count = questions.length;
   const at = draft.active;
@@ -396,7 +407,7 @@ export function questionView(draft: Draft, questions: readonly Question[]): Bloc
   if (question === undefined) throw new RangeError(`no question ${at}`);
   if (count > 1) {
     const header = shownAsWritten(strip(question.header));
-    const where = texts.fill(texts.QUESTION_WHERE, { number: at + 1, count });
+    const where = texts.fill(slackTexts.QUESTION_WHERE, { number: at + 1, count });
     blocks.push(context(header !== "" ? `${header} · ${where}` : where));
   }
   const whole = saysMore(question);
@@ -407,7 +418,7 @@ export function questionView(draft: Draft, questions: readonly Question[]): Bloc
     blocks.push(...question.options.map(optionWhole));
     // A header of blanks alone would leave the choice an empty label, which Slack refuses.
     const header = strip(question.header);
-    label = oneLine(header !== "" ? header : texts.QUESTION_ANSWER, LABEL_LIMIT);
+    label = oneLine(header !== "" ? header : slackTexts.QUESTION_ANSWER, LABEL_LIMIT);
   }
   const options = question.options.map((o, i) => optionEntry(i, o, !whole));
   const element: Block = {
@@ -425,7 +436,7 @@ export function questionView(draft: Draft, questions: readonly Question[]): Bloc
     type: "plain_text_input",
     action_id: "other",
     max_length: TYPED_LIMIT,
-    placeholder: { type: "plain_text", text: texts.QUESTION_OTHER_HINT },
+    placeholder: { type: "plain_text", text: slackTexts.QUESTION_OTHER_HINT },
   };
   const typed = draft.typed.get(at);
   if (typed) other.initial_value = typed;
@@ -441,7 +452,7 @@ export function questionView(draft: Draft, questions: readonly Question[]): Bloc
       type: "input",
       block_id: `o${at}`,
       optional: true,
-      label: { type: "plain_text", text: texts.QUESTION_OTHER },
+      label: { type: "plain_text", text: slackTexts.QUESTION_OTHER },
       element: other,
     },
   );
@@ -449,12 +460,13 @@ export function questionView(draft: Draft, questions: readonly Question[]): Bloc
     type: "modal",
     callback_id: QUESTION_FORM,
     private_metadata: dumpDraft(draft),
-    title: { type: "plain_text", text: texts.QUESTION_TITLE },
+    title: { type: "plain_text", text: named(slackTexts.QUESTION_TITLE, names) },
     submit: {
       type: "plain_text",
-      text: at < count - 1 ? texts.fill(texts.QUESTION_NEXT, { number: at + 1, count }) : "Submit",
+      text:
+        at < count - 1 ? texts.fill(slackTexts.QUESTION_NEXT, { number: at + 1, count }) : "Submit",
     },
-    close: { type: "plain_text", text: texts.QUESTION_CLOSE },
+    close: { type: "plain_text", text: slackTexts.QUESTION_CLOSE },
     blocks,
   };
 }

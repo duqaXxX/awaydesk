@@ -2,15 +2,15 @@
  * The picker `!open` shows: the message with its button, the modal with its search field and its
  * rows, what Slack sends back from it, and the order its updates are written in.
  */
+
 import { createHash } from "node:crypto";
 import type { KnownBlock, ModalView, Option } from "@slack/web-api";
-import { Semaphore } from "../../../core/sessions/tasks.ts";
-import * as texts from "../../../core/texts.ts";
-import { fill } from "../../../core/texts.ts";
+import { fill, Semaphore } from "../../../core/port.ts";
 import { isRecord } from "../../../values.ts";
 import { contextBlock, plainTextObject } from "../reply/blocks.ts";
 import { len, take } from "../reply/chars.ts";
 import { shownAsWritten } from "../reply/escape.ts";
+import * as slackTexts from "../texts.ts";
 
 // The button that opens the picker's modal (in the `!open` message and in the one of several
 // matches), the modal's callback id, and the ids of its two input blocks. Slack keeps the state
@@ -200,7 +200,7 @@ function chooseButton(words: string): KnownBlock {
       {
         type: "button",
         action_id: OPEN_BUTTON_ACTION,
-        text: plainTextObject(texts.OPEN_BUTTON),
+        text: plainTextObject(slackTexts.OPEN_BUTTON),
         ...(words ? { value: take(words, QUERY_LIMIT) } : {}),
       },
     ],
@@ -210,9 +210,9 @@ function chooseButton(words: string): KnownBlock {
 /** What `!open` alone posts: the button that opens the modal, and the way to open by name. */
 export function pickerBlocks(): KnownBlock[] {
   return [
-    { type: "section", text: { type: "mrkdwn", text: texts.OPEN_TITLE } },
+    { type: "section", text: { type: "mrkdwn", text: slackTexts.OPEN_TITLE } },
     chooseButton(""),
-    contextBlock(texts.OPEN_BY_NAME),
+    contextBlock(slackTexts.OPEN_BY_NAME),
   ];
 }
 
@@ -230,7 +230,7 @@ export function matchesBlocks(
     type: "section",
     text: {
       type: "mrkdwn",
-      text: fill(found.length === 1 ? texts.OPEN_MATCHES_ONE : texts.OPEN_MATCHES, {
+      text: fill(found.length === 1 ? slackTexts.OPEN_MATCHES_ONE : slackTexts.OPEN_MATCHES, {
         count: found.length,
         words: shownAsWritten(words),
       }),
@@ -238,9 +238,9 @@ export function matchesBlocks(
   };
   const blocks: KnownBlock[] = [
     heading,
-    found.some(fits) ? chooseButton(words) : contextBlock(texts.OPEN_MATCHES_TOO_LONG),
+    found.some(fits) ? chooseButton(words) : contextBlock(slackTexts.OPEN_MATCHES_TOO_LONG),
   ];
-  return complete ? blocks : [...blocks, contextBlock(texts.OPEN_PARTIAL)];
+  return complete ? blocks : [...blocks, contextBlock(slackTexts.OPEN_PARTIAL)];
 }
 
 /** What the block of these rows is told apart by: the same rows, the same mark. */
@@ -275,7 +275,7 @@ export function modalView(
     type: "plain_text_input" as const,
     action_id: QUERY_ACTION,
     max_length: QUERY_LIMIT,
-    placeholder: plainTextObject(texts.OPEN_QUERY_HINT),
+    placeholder: plainTextObject(slackTexts.OPEN_QUERY_HINT),
     dispatch_action_config: { trigger_actions_on: ["on_character_entered" as const] },
     ...(opening ? { focus_on_load: true, ...(words ? { initial_value: words } : {}) } : {}),
   };
@@ -285,24 +285,24 @@ export function modalView(
       block_id: QUERY_BLOCK,
       dispatch_action: true,
       optional: true,
-      label: plainTextObject(texts.OPEN_QUERY_LABEL),
+      label: plainTextObject(slackTexts.OPEN_QUERY_LABEL),
       element: query,
     },
   ];
   if (paths === null) {
-    blocks.push(contextBlock(texts.OPEN_LOADING));
+    blocks.push(contextBlock(slackTexts.OPEN_LOADING));
   } else {
     const rows = options(paths);
     const total = count ?? paths.length;
     let heading: string;
     if (words) {
-      heading = fill(total === 1 ? texts.OPEN_ROWS_MATCH_ONE : texts.OPEN_ROWS_MATCH, {
+      heading = fill(total === 1 ? slackTexts.OPEN_ROWS_MATCH_ONE : slackTexts.OPEN_ROWS_MATCH, {
         count: total,
       });
     } else if (total) {
-      heading = fill(texts.OPEN_ROWS_CHANGED, { count: total });
+      heading = fill(slackTexts.OPEN_ROWS_CHANGED, { count: total });
     } else {
-      heading = texts.OPEN_TYPE_A_NAME;
+      heading = slackTexts.OPEN_TYPE_A_NAME;
     }
     if (rows.length > 0) {
       blocks.push({
@@ -319,20 +319,20 @@ export function modalView(
       blocks.push(
         contextBlock(
           rows.length > 0
-            ? fill(texts.OPEN_MATCHES_CAPPED, { shown: rows.length, count: total })
-            : texts.OPEN_MATCHES_TOO_LONG,
+            ? fill(slackTexts.OPEN_MATCHES_CAPPED, { shown: rows.length, count: total })
+            : slackTexts.OPEN_MATCHES_TOO_LONG,
         ),
       );
     }
-    if (!complete) blocks.push(contextBlock(texts.OPEN_PARTIAL));
+    if (!complete) blocks.push(contextBlock(slackTexts.OPEN_PARTIAL));
   }
   return {
     type: "modal",
     callback_id: OPEN_FORM,
     private_metadata: target.dump(),
-    title: plainTextObject(texts.OPEN_MODAL_TITLE),
-    submit: plainTextObject(texts.OPEN_MODAL_SUBMIT),
-    close: plainTextObject(texts.OPEN_MODAL_CLOSE),
+    title: plainTextObject(slackTexts.OPEN_MODAL_TITLE),
+    submit: plainTextObject(slackTexts.OPEN_MODAL_SUBMIT),
+    close: plainTextObject(slackTexts.OPEN_MODAL_CLOSE),
     blocks,
   };
 }

@@ -104,7 +104,7 @@ export function toRequest(
 /** The owner's answer to a permission request for a call that had `input`. */
 export function permissionResult(answer: PermissionAnswer, input: Input): PermissionResult {
   if (!answer.allow) return { behavior: "deny", message: answer.message };
-  return { behavior: "allow", updatedInput: { ...(answer.changedInput ?? input) } };
+  return { behavior: "allow", updatedInput: { ...input } };
 }
 
 /**

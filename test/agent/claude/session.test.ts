@@ -262,53 +262,38 @@ test("two prompts get one batch each, in the order they were sent", LIMIT, async
 
 // Requests.
 
-test(
-  "a permission request reaches the handler and an allow with a changed input is passed on",
-  LIMIT,
-  async (t) => {
-    const handler = handlerOf({ allow: true, changedInput: { command: "echo changed" } });
-    const batch: Batch = [
-      ...TOOLS.slice(0, FIRST_CALL + 1),
-      ask({
-        toolName: "Bash",
-        input: BASH,
-        toolUseID: "toolu_000",
-        requestId: "request-1",
-        description: "Print ok",
-      }),
-      ...TOOLS.slice(FIRST_CALL + 1),
-    ];
-    const { session, query, events } = await started(t, { turns: [batch] }, {}, handler);
-    await session.send(PROMPT);
-    const seen = await until(events, "turn_ended");
-    assert.deepEqual(handler.asked, [
-      {
-        type: "permission",
-        requestId: "request-1",
-        callId: "toolu_000",
-        toolName: "Bash",
-        input: BASH,
-        title: null,
-        description: "Print ok",
-      },
-    ]);
-    // The SDK's result, field by field.
-    assert.deepEqual(query.permissionResults, [
-      { behavior: "allow", updatedInput: { command: "echo changed" } },
-    ]);
-    // The turn went on after the answer: the call and the end are both there.
-    assert.ok(types(seen).includes("call_started"));
-    assert.equal(seen.at(-1)?.type, "turn_ended");
-  },
-);
-
-test("an allow with no changed input passes the call's own input back", LIMIT, async (t) => {
-  const { session, query, events } = await started(t, {
-    turns: [[...TOOLS.slice(0, 2), ask({ toolName: "Bash", input: BASH }), ...TOOLS.slice(-1)]],
-  });
+test("a permission request reaches the handler and an allow is passed on", LIMIT, async (t) => {
+  const handler = handlerOf({ allow: true });
+  const batch: Batch = [
+    ...TOOLS.slice(0, FIRST_CALL + 1),
+    ask({
+      toolName: "Bash",
+      input: BASH,
+      toolUseID: "toolu_000",
+      requestId: "request-1",
+      description: "Print ok",
+    }),
+    ...TOOLS.slice(FIRST_CALL + 1),
+  ];
+  const { session, query, events } = await started(t, { turns: [batch] }, {}, handler);
   await session.send(PROMPT);
-  await until(events, "turn_ended");
+  const seen = await until(events, "turn_ended");
+  assert.deepEqual(handler.asked, [
+    {
+      type: "permission",
+      requestId: "request-1",
+      callId: "toolu_000",
+      toolName: "Bash",
+      input: BASH,
+      title: null,
+      description: "Print ok",
+    },
+  ]);
+  // The SDK's result, field by field.
   assert.deepEqual(query.permissionResults, [{ behavior: "allow", updatedInput: BASH }]);
+  // The turn went on after the answer: the call and the end are both there.
+  assert.ok(types(seen).includes("call_started"));
+  assert.equal(seen.at(-1)?.type, "turn_ended");
 });
 
 test("a deny reaches the SDK with the owner's message", LIMIT, async (t) => {

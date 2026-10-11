@@ -267,9 +267,59 @@ All notable changes to this project are documented here. The format follows
   Continue and Cancel. `!stop` inside the held thread, a top-level `!stop` of its channel, and a
   restart cancel the wait the same way Cancel does, with a `Not sent.` notice; the idle-close
   timer and the ✋ root reaction treat a held message the same way they treat an open approval.
+- The agent and the chat are modules chosen by name. `AWAYDESK_AGENT` and `AWAYDESK_CHAT` in
+  `~/.config/awaydesk/.env` select them. Both are optional and absent they mean `claude` and
+  `slack`, so an existing `.env` and `state.json` work with no edit and nothing in Slack changes.
+  `src/registry.ts` holds the entries and `src/main.ts` builds the selected ones without importing
+  either module; a name the registry does not hold stops the start, and the message lists the valid
+  ones. Each module names the variables it reads and receives only their values, still hidden from
+  `util.inspect`, `JSON.stringify` and a log line; `src/core/config.ts` reads the file, the two
+  selection variables and `ALLOWED_ROOT`. The Slack module checks the kind of its tokens before it
+  calls Slack, with the same messages. `docs/architecture.md` has a section, "Modules", and
+  `CONTRIBUTING.md` one on adding an agent or a chat.
+- Each seam declares what differs between modules and the core adapts to. The agent seam has
+  `Capabilities`, the agent's `name` and `words`, `usageLimits` and `close`; the chat seam has
+  `ChatCapabilities` and, for what the owner does, `ChatInbound`: a message, the answer to a
+  request and a pick from a list. A feature a module does not declare is not offered. Two texts
+  appear only for such a module: `!resume` says the agent keeps no list of its sessions, and the
+  folder list of `!bind` names no trust in its title when the agent keeps no record of it. With
+  Claude and Slack every capability is declared and neither text is shown. `!help` and `!guide`
+  leave out what the selected agent and chat cannot serve.
+- Two test modules prove the seams: a plain agent (`test/support/plain-agent.ts`) and a chat held
+  in memory (`test/support/memory-chat.ts`). A conformance suite per seam
+  (`test/conformance/agent.ts`, `test/conformance/chat.ts`) runs against both implementations of
+  that seam, the owner check included, and a scenario under `test/scenario/` runs the daemon with
+  the two selected by name. No second real agent or chat ships. The seams were shaped on these two
+  test modules, so a first real module may need a seam change.
+- `test/imports.test.ts` lets a chat provider import the core's port (`src/core/port.ts`) and
+  nothing else of the core, and `test/vocabulary.test.ts` fails on an identifier or a string
+  outside `src/agent/claude/`, `src/chat/slack/` and `src/registry.ts` that names an agent or a
+  chat.
 
 ### Changed
 
+- What a message, a word, an answer and a pick mean is decided in the core, as flows
+  (`src/core/flows/`): a message and every word, the requests put to the owner (a tool's
+  permission, the agent's questions, the same-folder hold, a session's setup), `!resume`, `!bind`,
+  `!status`, the crash repair and the upgrade notice. The Slack listeners acknowledge, check the
+  owner, the workspace and the channel, read the payload and call `ChatInbound`; the provider
+  draws what the core asks it to, and reaches the core through `src/core/port.ts` alone. The texts
+  that name the agent or the chat take the name from the module, and the provider's own words
+  (the labels of its controls, the Home tab, the file viewer, why it refuses a channel, a file or
+  a clip) are `src/chat/slack/texts.ts`. With Claude and Slack the behaviour was compared by the
+  existing suite and the golden files, none of which changed. Not run: the daemon against a real
+  Slack workspace after this change.
+- `state.json` is version 3: version 2 plus the names of the agent and the chat that wrote it. A
+  version 2 file is read for the modules running and written as version 3 on its first save; a
+  version 3 file written for other modules stops the start, and the message names both pairs. The
+  cleanup asks the chat whether a channel is still there (`ChatProvider.channelState`) and when a
+  thread was opened (`ChatProvider.openedAt`), in place of reading Slack's error and a thread's
+  name as a time, so a thread the chat cannot date is never dropped for its age.
+- The Slack provider implements the whole chat seam, and the daemon starts it through `slackChat`
+  in `src/chat/slack/module.ts`: its clients, identity, thread deleter, Home tab and channel guard
+  are built there and read the core only when first used. `SlackChat` opens and closes the
+  connection (`start`, `stop`, `close`), and `SlackThread` and `SlackChannel` carry the words the
+  daemon says in a thread and in a channel.
 - The daemon is written in TypeScript and runs on Node 22.18 or later, in place of Python and
   uv. It has three layers behind two seams: `src/agent/` holds the only code that knows an agent
   SDK (the Claude back end, on `@anthropic-ai/claude-agent-sdk` 0.3.296, which bundles Claude Code

@@ -2,10 +2,19 @@
 import { realpathSync, statSync } from "node:fs";
 import { opendir, stat } from "node:fs/promises";
 import { isAbsolute, sep } from "node:path";
+import type { AgentBackend } from "../../agent/seam.ts";
 import { errorCode } from "../../values.ts";
 import { ABSENT, expandUser, resolvePath } from "../paths.ts";
 import * as texts from "../texts.ts";
 import { DirectoryMissing, DirectoryUnreadable, DirectoryUntrusted } from "./errors.ts";
+
+/**
+ * `agent`'s record of trust as `checkDirectory` and the folder list read it. An agent that
+ * keeps none (`folderTrust`) has no gate to start a session behind: every folder counts.
+ */
+export function trustedBy(agent: AgentBackend): (folder: string) => Promise<boolean> {
+  return async (folder) => !agent.capabilities.folderTrust || agent.folderTrusted(folder);
+}
 
 /**
  * Rejects with the `DirectoryUnavailable` that keeps a session from starting in `directory`,
@@ -14,6 +23,7 @@ import { DirectoryMissing, DirectoryUnreadable, DirectoryUntrusted } from "./err
 export async function checkDirectory(
   directory: string,
   trusted: (folder: string) => Promise<boolean>,
+  names: texts.Names,
 ): Promise<void> {
   // One stat and one directory open on a local folder, as a session start always made them.
   // A folder the daemon is not let into is unreadable at either: at the stat when a folder
@@ -30,7 +40,7 @@ export async function checkDirectory(
     }
     throw error;
   }
-  if (!(await trusted(directory))) throw new DirectoryUntrusted(directory);
+  if (!(await trusted(directory))) throw new DirectoryUntrusted(directory, names);
 }
 
 /** Whether `path` is `root` or lies under it. */
@@ -68,11 +78,12 @@ export function shellQuote(word: string): string {
 const MARKDOWN_INLINE = /([\\`*_{}[\]()&~])/g;
 
 /**
- * The `!status` line with the command that forks a session in the terminal, run from the
- * thread's folder, where `!resume` in its channel then finds the fork.
+ * The `!status` line with the command that forks a session in the terminal (the agent's
+ * `words.terminal`, `template`), run from the thread's folder, where `!resume` in its channel
+ * then finds the fork.
  */
-export function terminalLine(directory: string, sessionId: string): string {
-  const command = texts.fill(texts.TERMINAL_COMMAND, {
+export function terminalLine(template: string, directory: string, sessionId: string): string {
+  const command = texts.fill(template, {
     directory: shellQuote(directory),
     session: sessionId,
   });

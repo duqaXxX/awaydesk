@@ -32,14 +32,13 @@
  * reference does not say what a parent's count reads in the channel's history once its replies
  * are gone, and a thread taken for a leftover would lose its root.
  */
+
 import type { WebClient } from "@slack/web-api";
-import { Mutex } from "../../core/sessions/tasks.ts";
-import type { StateStore } from "../../core/state.ts";
-import * as texts from "../../core/texts.ts";
-import { fill } from "../../core/texts.ts";
+import { fill, Mutex, type Names, named, type StatePort } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import { isRecord } from "../../values.ts";
 import { describe } from "./reply/errors.ts";
+import * as slackTexts from "./texts.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.delete");
 
@@ -50,10 +49,15 @@ export const CANT_DELETE = "cant_delete_message";
 export const THREAD_NOT_FOUND = "thread_not_found";
 
 /** What the deleter asks of the session manager (`SessionManager.release` and `.free`). */
+/** The part of the daemon's state a delete reads and writes. */
+export type DeleterState = Pick<StatePort, "thread" | "channels" | "removeThread">;
+
 export interface ThreadDeleterOptions {
   readonly botUserId: string;
   readonly ownerUserId: string;
-  readonly state: StateStore;
+  readonly state: DeleterState;
+  /** The names the lines it shows take; asked when one is shown, which is after the core exists. */
+  readonly names: () => Names;
   /**
    * Closes the thread's live session when it is idle, holds the thread so that no session is
    * built in it meanwhile, and says whether it did.
@@ -88,7 +92,8 @@ export class ThreadDeleter {
   readonly #owner: WebClient;
   readonly #botUserId: string;
   readonly #ownerUserId: string;
-  readonly #state: StateStore;
+  readonly #state: DeleterState;
+  readonly #names: () => Names;
   readonly #release: ThreadDeleterOptions["release"];
   readonly #free: ThreadDeleterOptions["free"];
   // One thread at a time: two deletes at once would share Slack's rate limit, and each would
@@ -101,6 +106,7 @@ export class ThreadDeleter {
     this.#botUserId = options.botUserId;
     this.#ownerUserId = options.ownerUserId;
     this.#state = options.state;
+    this.#names = options.names;
     this.#release = options.release;
     this.#free = options.free;
   }
@@ -125,16 +131,16 @@ export class ThreadDeleter {
       // From here until `free`, the thread is held: a message sent in it while its messages go
       // finds no session, and none is rebuilt from the entry `state.json` still has
       // (`SessionManager.release`).
-      if (!(await this.#release(channelId, threadTs))) return texts.HOME_DELETE_BUSY;
+      if (!(await this.#release(channelId, threadTs))) return slackTexts.HOME_DELETE_BUSY;
       const refused = await this.#empty(channelId, threadTs);
       if (refused > 0) {
         // The root stays while a reply does, so the thread can still be opened.
-        return fill(texts.HOME_DELETE_REFUSED, { count: refused });
+        return fill(named(slackTexts.HOME_DELETE_REFUSED, this.#names()), { count: refused });
       }
       this.#state.removeThread(channelId, threadTs);
     } catch (error) {
       logger.warning(`could not delete ${channelId}/${threadTs}: ${describe(error)}`);
-      return fill(texts.HOME_DELETE_FAILED, { error: describe(error) });
+      return fill(slackTexts.HOME_DELETE_FAILED, { error: describe(error) });
     } finally {
       this.#free(channelId, threadTs);
     }
@@ -204,10 +210,12 @@ export class ThreadDeleter {
         }
       } catch (error) {
         logger.warning(`could not clean up ${channelId}: ${describe(error)}`);
-        return fill(texts.HOME_CLEAN_FAILED, { error: describe(error) });
+        return fill(slackTexts.HOME_CLEAN_FAILED, { error: describe(error) });
       }
       logger.info(`cleaned up ${channelId}: ${loose.size} messages, ${refused} refused`);
-      return refused > 0 ? fill(texts.HOME_CLEAN_REFUSED, { count: refused }) : null;
+      return refused > 0
+        ? fill(named(slackTexts.HOME_CLEAN_REFUSED, this.#names()), { count: refused })
+        : null;
     });
   }
 

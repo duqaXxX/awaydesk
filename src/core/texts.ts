@@ -1,4 +1,6 @@
-/** Every sentence the owner can read in Slack. English only; one place to review the wording. */
+/** Every sentence the owner can read in the chat. English only; one place to review the wording. */
+import type { AgentBackend } from "../agent/seam.ts";
+import type { ChatProvider } from "../chat/seam.ts";
 
 /**
  * Fills a template's `{name}` fields: every template below keeps its `{name}` fields as written,
@@ -12,40 +14,97 @@ export function fill(template: string, values: Readonly<Record<string, string | 
   });
 }
 
-export const UNBOUND =
+/** The names a text takes from the agent and the chat the daemon runs with. */
+export interface Names {
+  /** The agent's name (`AgentBackend.name`). */
+  readonly agent: string;
+  /** Who writes the agent's replies (`AgentWords.author`). */
+  readonly author: string;
+  /** The command that opens the agent on the host (`AgentWords.command`). */
+  readonly cli: string;
+  /** The chat's name (`ChatProvider.name`). */
+  readonly chat: string;
+  /** Two of the agent's commands as the owner types them (`AgentWords.examples`). */
+  readonly examples: string;
+}
+
+/**
+ * A template that names the agent or the chat, with the fields `{agent}`, `{author}`, `{cli}`,
+ * `{chat}` and `{examples}`. It is no string, and it throws where one is made of it: nothing can show it
+ * before `named` filled the names in.
+ */
+export class Named {
+  readonly template: string;
+
+  constructor(template: string) {
+    this.template = template;
+    Object.freeze(this);
+  }
+
+  toString(): never {
+    throw new Error("a text that names the agent or the chat was shown before `named` filled it");
+  }
+}
+
+function naming(template: string): Named {
+  return new Named(template);
+}
+
+/** `text` with the names filled in; its other `{name}` fields are left for `fill`. */
+export function named(text: Named, names: Names): string {
+  return text.template.replace(
+    /\{(agent|author|cli|chat|examples)\}/g,
+    (_field, name: keyof Names) => names[name],
+  );
+}
+
+/** The names of an agent and a chat, as the two modules give them. */
+export function namesOf(
+  agent: Pick<AgentBackend, "name" | "words">,
+  chat: Pick<ChatProvider, "name">,
+): Names {
+  return {
+    agent: agent.name,
+    author: agent.words.author,
+    cli: agent.words.command,
+    chat: chat.name,
+    examples: agent.words.examples,
+  };
+}
+
+export const UNBOUND = naming(
   "This channel is not bound to a folder yet. Send `!bind` to choose one of the folders " +
-  "Claude Code trusts, or `!bind <folder>` with the folder's path relative to `{root}`, for " +
-  "example `!bind my-project`. `!guide` explains how awaydesk works.";
-export const AUTH_FAILED =
-  "Claude Code is not logged in on the host. On that machine, run `claude`, then `/login`. " +
-  "The login is never done from Slack.";
-export const LOGIN_ON_HOST =
-  "Log in on the host: on that machine, run `claude`, then `/login`. " +
-  "The login is never done from Slack.";
-export const LOGOUT_ON_HOST =
-  "Log out on the host: on that machine, run `claude`, then `/logout`. " +
-  "It is never done from Slack.";
-export const CHANNEL_REFUSED =
-  "awaydesk does not work in this channel: {reason}. It answers only in a private " +
-  "channel whose only members are you and the bot.";
-export const REASON_NOT_PRIVATE = "it is not a private channel";
-export const REASON_SHARED = "it is shared with another workspace";
-export const REASON_MEMBERS = "it has members other than you and the bot";
-export const REASON_UNREADABLE = "the bot cannot read its details";
+    "{agent} trusts, or `!bind <folder>` with the folder's path relative to `{root}`, for " +
+    "example `!bind my-project`. `!guide` explains how awaydesk works.",
+);
+export const AUTH_FAILED = naming(
+  "{agent} is not logged in on the host. On that machine, run `{cli}`, then `/login`. " +
+    "The login is never done from {chat}.",
+);
+export const LOGIN_ON_HOST = naming(
+  "Log in on the host: on that machine, run `{cli}`, then `/login`. " +
+    "The login is never done from {chat}.",
+);
+export const LOGOUT_ON_HOST = naming(
+  "Log out on the host: on that machine, run `{cli}`, then `/logout`. " +
+    "It is never done from {chat}.",
+);
 export const DIRECTORY_MISSING =
   "The directory `{directory}` no longer exists. Restore it to keep using this thread, or, in " +
   "the channel, bind another folder with `!bind <path>` and send a new message to start a " +
   "session there.";
-export const DIRECTORY_UNTRUSTED =
-  "Claude Code has not been trusted in `{directory}`, so its hooks and settings would run " +
-  "without asking. Open `claude` there in the terminal once and accept the trust dialog, then " +
-  "send your message again.";
+export const DIRECTORY_UNTRUSTED = naming(
+  "{agent} has not been trusted in `{directory}`, so its hooks and settings would run " +
+    "without asking. Open `{cli}` there in the terminal once and accept the trust dialog, then " +
+    "send your message again.",
+);
 export const DIRECTORY_UNREADABLE =
   "macOS does not let awaydesk read `{directory}`. Grant access in System Settings, " +
   "Privacy & Security, Full Disk Access (see docs/setup.md, Part 4).";
-export const SESSION_GONE =
-  "This thread's session no longer exists: Claude Code deleted it or cannot find it. Send a " +
-  "new message in the channel to start one.";
+export const SESSION_GONE = naming(
+  "This thread's session no longer exists: {agent} deleted it or cannot find it. Send a " +
+    "new message in the channel to start one.",
+);
 // Names no cause: the daemon keeps no record of a thread whose entry it dropped, so it cannot
 // tell a thread that never held a session from one whose session may still be resumable.
 export const NOT_A_SESSION =
@@ -53,42 +112,8 @@ export const NOT_A_SESSION =
   "`!resume` to continue an earlier one.";
 export const OPEN_TOP_LEVEL =
   "Opening a file belongs to one session: send `!open` inside its thread.";
-export const OPEN_FALLBACK = "Open a file";
-export const OPEN_TITLE = "*Open a file*";
-export const OPEN_BUTTON = "Choose a file";
-export const OPEN_BY_NAME = "Or type `!open setup` to open a file by name.";
-export const OPEN_NO_MATCH = "No file matches `{words}`.";
-export const OPEN_NO_MATCH_PARTIAL =
-  "No file matching `{words}` was found, but the folder could not be listed in full.";
-export const OPEN_MATCHES = "*{count} files match* `{words}`";
-export const OPEN_MATCHES_ONE = "*1 file matches* `{words}`";
-export const OPEN_PARTIAL =
-  "The folder could not be listed in full, so some files may be missing here.";
-export const OPEN_MATCHES_CAPPED =
-  "The first {shown} of {count} are listed: type more of the name to narrow it.";
-export const OPEN_MATCHES_TOO_LONG =
-  "None of their paths is short enough to list: open one with `!open <path>`.";
-export const OPEN_MODAL_TITLE = "Open a file";
-export const OPEN_MODAL_SUBMIT = "Open";
-export const OPEN_MODAL_CLOSE = "Close";
-export const OPEN_QUERY_LABEL = "Search any file";
-export const OPEN_QUERY_HINT = "Type part of a name";
-export const OPEN_ROWS_CHANGED = "Changed in this session ({count}), newest first";
-export const OPEN_ROWS_MATCH = "{count} files match";
-export const OPEN_ROWS_MATCH_ONE = "1 file matches";
-export const OPEN_TYPE_A_NAME = "No changed files to show. Type part of a name to find a file.";
-export const OPEN_LOADING = "Looking for files…";
-export const OPEN_NONE_CHOSEN = "Choose a file first.";
-export const OPEN_FORM_NOT_OPENED =
-  "The file list could not open (`{error}`). Click Choose a file again.";
-export const OPEN_NOT_A_FILE = "`{path}` is not a file inside this session's folder.";
-export const OPEN_TOO_LARGE =
-  "`{path}` is larger than 1 MB, the most Slack opens in its file viewer.";
-export const OPEN_EMPTY = "`{path}` is empty: there is nothing to show.";
-export const OPEN_NO_SCOPE =
-  "Opening a file needs the `files:write` scope: add it to the app and reinstall it from " +
-  "`slack-app-manifest.json` (docs/setup.md, Part 1).";
-export const OPEN_FAILED = "Could not open `{path}`: {error}";
+// Shown only by a chat that cannot share a file into a thread.
+export const OPEN_UNAVAILABLE = naming("{chat} cannot show a file here, so `!open` does nothing.");
 export const WORD_IN_THREAD = "`!{word}` works in the channel, not inside a thread.";
 // `!stop` typed in a thread that holds no session: it would have stopped the whole channel.
 export const STOP_OUTSIDE_SESSION =
@@ -96,12 +121,13 @@ export const STOP_OUTSIDE_SESSION =
   "a session's thread to stop that one.";
 export const CLEAR_IN_THREAD =
   "One thread is one session: send a new message in the channel to start a new one.";
-export const UPGRADE_NOTICE =
-  "awaydesk now runs one Claude Code session per thread. Send a new message in the " +
-  "channel to start a session; reply in its thread to continue it. The session this channel " +
-  "had is still in the folder: !resume brings it into a thread. Bypass is now set per " +
-  "session: send !bypass on inside a thread.";
-export const ERROR_REPLY = "Claude Code reported an error: `{error}`";
+export const UPGRADE_NOTICE = naming(
+  "awaydesk now runs one {agent} session per thread. Send a new message in the " +
+    "channel to start a session; reply in its thread to continue it. The session this channel " +
+    "had is still in the folder: !resume brings it into a thread. Bypass is now set per " +
+    "session: send !bypass on inside a thread.",
+);
+export const ERROR_REPLY = naming("{agent} reported an error: `{error}`");
 export const ENDED = "_This reply ended before an answer: {reason}._";
 export const ENDED_SHUTDOWN = "awaydesk stopped";
 // Crash repair (issue #19): what a reply the daemon died in the middle of ends with.
@@ -112,14 +138,16 @@ export const NOT_SENT_ONE = "1 message was not sent because {because}: send it a
 export const NOT_SENT_MANY = "{count} messages were not sent because {because}: send them again.";
 // Prompts Claude Code took into a running turn of its own (a report of a background task): no
 // result of their own follows, so the reply of that turn says so at its end.
-export const TAKEN_INTO_REPLY_ONE =
-  "Claude Code took your message into this reply: send it again if it is not answered here.";
-export const TAKEN_INTO_REPLY_MANY =
-  "Claude Code took {count} messages into this reply: " +
-  "send them again if they are not answered here.";
+export const TAKEN_INTO_REPLY_ONE = naming(
+  "{agent} took your message into this reply: send it again if it is not answered here.",
+);
+export const TAKEN_INTO_REPLY_MANY = naming(
+  "{agent} took {count} messages into this reply: " +
+    "send them again if they are not answered here.",
+);
 export const BECAUSE_RESTARTED = "awaydesk restarted";
 export const BECAUSE_SHUTDOWN = "awaydesk stopped";
-export const BECAUSE_STOPPED = "Claude Code stopped";
+export const BECAUSE_STOPPED = naming("{agent} stopped");
 export const ENDED_RESTARTING = "awaydesk is restarting; send your message again in a moment";
 // Never shown: an idle close (D9) always finds nothing running, sent or queued to end with it.
 export const ENDED_IDLE = "awaydesk closed this idle session";
@@ -144,7 +172,7 @@ export const BACKGROUND_NOTICE = "_Background task update_";
 export const PROMPT_IMAGE = "an image";
 export const COMPACTED = "Compacted the conversation: {before} → {after} tokens.";
 export const COMPACTED_PLAIN = "Compacted the conversation.";
-export const NO_OUTPUT = "_Done. Claude Code returned no text._";
+export const NO_OUTPUT = naming("_Done. {agent} returned no text._");
 export const BIND_OK =
   "Bound this channel to `{directory}`. The next message starts a new session there.";
 // D5: an old thread's session keeps the folder it was created in; `{old}` names each of them
@@ -155,52 +183,23 @@ export const BIND_OK_ELSEWHERE =
 export const BIND_UNAVAILABLE =
   "Bound this channel to `{directory}`, but no session can start there yet. {reason}";
 // D5: shown, ephemeral, before every prompt in a thread whose folder differs from the channel's.
-export const OLD_THREAD_FOLDER =
-  "This session works in `{old}`, the folder it was created in: Claude Code resumes a session " +
-  "only there. New messages in the channel use `{new}`.";
+export const OLD_THREAD_FOLDER = naming(
+  "This session works in `{old}`, the folder it was created in: {agent} resumes a session " +
+    "only there. New messages in the channel use `{new}`.",
+);
 export const BIND_OUTSIDE =
   "`{path}` is not a folder under `{root}`. Give its path relative to that folder, for " +
   "example `!bind my-project`.";
-export const UPLOAD_FAILED =
-  "Nothing was sent to Claude: {name} {reason}. Send the message again without it.";
-// An audio clip waits for the transcript only the owner can ask Slack for (`voice.ts`).
-export const CLIP_WAITING =
-  "Waiting for this clip's transcript: choose `Generate transcript` on the clip, and its text " +
-  "is sent to Claude.";
-export const CLIP_NOT_SENT =
-  "Nothing was sent to Claude: this clip had no transcript after {minutes} minutes. Send it " +
-  "again, or type the message.";
-export const CLIP_NOT_YOURS =
-  "Nothing was sent to Claude: this audio is a file somebody else uploaded.";
-export const CLIP_EMPTY = "Nothing was sent to Claude: Slack's transcript of this clip is empty.";
-export const CLIP_UNREADABLE =
-  "Nothing was sent to Claude: the transcript of this clip could not be read ({reason}).";
-export const UPLOAD_IMAGE_TYPE =
-  "is an image of type `{mimetype}`, and Claude reads only JPEG, PNG, GIF and WebP images";
-export const UPLOAD_IMAGE_SIZE = "is {size}, over the {limit} Claude accepts for an image";
-export const UPLOAD_IMAGE_SIDE =
-  "is {width}x{height} px, over the 8000x8000 px Claude accepts for an image";
-export const UPLOAD_FILE_TYPE =
-  "is a `{mimetype}` file, and awaydesk passes on only text, source code, PDF, JSON, " +
-  "XML, YAML and notebook files";
-export const UPLOAD_FILE_SIZE = "is {size}, over the {limit} limit for a file";
-export const UPLOAD_TOO_MANY =
-  "Nothing was sent to Claude: the message has {count} images, over the {limit} one message " +
-  "takes.";
-export const UPLOAD_TOO_HEAVY =
-  "Nothing was sent to Claude: its images total {size}, over the {limit} one message takes.";
 export const SESSION_CLOSED =
   "Nothing was done: this session closed while it ran (idle for a while, or the daemon " +
   "restarted). Send it again if it is still meant.";
-export const UPLOAD_NOT_SHARED = "is not a file shared in this channel that awaydesk can download";
-export const UPLOAD_DOWNLOAD = "could not be downloaded ({error})";
-export const BIND_LIST = "Folders under `{root}` that Claude Code trusts:";
-export const BIND_EMPTY =
-  "No folder under `{root}` is trusted by Claude Code yet. Open one in the terminal with " +
-  "`claude` and accept the trust dialog, then send `!bind` again.";
-export const BIND_MORE = "Only the first {rows} are shown: `!bind <folder>` binds any other.";
-export const BIND_CURRENT = " · _current_";
-export const BIND_BUTTON = "Bind";
+export const BIND_LIST = naming("Folders under `{root}` that {agent} trusts:");
+// The title of the list for an agent that keeps no record of trust: every folder is offered.
+export const BIND_LIST_ANY = "Folders under `{root}`:";
+export const BIND_EMPTY = naming(
+  "No folder under `{root}` is trusted by {agent} yet. Open one in the terminal with " +
+    "`{cli}` and accept the trust dialog, then send `!bind` again.",
+);
 export const BIND_ALREADY = "This channel is already bound to `{directory}`.";
 export const BIND_BUSY =
   "Sessions are running in this channel: binding another folder now would cut their work. " +
@@ -208,6 +207,10 @@ export const BIND_BUSY =
 export const BYPASS_TOP_LEVEL =
   "Bypass belongs to one session: send `!bypass on` inside its thread.";
 // True with the setup on screen and without it (after a stop, a restart or a Cancel).
+// Shown only by an agent with no mode that skips permission requests.
+export const BYPASS_UNAVAILABLE = naming(
+  "{agent} has no mode that runs tools without asking, so there is no bypass to switch.",
+);
 export const BYPASS_BEFORE_START =
   "This session has not started yet: tick Bypass in its setup and press Start. " +
   "If no setup is shown, send a message here first.";
@@ -215,11 +218,12 @@ export const BYPASS_ON_THREAD =
   "Bypass is on in this session: every tool runs without asking, until `!bypass off`. " +
   "It survives a restart.";
 // Says nothing about what is asked: that is the mode the owner's own settings give.
-export const BYPASS_OFF_THREAD =
-  "Bypass is off in this session: Claude Code follows your permission settings again.";
+export const BYPASS_OFF_THREAD = naming(
+  "Bypass is off in this session: {agent} follows your permission settings again.",
+);
 export const STOPPED = "Stopped the current turn.";
 // An answered question, as the terminal keeps it in the transcript.
-export const ANSWERED = "User answered Claude's questions:";
+export const ANSWERED = naming("User answered {author}'s questions:");
 // Slack drops plain spaces at the start of a line; no-break spaces stay and make the indent.
 export const NESTED = `${"\u00a0".repeat(4)}⎿ `;
 export const STOPPED_CHANNEL = "Stopped what was running in this channel.";
@@ -236,26 +240,19 @@ export const STOPPED_THREAD = "Stopped.";
 export const NOTHING_TO_STOP_THREAD = "Nothing is running in this session.";
 // D8: two sessions in one folder at once.
 export const HOLD_QUESTION = "Another session is working in this folder: {link}. Send anyway?";
-// The words of the question itself, and close in length: Slack sizes a button by its text, so
-// `Continue` beside `Cancel` made the second look the lesser choice (issue #76).
-export const HOLD_CONTINUE_BUTTON = "Send anyway";
-export const HOLD_CANCEL_BUTTON = "Don't send";
-export const HOLD_UNPOSTED =
-  "awaydesk could not show this question in Slack, so the message was not sent. Send it again.";
+export const HOLD_UNPOSTED = naming(
+  "awaydesk could not show this question in {chat}, so the message was not sent. Send it again.",
+);
 export const HOLD_GONE =
   "This question is no longer open: it was already answered, or awaydesk restarted.";
 export const NOT_SENT = "Not sent.";
 // Session setup: asked once per top-level message, before the first prompt of a new session.
 export const SETUP_FALLBACK = "Set up this session";
-export const SETUP_HEADER = "*Choose how this session starts*";
-export const SETUP_EFFORT_OPTION = "Effort: {level}";
-export const SETUP_EFFORT_DEFAULT = "Default";
-export const SETUP_BYPASS_OPTION = "Bypass permissions";
-export const SETUP_BYPASS_DESCRIPTION = "Run every tool without asking, until `!bypass off`.";
-export const SETUP_START_BUTTON = "Start";
+// The line that replaces the setup's controls once the owner started the session.
 export const SETUP_SUMMARY = "Model: {model} · Effort: {effort} · Bypass: {bypass}";
+export const SETUP_EFFORT_DEFAULT = "Default";
 export const STATUS = "Directory: `{directory}`\nSession: `{session}`";
-export const STATUS_STATE = "Mode: `{mode}`\nClaude Code: `{version}`\nNow: {activity}";
+export const STATUS_STATE = naming("Mode: `{mode}`\n{agent}: `{version}`\nNow: {activity}");
 // The line between the two once the thread has a session id (issue #12). Claude Code leaves a
 // session created through the Agent SDK out of the terminal's picker; a fork made in the
 // terminal gets an id of its own and a row there (sessions reference, read 2026-10-04; the
@@ -263,7 +260,6 @@ export const STATUS_STATE = "Mode: `{mode}`\nClaude Code: `{version}`\nNow: {act
 // from any folder since 2.1.223 (same reference): the `cd` chooses where the fork works and
 // whose picker lists it. `directory` arrives quoted for the shell, and `command` as a code
 // span, or escaped as plain text when it holds a backtick.
-export const TERMINAL_COMMAND = "cd {directory} && claude --resume {session} --fork-session";
 export const STATUS_TERMINAL = "Terminal: {command}";
 export const ACTIVITY_IDLE = "idle";
 export const VERSION_PENDING = "started, version shown after the first turn";
@@ -304,7 +300,7 @@ export const HELP_OWN = "**awaydesk**";
 export const HELP_RULE =
   "A message that starts with `!` is a command, in code or bold too. To send it as text, put " +
   "anything before the `!`, as in `\\!goal`.";
-export const HELP_WORDS: readonly string[] = [
+export const HELP_WORDS: readonly Named[] = [
   "`!guide` how awaydesk works, in a few lines; in the channel or inside a thread",
   "`!help [text]` this list, or only the lines that contain the text; in the channel or " +
     "inside a thread",
@@ -312,52 +308,36 @@ export const HELP_WORDS: readonly string[] = [
     "directory, mode and the footer's values",
   "`!stop` in the channel: every running session, its background tasks and its pending " +
     "approvals; inside a thread: only that session",
-  "`!bind [folder]` the folders Claude Code trusts, or bind this channel to one, its path " +
+  "`!bind [folder]` the folders {agent} trusts, or bind this channel to one, its path " +
     "relative to the allowed root; in the channel, refused inside a thread",
   "`!bypass on|off` run every tool without asking, until `!bypass off`; it survives a " +
     "restart; inside a thread, refused in the channel",
   "`!resume [session]` this directory's sessions, or resume one by id or name in the " +
     "thread of your `!resume` message; in the channel, refused inside a thread",
-  "`!open [file]` share a file of the session's folder into the thread, where Slack opens it in " +
+  "`!open [file]` share a file of the session's folder into the thread, where {chat} opens it in " +
     "its file viewer: a picker alone, or a path or part of a name; inside a thread, refused in " +
     "the channel",
-];
+].map(naming);
 export const HELP_NO_MATCH = "No command matches `{query}`.";
-export const HELP_CLAUDE =
-  "\n**Claude Code** (this session, now). Any other `!name args` runs that command; " +
-  "these words above come first.";
-export const HELP_UNBOUND = "\nClaude Code's own commands are listed inside a session's thread.";
-export const APPROVAL_PROMPT = "Claude Code asks to use *{tool}*";
-export const DENY_MESSAGE = "The owner denied this from Slack.";
+export const HELP_AGENT = naming(
+  "\n**{agent}** (this session, now). Any other `!name args` runs that command; " +
+    "these words above come first.",
+);
+export const HELP_UNBOUND = naming(
+  "\n{agent}'s own commands are listed inside a session's thread.",
+);
+export const DENY_MESSAGE = naming("The owner denied this from {chat}.");
 export const SKIP_MESSAGE = "The owner dismissed the question without answering.";
-export const QUESTIONS_ONE = "Claude Code has a question";
-export const QUESTIONS_MANY = "Claude Code has {count} questions";
-export const QUESTION_ANSWER = "Answer";
-export const QUESTION_TITLE = "Claude Code asks";
-export const QUESTION_CLOSE = "Later";
-export const QUESTION_NOT_OPENED = "The form could not open (`{error}`). Click Answer again.";
-export const QUESTION_MISSING = "Choose an option or type your own answer.";
-export const QUESTION_WHERE = "{number} of {count}";
-export const QUESTION_NEXT = "Next ({number}/{count})";
-export const QUESTION_OTHER = "Other";
-export const QUESTION_OTHER_HINT = "Or type your own answer";
-export const APPROVAL_CUT =
-  "_{count} characters of this request are not shown: Deny it unless you know them._";
-export const APPROVAL_UNPOSTED =
-  "awaydesk could not show this request in Slack, so nobody approved it.";
+export const APPROVAL_UNPOSTED = naming(
+  "awaydesk could not show this request in {chat}, so nobody approved it.",
+);
 export const APPROVAL_GONE =
   "This request is no longer pending: the turn ended or awaydesk restarted.";
 export const RESUME_LIST = "Sessions in `{directory}`, newest first:";
-export const RESUME_EMPTY = "No sessions in `{directory}` yet.";
-// Every session of the folder is already open in a thread: the list has no row to offer.
-export const RESUME_NONE_LEFT = "No session to resume in `{directory}`.";
-// Under the list: the sessions a thread already holds (D6), counted and not listed (issue #69).
-export const RESUME_OPEN_ONE = "1 more is open in its own thread.";
-export const RESUME_OPEN_MANY = "{count} more are open in their own threads.";
-export const RESUME_BUTTON = "Resume";
-export const RESUME_MORE =
-  "Only the newest {rows} are shown: `!resume <id>`, or `!resume <title>` for a session that " +
-  "has one, resumes an older session.";
+// Shown only by an agent that keeps no list of its sessions.
+export const RESUME_UNLISTED = naming(
+  "{agent} keeps no list of its sessions, so `!resume` has nothing to pick from.",
+);
 // Two processes on one session share its file and not its conversation (measured 2026-10-03,
 // issue #41, SDK 0.2.163 beside a host CLI 2.1.288 process): each keeps the session as it loaded
 // it plus its own turns, and a later resume continues one of the two branches.
@@ -380,140 +360,85 @@ export const RESUME_LISTED = "Resumed {title} in {link}.";
 // D6: a session held by any thread of any channel is never resumed a second time; `{link}` is the
 // holding thread's permalink (a plain fallback when Slack would not give one).
 export const RESUME_ELSEWHERE = "This session is already open in another thread: {link}.";
-// The app's Home tab: the sessions the threads hold, by channel, newest activity first, under
-// four filters. `{time}` is Slack's own date token, shown in the reader's time zone.
-export const HOME_HEADER = "Sessions by channel, newest first · updated {time}";
-export const HOME_EMPTY =
-  "No channel is bound yet: `!bind` in a private channel binds it to a folder.";
-export const HOME_NO_SESSIONS = "No sessions yet.";
-export const HOME_NO_MATCH = "No session matches these filters.";
-export const HOME_MORE = "Only the first {rows} sessions are shown: narrow the filters.";
-export const HOME_OPEN = "Open";
-export const HOME_NEW_THREAD = "New thread";
-export const HOME_EDIT = "Edit";
-export const HOME_DONE = "Done";
-export const HOME_DELETE = "Delete";
-// Bold, behind the hourglass the other two notes carry: mrkdwn has no colour, and the plain
-// word was missed among the row's details.
-export const HOME_DELETING = ":hourglass_flowing_sand: *deleting…*";
-export const HOME_CHANNEL_DELETING_ONE = ":hourglass_flowing_sand: deleting 1 thread…";
-export const HOME_CHANNEL_DELETING_MANY = ":hourglass_flowing_sand: deleting {count} threads…";
-export const HOME_DELETING_ONE =
-  ":hourglass_flowing_sand: *Deleting 1 thread.* Slack limits how fast messages are deleted: " +
-  "a thread takes about a minute, and leaves this page when it is gone.";
-export const HOME_DELETING_MANY =
-  ":hourglass_flowing_sand: *Deleting {count} threads, one at a time.* Slack limits how fast " +
-  "messages are deleted: each takes about a minute, and leaves this page when it is gone.";
-export const HOME_DELETE_TITLE = "Delete this thread?";
-export const HOME_DELETE_NAMED = "“{title}” in #{channel}, {replies}. ";
-export const HOME_DELETE_NAMED_BARE = "“{title}” in #{channel}. ";
-export const HOME_DELETE_TEXT =
-  "Every message of the thread is deleted from Slack, yours and the bot's. This cannot be " +
-  "undone. The session stays in Claude Code and can be resumed with !resume. Deleting takes " +
-  "about a minute.";
-export const HOME_DELETE_CONFIRM = "Delete thread";
-export const HOME_DELETE_DENY = "Cancel";
-export const HOME_CLEAN = "Clean up";
-export const HOME_CLEAN_TITLE = "Clean up this channel?";
-export const HOME_CLEAN_TEXT =
-  "Deletes from #{channel} what sits outside a thread: your messages there that have no " +
-  "reply, commands like !stop included, and the bot's own messages. Every thread that has a " +
-  "reply stays. This cannot be undone and can take a few minutes.";
-export const HOME_CLEAN_CONFIRM = "Clean up";
-export const HOME_CHANNEL_CLEANING = ":hourglass_flowing_sand: cleaning up…";
-export const HOME_CLEANING_ONE =
-  ":hourglass_flowing_sand: *Cleaning up 1 channel.* Slack limits how fast messages are " +
-  "deleted: this can take a few minutes.";
-export const HOME_CLEANING_MANY =
-  ":hourglass_flowing_sand: *Cleaning up {count} channels, one at a time.* Slack limits how " +
-  "fast messages are deleted: this can take a few minutes.";
-export const HOME_CLEAN_FAILED =
-  "Could not clean up that channel (`{error}`). Clean it up again to continue.";
-export const HOME_DELETE_REFUSED =
-  "Slack refused to delete {count} of that thread's messages (`cant_delete_message`): they " +
-  "are not yours or the bot's, or your workspace does not let you delete them. Every other " +
-  "message is gone and the thread is still listed.";
-export const HOME_CLEAN_REFUSED =
-  "Slack refused to delete {count} of that channel's messages (`cant_delete_message`): your " +
-  "workspace does not let you delete them. Every other one is gone.";
-export const HOME_DELETE_BUSY = "Not deleted: that thread is working or waiting for you.";
-export const HOME_DELETE_FAILED =
-  "Could not delete every message of that thread (`{error}`). Delete it again to continue.";
-export const HOME_SHOW_ALL = "Show all {count}";
-export const HOME_UNTITLED = "Session {id}";
-export const HOME_REPLY = "1 reply";
-export const HOME_REPLIES = "{count} replies";
-export const HOME_LAST_REPLY = "last reply {when}";
-export const HOME_STARTED = "started {when}";
-export const HOME_WORKING = "working";
-export const HOME_WAITING = "waiting for you";
-export const HOME_ENDED = "ended";
-export const HOME_ERROR = "error";
-export const HOME_ALL_CHANNELS = "All channels";
-export const HOME_ALL_STATUSES = "All statuses";
-export const HOME_ANY_TIME = "Any time";
-export const HOME_LAST_48 = "Last 48 hours";
-export const HOME_TODAY = "Today";
-export const HOME_YESTERDAY = "Yesterday";
-export const HOME_LAST_7 = "Last 7 days";
-export const HOME_LAST_30 = "Last 30 days";
-export const HOME_SEARCH_LABEL = "Search titles";
-export const HOME_SEARCH_HINT = "Type a word and press Enter";
-// `!guide`: how to use the bot, in the owner's words. `test/core/commands.test.ts` fails when a
-// word of the daemon is missing here; keep the tone plain and every line true of the current
-// behaviour.
-export const GUIDE =
+// `!guide`: how to use the bot, in the owner's words, as parts that `src/core/guide.ts` chooses
+// among and joins: a part appears only when the agent and the chat serve what it describes.
+// `test/core/commands.test.ts` fails when a word of the daemon is missing from the whole; keep
+// the tone plain and every line true of the current behaviour.
+export const GUIDE_INTRO = naming(
   "**awaydesk**\n" +
-  "This channel runs Claude Code on your Mac, in one folder, and answers you alone. One Slack " +
-  "thread is one Claude Code session: a top-level message starts a new one, and a reply inside its " +
-  "thread continues it, even days later.\n" +
-  "\n" +
-  "**Get started**\n" +
-  "1. `!bind` lists the folders Claude Code trusts, with a Bind button each; `!bind <folder>` " +
-  "binds one by its path relative to your allowed root: `!bind my-project`. Claude Code must trust " +
-  "that folder first: open `claude` there once in the terminal and accept. `!bind` works only as a " +
-  "top-level message in the channel.\n" +
+    "This channel runs {agent} on your Mac, in one folder, and answers you alone. One {chat} " +
+    "thread is one {agent} session: a top-level message starts a new one, and a reply inside its " +
+    "thread continues it, even days later.",
+);
+export const GUIDE_START = "**Get started**";
+export const GUIDE_BIND_TRUSTED = naming(
+  "1. `!bind` lists the folders {agent} trusts, with a Bind button each; `!bind <folder>` " +
+    "binds one by its path relative to your allowed root: `!bind my-project`. {agent} must trust " +
+    "that folder first: open `{cli}` there once in the terminal and accept. `!bind` works only as a " +
+    "top-level message in the channel.",
+);
+export const GUIDE_BIND_ANY =
+  "1. `!bind` lists the folders under your allowed root, with a Bind button each; " +
+  "`!bind <folder>` binds one by its path relative to your allowed root: `!bind my-project`. " +
+  "`!bind` works only as a top-level message in the channel.";
+export const GUIDE_FIRST_MESSAGE = naming(
   "2. Write a message in the channel: it opens a session, and its reply appears in a thread of its " +
-  "own, growing as Claude works, with a line for each tool it uses. Reply inside that thread to " +
-  "continue the same session. Attach images or files to a message: Claude sees a JPEG, PNG, GIF or " +
-  "WebP image directly (other image types are refused) and reads a text, code, PDF, JSON, XML, YAML " +
-  "or notebook file from a copy saved on this Mac; other files are refused.\n" +
-  "3. Before that first message is sent, the thread asks for the **Model**, the **Effort** " +
-  "(`Default` leaves Claude Code's own choice) and **Bypass permissions**; **Start** sends your " +
-  "message with those choices, and `!stop` cancels it instead.\n" +
-  "\n" +
+    "own, growing as {author} works, with a line for each tool it uses. Reply inside that thread to " +
+    "continue the same session. Attach images or files to a message: {author} sees a JPEG, PNG, GIF or " +
+    "WebP image directly (other image types are refused) and reads a text, code, PDF, JSON, XML, YAML " +
+    "or notebook file from a copy saved on this Mac; other files are refused.",
+);
+// Step 3 holds what the setup asks for; `{choices}` is the items on offer, joined as a list.
+export const GUIDE_SETUP =
+  "3. Before that first message is sent, the thread asks for {choices}; **Start** sends your " +
+  "message with those choices, and `!stop` cancels it instead.";
+export const GUIDE_SETUP_MODEL = "the **Model**";
+export const GUIDE_SETUP_EFFORT = naming("the **Effort** (`Default` leaves {agent}'s own choice)");
+export const GUIDE_SETUP_BYPASS = "**Bypass permissions**";
+export const GUIDE_COMMANDS = naming(
   "**Commands**\n" +
-  "Claude Code's commands start with `!` instead of `/`: `!compact`, `!model opus`. They run inside " +
-  "a session's thread, where `!help` lists every command that session offers, and `!help <text>` " +
-  "filters the list; typed in the channel, `!help` lists awaydesk's own words instead. " +
-  "`!clear` (`!reset`, `!new`) is refused inside a thread (one thread is one session): start a " +
-  "fresh session with a new top-level message instead.\n" +
-  "\n" +
-  "**Approvals and questions**\n" +
-  "When Claude Code asks permission, the request shows what will run, with **Approve** and " +
-  "**Deny**; a very long one shows its start and its end and says how much it leaves out. A " +
-  "question from Claude comes with **Answer**, which opens a short form, and **Skip**.\n" +
-  "\n" +
+    "{agent}'s commands start with `!` instead of `/`: {examples}. They run inside " +
+    "a session's thread, where `!help` lists every command that session offers, and `!help <text>` " +
+    "filters the list; typed in the channel, `!help` lists awaydesk's own words instead. " +
+    "`!clear` (`!reset`, `!new`) is refused inside a thread (one thread is one session): start a " +
+    "fresh session with a new top-level message instead.",
+);
+export const GUIDE_APPROVALS = "**Approvals**";
+export const GUIDE_APPROVALS_AND_QUESTIONS = "**Approvals and questions**";
+export const GUIDE_PERMISSION = naming(
+  "When {agent} asks permission, the request shows what will run, with **Approve** and " +
+    "**Deny**; a very long one shows its start and its end and says how much it leaves out.",
+);
+export const GUIDE_QUESTION = naming(
+  "A question from {author} comes with **Answer**, which opens a short form, and **Skip**.",
+);
+// The Sessions section, sentence by sentence: `guide.ts` leaves out the tasks and the resume ones.
+export const GUIDE_SESSIONS_STATUS =
   "**Sessions**\n" +
   "`!status` typed in the channel lists the folder and every session still live, each linked to " +
   "its thread; inside a thread it shows that session's directory, mode and the footer's values. " +
-  "`!stop` typed in the channel stops every running session and its background tasks; inside a " +
-  "thread it stops only that one. `!resume`, typed in the channel only, lists this folder's twenty " +
+  "`!stop` typed in the channel stops every running session";
+export const GUIDE_SESSIONS_TASKS = " and its background tasks";
+export const GUIDE_SESSIONS_STOP = "; inside a thread it stops only that one.";
+export const GUIDE_SESSIONS_RESUME =
+  "`!resume`, typed in the channel only, lists this folder's twenty " +
   "newest sessions, from the terminal too, each with the start of its id and a **Resume** button; " +
   "`!resume <id>` (that start is enough), or `!resume <title>` for a session that has one, resumes " +
-  "it in the thread of your `!resume` message. To continue a session in the terminal, run the " +
-  "`Terminal:` command `!status` shows in its thread.\n" +
-  "\n" +
+  "it in the thread of your `!resume` message.";
+export const GUIDE_SESSIONS_TERMINAL =
+  "To continue a session in the terminal, run the `Terminal:` command `!status` shows in its thread.";
+export const GUIDE_FILES = naming(
   "**Files**\n" +
-  "`!open`, sent inside a session's thread, offers the files changed in that session and a search " +
-  "over the folder's files; choosing one shares it into the thread, where Slack opens it in its " +
-  "file viewer, with Markdown rendered. `!open <path>` opens that file, and `!open <words>` the file " +
-  "whose path contains them, or lists the files that do. The search reads the folder from disk and " +
-  "leaves out what `.gitignore` excludes inside a git repository. A file over 1 MB is not opened.\n" +
-  "\n" +
+    "`!open`, sent inside a session's thread, offers the files changed in that session and a search " +
+    "over the folder's files; choosing one shares it into the thread, where {chat} opens it in its " +
+    "file viewer, with Markdown rendered. `!open <path>` opens that file, and `!open <words>` the file " +
+    "whose path contains them, or lists the files that do. The search reads the folder from disk and " +
+    "leaves out what `.gitignore` excludes inside a git repository. A file over 1 MB is not opened.",
+);
+export const GUIDE_BYPASS = naming(
   "**Bypass**\n" +
-  "`!bypass on`, sent inside a session's thread, lets Claude Code run every tool without asking in " +
-  "that session, until `!bypass off`; a restart of awaydesk keeps it. The footer shows ⚡ " +
-  "bypass while it is on.\n" +
-  "\n" +
-  "`!guide` shows this text again.";
+    "`!bypass on`, sent inside a session's thread, lets {agent} run every tool without asking in " +
+    "that session, until `!bypass off`; a restart of awaydesk keeps it. The footer shows ⚡ " +
+    "bypass while it is on.",
+);
+export const GUIDE_END = "`!guide` shows this text again.";

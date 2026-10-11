@@ -4,35 +4,36 @@
  *
  * The work handed to `replyOnFailure` is a function, called inside its guard.
  */
-import type { KnownBlock, WebClient } from "@slack/web-api";
+
+import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
-import type { Config } from "../../../core/config.ts";
-import type { Holds } from "../../../core/hold.ts";
-import { oneLine } from "../../../core/reply/words.ts";
-import type { Approvals } from "../../../core/requests.ts";
-import { DirectoryUnavailable, SessionClosed, SessionGone } from "../../../core/sessions/errors.ts";
-import type { SessionManager } from "../../../core/sessions/manager.ts";
-import type { ThreadSession } from "../../../core/sessions/session.ts";
-import { Cancelled } from "../../../core/sessions/tasks.ts";
-import type { StateStore } from "../../../core/state.ts";
-import * as texts from "../../../core/texts.ts";
-import { fill } from "../../../core/texts.ts";
+import {
+  type ApprovalsPort,
+  Cancelled,
+  DirectoryUnavailable,
+  fill,
+  type HoldsPort,
+  type Names,
+  named,
+  SessionClosed,
+  SessionGone,
+  type SessionsPort,
+  type StatePort,
+  texts,
+} from "../../../core/port.ts";
 import { getLogger } from "../../../log.ts";
+import type { ChatInbound } from "../../seam.ts";
 import type { Home } from "../home.ts";
+import { deliver } from "../notice.ts";
 import type { Listings } from "../openfile/listing.ts";
-import { contextBlock, FALLBACK_LIMIT, noticeText, split } from "../reply/blocks.ts";
-import { take } from "../reply/chars.ts";
-import { deleteRequest, describe } from "../reply/errors.ts";
-import { markdownEscape, mrkdwnEscape } from "../reply/escape.ts";
+import { contextBlock, noticeText } from "../reply/blocks.ts";
+import { describe } from "../reply/errors.ts";
 import type { Limiter } from "../reply/limiter.ts";
-import { TITLE_LIMIT } from "../resume.ts";
+import * as slackTexts from "../texts.ts";
+import type { SlackChat, SlackThread } from "../thread.ts";
 import { type ChannelGuard, type Identity, isOwner } from "./guards.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.app");
-
-// Rows of threads a stop waits for in one notice: a row is under 300 characters (a permalink,
-// a title of TITLE_LIMIT), so the list stays inside a context element's 3,000.
-export const RESTART_WAIT_ROWS = 8;
 
 /** How a failure reaches the owner: the text of one line, delivered where the failed act answers. */
 export type Report = (text: string) => Promise<void>;
@@ -47,17 +48,31 @@ export type Fetch = (request: {
   readonly limit: number;
 }) => Promise<Uint8Array>;
 
+/** What the handlers read of the daemon's configuration. */
+export interface AppConfig {
+  /** Downloads a message's files with it. */
+  readonly botToken: string;
+  /** The folder sessions may start under. */
+  readonly allowedRoot: string;
+}
+
 /** What the handlers are built over: every client, store and clock comes from outside. */
 export interface AppParts {
   /** The shared client every handler calls Slack with. */
   readonly slack: WebClient;
-  readonly config: Config;
+  /** The provider the handlers answer through. */
+  readonly chat: SlackChat;
+  readonly config: AppConfig;
   readonly identity: Identity;
-  readonly sessions: SessionManager;
-  readonly approvals: Approvals;
-  readonly holds: Holds;
+  readonly sessions: SessionsPort;
+  readonly approvals: ApprovalsPort;
+  readonly holds: HoldsPort;
   readonly guard: ChannelGuard;
-  readonly state: StateStore;
+  readonly state: StatePort;
+  /** The agent's and the chat's names, which the texts that name them take. */
+  readonly names: Names;
+  /** What the listeners tell the core of what the owner did. */
+  readonly inbound: ChatInbound;
   /** The folder a message's files that are no image are saved in. */
   readonly uploads: string;
   readonly home: Home;
@@ -67,7 +82,7 @@ export interface AppParts {
   /** Every wait of a handler: the clip's expiry, the rows of a modal that is opening. */
   readonly clock: Clock;
   /**
-   * Aborts when the daemon stops (`BuiltApp.close`). A listener still in flight then does
+   * Aborts when the daemon stops (`SlackChat.stopped`). A listener still in flight then does
    * nothing at its next step: the sessions are closed and the lock is released.
    */
   readonly stopped: AbortSignal;
@@ -111,27 +126,7 @@ export class Answers {
   ): Promise<void> {
     const { slack, identity, sessions } = this.parts;
     if (this.stopped) return;
-    const where = threadTs === null ? {} : { thread_ts: threadTs };
-    // Built to Block Kit's reference by the modules that make them: opaque to the library's types.
-    const shown = blocks as unknown as KnownBlock[];
-    if (options.ephemeral) {
-      await slack.chat.postEphemeral({
-        channel,
-        user: identity.ownerUserId,
-        text: take(text, FALLBACK_LIMIT),
-        blocks: shown,
-        ...where,
-      });
-    } else {
-      await slack.chat.postMessage({
-        channel,
-        text: take(text, FALLBACK_LIMIT),
-        blocks: shown,
-        unfurl_links: false,
-        unfurl_media: false,
-        ...where,
-      });
-    }
+    await deliver(slack, identity.ownerUserId, { channel, threadTs }, text, blocks, options);
     if (threadTs !== null) {
       // Slack clears a thread's status line when the app replies: the session's is set
       // again, so `Working…` does not go for a minute after the answer to a word.
@@ -155,23 +150,6 @@ export class Answers {
   }
 
   /**
-   * A reference the owner reads (`!help`, `!guide`, `!status`), at full size: a long one
-   * continues in a new message past a markdown block's limit.
-   */
-  async say(
-    channel: string,
-    threadTs: string | null,
-    text: string,
-    options: { readonly ephemeral?: boolean } = {},
-  ): Promise<void> {
-    for (const chunk of split(text)) {
-      await this.deliver(channel, threadTs, chunk, [{ type: "markdown", text: chunk }], {
-        ephemeral: options.ephemeral ?? false,
-      });
-    }
-  }
-
-  /**
    * A line for the owner alone, under their message in `threadTs`'s thread: a refusal that
    * answers what they just did. With `stays` it is a post in the thread instead, which a reload
    * keeps and which can notify. Never throws: nobody is left to tell about a failure.
@@ -182,12 +160,7 @@ export class Answers {
     text: string,
     options: { readonly stays?: boolean } = {},
   ): Promise<void> {
-    try {
-      await this.notice(channel, threadTs, text, { ephemeral: !options.stays });
-    } catch (error) {
-      if (isCancelled(error)) throw error;
-      logger.warning(`could not reach the owner in ${channel}: ${describe(error)}`);
-    }
+    await this.thread(channel, threadTs).tell(text, options);
   }
 
   /**
@@ -195,7 +168,16 @@ export class Answers {
    * click on a list posted there, is answered.
    */
   async inChannel(channel: string, text: string): Promise<void> {
-    await this.notice(channel, null, text);
+    await this.parts.chat.channel(channel).notice(text);
+  }
+
+  /**
+   * The thread as a handler answers in it: what it posts clears the live session's status line,
+   * which is set again.
+   */
+  private thread(channel: string, threadTs: string): SlackThread {
+    const ref = { channel, thread: threadTs };
+    return this.parts.chat.answering(ref, () => this.parts.sessions.wrote(channel, threadTs));
   }
 
   /**
@@ -232,7 +214,7 @@ export class Answers {
         return;
       }
       logger.error(`a request failed in ${channel}/${threadTs}: ${describe(error)}`);
-      await guarded(fill(texts.ERROR_REPLY, { error: describe(error) }));
+      await guarded(fill(named(texts.ERROR_REPLY, this.parts.names), { error: describe(error) }));
     }
   }
 
@@ -259,135 +241,9 @@ export class Answers {
     if (reason !== null) {
       // For the owner alone, even from a top-level message: a channel the guard refuses may
       // hold people who must not read the bot's words.
-      await this.tellOwner(channel, threadTs, fill(texts.CHANNEL_REFUSED, { reason }));
+      await this.tellOwner(channel, threadTs, fill(slackTexts.CHANNEL_REFUSED, { reason }));
       return false;
     }
     return true;
-  }
-
-  /**
-   * ✅ on the owner's own message: the mark that a word took effect, which stays after a reload.
-   * A reaction never rings a phone; a failed one is logged, never thrown (the word already took
-   * effect).
-   */
-  async acknowledge(channel: string, ts: string): Promise<void> {
-    if (this.stopped) return;
-    try {
-      await this.parts.slack.reactions.add({ channel, name: "white_check_mark", timestamp: ts });
-    } catch (error) {
-      if (isCancelled(error)) throw error;
-      logger.warning(`could not react to a word in ${channel}: ${describe(error)}`);
-    }
-  }
-
-  /** The tool's line in the reply records the call: the request message has done its job. */
-  async removeRequest(channel: string, threadTs: string, ts: string | null): Promise<void> {
-    if (ts === null || this.stopped) return;
-    await deleteRequest(this.parts.slack, { channel, ts }, { now: this.parts.now });
-    try {
-      // Crash repair (issue #19): spoken for either way, as the session's own delete does. A
-      // no-op for a ts this thread never recorded (a folder or resume picker click).
-      // Best-effort: a failed write here is logged and swallowed.
-      this.parts.state.removeRequest(channel, threadTs, ts);
-    } catch (error) {
-      logger.warning(
-        `could not clear a deleted request from state.json in ${channel}: ${describe(error)}`,
-      );
-    }
-  }
-
-  private async permalink(channel: string, threadTs: string): Promise<string | null> {
-    try {
-      const answer = await this.parts.slack.chat.getPermalink({ channel, message_ts: threadTs });
-      if (typeof answer.permalink !== "string") throw new TypeError("no permalink");
-      return answer.permalink;
-    } catch (error) {
-      if (isCancelled(error)) throw error;
-      logger.warning(`could not get a permalink for ${channel}/${threadTs}: ${describe(error)}`);
-      return null;
-    }
-  }
-
-  /**
-   * `say` posts a markdown block: standard Markdown links (docs.slack.dev, markdown block), not
-   * mrkdwn's `<url|label>`. The title is shown as written, so its own brackets cannot end the
-   * label.
-   */
-  async threadLink(channel: string, threadTs: string, title = ""): Promise<string> {
-    const permalink = await this.permalink(channel, threadTs);
-    if (permalink === null) {
-      return fill(texts.STATUS_CHANNEL_LINK_FALLBACK, { thread_ts: threadTs });
-    }
-    return `[${markdownEscape(title) || texts.STATUS_CHANNEL_SESSION}](${permalink})`;
-  }
-
-  /** A resume row and a notice are mrkdwn (`contextBlock`), which takes `<url|label>`. */
-  async threadMrkdwnLink(channel: string, threadTs: string, label: string): Promise<string> {
-    const permalink = await this.permalink(channel, threadTs);
-    if (permalink === null) {
-      return fill(texts.STATUS_CHANNEL_LINK_FALLBACK, { thread_ts: threadTs });
-    }
-    return `<${permalink}|${label}>`;
-  }
-
-  /**
-   * The threads a stop still waits for, one mrkdwn row each: its channel, a link to it labelled
-   * with its session's title, as the Home tab names it, and what holds the restart there. Then
-   * the word that ends the wait, when it ends any of them. Empty when nothing holds it. With
-   * `only`, the threads of that channel are named and the others counted: the answer is a post
-   * the channel's members read. At most RESTART_WAIT_ROWS rows, so the whole fits a notice and is
-   * never cut inside a link. Never throws: a title or a link that cannot be read falls back to a
-   * plain label.
-   */
-  async restartWaits(only: string | null = null): Promise<string> {
-    const { sessions, state } = this.parts;
-    const every = sessions.restartHolds();
-    const named = every.filter(([session]) => only === null || session.channelId === only);
-    if (every.length === 0) return "";
-    const shown = named.slice(0, RESTART_WAIT_ROWS);
-    const known = new Map<string, string>();
-    for (const directory of new Set(shown.map(([session]) => session.directory))) {
-      try {
-        for (const listed of await sessions.sessionsIn(directory)) {
-          known.set(listed.id, listed.title);
-        }
-      } catch (error) {
-        if (isCancelled(error)) throw error;
-        logger.warning(`could not list a folder's sessions: ${describe(error)}`);
-      }
-    }
-
-    const row = async (session: ThreadSession, hold: string): Promise<string> => {
-      const stored = state.thread(session.channelId, session.threadTs);
-      const title = stored === null ? "" : (known.get(String(stored.sessionId)) ?? "");
-      const label = mrkdwnEscape(oneLine(title, TITLE_LIMIT)) || texts.RESTART_WAIT_SESSION;
-      const link = await this.threadMrkdwnLink(session.channelId, session.threadTs, label);
-      return fill(texts.RESTART_WAIT_ROW, { channel: session.channelId, link, hold });
-    };
-
-    const lines = await Promise.all(shown.map(([session, hold]) => row(session, hold)));
-    if (named.length > shown.length) {
-      lines.push(fill(texts.RESTART_WAITS_MORE, { count: named.length - shown.length }));
-    }
-    if (every.length > named.length) {
-      lines.push(fill(texts.RESTART_WAITS_ELSEWHERE, { count: every.length - named.length }));
-    }
-    if (every.some(([, hold]) => hold !== texts.RESTART_HOLD_REPORT)) {
-      // A thread that only waits for a task's report ends by itself: `!stop` stops nothing
-      // there, so the line is left out when no other thread holds the stop.
-      lines.push(texts.RESTART_WAIT_STOP);
-    }
-    return lines.join("\n");
-  }
-
-  /**
-   * Tell the owner their message was not taken because the daemon is stopping, and which
-   * threads the stop waits for (issue #119): only they can answer or `!stop` those.
-   */
-  async refuseRestarting(channel: string, threadTs: string): Promise<void> {
-    const waits = await this.restartWaits();
-    let text: string = texts.RESTARTING;
-    if (waits) text = [text, texts.RESTART_WAITS_FOR, waits].join("\n");
-    await this.tellOwner(channel, threadTs, text);
   }
 }

@@ -19,13 +19,17 @@ export type HoldAnswer = true | Choice;
 /** One question waiting for the owner. */
 export interface Pending {
   readonly channelId: string;
-  readonly threadTs: string;
+  readonly threadId: string;
   /** What the owner chose, or null when the question was cancelled (Cancel, `!stop`, a drain). */
   readonly answer: Promise<HoldAnswer | null>;
   /** Whether `answer` is settled. */
   decided: boolean;
   messageTs: string | null;
-  /** What the asker needs back with a click that carries only the id (the setup's model list). */
+  /**
+   * What the asker needs back with a click that carries only the id (the setup's model list,
+   * empty for an agent that lists none). Null exactly for the same-folder hold: it is how an
+   * answer is checked to be of the request's kind.
+   */
   readonly context: readonly ModelInfo[] | null;
   /**
    * Set by `Holds.cancel` while an answer is being applied (the setup's Start settling): the
@@ -48,7 +52,7 @@ export class Holds {
 
   open(
     channelId: string,
-    threadTs: string,
+    threadId: string,
     context: readonly ModelInfo[] | null = null,
   ): [holdId: string, pending: Pending] {
     const holdId = randomBytes(16).toString("base64url");
@@ -58,7 +62,7 @@ export class Holds {
     });
     const pending: Pending = {
       channelId,
-      threadTs,
+      threadId,
       answer,
       decided: false,
       messageTs: null,
@@ -81,14 +85,14 @@ export class Holds {
   resolve(
     holdId: string,
     channelId: string,
-    threadTs: string,
+    threadId: string,
     value: HoldAnswer | null,
   ): Pending | null {
     const entry = this.entries.get(holdId);
     if (
       entry === undefined ||
       entry.pending.channelId !== channelId ||
-      entry.pending.threadTs !== threadTs ||
+      entry.pending.threadId !== threadId ||
       entry.pending.decided
     ) {
       return null;
@@ -115,10 +119,10 @@ export class Holds {
    * (`!stop`, a top-level `!stop` of its channel, a drain). One already answered but still being
    * applied is flagged `cancelled` instead: its asker sends nothing.
    */
-  cancel(channelId: string, threadTs: string): Pending | null {
+  cancel(channelId: string, threadId: string): Pending | null {
     for (const [holdId, entry] of [...this.entries]) {
       const { pending } = entry;
-      if (pending.channelId !== channelId || pending.threadTs !== threadTs) continue;
+      if (pending.channelId !== channelId || pending.threadId !== threadId) continue;
       if (!pending.decided) {
         pending.decided = true;
         entry.settle(null);
@@ -137,11 +141,11 @@ export class Holds {
    * The id of the open hold shown by this message, for a control that carries no id of its own
    * (a select): null when it is decided, gone, or shown elsewhere.
    */
-  atMessage(channelId: string, threadTs: string, messageTs: string): string | null {
+  atMessage(channelId: string, threadId: string, messageTs: string): string | null {
     for (const [holdId, { pending }] of this.entries) {
       if (
         pending.channelId === channelId &&
-        pending.threadTs === threadTs &&
+        pending.threadId === threadId &&
         pending.messageTs === messageTs &&
         !pending.decided
       ) {

@@ -269,14 +269,11 @@ async function main(): Promise<void> {
       );
     });
 
-    // 3. A tool call, a permission request, an allow with a changed input. Claude Code runs a
+    // 3. A tool call, a permission request, an allow. Claude Code runs a
     // read-only command (`echo`) without asking, so the tool is `Write`.
-    await section("allow with a changed input", async () => {
+    await section("allow", async () => {
       owner.permissions.length = 0;
-      owner.onPermission = (request) =>
-        request.toolName === "Write"
-          ? { allow: true, changedInput: { ...request.input, content: "CHANGED-by-owner-31" } }
-          : { allow: true };
+      owner.onPermission = () => ({ allow: true });
       const run = await turn(
         session,
         recorder,
@@ -302,9 +299,9 @@ async function main(): Promise<void> {
       );
       const written = await readFile(join(directory, "note.txt"), "utf8").catch(() => "");
       report(
-        written.includes("CHANGED-by-owner-31") && !written.includes("ORIGINAL-by-model-31"),
-        "an allow with a changed input changes what the tool did",
-        `the file holds the owner's text: ${written.includes("CHANGED-by-owner-31")}, the model's: ${written.includes("ORIGINAL-by-model-31")}`,
+        written.includes("ORIGINAL-by-model-31"),
+        "an allow runs the tool with the input it asked for",
+        `the file holds the model's text: ${written.includes("ORIGINAL-by-model-31")}`,
       );
     });
 

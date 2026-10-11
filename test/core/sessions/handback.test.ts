@@ -18,6 +18,7 @@
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
 import * as texts from "../../../src/core/texts.ts";
+import { NAMES } from "../../support/names.ts";
 import {
   type Harness,
   harnessFor,
@@ -76,7 +77,11 @@ async function settle(h: Harness): Promise<void> {
 
 function noExtraMessage(h: Harness): void {
   const all = h.replies().join("\n");
-  assert.equal(all.includes(texts.NO_OUTPUT), false, "the turn that did nothing wrote a reply");
+  assert.equal(
+    all.includes(texts.named(texts.NO_OUTPUT, NAMES)),
+    false,
+    "the turn that did nothing wrote a reply",
+  );
   assert.equal(all.includes(texts.BACKGROUND_NOTICE), false, "a report opened under the notice");
   assert.equal(h.bodies().length, 1, "everything belongs to the reply that started the tasks");
 }
@@ -171,6 +176,6 @@ test("a turn that does nothing ends the wait for a task's report", async (t) => 
   h.clients[0]?.inject(nothing);
   await h.until(() => !inside(h.session()).injectedExpected);
   await settle(h);
-  assert.equal(h.replies().join("\n").includes(texts.NO_OUTPUT), false);
+  assert.equal(h.replies().join("\n").includes(texts.named(texts.NO_OUTPUT, NAMES)), false);
   assert.equal(h.bodies().length, 1);
 });

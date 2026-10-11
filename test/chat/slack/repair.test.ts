@@ -3,17 +3,23 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
-import { logger, repairCrash } from "../../../src/chat/slack/repair.ts";
-import { UpdateLimiter } from "../../../src/chat/slack/reply/limiter.ts";
+import { logger } from "../../../src/chat/slack/repair.ts";
+import { type Limiter, UpdateLimiter } from "../../../src/chat/slack/reply/limiter.ts";
 import { resetStatusFlags, Status } from "../../../src/chat/slack/reply/status.ts";
+import { SlackChat } from "../../../src/chat/slack/thread.ts";
+import { repair } from "../../../src/core/flows/repair.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import * as texts from "../../../src/core/texts.ts";
 import {
+  AGENT,
   type Args,
+  BOT,
   CHANNEL,
   FakeSlack,
   OTHER_THREAD,
+  OWNER,
   rejected,
+  TEAM,
   THREAD,
 } from "../../support/fake-slack.ts";
 import { type JsonObject, slackPayload } from "../../support/fixtures.ts";
@@ -24,6 +30,18 @@ const STOPPED_BLOCK = {
 };
 
 const made: string[] = [];
+
+/** The core's repair, over the Slack provider on `slack`: what the daemon runs at start. */
+function repairCrash(slack: FakeSlack, state: StateStore, limiter: Limiter): Promise<void> {
+  const chat = new SlackChat({
+    slack,
+    replies: slack,
+    identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
+    agent: () => AGENT,
+    limiter,
+  });
+  return repair(chat, state);
+}
 
 after(() => {
   for (const directory of made) rmSync(directory, { recursive: true, force: true });

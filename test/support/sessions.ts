@@ -20,6 +20,7 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { TestContext } from "node:test";
+import { NAME, WORDS } from "../../src/agent/claude/backend.ts";
 import { CAPABILITIES } from "../../src/agent/claude/capabilities.ts";
 import { postToolUseHookEvents, stopHookEvents } from "../../src/agent/claude/hooks.ts";
 import { agentInfo, contextUsage } from "../../src/agent/claude/info.ts";
@@ -44,6 +45,7 @@ import type {
   SessionEvent,
   StartOptions,
 } from "../../src/agent/seam.ts";
+import type { ChatCapabilities } from "../../src/chat/seam.ts";
 import { UpdateLimiter } from "../../src/chat/slack/reply/limiter.ts";
 import { resetStatusFlags } from "../../src/chat/slack/reply/status.ts";
 import { SlackChat } from "../../src/chat/slack/thread.ts";
@@ -55,6 +57,7 @@ import type { SessionDeps } from "../../src/core/sessions/deps.ts";
 import { SessionManager } from "../../src/core/sessions/manager.ts";
 import type { ThreadSession } from "../../src/core/sessions/session.ts";
 import { StateStore } from "../../src/core/state.ts";
+import { named } from "../../src/core/texts.ts";
 import { setWriter } from "../../src/log.ts";
 import {
   type AsyncEvent,
@@ -67,6 +70,7 @@ import {
   THREAD,
 } from "./fake-slack.ts";
 import { type JsonObject, sdkJson, sdkRecords } from "./fixtures.ts";
+import { NAMES } from "./names.ts";
 
 /** A point in a scripted turn where the CLI would ask the host for a permission decision. */
 export interface CanUseToolCall {
@@ -303,7 +307,7 @@ export class FakeAgentSession implements AgentSession {
       if (batch === CLOSED) return;
       for (const item of batch) {
         if ("end" in item) {
-          yield { type: "process_lost", reason: PROCESS_EXITED };
+          yield { type: "process_lost", reason: named(PROCESS_EXITED, NAMES) };
           return;
         }
         if ("ask" in item) {
@@ -384,11 +388,15 @@ export async function anyRepository(directory: string): Promise<Repository | nul
 
 /** The back end of a harness: each `start` plays the next script. */
 export class FakeAgentBackend implements AgentBackend {
+  readonly name = NAME;
+  readonly words = WORDS;
   capabilities: Capabilities = CAPABILITIES_FOR_TESTS;
   /** Every session started, in order; one whose start failed is there too. */
   readonly sessions: FakeAgentSession[] = [];
   /** What `listSessions` answers for a folder. */
   listed: ListedSession[] = [];
+  /** The members of the listing, the trust and the usage limits called, in order. */
+  readonly called: string[] = [];
   trusted: (folder: string) => Promise<boolean> = async () => true;
   repository: (folder: string, sessionFolder: string) => Promise<Repository | null> = (folder) =>
     anyRepository(folder);
@@ -409,6 +417,7 @@ export class FakeAgentBackend implements AgentBackend {
   }
 
   async listSessions(_folder: string): Promise<readonly ListedSession[]> {
+    this.called.push("listSessions");
     return this.listed;
   }
 
@@ -416,20 +425,26 @@ export class FakeAgentBackend implements AgentBackend {
     _folder: string,
     sessions: readonly ListedSession[],
   ): Promise<ListedSession[]> {
+    this.called.push("datedSessions");
     return [...sessions].sort((a, b) => b.lastModified - a.lastModified);
   }
 
   async aliveSessions(_folder: string): Promise<ReadonlySet<string> | null> {
+    this.called.push("aliveSessions");
     return new Set(this.listed.map((session) => session.id));
   }
 
   folderTrusted(folder: string): Promise<boolean> {
+    this.called.push("folderTrusted");
     return this.trusted(folder);
   }
 
   trustedRepository(folder: string, sessionFolder: string): Promise<Repository | null> {
+    this.called.push("trustedRepository");
     return this.repository(folder, sessionFolder);
   }
+
+  async close(): Promise<void> {}
 }
 
 // The Claude back end's capabilities, with the effort levels the seam asks a back end to name
@@ -471,15 +486,23 @@ const CALM_TURNS = 5;
 const REAL_WORK_LIMIT_MS = 10_000;
 
 /**
+ * What a running daemon keeps open for as long as it runs, and so is no work in flight: outside
+ * macOS its single-instance lock is a listening socket or pipe (`src/core/lock.ts`).
+ */
+export const HELD_BY_A_RUNNING_DAEMON = process.platform === "darwin" ? 0 : 1;
+
+/**
  * Wait until no real work started by the daemon is in flight (a file call, a `git` process): it
  * answers on the operating system's time, so under load it outlasts any fixed number of turns.
- * Returns at once when nothing is in flight.
+ * Returns at once when nothing is in flight. `held` counts what stays open on purpose while the
+ * caller's daemon runs (`HELD_BY_A_RUNNING_DAEMON`), which would otherwise be waited for until
+ * the limit, every time.
  */
-export async function realWorkDone(): Promise<void> {
+export async function realWorkDone(held = 0): Promise<void> {
   const deadline = Date.now() + REAL_WORK_LIMIT_MS;
   let calm = 0;
   while (calm < CALM_TURNS && Date.now() < deadline) {
-    if (realWorkInFlight() > AT_REST) {
+    if (realWorkInFlight() > AT_REST + held) {
       calm = 0;
       await new Promise<void>((resolve) => setTimeout(resolve, 1));
     } else {
@@ -487,6 +510,16 @@ export async function realWorkDone(): Promise<void> {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
   }
+}
+
+/**
+ * One turn of the event loop, then whatever real work it set going: what a test waits between
+ * two looks at the daemon. A count of bare turns is not a wait: a file call outlasts any number
+ * of them on a loaded machine.
+ */
+export async function settledTurn(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await realWorkDone();
 }
 
 /**
@@ -509,6 +542,42 @@ export interface HarnessOptions {
   readonly taskRepliesKept?: number;
   /** The client replies are written with, when it is not the one everything else goes through. */
   readonly replies?: FakeSlack;
+  /**
+   * What the sessions' chat declares instead of the provider's own. The sessions then write
+   * through a facade that records every call (`Harness.chatCalls`); without it they get the
+   * provider itself.
+   */
+  readonly chatCapabilities?: Partial<ChatCapabilities>;
+  /** `null`: no usage cache in the sessions' deps, as for an agent with no limits. */
+  readonly usage?: null;
+}
+
+/**
+ * `target` with every member called and every property read reported; `wrap` replaces what a
+ * member returns (a thread's reply, recorded in turn).
+ */
+function recording<T extends object>(
+  target: T,
+  seen: {
+    readonly call: (name: string, args: readonly unknown[]) => void;
+    readonly read: (name: string) => void;
+  },
+  wrap: (name: string, value: unknown) => unknown = (_name, value) => value,
+): T {
+  return new Proxy(target, {
+    get(object, name) {
+      const value = Reflect.get(object, name);
+      if (typeof name !== "string") return value;
+      if (typeof value !== "function") {
+        seen.read(name);
+        return value;
+      }
+      return (...args: unknown[]) => {
+        seen.call(name, args);
+        return wrap(name, value.apply(object, args));
+      };
+    },
+  });
 }
 
 export class Harness {
@@ -516,7 +585,7 @@ export class Harness {
   /** A scratch folder, bound to `CHANNEL`, with its symlinks resolved. */
   readonly tmpPath: string;
   readonly state: StateStore;
-  readonly approvals = new Approvals();
+  readonly approvals = new Approvals(NAMES);
   readonly holds = new Holds();
   readonly backend: FakeAgentBackend;
   /** The sessions' own clock. */
@@ -527,6 +596,18 @@ export class Harness {
   readonly deps: SessionDeps;
   manager: SessionManager;
   usageFetches = 0;
+  /** The usage cache of the sessions' deps; throws when the harness was made with none. */
+  get usage(): UsageCache {
+    if (this.deps.usage === null) throw new Error("the harness has no usage cache");
+    return this.deps.usage;
+  }
+
+  /** The members of the sessions' threads and replies called, when `chatCapabilities` is set. */
+  readonly chatCalls: string[] = [];
+  /** The properties of those threads read. */
+  readonly chatReads: string[] = [];
+  /** Every text handed to a reply, as the core handed it. */
+  readonly replyTexts: string[] = [];
 
   constructor(
     slack: FakeSlack,
@@ -543,6 +624,7 @@ export class Harness {
       slack,
       replies: options.replies ?? slack,
       identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
+      agent: () => this.backend,
       // A generous burst: these tests are about session orchestration, not the shared
       // limiter's own pacing (that lives in the sink's tests).
       limiter: new UpdateLimiter({ burst: 1_000, clock: this.slackClock }),
@@ -553,20 +635,53 @@ export class Harness {
       }),
     });
     this.deps = {
-      chat: this.chat,
+      chat:
+        options.chatCapabilities === undefined
+          ? this.chat
+          : this.declaring(options.chatCapabilities),
       agent: this.backend,
       state: this.state,
       approvals: this.approvals,
-      usage: new UsageCache(async () => {
-        this.usageFetches += 1;
-        return { session: { percent: 5, resetsAt: null }, week: null };
-      }),
+      usage:
+        options.usage === null
+          ? null
+          : new UsageCache(async () => {
+              this.usageFetches += 1;
+              return { session: { percent: 5, resetsAt: null }, week: null };
+            }),
       holds: this.holds,
       clock: this.clock,
       ...(options.tasksKept !== undefined && { tasksKept: options.tasksKept }),
       ...(options.taskRepliesKept !== undefined && { taskRepliesKept: options.taskRepliesKept }),
     };
     this.manager = new SessionManager(this.deps);
+  }
+
+  /** The provider as the sessions see it when the test chooses what the chat declares. */
+  private declaring(declared: Partial<ChatCapabilities>): SlackChat {
+    const capabilities = { ...this.chat.capabilities, ...declared };
+    const seen = {
+      call: (name: string, args: readonly unknown[]) => {
+        this.chatCalls.push(name);
+        if (name === "text" && typeof args[0] === "string") this.replyTexts.push(args[0]);
+      },
+      read: (name: string) => {
+        this.chatReads.push(name);
+      },
+    };
+    const reply = (name: string, value: unknown): unknown =>
+      name === "openReply" ? recording(value as object, seen) : value;
+    return new Proxy(this.chat, {
+      get: (object, name) => {
+        if (name === "capabilities") return capabilities;
+        if (name !== "thread") {
+          const value = Reflect.get(object, name);
+          return typeof value === "function" ? value.bind(object) : value;
+        }
+        return (ref: Parameters<SlackChat["thread"]>[0]) =>
+          recording(object.thread(ref), seen, reply);
+      },
+    });
   }
 
   /** A restart of the daemon: every session closed, then a new manager on the same state. */

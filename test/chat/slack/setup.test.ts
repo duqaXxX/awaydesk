@@ -10,8 +10,9 @@ import {
   SETUP_MODEL,
   SETUP_START,
   setupBlocks,
-  summary,
 } from "../../../src/chat/slack/setup.ts";
+import * as slackTexts from "../../../src/chat/slack/texts.ts";
+import { summaryLine as summary } from "../../../src/core/flows/setup.ts";
 import { type Choice, DEFAULT, DEFAULT_CHOICE, effortLevels } from "../../../src/core/setup.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { sdkJson } from "../../support/fixtures.ts";
@@ -137,7 +138,7 @@ test("the bypass checkbox starts unchecked and keeps a tick", () => {
   );
   assert.deepEqual(ticked.options[0].description, {
     type: "mrkdwn",
-    text: texts.SETUP_BYPASS_DESCRIPTION,
+    text: slackTexts.SETUP_BYPASS_DESCRIPTION,
   });
 });
 

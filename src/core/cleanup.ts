@@ -11,9 +11,10 @@
  * `StateStore.prune`'s. The chat provider supplies the lookup that turns Slack's answer into a
  * `ChannelAnswer`.
  */
+import type { ThreadRef } from "../chat/seam.ts";
 import { getLogger, type Logger } from "../log.ts";
 import { errorName } from "../values.ts";
-import type { StateStore, ThreadKey } from "./state.ts";
+import type { OpenedAt, StateStore } from "./state.ts";
 
 export const logger = getLogger("awaydesk.core.cleanup");
 
@@ -32,10 +33,10 @@ export type ChannelAnswer = "gone" | "there" | "no answer";
 export type ChannelLookup = (channelId: string) => Promise<ChannelAnswer>;
 
 /**
- * The (channelId, threadTs) of every thread with a live session in the daemon, read at the moment
+ * The (channelId, threadId) of every thread with a live session in the daemon, read at the moment
  * it is needed: nothing of theirs is removed under them.
  */
-export type Live = () => Iterable<ThreadKey>;
+export type Live = () => Iterable<ThreadRef>;
 
 /** A folder's session ids, or null when it cannot tell. */
 export type Alive = (
@@ -45,6 +46,10 @@ export type Alive = (
 export interface CleanOptions {
   readonly alive: Alive;
   readonly live: Live;
+  /** The chat's name (`ChatProvider.name`), for the log lines that say whose answer it was. */
+  readonly chat: string;
+  /** When the chat opened a thread (`ChatProvider.openedAt`): a thread it cannot date is kept. */
+  readonly openedAt: OpenedAt;
   /** Seconds since the epoch. */
   readonly now?: () => number;
   readonly logger?: Log;
@@ -55,12 +60,14 @@ export interface CleanOptions {
  * return their ids. A channel with a live session is left for the next pass. When the chat finds
  * none of the bound channels (a channel it gave no answer about is not one it found), nothing is
  * removed: that is what the token of another workspace, or an app removed from every channel,
- * looks like, and forgetting every binding would be the wrong repair.
+ * looks like, and forgetting every binding would be the wrong repair. `chat` is the chat's
+ * name, for the log lines.
  */
 export async function forgetGoneChannels(
   lookup: ChannelLookup,
   state: StateStore,
   live: Live,
+  chat: string,
   log: Log = logger,
 ): Promise<string[]> {
   const bound = state.channels();
@@ -85,12 +92,12 @@ export async function forgetGoneChannels(
   if (gone.length === 0) return [];
   if (found === 0) {
     log.warning(
-      `Slack finds none of the ${bound.length} bound channels: nothing is forgotten (check the ` +
+      `${chat} finds none of the ${bound.length} bound channels: nothing is forgotten (check the ` +
         "workspace of the bot token, and that the bot is still in its channels)",
     );
     return [];
   }
-  const busy = new Set([...live()].map(([channelId]) => channelId));
+  const busy = new Set([...live()].map((ref) => ref.channel));
   const forgotten: string[] = [];
   for (const channelId of gone) {
     const record = state.channel(channelId);
@@ -98,7 +105,7 @@ export async function forgetGoneChannels(
     state.removeChannel(channelId);
     forgotten.push(channelId);
     log.info(
-      `forgot channel ${channelId}: Slack no longer has it (${record.threads.size} thread(s))`,
+      `forgot channel ${channelId}: ${chat} no longer has it (${record.threads.size} thread(s))`,
     );
   }
   return forgotten;
@@ -118,7 +125,7 @@ export async function clean(
   const now = options.now ?? (() => Date.now() / 1000);
   const log = options.logger ?? logger;
   try {
-    await forgetGoneChannels(lookup, state, live, log);
+    await forgetGoneChannels(lookup, state, live, options.chat, log);
   } catch (error) {
     log.warning(`could not check the bound channels: ${errorName(error)}`);
   }
@@ -136,7 +143,12 @@ export async function clean(
       const sessions = await alive(folder);
       known.set(folder, sessions === null ? null : [...sessions]);
     }
-    const removed = state.prune((directory) => known.get(directory) ?? null, now(), live());
+    const removed = state.prune(
+      (directory) => known.get(directory) ?? null,
+      options.openedAt,
+      now(),
+      live(),
+    );
     if (removed > 0) log.info(`pruned ${removed} stale thread(s) from state.json`);
   } catch (error) {
     log.warning(`could not prune stale threads: ${errorName(error)}`);

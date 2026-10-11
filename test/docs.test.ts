@@ -10,8 +10,10 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { test } from "node:test";
 import { features } from "../probe/features.ts";
 import { WORD } from "../src/core/commands.ts";
-import { REQUIRED } from "../src/core/config.ts";
+import { REQUIRED, SELECTORS } from "../src/core/config.ts";
+import { REGISTRY } from "../src/registry.ts";
 import { sdkJson } from "./support/fixtures.ts";
+import { blank } from "./support/source-scan.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 const SRC = join(ROOT, "src");
@@ -30,7 +32,7 @@ const LINK = /\[[^\]]*\]\(([^)\s]+)\)/g;
 const LINE_POINTER = /\b[\w./-]+\.(?:ts|py|md|sh|ya?ml|json|toml):\d+/;
 const REPO_PATH = /`((?:src|test|tests|docs|probe|\.github)\/[\w./-]+)`/g;
 const BACKTICKS = /`[^`]*`/g;
-// A code span that is nothing but a dotted name: `texts.GUIDE`, `ClaudeSession.query`.
+// A code span that is nothing but a dotted name: `texts.GUIDE_INTRO`, `ClaudeSession.query`.
 const SYMBOL = /`([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)`/g;
 // `state.json` and `config.ts` are files, not attributes of the modules of the same name.
 const FILE_SUFFIXES = new Set([
@@ -217,116 +219,6 @@ test("the readme states the version and the node the package declares", () => {
 // next line that starts with `}`, and a member of a class, an interface or an object sits on a
 // line indented by two spaces.
 
-/** `source` with comments, string contents and regular expression bodies blanked to spaces. */
-function blank(source: string): string {
-  let out = "";
-  let i = 0;
-  const space = (ch: string): string => (ch === "\n" ? "\n" : " ");
-
-  function quoted(quote: string): void {
-    out += quote;
-    i += 1;
-    while (i < source.length && source.charAt(i) !== quote) {
-      if (source.charAt(i) === "\\") {
-        out += " ";
-        i += 1;
-      }
-      out += space(source.charAt(i));
-      i += 1;
-    }
-    out += quote;
-    i += 1;
-  }
-
-  function template(): void {
-    out += "`";
-    i += 1;
-    while (i < source.length && source.charAt(i) !== "`") {
-      if (source.charAt(i) === "\\") {
-        out += " ";
-        i += 1;
-        out += space(source.charAt(i));
-        i += 1;
-      } else if (source.charAt(i) === "$" && source.charAt(i + 1) === "{") {
-        out += "${";
-        i += 2;
-        code(true);
-      } else {
-        out += space(source.charAt(i));
-        i += 1;
-      }
-    }
-    out += "`";
-    i += 1;
-  }
-
-  function regex(): void {
-    out += "/";
-    i += 1;
-    let inClass = false;
-    while (i < source.length && (source.charAt(i) !== "/" || inClass)) {
-      const ch = source.charAt(i);
-      if (ch === "\\") {
-        out += " ";
-        i += 1;
-      } else if (ch === "[") inClass = true;
-      else if (ch === "]") inClass = false;
-      out += space(source.charAt(i));
-      i += 1;
-    }
-    out += "/";
-    i += 1;
-  }
-
-  // Code up to the end of the file, or, inside a template's `${`, up to its closing brace.
-  function code(nested: boolean): void {
-    let depth = 0;
-    let last = "";
-    while (i < source.length) {
-      const ch = source.charAt(i);
-      const after = source.charAt(i + 1);
-      if (ch === "/" && after === "/") {
-        while (i < source.length && source.charAt(i) !== "\n") {
-          out += " ";
-          i += 1;
-        }
-      } else if (ch === "/" && after === "*") {
-        const end = source.indexOf("*/", i + 2);
-        const stop = end < 0 ? source.length : end + 2;
-        for (; i < stop; i += 1) out += space(source.charAt(i));
-      } else if (ch === '"' || ch === "'") {
-        quoted(ch);
-        last = ch;
-      } else if (ch === "`") {
-        template();
-        last = ch;
-      } else if (
-        ch === "/" &&
-        (last === "" || "(,=:[!&|?{};+-*%<>~^".includes(last) || out.trimEnd().endsWith("return"))
-      ) {
-        regex();
-        last = ")";
-      } else {
-        if (ch === "{") depth += 1;
-        if (ch === "}") {
-          if (nested && depth === 0) {
-            out += "}";
-            i += 1;
-            return;
-          }
-          depth -= 1;
-        }
-        out += ch;
-        i += 1;
-        if (ch.trim() !== "") last = ch;
-      }
-    }
-  }
-
-  code(false);
-  return out;
-}
-
 /** What an export holds that can be named after a dot: null when it has no such members. */
 interface Declared {
   members: Set<string> | null;
@@ -496,7 +388,7 @@ test("the scan of the sources reads comments, strings and templates as the compi
 });
 
 test("a dotted name is checked against the module, then the export's members", () => {
-  assert.equal(unresolved("texts.GUIDE"), false);
+  assert.equal(unresolved("texts.GUIDE_INTRO"), false);
   assert.equal(unresolved("texts.NO_SUCH_TEXT"), true);
   assert.equal(unresolved("commands.WORD.help"), false);
   assert.equal(unresolved("commands.WORD.nothing"), true);
@@ -537,7 +429,17 @@ test("the setup guide names every variable scope and word", () => {
   const manifest = JSON.parse(read(join(ROOT, "slack-app-manifest.json"))) as {
     oauth_config: { scopes: { bot: string[] } };
   };
-  for (const name of new Set([...REQUIRED, ...read_, ...manifest.oauth_config.scopes.bot])) {
+  // Every variable the daemon reads: the core's, and those each module of the registry names.
+  const modules = [...Object.values(REGISTRY.agents), ...Object.values(REGISTRY.chats)];
+  const variables = modules.flatMap((entry) => [...entry.required, ...entry.optional]);
+  const names = new Set([
+    ...REQUIRED,
+    ...SELECTORS,
+    ...variables,
+    ...read_,
+    ...manifest.oauth_config.scopes.bot,
+  ]);
+  for (const name of names) {
     assert.ok(text.includes(`\`${name}\``), `docs/setup.md does not name ${name}`);
   }
   const rows = new Set(

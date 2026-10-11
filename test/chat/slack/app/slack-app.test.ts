@@ -9,7 +9,8 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { isDeepStrictEqual } from "node:util";
 import { type Question, ResumeRefused } from "../../../../src/agent/seam.ts";
-import { ago, logger, slackUnescape } from "../../../../src/chat/slack/app/app.ts";
+import { logger } from "../../../../src/chat/slack/app/app.ts";
+import { slackUnescape } from "../../../../src/chat/slack/app/messages.ts";
 import { DownloadFailed } from "../../../../src/chat/slack/attachments.ts";
 import { HOLD_CONTINUE, holdBlocks } from "../../../../src/chat/slack/hold.ts";
 import {
@@ -36,10 +37,12 @@ import {
   newDraft,
   SECTION_LIMIT,
 } from "../../../../src/chat/slack/requests.ts";
+import * as slackTexts from "../../../../src/chat/slack/texts.ts";
+import { guideText } from "../../../../src/core/guide.ts";
 import { STOP_TAIL_WAIT } from "../../../../src/core/sessions/constants.ts";
 import type { ThreadSession } from "../../../../src/core/sessions/session.ts";
 import * as texts from "../../../../src/core/texts.ts";
-import { fill } from "../../../../src/core/texts.ts";
+import { fill, named as namedText } from "../../../../src/core/texts.ts";
 import {
   AsyncEvent,
   BOT,
@@ -52,6 +55,8 @@ import {
   TEAM,
   THREAD,
 } from "../../../support/fake-slack.ts";
+import { EVERYTHING_OFFERED } from "../../../support/guide-offer.ts";
+import { NAMES } from "../../../support/names.ts";
 import { canUseToolCall, sdkMessages, splitTurns } from "../../../support/sessions.ts";
 import {
   type Body,
@@ -251,7 +256,7 @@ test("a refused channel tells only the owner", async (t) => {
   await world.dispatch(message());
   assert.deepEqual(world.queries(), []);
   assert.deepEqual(world.ephemerals(), [
-    fill(texts.CHANNEL_REFUSED, { reason: texts.REASON_MEMBERS }),
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
   ]);
   const refusals = world.slack.callsTo("chat.postEphemeral") as Body[];
   assert.equal(refusals.length, 1);
@@ -263,7 +268,7 @@ test("a refused channel tells only the owner", async (t) => {
 test("an unbound channel explains how to bind", async (t) => {
   const world = worldFor(t)({ bound: false });
   await world.dispatch(message());
-  assert.deepEqual(said(world), [fill(texts.UNBOUND, { root: world.root })]);
+  assert.deepEqual(said(world), [fill(namedText(texts.UNBOUND, NAMES), { root: world.root })]);
   assert.ok(!("thread_ts" in (world.slack.callsTo("chat.postMessage")[0] as Body)));
 });
 
@@ -347,9 +352,9 @@ for (const word of ["!reset", "!new", "!NEW keep this"]) {
 }
 
 for (const [word, answer] of [
-  ["!login", texts.LOGIN_ON_HOST],
-  ["!LOGIN now", texts.LOGIN_ON_HOST],
-  ["!logout", texts.LOGOUT_ON_HOST],
+  ["!login", namedText(texts.LOGIN_ON_HOST, NAMES)],
+  ["!LOGIN now", namedText(texts.LOGIN_ON_HOST, NAMES)],
+  ["!logout", namedText(texts.LOGOUT_ON_HOST, NAMES)],
 ] as const) {
   test(`login and logout never reach claude code from the channel [${word}]`, async (t) => {
     const world = worldOf(t);
@@ -362,8 +367,8 @@ for (const [word, answer] of [
 }
 
 for (const [word, answer] of [
-  ["!login", texts.LOGIN_ON_HOST],
-  ["!logout", texts.LOGOUT_ON_HOST],
+  ["!login", namedText(texts.LOGIN_ON_HOST, NAMES)],
+  ["!logout", namedText(texts.LOGOUT_ON_HOST, NAMES)],
 ] as const) {
   test(`login and logout never reach claude code from a thread [${word}]`, async (t) => {
     const world = worldOf(t);
@@ -391,7 +396,7 @@ test("a daemon word in a dead thread acts as top level", async (t) => {
   assert.ok(!("thread_ts" in post)); // answered in the channel, like a top-level `!bind`
   const blocks = post.blocks as Body[];
   const rows: string[] = blocks.filter((b) => b.type === "section").map((b) => b.text.text);
-  assert.ok(rows.some((row) => row.startsWith("`app`") && row.includes(texts.BIND_CURRENT)));
+  assert.ok(rows.some((row) => row.startsWith("`app`") && row.includes(slackTexts.BIND_CURRENT)));
   const values = blocks.filter((b) => "accessory" in b).map((b) => b.accessory.value);
   assert.deepEqual(values, ["."]); // the current folder ("app") shows with no button
 });
@@ -417,7 +422,7 @@ test("bang help top level lists only the daemon words", async (t) => {
   assert.equal(shown.length, 1);
   const [text] = shown as [string];
   assert.ok(text.includes("`!bypass") && !text.includes("`!compact"));
-  assert.ok(text.includes(texts.HELP_UNBOUND));
+  assert.ok(text.includes(namedText(texts.HELP_UNBOUND, NAMES)));
   assert.deepEqual(world.clients, []);
   // Typed in the channel, the answer is a normal top-level post that survives a reload.
   assert.ok(!("thread_ts" in (world.slack.callsTo("chat.postMessage")[0] as Body)));
@@ -468,7 +473,10 @@ test("bang bypass off inside a thread says so too", async (t) => {
   await world.dispatch(word);
   assert.deepEqual(world.clients[0]?.modes, ["bypassPermissions", "default"]);
   assert.deepEqual(reactionsOn(world, word.event.ts), ["white_check_mark"]);
-  assert.deepEqual(world.ephemerals(), [texts.BYPASS_ON_THREAD, texts.BYPASS_OFF_THREAD]);
+  assert.deepEqual(world.ephemerals(), [
+    texts.BYPASS_ON_THREAD,
+    namedText(texts.BYPASS_OFF_THREAD, NAMES),
+  ]);
   assert.deepEqual(said(world), []);
   assert.equal(world.state.thread(CHANNEL, THREAD)?.bypass, false);
 });
@@ -519,7 +527,7 @@ test("a gone session answers bypass with no new session", async (t) => {
   world.connectError = new ResumeRefused();
   const word = reply("!bypass on", THREAD);
   await world.dispatch(word);
-  assert.deepEqual(world.ephemerals(), [texts.SESSION_GONE]);
+  assert.deepEqual(world.ephemerals(), [namedText(texts.SESSION_GONE, NAMES)]);
   assert.deepEqual(reactionsOn(world, word.event.ts), []); // nothing took effect: no ✅
   assert.equal(world.state.thread(CHANNEL, THREAD), null);
 });
@@ -647,22 +655,6 @@ test("bang status falls back to session when the titles cannot be read", async (
   assert.equal((said(world).at(-1) as string).split("\n")[1], `[Session](${PERMALINK}): idle`);
 });
 
-for (const [seconds, shown] of [
-  [5, "just now"],
-  [59, "just now"],
-  [60, "1m ago"],
-  [3_599, "59m ago"],
-  [3_600, "1h ago"],
-  [86_399, "23h ago"],
-  [86_400, "1d ago"],
-  [30 * 86_400, "30d ago"],
-  [-30, "just now"],
-] as const) {
-  test(`how long ago reads in one unit [${seconds}-${shown}]`, () => {
-    assert.equal(ago(seconds), shown);
-  });
-}
-
 test("the hold question s buttons answer it in its own words", () => {
   // Issue #76: `Continue` beside the shorter `Cancel` made the second look the lesser choice,
   // and a button's width is its text. One `primary` in the set, as the button reference asks.
@@ -739,8 +731,11 @@ test("an answer in a session thread sets its status line again", async (t) => {
   const world = worldOf(t);
   await world.dispatch(message("hi", { ts: THREAD }));
   const told: Array<[string, string]> = [];
-  world.sessions.wrote = (channel, thread) => {
-    told.push([channel, thread]);
+  // The answer is posted through the session's own thread, which sets its status line again.
+  const session = world.sessions.get(CHANNEL, THREAD);
+  assert.ok(session !== null);
+  session.threadChat.written = () => {
+    told.push([CHANNEL, THREAD]);
   };
   await world.dispatch(reply("!status", THREAD));
   assert.deepEqual(told, [[CHANNEL, THREAD]]); // the answer cleared the status: it is set again
@@ -789,7 +784,7 @@ test("a malformed daemon word at top level shows only the daemon words", async (
   await world.dispatch(message("!bypass maybe"));
   const text = said(world).at(-1) as string;
   assert.ok(text.includes("`!bypass") && !text.includes("`!compact"));
-  assert.ok(text.includes(texts.HELP_UNBOUND));
+  assert.ok(text.includes(namedText(texts.HELP_UNBOUND, NAMES)));
   assert.deepEqual(world.queries(), []);
 });
 
@@ -801,7 +796,7 @@ test("a malformed daemon word inside a thread shows the session s help too", asy
   assert.equal(shown.length, 1);
   const [text] = shown as [string];
   assert.ok(text.includes("`!bypass") && text.includes("`!compact"));
-  assert.ok(!text.includes(texts.HELP_UNBOUND));
+  assert.ok(!text.includes(namedText(texts.HELP_UNBOUND, NAMES)));
 });
 
 test("bang from anyone else does nothing", async (t) => {
@@ -998,7 +993,7 @@ test("submit with the open question unanswered shows an error", async (t) => {
   const response = await world.dispatch(formBody("view_submission", draft, {}));
   assert.deepEqual(response.body, {
     response_action: "errors",
-    errors: { q0: texts.QUESTION_MISSING },
+    errors: { q0: slackTexts.QUESTION_MISSING },
   });
   assert.ok(!pending.decided);
 });
@@ -1076,7 +1071,7 @@ test("a form that cannot open tells the owner", async (t) => {
   body.trigger_id = "0000000000.0000000000.fake";
   await world.dispatch(body);
   assert.deepEqual(world.ephemerals(), [
-    fill(texts.QUESTION_NOT_OPENED, { error: "expired_trigger_id" }),
+    fill(slackTexts.QUESTION_NOT_OPENED, { error: "expired_trigger_id" }),
   ]);
 });
 
@@ -1288,7 +1283,7 @@ test("the list counts a session held elsewhere and gives it no row", async (t) =
   const blocks = (world.slack.callsTo("chat.postMessage").at(-1) as Body).blocks as Body[];
   const rows = blocks.filter((b) => b.block_id).map((b) => b.block_id);
   assert.deepEqual(rows, [`session-${SESSION_A}`]); // the rows are the sessions that can be resumed
-  assert.equal(blocks.at(-1)?.elements[0].text, texts.RESUME_OPEN_ONE);
+  assert.equal(blocks.at(-1)?.elements[0].text, slackTexts.RESUME_OPEN_ONE);
   assert.deepEqual(world.slack.callsTo("chat.getPermalink"), []); // no row links to a thread
 });
 
@@ -1336,7 +1331,9 @@ test("a failing resume click tells the owner", async (t) => {
     throw named("PermissionError", "transcripts unreadable");
   };
   await world.dispatch(resumeClick(SESSION_B));
-  assert.deepEqual(said(world), [fill(texts.ERROR_REPLY, { error: "PermissionError" })]);
+  assert.deepEqual(said(world), [
+    fill(namedText(texts.ERROR_REPLY, NAMES), { error: "PermissionError" }),
+  ]);
   assert.ok(!("thread_ts" in (world.slack.callsTo("chat.postMessage")[0] as Body)));
 });
 
@@ -1346,8 +1343,10 @@ test("bang guide works in an unbound channel", async (t) => {
   // The block holds the whole guide; `text` is its fallback, cut at FALLBACK_LIMIT.
   const posts = world.slack.callsTo("chat.postMessage") as Body[];
   assert.equal(posts.length, 1);
-  assert.deepEqual(posts[0]?.blocks, [{ type: "markdown", text: texts.GUIDE }]);
-  assert.equal(posts[0]?.text, take(texts.GUIDE, FALLBACK_LIMIT));
+  assert.deepEqual(posts[0]?.blocks, [
+    { type: "markdown", text: guideText(NAMES, EVERYTHING_OFFERED) },
+  ]);
+  assert.equal(posts[0]?.text, take(guideText(NAMES, EVERYTHING_OFFERED), FALLBACK_LIMIT));
   assert.deepEqual(world.clients, []);
 });
 
@@ -1355,7 +1354,7 @@ test("bang guide inside a thread is for the owner alone", async (t) => {
   const world = worldOf(t);
   await world.dispatch(message("hi", { ts: THREAD }));
   await world.dispatch(reply("!guide", THREAD));
-  assert.ok(!said(world).includes(texts.GUIDE));
+  assert.ok(!said(world).includes(guideText(NAMES, EVERYTHING_OFFERED)));
   const guides = world.slack.callsTo("chat.postEphemeral") as Body[];
   assert.equal(guides.length, 1);
   assert.equal(guides[0]?.thread_ts, THREAD);
@@ -1400,7 +1399,9 @@ test("a failure starting a prompt lands in its thread", async (t) => {
   // session's thread (a command needs the connection at once), not shown to the owner alone.
   world.connectError = named("RuntimeError", "boom");
   await world.dispatch(message("!compact", { ts: THREAD }));
-  assert.deepEqual(said(world), [fill(texts.ERROR_REPLY, { error: "RuntimeError" })]);
+  assert.deepEqual(said(world), [
+    fill(namedText(texts.ERROR_REPLY, NAMES), { error: "RuntimeError" }),
+  ]);
   assert.equal((world.slack.callsTo("chat.postMessage")[0] as Body).thread_ts, THREAD);
   assert.deepEqual(world.ephemerals(), []);
 });
@@ -1466,7 +1467,7 @@ test("no trusted folder says so in the notification too", async (t) => {
   await world.dispatch(message("!bind"));
   const posts = world.slack.callsTo("chat.postMessage") as Body[];
   assert.equal(posts.length, 1);
-  assert.equal(posts[0]?.text, fill(texts.BIND_EMPTY, { root: world.root }));
+  assert.equal(posts[0]?.text, fill(namedText(texts.BIND_EMPTY, NAMES), { root: world.root }));
   await world.sessions.closeAll();
 });
 
@@ -1678,8 +1679,10 @@ test("a file reaches claude as a path to its saved copy", async (t) => {
 test("a refused file sends nothing and says why", async (t) => {
   const world = worldOf(t);
   await world.dispatch(sharedFile("image", { mimetype: "image/heic" }));
-  const reason = fill(texts.UPLOAD_IMAGE_TYPE, { mimetype: "image/heic" });
-  assert.deepEqual(world.ephemerals(), [fill(texts.UPLOAD_FAILED, { name: "photo.png", reason })]);
+  const reason = fill(namedText(slackTexts.UPLOAD_IMAGE_TYPE, NAMES), { mimetype: "image/heic" });
+  assert.deepEqual(world.ephemerals(), [
+    fill(namedText(slackTexts.UPLOAD_FAILED, NAMES), { name: "photo.png", reason }),
+  ]);
   assert.deepEqual(world.queries(), []);
 });
 
@@ -1688,15 +1691,17 @@ test("a failed download sends nothing and says why", async (t) => {
   const body = sharedFile("image");
   world.downloads.set(body.event.files[0].url_private_download, new DownloadFailed("HTTP 404"));
   await world.dispatch(body);
-  const reason = fill(texts.UPLOAD_DOWNLOAD, { error: "HTTP 404" });
-  assert.deepEqual(world.ephemerals(), [fill(texts.UPLOAD_FAILED, { name: "photo.png", reason })]);
+  const reason = fill(slackTexts.UPLOAD_DOWNLOAD, { error: "HTTP 404" });
+  assert.deepEqual(world.ephemerals(), [
+    fill(namedText(slackTexts.UPLOAD_FAILED, NAMES), { name: "photo.png", reason }),
+  ]);
   assert.deepEqual(world.queries(), []);
 });
 
 test("a file in an unbound channel explains how to bind", async (t) => {
   const world = worldFor(t)({ bound: false });
   await world.dispatch(sharedFile("image"));
-  assert.deepEqual(said(world), [fill(texts.UNBOUND, { root: world.root })]);
+  assert.deepEqual(said(world), [fill(namedText(texts.UNBOUND, NAMES), { root: world.root })]);
   assert.ok(!("thread_ts" in (world.slack.callsTo("chat.postMessage")[0] as Body)));
   await world.sessions.closeAll();
 });
@@ -1718,7 +1723,10 @@ test("a file on another host is never downloaded", async (t) => {
   await world.dispatch(sharedFile("image", { url_private_download: "https://evil.example/x.png" }));
   assert.deepEqual(world.fetched, []);
   assert.deepEqual(world.ephemerals(), [
-    fill(texts.UPLOAD_FAILED, { name: "photo.png", reason: texts.UPLOAD_NOT_SHARED }),
+    fill(namedText(slackTexts.UPLOAD_FAILED, NAMES), {
+      name: "photo.png",
+      reason: slackTexts.UPLOAD_NOT_SHARED,
+    }),
   ]);
 });
 
@@ -1779,7 +1787,9 @@ test("too many images send nothing and download nothing", async (t) => {
   await world.dispatch(body);
   assert.deepEqual(world.fetched, []);
   assert.deepEqual(world.queries(), []);
-  assert.deepEqual(world.ephemerals(), [fill(texts.UPLOAD_TOO_MANY, { count: 6, limit: 5 })]);
+  assert.deepEqual(world.ephemerals(), [
+    fill(namedText(slackTexts.UPLOAD_TOO_MANY, NAMES), { count: 6, limit: 5 }),
+  ]);
 });
 
 test("a bind during the downloads never moves the thread already opened", async (t) => {
@@ -1840,7 +1850,7 @@ test("a retry that finds the thread gone answers session gone", async (t) => {
   await world.appClock.advance(0.2);
   await world.settle();
   assert.deepEqual(world.queries(), []);
-  assert.ok(said(world).includes(texts.SESSION_GONE)); // in the prompt's thread: the turn's one push
+  assert.ok(said(world).includes(namedText(texts.SESSION_GONE, NAMES))); // in the prompt's thread: the turn's one push
 });
 
 test("a prompt while the daemon stops is refused and words still work", async (t) => {
@@ -1972,7 +1982,7 @@ for (const how of ["typed", "clicked"]) {
     world.backend.trusted = async (directory) => directory !== docs;
     if (how === "typed") await world.dispatch(message("!bind docs"));
     else await world.dispatch(click("folder_bind", "docs"));
-    const reason = fill(texts.DIRECTORY_UNTRUSTED, { directory: docs });
+    const reason = fill(namedText(texts.DIRECTORY_UNTRUSTED, NAMES), { directory: docs });
     assert.equal(said(world).at(-1), fill(texts.BIND_UNAVAILABLE, { directory: docs, reason }));
     assert.equal(world.state.channel(CHANNEL)?.directory, docs);
     await world.sessions.closeAll();
@@ -2025,7 +2035,7 @@ test("a reply in an old folder thread gets the notice on every prompt", async (t
   await idleMessage(world, "hi", THREAD); // opens a session in `app`
   mkdirSync(join(world.root, "docs"));
   await world.dispatch(message("!bind docs"));
-  const expected = fill(texts.OLD_THREAD_FOLDER, {
+  const expected = fill(namedText(texts.OLD_THREAD_FOLDER, NAMES), {
     old: join(world.root, "app"),
     new: join(world.root, "docs"),
   });
@@ -2044,7 +2054,7 @@ test("a failed old folder notice still submits the prompt", async (t) => {
   await idleMessage(world, "hi", THREAD); // opens a session in `app`
   mkdirSync(join(world.root, "docs"));
   await world.dispatch(message("!bind docs"));
-  const expected = fill(texts.OLD_THREAD_FOLDER, {
+  const expected = fill(namedText(texts.OLD_THREAD_FOLDER, NAMES), {
     old: join(world.root, "app"),
     new: join(world.root, "docs"),
   });
@@ -2078,7 +2088,7 @@ test("long answers fit slack s limit", () => {
     options: [],
   }));
   const answers = { ["q".repeat(900)]: "a".repeat(300) };
-  const blocks = answeredBlocks(questions, answers) as Body[];
+  const blocks = answeredBlocks(questions, answers, NAMES) as Body[];
   assert.equal(blocks.length, 1);
   assert.ok(Array.from(blocks[0]?.elements[0].text as string).length <= SECTION_LIMIT);
 });

@@ -22,7 +22,9 @@ import {
 } from "../../../src/chat/slack/requests.ts";
 import { logger, SlackChat, type SlackThread } from "../../../src/chat/slack/thread.ts";
 import * as texts from "../../../src/core/texts.ts";
+import { named } from "../../../src/core/texts.ts";
 import {
+  AGENT,
   BOT,
   CHANNEL,
   FakeClock,
@@ -33,6 +35,7 @@ import {
   TEAM,
   THREAD,
 } from "../../support/fake-slack.ts";
+import { NAMES } from "../../support/names.ts";
 
 beforeEach(() => resetStatusFlags());
 
@@ -71,10 +74,11 @@ function made(options: { replies?: FakeSlack } = {}): Made {
     // The tests that do not look at which client a reply is written with share one fake.
     replies: options.replies ?? slack,
     identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
+    agent: () => AGENT,
     limiter,
     clock,
   });
-  return { slack, clock, limiter, chat, thread: chat.thread(CHANNEL, THREAD) };
+  return { slack, clock, limiter, chat, thread: chat.thread({ channel: CHANNEL, thread: THREAD }) };
 }
 
 /** Let what is ready run: the status line's own task, a reaction asked for and not awaited. */
@@ -222,7 +226,7 @@ test("a permission request is a message of its own and the core gets its ts", as
     channel: CHANNEL,
     thread_ts: THREAD,
     text: "Bash: ls",
-    blocks: JSON.parse(JSON.stringify(approvalBlocks("approval-1", PERMISSION))),
+    blocks: JSON.parse(JSON.stringify(approvalBlocks("approval-1", PERMISSION, NAMES))),
     unfurl_links: false,
     unfurl_media: false,
   });
@@ -235,7 +239,7 @@ test("a question request is posted with the questions buttons", async () => {
   assert.equal(post?.text, "AskUserQuestion");
   assert.deepEqual(
     post?.blocks,
-    JSON.parse(JSON.stringify(questionBlocks("approval-2", QUESTION.questions))),
+    JSON.parse(JSON.stringify(questionBlocks("approval-2", QUESTION.questions, NAMES))),
   );
 });
 
@@ -269,8 +273,8 @@ test("an answered question is rewritten on the budget every reply draws from", a
   assert.deepEqual(update, {
     channel: CHANNEL,
     ts,
-    text: texts.ANSWERED,
-    blocks: JSON.parse(JSON.stringify(answeredBlocks(QUESTION.questions, answers))),
+    text: named(texts.ANSWERED, NAMES),
+    blocks: JSON.parse(JSON.stringify(answeredBlocks(QUESTION.questions, answers, NAMES))),
   });
   // One token, taken before the update was sent.
   assert.equal(limiter.acquired, 1);
@@ -310,11 +314,12 @@ test("the status line counts its refresh on the steady clock, not on the wall cl
     slack,
     replies: slack,
     identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
+    agent: () => AGENT,
     limiter: new CountingLimiter(slack),
     clock: wall,
     steady,
   });
-  const thread = chat.thread(CHANNEL, THREAD);
+  const thread = chat.thread({ channel: CHANNEL, thread: THREAD });
   const shown = () => slack.callsTo("assistant.threads.setStatus").length;
   thread.showActivity("Working…", "is working…");
   await steady.advance(0);
@@ -329,7 +334,7 @@ test("the status line counts its refresh on the steady clock, not on the wall cl
 
 test("the provider gives each thread its own object and shares one budget", async () => {
   const { slack, limiter, chat, thread } = made();
-  const other = chat.thread(CHANNEL, OTHER_THREAD);
+  const other = chat.thread({ channel: CHANNEL, thread: OTHER_THREAD });
   assert.notEqual(other, thread);
   assert.equal(chat.limiter, limiter);
   await other.showStatus("working");

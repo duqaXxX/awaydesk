@@ -14,6 +14,7 @@ import type { PromptContent } from "../../../src/agent/seam.ts";
 import type { ThreadSession } from "../../../src/core/sessions/session.ts";
 import { type Turn, takenNote } from "../../../src/core/sessions/turn.ts";
 import * as texts from "../../../src/core/texts.ts";
+import { NAMES } from "../../support/names.ts";
 import {
   END_OF_STREAM,
   type Harness,
@@ -132,7 +133,7 @@ test("a prompt taken into a report turn is released when that turn ends", async 
   await prompt.done.wait();
   await h.until(() => inside(session).active === null);
   assertNothingRuns(h, session);
-  assert.ok(said(h).includes(texts.TAKEN_INTO_REPLY_ONE));
+  assert.ok(said(h).includes(texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)));
   assert.ok(!said(h).includes("PINEAPPLE")); // the replay is an acknowledgement, never text
   // the owner's first reply, the report's
   assert.equal(h.slack.callsTo("chat.startStream").length, 2);
@@ -151,7 +152,7 @@ test("a prompt sent just before a report turn starts is released with it", async
   await prompt.done.wait();
   await h.until(() => inside(session).active === null);
   assertNothingRuns(h, session);
-  assert.ok(said(h).includes(texts.TAKEN_INTO_REPLY_ONE));
+  assert.ok(said(h).includes(texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)));
   // the prompt's reply holds the report
   assert.equal(h.slack.callsTo("chat.startStream").length, 2);
   await assertStopHasNothingToStop(h, session);
@@ -182,7 +183,7 @@ for (const name of ["at-init", "after-tools"]) {
     await prompt.done.wait();
     await h.until(() => inside(session).active === null);
     assertNothingRuns(h, session);
-    assert.ok(!said(h).includes(texts.TAKEN_INTO_REPLY_ONE));
+    assert.ok(!said(h).includes(texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)));
     assert.ok(said(h).includes("PINEAPPLE")); // the answer, not the replay of the question
     assert.equal(h.slack.callsTo("chat.startStream").length, 2);
     await assertStopHasNothingToStop(h, session);
@@ -207,7 +208,7 @@ async function ownTurnFollows(
   await prompt.done.wait();
   await h.until(() => inside(session).active === null);
   assertNothingRuns(h, session);
-  assert.ok(!said(h).includes(texts.TAKEN_INTO_REPLY_ONE));
+  assert.ok(!said(h).includes(texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)));
   assert.ok(said(h).includes("PINEAPPLE"));
   // The first reply (which the report also renders into), and the prompt's own.
   assert.equal(h.slack.callsTo("chat.startStream").length, 3);
@@ -273,7 +274,7 @@ test("stop after a prompt was taken in releases it once", async (t) => {
   await prompt.done.wait();
   await h.until(() => inside(session).active === null);
   assertNothingRuns(h, session);
-  assert.equal(count(said(h), texts.TAKEN_INTO_REPLY_ONE), 1);
+  assert.equal(count(said(h), texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)), 1);
   await assertStopHasNothingToStop(h, session);
 });
 
@@ -293,7 +294,7 @@ test("stop during a report turn with a prompt queued leaves nothing behind", asy
   await prompt.done.wait();
   await h.until(() => inside(session).active === null);
   assertNothingRuns(h, session);
-  assert.ok(!said(h).includes(texts.TAKEN_INTO_REPLY_ONE));
+  assert.ok(!said(h).includes(texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)));
   await assertStopHasNothingToStop(h, session);
 });
 
@@ -307,7 +308,7 @@ test("a replay naming no sent prompt acknowledges nothing", async (t) => {
   await h.until(() => inside(session).active === null);
   assert.ok(!prompt.done.isSet);
   assert.ok(inside(session).sent.length === 1 && inside(session).sent[0] === prompt);
-  assert.ok(!said(h).includes(texts.TAKEN_INTO_REPLY_ONE));
+  assert.ok(!said(h).includes(texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)));
   play(h, r.own);
   await prompt.done.wait();
   assertNothingRuns(h, session);
@@ -324,15 +325,18 @@ test("a prompt taken in when the client ends is noted as not sent", async (t) =>
   await prompt.done.wait();
   await h.until(() => !session.busy);
   assert.equal(inside(session).sent.length, 0);
-  const note = texts.fill(texts.NOT_SENT_ONE, { count: 1, because: texts.BECAUSE_STOPPED });
+  const note = texts.fill(texts.NOT_SENT_ONE, {
+    count: 1,
+    because: texts.named(texts.BECAUSE_STOPPED, NAMES),
+  });
   assert.ok(said(h).includes(note));
 });
 
 test("the note counts the prompts taken in", () => {
   // The worker sends one prompt at a time, so a turn takes in one today; the note reads `taken`.
-  assert.equal(takenNote(1), texts.TAKEN_INTO_REPLY_ONE);
+  assert.equal(takenNote(1, NAMES), texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES));
   assert.equal(
-    takenNote(2),
+    takenNote(2, NAMES),
     "Claude Code took 2 messages into this reply: " +
       "send them again if they are not answered here.",
   );

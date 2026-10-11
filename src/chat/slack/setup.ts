@@ -3,16 +3,11 @@
  * model, the effort and bypass, and the owner's choice read back from `state.values`. Pure
  * functions: the handlers post and wait, the session applies the choice.
  */
+
 import type { ModelInfo } from "../../agent/seam.ts";
-import {
-  type Choice,
-  choiceOf,
-  DEFAULT,
-  effortLevels,
-  type Summary,
-  summaryOf,
-} from "../../core/setup.ts";
-import * as texts from "../../core/texts.ts";
+import { type Choice, choiceOf, DEFAULT, effortLevels, texts } from "../../core/port.ts";
+import type { SetupSelection } from "../seam.ts";
+import * as slackTexts from "./texts.ts";
 
 export const SETUP_BLOCK = "setup"; // the one `actions` block that holds every control
 export const SETUP_MODEL = "setup_model";
@@ -54,7 +49,7 @@ function modelOptions(models: readonly ModelInfo[]): Block[] {
 
 function effortOptions(models: readonly ModelInfo[], model: string): Block[] {
   return [DEFAULT, ...effortLevels(models, model)].map((level) =>
-    option(texts.fill(texts.SETUP_EFFORT_OPTION, { level }), level),
+    option(texts.fill(slackTexts.SETUP_EFFORT_OPTION, { level }), level),
   );
 }
 
@@ -87,9 +82,9 @@ export function setupBlocks(
     elements.push(select(SETUP_MODEL, modelOptions(models), choice.model));
   }
   elements.push(select(SETUP_EFFORT, effortOptions(models, choice.model), choice.effort));
-  const bypass = option(texts.SETUP_BYPASS_OPTION, BYPASS_ON, {
+  const bypass = option(slackTexts.SETUP_BYPASS_OPTION, BYPASS_ON, {
     type: "mrkdwn",
-    text: texts.SETUP_BYPASS_DESCRIPTION,
+    text: slackTexts.SETUP_BYPASS_DESCRIPTION,
   });
   const checkboxes: Block = { type: "checkboxes", action_id: SETUP_BYPASS, options: [bypass] };
   if (choice.bypass) checkboxes.initial_options = [bypass];
@@ -99,10 +94,10 @@ export function setupBlocks(
     action_id: SETUP_START,
     value: setupId,
     style: "primary",
-    text: { type: "plain_text", text: texts.SETUP_START_BUTTON },
+    text: { type: "plain_text", text: slackTexts.SETUP_START_BUTTON },
   });
   return [
-    { type: "section", text: { type: "mrkdwn", text: texts.SETUP_HEADER } },
+    { type: "section", text: { type: "mrkdwn", text: slackTexts.SETUP_HEADER } },
     { type: "actions", block_id: SETUP_BLOCK, elements },
   ];
 }
@@ -114,10 +109,10 @@ function record(value: unknown): Readonly<Record<string, unknown>> {
 }
 
 /**
- * The owner's choice from a payload's `state.values`. A control with no selection, or one naming
- * something the agent did not list, reads as its default (`choiceOf`).
+ * What the controls hold in a payload's `state.values`, as they stand: a control with no
+ * selection reads as `DEFAULT`. The core checks it against what the request offered.
  */
-export function readChoice(values: unknown, models: readonly ModelInfo[]): Choice {
+export function readSelection(values: unknown): SetupSelection {
   const row = record(record(values)[SETUP_BLOCK]);
   const selected = (action: string): string => {
     const value = record(record(row[action]).selected_option).value;
@@ -125,19 +120,13 @@ export function readChoice(values: unknown, models: readonly ModelInfo[]): Choic
   };
   const picked = record(row[SETUP_BYPASS]).selected_options;
   const bypass = Array.isArray(picked) && picked.some((o) => record(o).value === BYPASS_ON);
-  return choiceOf(models, {
-    model: selected(SETUP_MODEL),
-    effort: selected(SETUP_EFFORT),
-    bypass,
-  });
+  return { model: selected(SETUP_MODEL), effort: selected(SETUP_EFFORT), bypass };
 }
 
-/** The one line that replaces the controls once the owner pressed Start. */
-export function summary(models: readonly ModelInfo[], choice: Choice): string {
-  const data: Summary = summaryOf(models, choice);
-  return texts.fill(texts.SETUP_SUMMARY, {
-    model: data.model,
-    effort: data.effort ?? texts.SETUP_EFFORT_DEFAULT,
-    bypass: data.bypass ? "on" : "off",
-  });
+/**
+ * The owner's choice from a payload's `state.values`. A control with no selection, or one naming
+ * something the agent did not list, reads as its default (`choiceOf`).
+ */
+export function readChoice(values: unknown, models: readonly ModelInfo[]): Choice {
+  return choiceOf(models, readSelection(values));
 }

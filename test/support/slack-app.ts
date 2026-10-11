@@ -36,6 +36,8 @@ import type {
   RequestHandler,
   StartOptions,
 } from "../../src/agent/seam.ts";
+import type { ChatInbound } from "../../src/chat/seam.ts";
+import type { AppConfig } from "../../src/chat/slack/app/answers.ts";
 import { type BuiltApp, buildApp } from "../../src/chat/slack/app/app.ts";
 import { ChannelGuard, type Identity } from "../../src/chat/slack/app/guards.ts";
 import { HOLD_CONTINUE } from "../../src/chat/slack/hold.ts";
@@ -62,15 +64,17 @@ import {
   SETUP_START,
 } from "../../src/chat/slack/setup.ts";
 import { SlackChat } from "../../src/chat/slack/thread.ts";
-import type { Config } from "../../src/core/config.ts";
+import { buildFlows } from "../../src/core/flows/flows.ts";
 import { UsageCache } from "../../src/core/footer.ts";
 import { Holds } from "../../src/core/hold.ts";
+import type { CorePort } from "../../src/core/port.ts";
 import { Approvals } from "../../src/core/requests.ts";
 import { SessionManager } from "../../src/core/sessions/manager.ts";
 import { StateStore } from "../../src/core/state.ts";
 import * as texts from "../../src/core/texts.ts";
 import { setWriter } from "../../src/log.ts";
 import {
+  AGENT,
   type AsyncEvent,
   BOT,
   CHANNEL,
@@ -83,6 +87,7 @@ import {
 } from "./fake-slack.ts";
 import { type JsonObject, sdkJson, slackPayload, slackPayloads } from "./fixtures.ts";
 import { commitAt, gitInit } from "./git-layouts.ts";
+import { NAMES } from "./names.ts";
 import {
   FakeAgentBackend,
   FakeAgentSession,
@@ -205,7 +210,7 @@ export class World {
   /** The allowed root; `root/app` is the channel's folder. */
   readonly root: string;
   readonly state: StateStore;
-  readonly approvals = new Approvals();
+  readonly approvals = new Approvals(NAMES);
   readonly holds = new Holds();
   readonly backend = new WorldBackend();
   /** What each file URL downloads to: bytes, or the failure the download rejects with. */
@@ -236,11 +241,17 @@ export class World {
   now: () => number = () => Date.now() / 1000;
   readonly limiter: Limiter;
   readonly identity: Identity = { ownerUserId: OWNER, teamId: TEAM, botUserId: BOT };
-  readonly config: Config;
+  readonly config: AppConfig;
   readonly sessions: SessionManager;
   readonly home: Home;
   readonly deleted: Array<[string, string]> = [];
   readonly cleaned: string[] = [];
+  /** The Slack provider the handlers answer through. */
+  readonly chat: SlackChat;
+  /** The core as the provider reaches it: the stores above. */
+  readonly core: CorePort;
+  /** What the listeners tell the core of what the owner did. */
+  readonly inbound: ChatInbound;
   readonly built: BuiltApp;
   readonly app: App;
   /** Whether the app's receiver was started, and stopped. */
@@ -269,15 +280,16 @@ export class World {
     };
     // A generous burst: these tests are about the handlers, not the shared limiter's pacing.
     this.limiter = options.limiter ?? new UpdateLimiter({ burst: 1_000, clock: this.slackClock });
-    const chat = new SlackChat({
+    this.chat = new SlackChat({
       slack,
       replies: slack,
       identity: this.identity,
+      agent: () => AGENT,
       limiter: this.limiter,
       clock: this.slackClock,
     });
     this.sessions = new SessionManager({
-      chat,
+      chat: this.chat,
       agent: this.backend,
       state: this.state,
       approvals: this.approvals,
@@ -285,18 +297,32 @@ export class World {
       usage: new UsageCache(async () => ({ session: null, week: null })),
       clock: this.clock,
     });
-    this.config = {
-      botToken: `${"xox"}b-fake`,
-      appToken: `${"xap"}p-fake`,
-      ownerUserId: OWNER,
+    this.config = { botToken: `${"xox"}b-fake`, allowedRoot: this.root };
+    const { inbound } = buildFlows({
+      chat: this.chat,
+      agent: this.backend,
+      sessions: this.sessions,
+      state: this.state,
+      approvals: this.approvals,
+      holds: this.holds,
+      names: NAMES,
       allowedRoot: this.root,
-      configDir: tmpPath,
-      userToken: null,
+      stopped: this.chat.stopped,
+      now: () => this.now(),
+    });
+    this.inbound = inbound;
+    this.core = {
+      sessions: this.sessions,
+      state: this.state,
+      approvals: this.approvals,
+      holds: this.holds,
+      agent: this.backend,
     };
     this.home = new Home(slack, {
       ownerUserId: OWNER,
       teamId: TEAM,
       state: this.state,
+      names: () => NAMES,
       sessionsOf: () => this.storedSessions,
       delete: async (channelId, threadTs) => {
         this.deleted.push([channelId, threadTs]);
@@ -326,9 +352,11 @@ export class World {
       holds: this.holds,
       guard: new ChannelGuard(slack, this.identity),
       state: this.state,
+      names: NAMES,
+      inbound: this.inbound,
       uploads: this.uploads,
       home: this.home,
-      limiter: this.limiter,
+      chat: this.chat,
       receiver,
       fetch: (request) => this.fetch(request),
       clock: this.appClock,
@@ -336,6 +364,9 @@ export class World {
       ...(options.listings !== undefined && { listings: options.listings }),
     });
     this.app = this.built.app;
+    // The app is built by hand, not through `SlackChat.start`: `!open` reaches it from here.
+    this.chat.openFile = (ref, folder, words) =>
+      this.built.openFile(ref.channel, ref.thread, folder, words);
   }
 
   /** Every agent session started, in order: the back end's `sessions`. */
