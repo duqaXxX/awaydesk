@@ -33,6 +33,7 @@ import { namesOf } from "../../../src/core/texts.ts";
 import { FakeClock } from "../../support/fake-slack.ts";
 import { type MemoryChat, memoryChat, OWNER } from "../../support/memory-chat.ts";
 import { PLAIN_CAPABILITIES, PlainAgent, type PlainSession } from "../../support/plain-agent.ts";
+import { settledTurn } from "../../support/sessions.ts";
 
 /** The names the texts take when the plain agent and the memory chat are the two modules. */
 export const PLAIN_NAMES = { agent: "Plain", author: "Plain", cli: "plain", chat: "Memory chat" };
@@ -221,7 +222,7 @@ export class MessagesWorld {
   /** Lets what is ready run, and what it starts. */
   async settle(rounds = 30): Promise<void> {
     for (let round = 0; round < rounds; round += 1) {
-      await new Promise<void>((resolve) => setImmediate(resolve));
+      await settledTurn();
     }
   }
 
@@ -232,7 +233,7 @@ export class MessagesWorld {
         .requests()
         .find((r) => (ref === undefined || r.ref.thread === ref.thread) && r.request.type === type);
       if (found !== undefined) return found;
-      await new Promise<void>((resolve) => setImmediate(resolve));
+      await settledTurn();
     }
     throw new Error(`no ${type} request was asked`);
   }

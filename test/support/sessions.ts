@@ -505,6 +505,16 @@ export async function realWorkDone(): Promise<void> {
 }
 
 /**
+ * One turn of the event loop, then whatever real work it set going: what a test waits between
+ * two looks at the daemon. A count of bare turns is not a wait: a file call outlasts any number
+ * of them on a loaded machine.
+ */
+export async function settledTurn(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await realWorkDone();
+}
+
+/**
  * A fake clock whose `advance` returns once the real work it set going is done: a timer that
  * fires into an end of turn starts the footer's `git`, and a test that advances a clock and
  * then asserts the end state would otherwise race the operating system.

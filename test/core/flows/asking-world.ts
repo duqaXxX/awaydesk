@@ -34,6 +34,7 @@ import {
   type ShownMessage,
 } from "../../support/memory-chat.ts";
 import { PlainAgent } from "../../support/plain-agent.ts";
+import { settledTurn } from "../../support/sessions.ts";
 
 /** One answer that reached the core. */
 export interface Reached {
@@ -199,7 +200,7 @@ export class AskingWorld {
     for (let round = 0; round < 200; round += 1) {
       const found = this.open(ref).find((r) => r.request.type === type);
       if (found !== undefined) return found;
-      await new Promise<void>((resolve) => setImmediate(resolve));
+      await settledTurn();
     }
     throw new Error(`no ${type} request was asked in ${ref.thread}`);
   }

@@ -12,7 +12,7 @@ import * as texts from "../../../src/core/texts.ts";
 import { fill, named } from "../../../src/core/texts.ts";
 import { OWNER, SOMEONE } from "../../support/memory-chat.ts";
 import { call, type PlainAgent, question, say } from "../../support/plain-agent.ts";
-import { FakeAgentBackend } from "../../support/sessions.ts";
+import { FakeAgentBackend, settledTurn } from "../../support/sessions.ts";
 import { AskingWorld } from "./asking-world.ts";
 
 /** The lines the core's flows logged from here on. */
@@ -37,7 +37,7 @@ async function busyNeighbour(world: AskingWorld) {
   (world.agent as PlainAgent).next({ hold: true });
   await neighbour.session.submit("long job");
   for (let round = 0; round < 50 && !neighbour.session.busy; round += 1) {
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    await settledTurn();
   }
   assert.ok(neighbour.session.busy, "the neighbour works");
   return neighbour;
@@ -194,10 +194,10 @@ test("a drain that starts while Start is applied cancels it: nothing is sent", a
     selection: { model: "default", effort: "full", bypass: false },
   });
   // The summary waits on the chat: Start is still being applied when the drain begins.
-  for (let round = 0; round < 20; round += 1) await new Promise<void>((r) => setImmediate(r));
+  for (let round = 0; round < 20; round += 1) await settledTurn();
   const cut = new AbortController();
   const drain = world.sessions.drain(cut.signal);
-  for (let round = 0; round < 20; round += 1) await new Promise<void>((r) => setImmediate(r));
+  for (let round = 0; round < 20; round += 1) await settledTurn();
   world.gate.set();
 
   assert.equal(await asked, null);
@@ -391,7 +391,7 @@ test("a stop that lands while the summary waits on the chat sends nothing and wr
     type: "setup",
     selection: { model: "default", effort: "full", bypass: false },
   });
-  for (let round = 0; round < 20; round += 1) await new Promise<void>((r) => setImmediate(r));
+  for (let round = 0; round < 20; round += 1) await settledTurn();
   await session.stop();
   world.gate.set();
 
