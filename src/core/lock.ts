@@ -4,20 +4,17 @@
  * What holds, by platform (`singleInstance` picks the mechanism):
  *
  * - macOS, the only supported host: the lock is the open file description of the configuration
- *   directory itself, opened with `O_EXLOCK | O_NONBLOCK`. That is `flock(LOCK_EX | LOCK_NB)` on
- *   the directory, exactly the lock the Python daemon takes, so a Python daemon and this one
- *   refuse each other. It adds no file, and the kernel drops it when the process dies, a killed
- *   one included, and whatever child processes outlive it (the descriptor is close-on-exec).
- *   Renaming or removing `lock.sock` or any other file in the directory changes nothing.
+ *   directory itself, opened with `O_EXLOCK | O_NONBLOCK`, which is `flock(LOCK_EX | LOCK_NB)` on
+ *   the directory. It adds no file, and the kernel drops it when the process dies, a killed one
+ *   included, and whatever child processes outlive it (the descriptor is close-on-exec). Renaming
+ *   or removing `lock.sock` or any other file in the directory changes nothing.
  * - Linux: a listening Unix socket `lock.sock` in the directory, with `lock.sock.claim` taken
  *   around every start so that the recovery of a stale socket is never raced. Linux has no
- *   `O_EXLOCK`, and Node has no `flock`. This lock does not exclude the Python daemon, which
- *   holds a `flock` on the directory, and a path-named lock has one more limit: removing
- *   `lock.sock` under a live holder lets a second start in, since the new socket is a different
- *   file. A claim file left behind blocks a start for at most `CLAIM_STALE_MS`.
+ *   `O_EXLOCK`, and Node has no `flock`. A path-named lock has one limit the macOS one lacks:
+ *   removing `lock.sock` under a live holder lets a second start in, since the new socket is a
+ *   different file. A claim file left behind blocks a start for at most `CLAIM_STALE_MS`.
  * - Windows: a named pipe derived from the directory's real path. The system drops it with its
- *   process and refuses a second one of the same name; no claim file is involved. It does not
- *   exclude the Python daemon either.
+ *   process and refuses a second one of the same name; no claim file is involved.
  */
 import { createHash } from "node:crypto";
 import {
@@ -245,7 +242,7 @@ export async function socketLock(
 
 /**
  * The macOS mechanism: the lock is the open file description of `directory`, opened with
- * `O_EXLOCK | O_NONBLOCK`, which is the `flock` the Python daemon takes on the same directory.
+ * `O_EXLOCK | O_NONBLOCK`, which is `flock(LOCK_EX | LOCK_NB)` on the directory.
  */
 async function directoryLock(directory: string): Promise<InstanceLock> {
   let fd: number;
