@@ -13,7 +13,6 @@ import type { ChatProvider } from "../chat/seam.ts";
 import type { Clock } from "../clock.ts";
 import type { OtherFlows } from "./flows/contract.ts";
 import type { FilesSession, FilesSessions, FilesState } from "./port/file-flows.ts";
-import type { HoldHolds, HoldSession, HoldSessions } from "./port/hold.ts";
 import type { HomeAgent, HomeState } from "./port/home.ts";
 import type {
   RequestsApprovals,
@@ -26,27 +25,19 @@ import type { ThreadsSessions, ThreadsState } from "./port/threads.ts";
 import type { WordsSession, WordsSessions, WordsState } from "./port/words.ts";
 
 /** The live sessions, as every flow of a provider together may reach them. */
-export type SessionsPort = WordsSessions &
-  RequestsSessions &
-  HoldSessions &
-  FilesSessions &
-  ThreadsSessions;
+export type SessionsPort = WordsSessions & RequestsSessions & FilesSessions & ThreadsSessions;
 
 /** One thread's session, as a provider holds it between two calls. */
-export type SessionPort = WordsSession & RequestsSession & HoldSession & FilesSession;
+export type SessionPort = WordsSession & RequestsSession & FilesSession;
 
 /** What the daemon keeps of its channels and threads. */
-export type StatePort = WordsState &
-  RequestsState &
-  FilesState &
-  ThreadsState &
-  HomeState;
+export type StatePort = WordsState & RequestsState & FilesState & ThreadsState & HomeState;
 
 /** The requests of the agent that wait for the owner. */
 export type ApprovalsPort = RequestsApprovals;
 
 /** The questions of the daemon's own that wait for the owner. */
-export type HoldsPort = HoldHolds & RequestsHolds;
+export type HoldsPort = RequestsHolds;
 
 /** What a provider reads of the agent. */
 export type AgentPort = HomeAgent & Pick<AgentBackend, "name" | "words">;
@@ -97,8 +88,8 @@ export type { ChannelLookup } from "./cleanup.ts";
 export type { Command, Passthrough, Word } from "./commands.ts";
 export { helpText, hostOnly, parseBang, refusedInThread, unformatted, WORD } from "./commands.ts";
 export { ConfigError } from "./config.ts";
-export type { OtherFlows } from "./flows/contract.ts";
 export { boundText } from "./flows/bind.ts";
+export type { OtherFlows } from "./flows/contract.ts";
 export { FOLDER_ROWS, foldersWithin } from "./folders.ts";
 export type { FooterKey } from "./footer.ts";
 export { footerFields, GIT_TIMEOUT, runGit } from "./footer.ts";
