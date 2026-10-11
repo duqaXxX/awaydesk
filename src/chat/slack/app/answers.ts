@@ -229,13 +229,28 @@ export class Answers {
     channel: string | null,
     threadTs: string,
   ): Promise<boolean> {
-    const { identity, guard } = this.parts;
+    if (!this.fromOwner(user, team, channel) || channel === null) return false;
+    return this.channelAllowed(channel, threadTs);
+  }
+
+  /**
+   * The first of the two checks, with nothing awaited: false once the daemon has stopped, for an
+   * event with no channel and for anyone but the owner acting from the workspace read at
+   * startup. A listener that keeps an order takes its place only after it, so that anyone else
+   * takes none.
+   */
+  fromOwner(user: string | null, team: string | null, channel: string | null): boolean {
     if (this.stopped) return false;
-    if (!channel || !isOwner(identity, user, team)) {
+    if (!channel || !isOwner(this.parts.identity, user, team)) {
       logger.info("ignored an inbound event from someone other than the owner");
       return false;
     }
-    const reason = await guard.refusal(channel);
+    return true;
+  }
+
+  /** The second check: the channel as Slack describes it now, the owner told why when refused. */
+  async channelAllowed(channel: string, threadTs: string): Promise<boolean> {
+    const reason = await this.parts.guard.refusal(channel);
     // The check can outlast the daemon: nothing is said, not even to refuse the channel.
     if (this.stopped) return false;
     if (reason !== null) {

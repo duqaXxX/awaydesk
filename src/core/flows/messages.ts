@@ -6,8 +6,9 @@
  * were sent although files take a while to read. That holds by construction: from the moment a
  * provider hands over a message (`message` is called) to the moment its place in line is taken
  * (`Mutex.acquire` inside `arrival`), nothing is awaited except a call to the chat (the
- * old-folder notice). The stretches are marked `(sync)`; the provider keeps its side of it,
- * handing the message over with nothing awaited after its own checks.
+ * old-folder notice). The stretches are marked `(sync)`; the provider keeps its side of it: it
+ * hands the messages of a thread over in the order its listeners were called, whatever its
+ * checks take, with nothing awaited between its last check and the call.
  */
 
 import type { CommandInfo } from "../../agent/seam.ts";

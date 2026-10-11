@@ -924,6 +924,22 @@ All notable changes to this project are documented here. The format follows
   refused interrupt by the error's name and still stops the background tasks. `Open.openFile`
   logs the error code of the cause when it answers that a path is not a file (`EACCES` for a file
   the daemon may not read); the owner reads the same sentence as before.
+- Two messages of one thread are handed to the core in the order they were sent, whatever the
+  channel check takes (`ThreadOrder`, `Answers.fromOwner`, `Answers.channelAllowed`). The `message`
+  listener awaited the check (`conversations.info` and `conversations.members`, each of which can
+  be sent again after a pause) before the stretch that takes the thread's place in line, so the
+  listener whose check returned first took the first turn, and a `!stop` typed right after a
+  prompt could run before the prompt was queued. The listener now checks the owner first, with
+  nothing awaited, takes its place among the thread's messages, and leaves it when it has called
+  `ChatInbound.message`. With the first message's `conversations.info` held, the queue held
+  `["second", "first"]` at rest before the change (measured 2026-10-11). A later message of a
+  thread now waits for the checks of the messages before it, which before it did not: about 60
+  seconds per message ahead with no network (two calls of the client's 30 second timeout, read
+  from `clients.ts`, not measured), other threads unaffected. Three orderings are left as they
+  were, none of them in the listener: a `!stop` is a word and takes no place in `arrival`, so a
+  prompt that reads files is submitted after it; the two `talk.tell` calls of the old-folder
+  notice race when a later prompt of the thread has the notice due as well; and a clip whose
+  transcript is in the file's `vtt` is handed over after the download of that file.
 - A table's delimiter row in a reply is recognised in linear time (`markdown.markdownStarts`).
   One pattern read the whole row, and on a line of spaces around a single dash, under a line
   holding a `|`, it backtracked in cubic time: 200 ms at 800 spaces a side and 3.1 s at 2,000
