@@ -877,6 +877,23 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A call Slack answers with HTTP 500 or 503 (`clients.SERVER_ERROR_STATUSES`) is sent again
+  once, after the pause and under the rule of a call that failed on the connection: every method
+  on `clients.sharedClient`, every method but `clients.CREATING_METHODS` on
+  `clients.repliesClient`, and one retry between the two kinds (issue #265). The policy sent no
+  call again after an HTTP status other than 429, so one 503 on the `reactions.add` of ✅ at the
+  end of a turn left ⏳ on the root until the next turn or the idle close, an hour later
+  (reproduced with the fake Slack client and the fake clock, 2026-10-11). The two statuses and
+  the one retry are those of slack-sdk's `ServerErrorRetryHandler`. A call that meets such an
+  answer now takes that pause and a second send longer to fail. Not run against Slack: how often
+  a second send after a 500 or a 503 goes through.
+- `markdown.plainWords` reads a text in a time linear in its length (issue #241). Its pattern for
+  a labelled link started again at every `<` of a run and read to the end each time: 660 ms at
+  40,000 `<` (Node 26.5.1, 2026-10-11), on the event loop every thread shares. The same pattern
+  now also matches the stretch that holds no label, so the search goes on after it, and the text
+  after the last `>` is left unread. The result is the same on every text of up to 7 characters
+  over `<`, `|`, `>`, two letters and a space, compared with the pattern of before in
+  `test/chat/slack/reply/markdown.test.ts`; 200,000 `<` take about 1 ms.
 - `listing.aliveSessions` answers "cannot tell" (null) when the `stat` of a folder's transcripts
   directory fails for any reason but the directory not being there (`ENOENT`, `ENOTDIR`). The
   check turned every failed `stat` into "not there" and returned the SDK's listing alone, which

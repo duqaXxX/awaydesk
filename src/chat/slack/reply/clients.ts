@@ -11,17 +11,21 @@
  *   idempotent, a connection can reset after Slack applied the call, and a second send would
  *   duplicate a message or its text, or stop a stream twice. The sink reads the thread back
  *   instead, and adopts what landed.
- * - nothing else is sent again: Slack answering with an error (`WebAPIPlatformError`), an HTTP
- *   status other than 200 and 429, a timeout (slack-sdk retried neither, and a timed out call may
- *   have run).
+ * - a call Slack answered with HTTP 500 or 503 (`SERVER_ERROR_STATUSES`) is sent again as one
+ *   that failed on the connection is: once, after the same pause, by the same client for the
+ *   same methods, since such an answer says no more than a reset about whether the call ran.
+ *   The statuses and the one retry are those of slack-sdk's `ServerErrorRetryHandler`
+ *   (`slack_sdk/http_retry/builtin_handlers.py`, read 2026-10-11).
+ * - nothing else is sent again: Slack answering with an error (`WebAPIPlatformError`), any other
+ *   HTTP status, a timeout (a timed out call may have run).
  *
  * `@slack/web-api` 8.2.0 retries every failure or none: `WebClient.makeRequest` ends in
  * `pRetry(task, this.retryConfig)`, with no option per method and none per error. So both clients
  * are built with the two documented options that switch its retries off (`SENT_ONCE`), which
  * makes the library report each failure once, as a typed error, and `PolicyClient.apiCall` applies
  * the policy around `WebClient.apiCall`. A retry counts toward one budget per call, as slack-sdk's
- * `RetryState.current_attempt` did: a connection retry is allowed while no retry was made, a rate
- * limit retry while fewer than 3 were.
+ * `RetryState.current_attempt` did: a connection or server error retry is allowed while no retry
+ * was made, a rate limit retry while fewer than 3 were.
  *
  * Differences from slack-sdk: a 429 with no valid `Retry-After` is thrown as the library's plain
  * error at once (slack-sdk waited 1 to 2 seconds and retried; Slack always sends the header); and
@@ -32,6 +36,7 @@
  */
 import {
   type WebAPICallResult,
+  WebAPIHTTPError,
   WebAPIRateLimitedError,
   WebAPIRequestError,
   WebClient,
@@ -62,6 +67,8 @@ export const SENT_ONCE = {
 // `AsyncRateLimitErrorRetryHandler(max_retry_count=3)` and slack-sdk's connection handler default.
 export const RATE_LIMIT_RETRIES = 3;
 export const CONNECTION_RETRIES = 1;
+/** The HTTP statuses a call is sent again after, as after a failed connection. */
+export const SERVER_ERROR_STATUSES: readonly number[] = [500, 503];
 // `BackoffRetryIntervalCalculator(backoff_factor=0.5)`: 0.5 * 2^attempt seconds, plus a jitter.
 const BACKOFF_FACTOR = 0.5;
 
@@ -86,6 +93,11 @@ function failedOnConnection(error: unknown): boolean {
   );
 }
 
+/** Slack answered with a status that says its side failed, with no word on the call itself. */
+function failedOnServer(error: unknown): boolean {
+  return error instanceof WebAPIHTTPError && SERVER_ERROR_STATUSES.includes(error.statusCode);
+}
+
 /** A `WebClient` that sends each call by the policy at the top of this file. */
 class PolicyClient extends WebClient {
   readonly #notRetried: ReadonlySet<string>;
@@ -106,7 +118,7 @@ class PolicyClient extends WebClient {
       return retries < RATE_LIMIT_RETRIES ? error.retryAfter + this.#random() : null;
     }
     if (
-      failedOnConnection(error) &&
+      (failedOnConnection(error) || failedOnServer(error)) &&
       retries < CONNECTION_RETRIES &&
       !this.#notRetried.has(method)
     ) {
@@ -132,14 +144,14 @@ class PolicyClient extends WebClient {
   }
 }
 
-/** The shared client: connection and rate limit retries for every call. */
+/** The shared client: connection, server error and rate limit retries for every call. */
 export function sharedClient(token: string | undefined, options: ClientOptions = {}): WebClient {
   return new PolicyClient(token, [], options);
 }
 
 /**
  * The replies client: the shared client's policy, except that `CREATING_METHODS` are not resent
- * on a connection failure.
+ * on a connection failure or a server error.
  */
 export function repliesClient(token: string | undefined, options: ClientOptions = {}): WebClient {
   return new PolicyClient(token, CREATING_METHODS, options);
