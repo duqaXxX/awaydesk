@@ -87,6 +87,12 @@ export type Item =
   | { readonly event: SessionEvent }
   /** The CLI asks for a permission decision, and waits for it before it goes on. */
   | { readonly ask: CanUseToolCall }
+  /**
+   * The same request, made while the stream goes on. `ClaudeSession` reads its stream and serves
+   * `canUseTool` independently (the SDK calls the callback from its own task), so a process can
+   * end with a request still waiting: `ask` cannot play that, since it holds the stream.
+   */
+  | { readonly request: CanUseToolCall }
   /** The CLI runs the host's hooks: Stop before the result, PostToolUse after a tool. */
   | { readonly hook: "Stop" | "PostToolUse"; readonly input: JsonObject }
   /** The CLI process exits and its stream ends. */
@@ -139,6 +145,14 @@ export function splitTurns(items: readonly Item[]): Item[][] {
 
 export function canUseToolCall(toolName: string, input: JsonObject, callId = "toolu_fake_1"): Item {
   return { ask: { toolName, input, callId } };
+}
+
+export function requestWhileStreaming(
+  toolName: string,
+  input: JsonObject,
+  callId = "toolu_fake_1",
+): Item {
+  return { request: { toolName, input, callId } };
 }
 
 export function hookRun(input: JsonObject, hook: "Stop" | "PostToolUse" = "Stop"): Item {
@@ -312,6 +326,16 @@ export class FakeAgentSession implements AgentSession {
         }
         if ("ask" in item) {
           this.permissionResults.push(await this.#ask(item.ask));
+        } else if ("request" in item) {
+          this.#ask(item.request).then(
+            (answer) => this.permissionResults.push(answer),
+            (error: unknown) => {
+              // Nobody awaits this call, so a rejection would vanish: make it an uncaught error.
+              setImmediate(() => {
+                throw error;
+              });
+            },
+          );
         } else if ("hook" in item) {
           yield* item.hook === "Stop"
             ? stopHookEvents(item.input)

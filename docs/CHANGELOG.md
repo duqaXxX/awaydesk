@@ -940,6 +940,20 @@ All notable changes to this project are documented here. The format follows
   prompt that reads files is submitted after it; the two `talk.tell` calls of the old-folder
   notice race when a later prompt of the thread has the notice due as well; and a clip whose
   transcript is in the file's `vtt` is handed over after the download of that file.
+- A request waiting for the owner when the agent's process ends is settled with the reader
+  (`ThreadSession.read`, through `settleRequests`, the steps `close` already took). Only `close`
+  denied requests, so after a lost process the request kept its buttons, its timestamp stayed in
+  `state.json`, `waitingForOwner` stayed true and the idle close never fired, `!stop` answered
+  `Nothing is running in this session.`, and a click on Approve set the root to working with no
+  process and no turn (measured on 2026-10-11 with the real session, in a test of the session
+  and in one of the daemon with the plain agent and the memory chat). The request is now denied,
+  its message withdrawn and its entry removed from `state.json` before the reply ends, and the
+  root goes to the error status without a stop at working, even when no turn was active. The
+  turn is released whether or not the chat withdrew the messages, and `ensureConnected` starts no
+  new process until the previous reader has ended, so a slow withdrawal cannot end the next
+  process's turn as lost. The back end's `canUseTool` callback still ignores the abort of its
+  `signal`; ending a request on that signal needs a word from the back end to the core that the
+  agent seam does not have.
 - A table's delimiter row in a reply is recognised in linear time (`markdown.markdownStarts`).
   One pattern read the whole row, and on a line of spaces around a single dash, under a line
   holding a `|`, it backtracked in cubic time: 200 ms at 800 spaces a side and 3.1 s at 2,000
