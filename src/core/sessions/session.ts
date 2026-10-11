@@ -138,9 +138,10 @@ export class ThreadSession {
   // One status on the session's root message, which `threadId` always is, and the line under
   // the thread's last message (issues #83 and #95): both are the chat's to draw.
   private readonly thread: ThreadChat;
-  // Set by `stop()` while it denies pending approvals, so `askOwner`'s own finally does not
-  // race its closing ✅ back to working; `finish` and `abandon` clear it, once that turn's own
-  // tail ends, whichever way.
+  // Set by `stop()` while it denies pending approvals, and by `read` while it settles the
+  // requests of a lost process, so `askOwner`'s own finally does not race its closing ✅ (or
+  // the ❌) back to working; `finish` and `abandon` clear it, once that turn's own tail ends,
+  // whichever way.
   private interrupting = false;
   /** Set once the turn `stop()` interrupted has closed its reply (`stopLanded`). */
   private stopTail: Event | null = null;
@@ -722,6 +723,11 @@ export class ThreadSession {
     try {
       if (this.closedFlag) throw new SessionClosed();
       if (this.client !== null) return this.client;
+      // The reader of the process before this one may still be ending (it withdraws the
+      // requests that process left, then releases its turns): a process started now would have
+      // its turn released by that reader, which ends whatever turn is active when it gets there.
+      // Nothing that reader awaits takes this lock, and a reader that has finished settles at once.
+      if (this.reader !== null) await cancellable(this.reader.settled(), signal);
       if (this.predecessor !== null) {
         // The agent process this thread had before may still be exiting: it needs time to
         // flush the session file after EOF, and starting with the same id to resume before that
@@ -1500,20 +1506,24 @@ export class ThreadSession {
       const requests = this.requestMessages();
       if (requests.length > 0) this.reactError();
       this.interrupting = true;
-      await this.settleRequests(requests);
-      await this.abandon(
-        texts.fill(texts.named(texts.ERROR_REPLY, this.names), { error: reason }),
-        {
-          error: true,
-          because: texts.named(texts.BECAUSE_STOPPED, this.names),
-        },
-      );
+      try {
+        await this.settleRequests(requests);
+      } finally {
+        // Whatever the chat did meanwhile, the turn is released.
+        await this.abandon(
+          texts.fill(texts.named(texts.ERROR_REPLY, this.names), { error: reason }),
+          {
+            error: true,
+            because: texts.named(texts.BECAUSE_STOPPED, this.names),
+          },
+        );
+      }
     } finally {
       await client.close().catch(() => {});
+      // The session stays alive (not closed): the next turn reconnects. `abandon` settles it
+      // from outside this loop's own per-event check above, so it needs its own call.
+      this.idleTimerCheck();
     }
-    // The session stays alive (not closed): the next turn reconnects. `abandon` settles it
-    // from outside this loop's own per-event check above, so it needs its own call.
-    this.idleTimerCheck();
   }
 
   /**
@@ -2187,7 +2197,8 @@ export class ThreadSession {
   private async startTurn(worded: boolean): Promise<ActiveTurn> {
     // Skipped while `stop()` is still winding an interrupt down (`finish` clears the flag once
     // that very turn's own end says so): this can be that turn's own trailing events, not a
-    // new one, and `stop()`'s own ✅ must stand.
+    // new one, and `stop()`'s own ✅ must stand. `read` raises it too, while it settles a lost
+    // process's requests, for the same reason.
     if (!this.interrupting) {
       this.errorStanding = false; // a turn is sent, or a report turn starts: new work
       // A background task's own report turn can start while a hold waits on this very

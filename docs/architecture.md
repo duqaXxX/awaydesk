@@ -1314,10 +1314,11 @@ closed when the start returns (`ThreadSession.connect`).
 - If the Claude Code process exits or its stream fails, the back end ends the session's events with
   `process_lost`, whose reason is its own words for a process that exited or the name of the
   failure, never its message. The requests the thread had open are denied and their messages
-  deleted, as a close does it (`ThreadSession.settleRequests`), so none is left with buttons
-  nobody can answer and the idle close is no longer held. The open reply ends with an error line,
-  every waiting message is told, and the next message starts a new process. A Slack failure while a reply is written never stops
-  the session or the running turn.
+  deleted, as a close does it (`ThreadSession.settleRequests`), so none keeps buttons nobody can
+  answer and the session stops counting as waiting for the owner: the idle close can fire and
+  `!stop` has nothing left to deny. The open reply ends with an error line, every waiting message
+  is told, and the next message starts a new process, once the lost process's reader has ended.
+  A Slack failure while a reply is written never stops the session or the running turn.
 - Messages are queued and run one at a time; each gets its own reply in the thread. `!stop`
   interrupts the running turn, denies its pending approvals and stops the thread's background tasks
   (`AgentSession.stopTask`); an interrupt or a stop of one task that the agent refuses is logged by

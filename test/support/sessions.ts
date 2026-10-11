@@ -327,7 +327,15 @@ export class FakeAgentSession implements AgentSession {
         if ("ask" in item) {
           this.permissionResults.push(await this.#ask(item.ask));
         } else if ("request" in item) {
-          void this.#ask(item.request).then((answer) => this.permissionResults.push(answer));
+          this.#ask(item.request).then(
+            (answer) => this.permissionResults.push(answer),
+            (error: unknown) => {
+              // Nobody awaits this call, so a rejection would vanish: make it an uncaught error.
+              setImmediate(() => {
+                throw error;
+              });
+            },
+          );
         } else if ("hook" in item) {
           yield* item.hook === "Stop"
             ? stopHookEvents(item.input)

@@ -9,7 +9,7 @@ import { test } from "node:test";
 import { Status } from "../../../src/chat/slack/reply/status.ts";
 import { APPROVE } from "../../../src/core/requests.ts";
 import { IDLE_CLOSE_SECONDS } from "../../../src/core/sessions/constants.ts";
-import { CHANNEL, THREAD } from "../../support/fake-slack.ts";
+import { AsyncEvent, CHANNEL, THREAD } from "../../support/fake-slack.ts";
 import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
 import {
   END_OF_STREAM,
@@ -22,15 +22,20 @@ import {
 } from "../../support/sessions.ts";
 import { inside, pending } from "./helpers.ts";
 
-/** The recorded turn up to the reply's first message, then the agent's request, then silence. */
-function askingTurn(toolName: string, input: JsonObject) {
+/** The recorded turn cut right after the reply's first message. */
+function openedTurn() {
   const tools = sdkMessages("tools");
   const started = tools.findIndex((item) => {
     const event = recordOf(item)?.event;
     return isRecord(item, "stream_event") && (event as JsonObject).type === "message_start";
   });
   assert.notEqual(started, -1);
-  return [...tools.slice(0, started + 1), requestWhileStreaming(toolName, input)];
+  return tools.slice(0, started + 1);
+}
+
+/** The recorded turn up to the reply's first message, then the agent's request, then silence. */
+function askingTurn(toolName: string, input: JsonObject) {
+  return [...openedTurn(), requestWhileStreaming(toolName, input)];
 }
 
 /** A session with `turn` running and its one request posted, then the process ends. */
@@ -103,4 +108,73 @@ test("an approval pressed after the process was lost finds no request", async (t
   assert.equal(h.approvals.resolve(approvalId, CHANNEL, THREAD, APPROVE), null);
   await h.idle();
   assert.equal(h.reactions().at(-1), Status.ERROR);
+});
+
+/** The recorded turn whole, then a request made with no turn running: a background task's. */
+async function askedBetweenTurns(h: Harness, session: ReturnType<Harness["session"]>) {
+  await (await session.submit("first")).done.wait();
+  h.clients[0]?.inject([requestWhileStreaming("Bash", { command: "rm -rf build" })]);
+  await h.until(() => pending(h.approvals).length > 0);
+  await h.until(() => (h.state.thread(CHANNEL, THREAD)?.requests.length ?? 0) === 1);
+}
+
+test("a request with no turn running leaves the root on the error status, not waiting", async (t) => {
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
+  const session = h.session();
+  await askedBetweenTurns(h, session);
+  assert.equal(h.reactions().at(-1), Status.WAITING);
+
+  h.clients[0]?.inject([END_OF_STREAM]);
+  await h.until(() => inside(session).client === null);
+  await h.idle();
+
+  assert.deepEqual(pending(h.approvals), []);
+  assert.equal(h.reactions().at(-1), Status.ERROR);
+  assert.equal(h.state.thread(CHANNEL, THREAD)?.status, null);
+});
+
+test("a withdrawal that fails does not keep the lost process's turn", async (t) => {
+  const h = harnessFor(t)({ turns: [askingTurn("Bash", { command: "rm -rf build" })] });
+  const session = h.session();
+  const turn = await session.submit("clean");
+  await h.until(() => pending(h.approvals).length > 0);
+  await h.until(() => (h.state.thread(CHANNEL, THREAD)?.requests.length ?? 0) === 1);
+  // The chat seam does not promise that `withdraw` never rejects.
+  const chat = (session as unknown as { thread: { withdraw(message: string): Promise<void> } })
+    .thread;
+  chat.withdraw = () => Promise.reject(new Error("the chat is gone"));
+
+  h.clients[0]?.inject([END_OF_STREAM]);
+  await h.until(() => turn.done.isSet);
+  await h.until(() => inside(session).client === null);
+  await h.idle();
+
+  assert.equal(inside(session).interrupting, false);
+  assert.equal(inside(session).active, null);
+  assert.equal(h.reactions().at(-1), Status.ERROR);
+});
+
+test("a new process does not start while the old reader still withdraws its requests", async (t) => {
+  // A request open with no turn running (a background task's), a withdrawal slower than the
+  // next message: the old reader must not end the turn the new process is about to run.
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")] }, { turns: [openedTurn()] });
+  const session = h.session();
+  await askedBetweenTurns(h, session);
+  const gate = new AsyncEvent();
+  h.slack.gate = gate;
+  h.slack.gateMethod = "chat.delete";
+
+  h.clients[0]?.inject([END_OF_STREAM]);
+  await h.slack.gated.wait();
+  const second = await session.submit("second");
+  await h.idle();
+  assert.equal(h.clients.length, 1); // no process until the old reader has finished
+  gate.set();
+  await h.until(() => h.clients.length === 2);
+  await h.until(() => inside(session).active !== null);
+  await h.idle();
+
+  assert.equal(inside(session).interrupting, false);
+  assert.equal(second.done.isSet, false); // the new turn runs; nothing ended it as lost
+  assert.ok(!h.bodies().some((body) => body.includes("reported an error")));
 });
