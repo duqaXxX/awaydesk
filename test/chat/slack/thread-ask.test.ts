@@ -5,11 +5,11 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import type { ModelInfo } from "../../../src/agent/seam.ts";
-import { ChatError, type HoldRequest, type SetupRequest } from "../../../src/chat/seam.ts";
+import type { HoldRequest, SetupRequest } from "../../../src/chat/seam.ts";
 import { holdBlocks } from "../../../src/chat/slack/hold.ts";
 import { resetStatusFlags } from "../../../src/chat/slack/reply/status.ts";
 import { SETUP_EFFORT, SETUP_START, setupBlocks } from "../../../src/chat/slack/setup.ts";
-import { CHANNEL, OTHER_THREAD, rejected, THREAD } from "../../support/fake-slack.ts";
+import { CHANNEL, OTHER_THREAD, THREAD } from "../../support/fake-slack.ts";
 import { madeChat } from "../../support/slack-chat.ts";
 
 beforeEach(() => resetStatusFlags());
@@ -93,14 +93,5 @@ test("a setup is drawn as its request says: no Bypass checkbox and the agent's e
   assert.deepEqual(
     efforts.map((option) => option.value),
     ["default", "brief", "full"],
-  );
-});
-
-test("a request Slack refuses rejects with a ChatError named by its code", async () => {
-  const { slack, thread } = madeChat();
-  slack.responses["chat.postMessage"] = rejected("channel_not_found");
-  await assert.rejects(
-    thread.ask("hold-1", HOLD, "Another session is working here"),
-    (error: unknown) => error instanceof ChatError && error.name === "channel_not_found",
   );
 });

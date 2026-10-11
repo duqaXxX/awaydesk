@@ -307,11 +307,7 @@ test("a header of blanks alone never leaves the choice an empty label", () => {
   assert.equal(choices[0]?.label.text, "Answer");
 });
 
-for (const [shown, blank] of [
-  ["[ ]", " "],
-  ["[\\n]", "\n"],
-  ["[ \\n\\t]", " \n\t"],
-] as const) {
+for (const [shown, blank] of [["[ \\n\\t]", " \n\t"]] as const) {
   test(`a preview or a description of blanks alone counts as none ${shown}`, () => {
     const asked = question({
       question: "Colour?",

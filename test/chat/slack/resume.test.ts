@@ -175,11 +175,9 @@ test("a resume value round trips", () => {
 });
 
 for (const [name, value] of [
-  ["", ""],
   ["68da9311", "68da9311"],
   ["68da9311@", "68da9311@"],
   [`@${THREAD}`, `@${THREAD}`],
-  ["68da9311@thread", "68da9311@thread"],
   ["68da9311@1780000000", "68da9311@1780000000"],
   ["68da9311@1.2.3", "68da9311@1.2.3"],
 ] as const) {

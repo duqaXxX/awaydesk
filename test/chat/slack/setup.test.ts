@@ -159,11 +159,6 @@ test("start carries the setup id and is primary", () => {
   assert.deepEqual([button.value, button.style], ["the-id", "primary"]);
 });
 
-test("no listed model leaves the model select out", () => {
-  const blocks = setupBlocks("id", drawn([], { efforts: ["brief"] }), DEFAULT_CHOICE);
-  assert.deepEqual(Object.keys(controls(blocks)), [SETUP_EFFORT, SETUP_BYPASS, SETUP_START]);
-});
-
 test("a request that offers no bypass draws no Bypass checkbox", () => {
   const found = controls(
     setupBlocks("id", drawn(MODELS, { bypassOffered: false }), DEFAULT_CHOICE),

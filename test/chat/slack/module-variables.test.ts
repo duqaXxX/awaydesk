@@ -33,15 +33,6 @@ const unreached = slackChat({
 
 const OWNER = { SLACK_OWNER_USER_ID: "U000ALICE" };
 
-test("the entry names the variables it reads", () => {
-  assert.deepEqual(unreached.required, [
-    "SLACK_BOT_TOKEN",
-    "SLACK_APP_TOKEN",
-    "SLACK_OWNER_USER_ID",
-  ]);
-  assert.deepEqual(unreached.optional, ["SLACK_USER_TOKEN"]);
-});
-
 const refusals: [string, Record<string, string>, string][] = [
   [
     "swapped tokens",

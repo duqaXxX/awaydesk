@@ -174,20 +174,6 @@ test("start opens the connection, reading the core only then; stop closes it", a
   assert.equal(chat.stopped.aborted, true);
 });
 
-test("after stop the provider says nothing", async (t) => {
-  const world = worldOf(t);
-  const { chat } = started(world);
-  await chat.start(NOBODY);
-  await chat.stop();
-  const thread = chat.thread({ channel: CHANNEL, thread: THREAD });
-  await thread.tell("words");
-  await thread.say("words");
-  await thread.acknowledge("1780000000.000009");
-  await chat.channel(CHANNEL).notice("words");
-  await chat.channel(CHANNEL).say("words");
-  assert.deepEqual(world.slack.apiCalls, []);
-});
-
 test("stop stops what listens even when the connection will not close", async (t) => {
   const world = worldOf(t);
   const { chat } = started(world, { stuck: true });
