@@ -4,7 +4,7 @@
  * is resolved with its links, held to the folder, and opened by a descriptor that refuses a link.
  */
 import { type BigIntStats, constants, type Stats } from "node:fs";
-import { open, realpath, stat } from "node:fs/promises";
+import { open, readlink, realpath, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, posix, sep } from "node:path";
 import type { WebClient } from "@slack/web-api";
 import { compareCodePoints } from "../../../text.ts";
@@ -48,8 +48,15 @@ export interface Opened {
   close(): Promise<void>;
 }
 
-/** Python's non-strict `os.path.realpath`: the links of what exists are resolved, the rest kept. */
-export async function realpathLoose(path: string): Promise<string> {
+// The kernel's own bound on the links one path may cross (Linux `MAXSYMLINKS`).
+const LINK_LIMIT = 40;
+
+/**
+ * Python's non-strict `os.path.realpath`: the links of what exists are resolved, the rest kept; a
+ * link whose target is missing leads to that target. A loop of links is left where the bound ends.
+ * It cannot call `resolvePath` of the core, which a chat provider may not import.
+ */
+export async function realpathLoose(path: string, links = 0): Promise<string> {
   // Made absolute as text and never normalized: `resolve` would fold `link/..` before the link
   // is followed, and name another folder than the one the kernel reaches.
   const absolute = isAbsolute(path) ? path : `${process.cwd()}/${path}`;
@@ -58,7 +65,11 @@ export async function realpathLoose(path: string): Promise<string> {
   } catch {
     const parent = dirname(absolute);
     if (parent === absolute) return absolute;
-    return join(await realpathLoose(parent), basename(absolute));
+    const leaf = join(await realpathLoose(parent, links), basename(absolute));
+    // `realpath` failed on a link: it dangles, or it is part of a loop.
+    const led = await readlink(leaf).catch(() => null);
+    if (led === null || links >= LINK_LIMIT) return leaf;
+    return realpathLoose(isAbsolute(led) ? led : `${dirname(leaf)}${sep}${led}`, links + 1);
   }
 }
 

@@ -227,3 +227,24 @@ test("a folder named through a link and .. is the one the link leads to", POSIX,
     join(tmp.dir, "elsewhere", "missing", "x"),
   );
 });
+
+test("a dangling link is followed to what it names, as Python's realpath does", POSIX, async () => {
+  const dir = join(tmp.dir, "links");
+  mkdirSync(join(dir, "real"), { recursive: true });
+  symlinkSync(join(dir, "missing"), join(dir, "dangling"));
+  symlinkSync("real", join(dir, "ok"));
+  symlinkSync("../links/gone", join(dir, "relative"));
+  assert.equal(await realpathLoose(join(dir, "dangling")), join(dir, "missing"));
+  assert.equal(await realpathLoose(join(dir, "dangling", "sub")), join(dir, "missing", "sub"));
+  assert.equal(await realpathLoose(join(dir, "relative")), join(dir, "gone"));
+  assert.equal(await realpathLoose(join(dir, "ok")), join(dir, "real"));
+  assert.equal(await realpathLoose(join(dir, "ok", "nope")), join(dir, "real", "nope"));
+});
+
+test("a loop of links ends the walk instead of following it for ever", POSIX, async () => {
+  const dir = join(tmp.dir, "loop");
+  mkdirSync(dir);
+  symlinkSync(join(dir, "b"), join(dir, "a"));
+  symlinkSync(join(dir, "a"), join(dir, "b"));
+  assert.match(await realpathLoose(join(dir, "a")), /[/\\][ab]$/);
+});
