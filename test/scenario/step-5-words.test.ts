@@ -110,6 +110,12 @@ test("!stop ends the turn that runs, in a thread or in the channel, and says so 
   await world.finish();
 });
 
+// The words of the daemon this pair can serve: no bypass mode and no file upload, so `!bypass`
+// and `!open` are refused when typed and the help does not offer them.
+const OFFERED_WORDS = texts.HELP_WORDS.map((line) => named(line, NAMES)).filter(
+  (line) => !line.startsWith("`!bypass") && !line.startsWith("`!open"),
+);
+
 test("!help lists the daemon's words and the plain agent's two commands, and none of Claude's", async (t) => {
   const world = World.make(t);
   await world.start();
@@ -122,7 +128,7 @@ test("!help lists the daemon's words and the plain agent's two commands, and non
     [
       texts.HELP_OWN,
       texts.HELP_RULE,
-      ...texts.HELP_WORDS.map((line) => named(line, NAMES)),
+      ...OFFERED_WORDS,
       named(texts.HELP_AGENT, NAMES),
       "`!count <text>` Count the words",
       "`!echo <text>` Say the text back",
@@ -134,19 +140,14 @@ test("!help lists the daemon's words and the plain agent's two commands, and non
   await world.owner.says(world.channel, "!help");
   assert.equal(
     channelLines(world).at(-1)?.[1],
-    [
-      texts.HELP_OWN,
-      texts.HELP_RULE,
-      ...texts.HELP_WORDS.map((line) => named(line, NAMES)),
-      named(texts.HELP_UNBOUND, NAMES),
-    ].join("\n"),
+    [texts.HELP_OWN, texts.HELP_RULE, ...OFFERED_WORDS, named(texts.HELP_UNBOUND, NAMES)].join(
+      "\n",
+    ),
   );
   await world.finish();
 });
 
-test("!help lists only the words this agent and this chat can serve", {
-  todo: "the help list is not filtered by capability: HELP_WORDS (src/core/texts.ts) always lists !bypass and !open",
-}, async (t) => {
+test("!help lists only the words this agent and this chat can serve", async (t) => {
   const world = World.make(t);
   await world.start();
   const thread = await session(world);

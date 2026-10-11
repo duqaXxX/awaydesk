@@ -159,9 +159,17 @@ export function helpText(
   escapeMarkdown: (text: string) => string,
   names: texts.Names,
   agentCommands = true,
+  unserved: ReadonlySet<string> = new Set(),
 ): string {
   const keep = (line: string): boolean => line.toLowerCase().includes(query.toLowerCase());
-  const own = texts.HELP_WORDS.map((word) => texts.named(word, names)).filter(keep);
+  // A word the agent or the chat cannot serve is not offered: its line is left out.
+  const served = (line: string): boolean =>
+    ![...unserved].some(
+      (word) => line.startsWith(`\`!${word} `) || line.startsWith(`\`!${word}\``),
+    );
+  const own = texts.HELP_WORDS.map((word) => texts.named(word, names))
+    .filter(served)
+    .filter(keep);
   const refused = refusedInThread(commands, agentCommands);
   const offered = (commands ?? []).filter((c) => !refused.has(c.name.toLowerCase()));
   const session = offered

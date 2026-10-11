@@ -38,6 +38,12 @@ export type WordFlow = (
 export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFlow {
   const { chat, agent, sessions, names } = deps;
   const status = channelStatus(deps, talk);
+  // The words this agent and this chat cannot serve: each is refused when typed, and `!help`
+  // does not list it.
+  const unserved = new Set<string>();
+  if (agent.capabilities.permissionModes.bypass === null) unserved.add(WORD.bypass);
+  if (!agent.capabilities.sessionListing) unserved.add(WORD.resume);
+  if (!chat.capabilities.fileUpload) unserved.add(WORD.open);
 
   return async (ref, message, command, { session, outside }) => {
     const { channel, thread } = ref;
@@ -59,6 +65,7 @@ export function wordFlow(deps: FlowDeps, talk: Talk, others: OtherFlows): WordFl
             (text) => chat.escape(text, "reference"),
             names,
             agent.capabilities.commands,
+            unserved,
           ),
           { ownerOnly: quiet },
         );

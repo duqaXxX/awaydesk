@@ -89,6 +89,18 @@ test("help lists the daemon words and every session command", () => {
   assert.ok(commands.filter((c) => c.name !== "clear").every((c) => text.includes(`\`!${c.name}`)));
 });
 
+test("help leaves out the words the agent or the chat cannot serve", () => {
+  const all = helpText(null, "", (text) => text, NAMES);
+  const fewer = helpText(null, "", (text) => text, NAMES, true, new Set(["bypass", "open"]));
+  assert.ok(all.includes("`!bypass on|off`") && all.includes("`!open [file]`"));
+  assert.ok(!fewer.includes("`!bypass on|off`") && !fewer.includes("`!open [file]`"));
+  // Every other line is there, as written.
+  assert.deepEqual(
+    all.split("\n").filter((line) => !line.startsWith("`!bypass") && !line.startsWith("`!open")),
+    fewer.split("\n"),
+  );
+});
+
 test("help says how a command is told from a text", () => {
   const commands = recordedCommands();
   for (const listed of [null, commands]) {
