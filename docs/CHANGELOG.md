@@ -754,6 +754,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A clip's WebVTT transcript loses every tag of a cue (`voice.vttText`). A tag runs from `<` to
+  the next `>`, a line end does not close it, and one that nothing closes takes the rest of its
+  cue, as the cue text tokenizer of WebVTT 1 reads them. One pass over each line left a tag that
+  spans two lines, and the opening of one nothing closes, in the text sent to Claude. Slack was
+  not seen to write a tag. Found by the first code scanning analysis of the TypeScript source,
+  with a test helper that told the upload host by a text of the URL where it now reads the host.
 - A Claude Code process lost while no turn is active is told where it matters. With a
   background task of the session still running, the reply that waited for it closed with its
   footer as if all had ended well, and the ❌ on the root was the only sign: the reply now

@@ -78,3 +78,18 @@ test("the words of a webvtt transcript are one line", () => {
   assert.equal(voice.vttText(tagged), "Hello there");
   assert.equal(voice.vttText(VTT.replaceAll("\n", "\r\n")), voice.vttText(VTT));
 });
+
+test("a tag of a webvtt cue runs to its closing bracket, or to the end of the cue", () => {
+  // WebVTT 1, the cue text tokenizer: a line end does not close a tag, and a tag nothing closes
+  // takes the rest of the cue. Neither was seen from Slack.
+  const cue = (text: string) => `WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n${text}\n`;
+  assert.equal(voice.vttText(cue("Hello <v Alice\nBob>there")), "Hello there");
+  assert.equal(voice.vttText(cue("Hello <i>there</i> <v Alice")), "Hello there");
+  assert.equal(voice.vttText(cue("Hello <v <b>there")), "Hello there");
+  assert.equal(voice.vttText(cue("Hello <b\nthere")), "Hello");
+  // The next cue is text again.
+  assert.equal(
+    voice.vttText(`${cue("Hello <b")}\n00:00:01.000 --> 00:00:02.000\nthere\n`),
+    "Hello there",
+  );
+});

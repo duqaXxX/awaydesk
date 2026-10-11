@@ -282,7 +282,7 @@ function uploading(requests: string[], resets: number, resetAt: string): FetchFu
   let reset = 0;
   return async (url) => {
     const target = String(url);
-    requests.push(target.includes("files.slack.com") ? "bytes" : methodOf(url));
+    requests.push(new URL(target).hostname === "files.slack.com" ? "bytes" : methodOf(url));
     if (requests.at(-1) === resetAt && reset < resets) {
       reset += 1;
       const cause = Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
