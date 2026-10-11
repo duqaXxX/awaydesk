@@ -1,7 +1,7 @@
 /** Load the daemon's configuration from ~/.config/awaydesk/.env. */
 import { lstatSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { parseEnv } from "node:util";
 import { errorCode } from "../values.ts";
 import { expandUser, resolvePath } from "./paths.ts";
@@ -216,7 +216,16 @@ export function loadConfig(
   if (missing.length > 0) {
     throw new ConfigError(`missing in ${envPath}: ${missing.join(", ")}`);
   }
-  const root = resolvePath(expandUser(values.ALLOWED_ROOT as string));
+  const written = values.ALLOWED_ROOT as string;
+  const expanded = expandUser(written);
+  // A relative path would read from the working directory: the terminal's folder at Checkpoint 2,
+  // `/` under launchd.
+  if (!isAbsolute(expanded)) {
+    throw new ConfigError(
+      `ALLOWED_ROOT must be an absolute path, or one starting with ~/; it is "${written}"`,
+    );
+  }
+  const root = resolvePath(expanded);
   if (!isDirectory(root)) {
     throw new ConfigError(`ALLOWED_ROOT is not a directory: ${root}`);
   }

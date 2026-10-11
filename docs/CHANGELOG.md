@@ -832,6 +832,17 @@ All notable changes to this project are documented here. The format follows
   the configuration folder read-only, `run` stayed running after one hour of the daemon's clock
   before the change and returns 0 after it (measured 2026-10-11). Found by the review of
   2026-10-11.
+- The daemon refuses to start on a Node older than 22.18, and on a relative `ALLOWED_ROOT`. The
+  entry ended its file with `if (import.meta.main) void main();`, and below 22.18 that value is
+  undefined: `main` never ran and the command ended with status 0 and no output (measured
+  2026-10-11, Node 22.17.0), a restart loop with an empty log under the LaunchAgent. `main.ts` now
+  imports `require-node.ts` first, which ends the process with one `ERROR awaydesk.main:` line and
+  status 1 when `node-version.nodeRefusal` finds `process.versions.node` below
+  `node-version.MINIMUM_NODE`, and `test/node-version.test.ts` holds that constant to
+  `engines.node`. `config.loadConfig` read a relative `ALLOWED_ROOT` from the working directory
+  (`paths.resolvePath`), so `ALLOWED_ROOT=proj` passed Checkpoint 2 in a terminal and failed under
+  launchd, which starts the job in `/`; it now refuses a value that is not absolute once `~/` is
+  expanded, and the message quotes the value.
 - A table's delimiter row in a reply is recognised in linear time (`markdown.markdownStarts`).
   One pattern read the whole row, and on a line of spaces around a single dash, under a line
   holding a `|`, it backtracked in cubic time: 200 ms at 800 spaces a side and 3.1 s at 2,000

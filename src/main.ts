@@ -41,8 +41,11 @@
  * - The entry point. `import.meta.main` (Node 22.18, `@since v22.18.0` in `@types/node`, and
  *   run on 22.23 and 26.5) is true only for the module the process started with, a symlink in
  *   `node_modules/.bin` included: Node runs the real path. Comparing `process.argv[1]` with
- *   this file's path would fail through that symlink.
+ *   this file's path would fail through that symlink. Below 22.18 the value is undefined and
+ *   `main` would never run, so the first import, `require-node.ts`, ends the process with a
+ *   refusal on an older Node (see `node-version.ts`); it does not rest on `import.meta.main`.
  */
+import "./require-node.ts";
 import { join } from "node:path";
 import type { AgentEntry } from "./agent/seam.ts";
 import { type Clock, monotonicClock, systemClock } from "./clock.ts";

@@ -27,7 +27,7 @@ reads the imports of every source file and fails on one the table does not allow
 | `src/core/` | the sessions, the flows (`src/core/flows/`: a message, a word, a request to the owner, a list, the crash repair), the port a provider calls (`src/core/port.ts`), `state.json`, the model of a reply, the pending requests and holds, the daemon's words and texts, the configuration, the lock | the two seams; neither library, and nothing under `src/agent/claude/` or `src/chat/slack/` |
 | `src/chat/` | the chat seam (`src/chat/seam.ts`) and the Slack provider (`src/chat/slack/`): the listeners and their guards, the reply sink, the root's reaction and the thread's status line, the Home tab, files, the provider's own texts | the provider is the only code that imports `@slack/bolt` and `@slack/web-api`; the agent seam's types and, of the core, the port alone; never the back end |
 | `src/registry.ts` | the agents and the chats the daemon can run, by name | the two modules: the one file outside them that names them |
-| `src/main.ts` | the startup order and the shutdown | the registry and the core; neither module |
+| `src/main.ts` | the startup order and the shutdown; its first import, `src/require-node.ts`, ends the process with a refusal on a Node older than `node-version.MINIMUM_NODE` | the registry and the core; neither module |
 
 The core talks to the two libraries through the seams alone. No type of the Agent SDK appears in
 `src/agent/seam.ts` and no type of a Slack package in `src/chat/seam.ts`. The same holds for
@@ -399,8 +399,9 @@ The file is parsed by Node's `util.parseEnv`, after a leading byte order mark is
 name resolves from the values the file defines above it, else from the process environment, where a
 variable set to nothing counts as set, else to its default, else to nothing. An expanded value is
 not expanded again, and `$NAME` without braces stays as written. A value is trimmed, and a variable
-left empty counts as missing. `ALLOWED_ROOT` takes a leading `~` as the home directory and is stored
-with its symlinks resolved; it must be a directory. The two modules' variables are non-enumerable
+left empty counts as missing. `ALLOWED_ROOT` takes a leading `~` as the home directory and must then be
+absolute (`config.loadConfig` refuses a relative path, which `paths.resolvePath` would read from
+the working directory); it is stored with its symlinks resolved and must be a directory. The two modules' variables are non-enumerable
 fields of the `Config`, and each holds only non-enumerable properties, so a log line or a
 `JSON.stringify` of either never shows a token.
 
