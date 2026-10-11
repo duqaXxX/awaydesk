@@ -29,7 +29,13 @@ function logged(t: TestContext): string[] {
 }
 
 // The names the texts take when the plain agent and the memory chat are the two modules.
-const PLAIN_NAMES = { agent: "Plain", author: "Plain", cli: "plain", chat: "Memory chat" };
+const PLAIN_NAMES = {
+  agent: "Plain",
+  author: "Plain",
+  cli: "plain",
+  chat: "Memory chat",
+  examples: "`!echo hello`, `!count one two`",
+};
 
 /** A second thread with its session, working in the folder: the one a hold names. */
 async function busyNeighbour(world: AskingWorld) {
@@ -686,4 +692,220 @@ test("an answer from someone else never reaches the core, whatever the request",
   await world.answers(permission.open.requestId, { type: "permission", allow: true });
   await permission.turn.done.wait();
   await world.answers(questionOpen.requestId, { type: "question", answers: null });
+});
+
+// --- An answer is of the kind of the request it names
+
+const ANY_SELECTION = { model: "default", effort: "default", bypass: false };
+
+test("a setup answer with a hold's id is refused, logged, and the hold stays answerable", async (t) => {
+  const world = await AskingWorld.make(t);
+  const other = await busyNeighbour(world);
+  const { ref, session } = world.thread();
+  const sent = world.flows.hold.beforeSending(ref, session, other.session);
+  const open = await world.asked(ref, "hold");
+  const lines = logged(t);
+
+  assert.equal(
+    await world.inbound.answer(
+      ref,
+      open.requestId,
+      { type: "setup", selection: ANY_SELECTION },
+      open.message,
+    ),
+    false,
+  );
+  assert.deepEqual(world.shown(ref).slice(-1), [texts.HOLD_GONE]);
+  assert.deepEqual(lines, [
+    `refused a click (setup start, wrong kind) in ${ref.channel}/${ref.thread} on message ${open.message}; held=True, decided=False, kind_matches=False`,
+  ]);
+  assert.equal(world.open(ref).length, 1, "the hold is still open");
+  assert.equal(world.holds.get(open.requestId)?.decided, false);
+
+  assert.equal(await world.answers(open.requestId, { type: "hold", send: true }), true);
+  assert.equal(await sent, true);
+});
+
+test("a hold answer with a setup's id is refused, logged, and the setup stays answerable", async (t) => {
+  const world = await AskingWorld.make(t);
+  const { ref, session } = world.thread();
+  const asked = world.flows.setup.beforeSending(ref, session);
+  const open = await world.asked(ref, "setup");
+  const lines = logged(t);
+
+  assert.equal(
+    await world.inbound.answer(ref, open.requestId, { type: "hold", send: true }, open.message),
+    false,
+  );
+  assert.deepEqual(world.shown(ref).slice(-1), [texts.HOLD_GONE]);
+  assert.deepEqual(lines, [
+    `refused a click (hold decision, wrong kind) in ${ref.channel}/${ref.thread} on message ${open.message}; send=True, held=True, decided=False, kind_matches=False`,
+  ]);
+  assert.equal(world.open(ref).length, 1, "the setup is still open");
+
+  assert.equal(
+    await world.answers(open.requestId, { type: "setup", selection: ANY_SELECTION }),
+    true,
+  );
+  assert.equal(await asked, session);
+});
+
+test("a setup of an agent with no models is still told from a hold", async (t) => {
+  const agent = new FakeAgentBackend([
+    { info: { models: [], commands: [], permissionMode: "default" } },
+  ]);
+  const world = await AskingWorld.make(t, { agent });
+  const { ref, session } = world.thread();
+  const asked = world.flows.setup.beforeSending(ref, session);
+  const open = await world.asked(ref, "setup");
+
+  assert.equal(
+    await world.inbound.answer(ref, open.requestId, { type: "hold", send: true }, open.message),
+    false,
+  );
+  assert.equal(world.open(ref).length, 1, "the setup is still open");
+  assert.equal(
+    await world.answers(open.requestId, { type: "setup", selection: ANY_SELECTION }),
+    true,
+  );
+  await asked;
+});
+
+test("a permission answer with a question's id is refused and the question stays answerable", async (t) => {
+  const world = await AskingWorld.make(t);
+  const { ref, session } = world.thread();
+  (world.agent as PlainAgent).next(question("Which one?", ["red", "blue"]), say("Chosen."));
+  const turn = await session.submit("pick one");
+  const open = await world.asked(ref, "question");
+
+  for (const allow of [true, false]) {
+    assert.equal(
+      await world.inbound.answer(ref, open.requestId, { type: "permission", allow }, open.message),
+      false,
+    );
+    assert.deepEqual(world.shown(ref).slice(-1), [texts.APPROVAL_GONE]);
+    assert.equal(world.open(ref).length, 1, "the question is still open");
+  }
+  assert.equal(
+    await world.answers(open.requestId, { type: "question", answers: { "Which one?": "red" } }),
+    true,
+  );
+  await turn.done.wait();
+  const agent = world.agent as PlainAgent;
+  assert.deepEqual(
+    agent.sessions[0]?.answers.map((a) => a.answer),
+    [{ answered: true, answers: { "Which one?": "red" } }],
+  );
+});
+
+test("a question answer with a permission's id is refused and the permission stays answerable", async (t) => {
+  const world = await AskingWorld.make(t);
+  const { ref, turn, open } = await permissionAsked(world);
+
+  assert.equal(
+    await world.inbound.answer(
+      ref,
+      open.requestId,
+      { type: "question", answers: { "Which one?": "red" } },
+      open.message,
+    ),
+    false,
+  );
+  assert.deepEqual(world.shown(ref).slice(-1), [texts.APPROVAL_GONE]);
+  assert.equal(world.open(ref).length, 1, "the permission is still open");
+
+  assert.equal(await world.answers(open.requestId, { type: "permission", allow: true }), true);
+  await turn.done.wait();
+  const agent = world.agent as PlainAgent;
+  assert.deepEqual(
+    agent.sessions[0]?.answers.map((a) => a.answer),
+    [{ allow: true }],
+  );
+});
+
+// --- The message that goes is the one the core stored
+
+test("a permission answered with a decoy message removes the request's own message", async (t) => {
+  const world = await AskingWorld.make(t);
+  const real = await permissionAsked(world);
+  const decoy = await permissionAsked(world);
+
+  assert.equal(
+    await world.inbound.answer(
+      real.ref,
+      real.open.requestId,
+      { type: "permission", allow: true },
+      decoy.open.message,
+    ),
+    true,
+  );
+  await real.turn.done.wait();
+  assert.ok(
+    !world.messages(real.ref).some((m) => m.id === real.open.message),
+    "the request's own message is removed",
+  );
+  assert.deepEqual(world.state.thread(real.ref.channel, real.ref.thread)?.requests, []);
+  assert.ok(
+    world.messages(decoy.ref).some((m) => m.id === decoy.open.message),
+    "the decoy stays",
+  );
+  assert.deepEqual(world.state.thread(decoy.ref.channel, decoy.ref.thread)?.requests, [
+    decoy.open.message,
+  ]);
+  assert.equal(world.open(decoy.ref).length, 1, "the decoy's request is still open");
+  await world.answers(decoy.open.requestId, { type: "permission", allow: true });
+  await decoy.turn.done.wait();
+});
+
+test("a hold answered with a decoy message removes the hold's own message", async (t) => {
+  const world = await AskingWorld.make(t);
+  const other = await busyNeighbour(world);
+  const decoy = await permissionAsked(world);
+  const { ref, session } = world.thread();
+  const sent = world.flows.hold.beforeSending(ref, session, other.session);
+  const open = await world.asked(ref, "hold");
+
+  assert.equal(
+    await world.inbound.answer(
+      ref,
+      open.requestId,
+      { type: "hold", send: true },
+      decoy.open.message,
+    ),
+    true,
+  );
+  assert.equal(await sent, true);
+  assert.ok(!world.messages(ref).some((m) => m.id === open.message), "the hold's own is removed");
+  assert.deepEqual(world.state.thread(ref.channel, ref.thread)?.requests, []);
+  assert.ok(world.messages(decoy.ref).some((m) => m.id === decoy.open.message));
+  await world.answers(decoy.open.requestId, { type: "permission", allow: true });
+  await decoy.turn.done.wait();
+});
+
+test("a permission answered from its own message makes one removal", async (t) => {
+  const world = await AskingWorld.make(t);
+  const { ref, turn, open } = await permissionAsked(world);
+  const withdraw = t.mock.method(world.sessions.chatOf(ref.channel, ref.thread), "withdraw");
+
+  await world.inbound.answer(
+    ref,
+    open.requestId,
+    { type: "permission", allow: true },
+    open.message,
+  );
+  await turn.done.wait();
+  assert.deepEqual(
+    withdraw.mock.calls.map((call) => call.arguments),
+    [[open.message]],
+  );
+});
+
+test("a permission answered with no message still removes the request's own", async (t) => {
+  const world = await AskingWorld.make(t);
+  const { ref, turn, open } = await permissionAsked(world);
+
+  await world.inbound.answer(ref, open.requestId, { type: "permission", allow: true }, null);
+  await turn.done.wait();
+  assert.ok(!world.messages(ref).some((m) => m.id === open.message));
+  assert.deepEqual(world.state.thread(ref.channel, ref.thread)?.requests, []);
 });

@@ -25,7 +25,11 @@ export interface Pending {
   /** Whether `answer` is settled. */
   decided: boolean;
   messageTs: string | null;
-  /** What the asker needs back with a click that carries only the id (the setup's model list). */
+  /**
+   * What the asker needs back with a click that carries only the id (the setup's model list,
+   * empty for an agent that lists none). Null exactly for the same-folder hold: it is how an
+   * answer is checked to be of the request's kind.
+   */
   readonly context: readonly ModelInfo[] | null;
   /**
    * Set by `Holds.cancel` while an answer is being applied (the setup's Start settling): the
