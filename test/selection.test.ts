@@ -12,6 +12,8 @@ import { ConfigError } from "../src/core/config.ts";
 import type { ChatEntry } from "../src/core/port.ts";
 import { run } from "../src/main.ts";
 import type { Registry } from "../src/registry.ts";
+import { World } from "./scenario/world.ts";
+import { say } from "./support/plain-agent.ts";
 import { FakeAgentBackend } from "./support/sessions.ts";
 
 const MAIN = join(import.meta.dirname, "..", "src", "main.ts");
@@ -24,10 +26,59 @@ test("main imports neither a back end nor a provider", () => {
   assert.deepEqual(modules, []);
 });
 
-test("the plain agent and the memory chat, named in the configuration, run a session", {
-  skip: "track 1b writes and enables it, with the two test modules of tracks 1a and 1d",
-}, () => {
-  assert.fail("not written yet");
+test("the plain agent and the memory chat, named in the configuration, run a session", async (t) => {
+  // Four entries, and the registry's defaults point at the two that must not be built: only the
+  // `.env` of the config folder (`AWAYDESK_AGENT=plain`, `AWAYDESK_CHAT=memory`) can choose.
+  const built: string[] = [];
+  const world = World.make(t, {
+    defaults: { agent: "other-agent", chat: "other-chat" },
+    more: {
+      agents: {
+        "other-agent": {
+          required: [],
+          optional: [],
+          build: () => {
+            built.push("other-agent");
+            throw new Error("an agent the configuration did not name was built");
+          },
+        },
+      },
+      chats: {
+        "other-chat": {
+          required: [],
+          optional: [],
+          build: async () => {
+            built.push("other-chat");
+            throw new Error("a chat the configuration did not name was built");
+          },
+        },
+      },
+    },
+  });
+  assert.deepEqual(
+    [Object.keys(world.registry.agents), Object.keys(world.registry.chats)],
+    [
+      ["plain", "other-agent"],
+      ["memory", "other-chat"],
+    ],
+  );
+  const env = readFileSync(join(world.config, ".env"), "utf8");
+  assert.match(env, /^AWAYDESK_AGENT=plain$/m);
+  assert.match(env, /^AWAYDESK_CHAT=memory$/m);
+
+  await world.start();
+  world.script(say("Hello from the plain agent."));
+  const thread = await world.open("one message");
+  await world.ended(thread);
+
+  assert.deepEqual(built, []);
+  assert.equal(world.entry.built.length, 1);
+  assert.deepEqual(world.prompts(), ["one message"]);
+  assert.equal(world.shown(thread).at(-1), `Hello from the plain agent.\nfull · ${world.folder}`);
+  await world.finish();
+  // The names the run wrote are the two it was given.
+  const written = JSON.parse(readFileSync(world.state, "utf8")) as Record<string, unknown>;
+  assert.deepEqual([written.agent, written.chat], ["plain", "memory"]);
 });
 
 /** A configuration directory whose `.env` holds `lines` and `ALLOWED_ROOT` (mode 600). */
