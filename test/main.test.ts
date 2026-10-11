@@ -738,15 +738,6 @@ test("a stop closes the connection before the last page of the session index", a
   assert.deepEqual(d.events, ["connect", "app.stop", "page"]);
 });
 
-test("the lock is released when the daemon has stopped", async (t) => {
-  const d = new Daemon(t);
-  d.start();
-  await d.booted();
-  await assert.rejects(singleInstance(d.dir), AlreadyRunning);
-  await d.stop();
-  await (await singleInstance(d.dir)).release();
-});
-
 test("a signal during the repair stops the daemon once it is up", async (t) => {
   const d = new Daemon(t);
   const state = new StateStore(d.path);

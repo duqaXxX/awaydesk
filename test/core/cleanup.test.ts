@@ -100,12 +100,8 @@ test("a channel slack no longer has is forgotten with its threads", async () => 
   assert.ok(text.includes(GONE_CHANNEL) && text.includes("1 thread"));
 });
 
-const failures: [string, Reply][] = [
-  ["internal_error", "internal_error"],
-  ["ratelimited", "ratelimited"],
-  ["missing_scope", "missing_scope"],
-  ["network down", new Error("network down")],
-];
+// The lookup maps every answer but `channel_not_found` to `no answer`, so one row stands for all.
+const failures: [string, Reply][] = [["internal_error", "internal_error"]];
 
 for (const [label, failure] of failures) {
   test(`anything but not found forgets nothing [${label}]`, async () => {
@@ -125,10 +121,7 @@ test("no channel slack can see forgets nothing and says so", async () => {
   assert.ok(log.lines.join("\n").includes("none of the 2 bound channels"));
 });
 
-for (const [label, failure] of [
-  ["network down", new Error("network down")],
-  ["ratelimited", "ratelimited"],
-] as [string, Reply][]) {
+for (const [label, failure] of [["network down", new Error("network down")]] as [string, Reply][]) {
   test(`a pass in which slack found no channel forgets nothing [${label}]`, async () => {
     // The token of another workspace, and one call that failed for a reason of its own: a
     // channel Slack did not answer about is not a channel it found.

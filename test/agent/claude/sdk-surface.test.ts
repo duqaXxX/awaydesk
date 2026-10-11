@@ -744,13 +744,13 @@ test("every sdk name the source imports has a row and no row is left over", () =
   assert.deepEqual(listed, [...new Set(names)]);
 });
 
-for (const row of ROWS) {
+// A `reference` row has no case of its own: `the pinned release defines everything the map lists`
+// holds the same condition (`inPackage` is not false) and prints the rows that fail it.
+for (const row of ROWS.filter((each) => each.source !== "reference")) {
   test(`a row s source agrees with the installed package [${id(row)}]`, () => {
     const defined = inPackage(row);
     if (row.source === "package") {
       assert.equal(defined, true, "a `package` row names something the package declares");
-    } else if (row.source === "reference") {
-      assert.notEqual(defined, false, "the reference names it and the package no longer has it");
     } else {
       assert.notEqual(
         defined,

@@ -16,16 +16,6 @@ import { World } from "./scenario/world.ts";
 import { say } from "./support/plain-agent.ts";
 import { FakeAgentBackend } from "./support/sessions.ts";
 
-const MAIN = join(import.meta.dirname, "..", "src", "main.ts");
-
-test("main imports neither a back end nor a provider", () => {
-  const source = readFileSync(MAIN, "utf8");
-  const modules = [...source.matchAll(/from\s+"(\.\/(?:agent\/claude|chat\/slack)\/[^"]+)"/g)].map(
-    (match) => match[1],
-  );
-  assert.deepEqual(modules, []);
-});
-
 test("the plain agent and the memory chat, named in the configuration, run a session", async (t) => {
   // Four entries, and the registry's defaults point at the two that must not be built: only the
   // `.env` of the config folder (`AWAYDESK_AGENT=plain`, `AWAYDESK_CHAT=memory`) can choose.

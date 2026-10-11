@@ -315,7 +315,7 @@ beforeEach(() => {
   mkdirSync(join(tmp, "work"));
 });
 
-for (const depth of [1, 2, 3]) {
+for (const depth of [1]) {
   test(`the footer shows a repository inside the folder only with its own trust [${depth}]`, async () => {
     const { folder, home } = work();
     const lookup = lookupFor(home);

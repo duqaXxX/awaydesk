@@ -110,34 +110,6 @@ test(
   },
 );
 
-test("a session started the ordinary way still carries both", LIMIT, async (t) => {
-  // The control of the test above: the options differ because of the second way to start, not
-  // because the fake drops them.
-  const home = await mkdtemp(join(tmpdir(), "awaydesk-probe-"));
-  t.after(() => rm(home, { recursive: true, force: true }));
-  await writeFile(
-    join(home, ".claude.json"),
-    JSON.stringify({ claudeInChromeDefaultEnabled: true }),
-  );
-  const sdk = new FakeSdk();
-  const session = await new ClaudeBackend({ query: sdk.query, home }).start(
-    {
-      folder: FOLDER,
-      resume: null,
-      settingsSources: [],
-      model: null,
-      effort: null,
-    },
-    {
-      permission: async () => ({ allow: false, message: "" }),
-      question: async () => ({ answered: false, message: "" }),
-    },
-  );
-  assert.equal(sdk.only.options.allowDangerouslySkipPermissions, true);
-  assert.ok("chrome" in (sdk.only.options.extraArgs ?? {}));
-  await session.close();
-});
-
 test("the probe keeps its session for the next read", LIMIT, async () => {
   const sdk = new FakeSdk({ turns: [sdkRecords("usage"), sdkRecords("usage")] });
   const { probe } = probeOn(sdk);

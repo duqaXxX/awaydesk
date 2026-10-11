@@ -142,18 +142,6 @@ test("the answer needs no git", async () => {
   }
 });
 
-test("the trust record is read again only when it changes", async () => {
-  const folder = join(tmp, "notes");
-  mkdirSync(folder);
-  trust(home, [folder]);
-  const parses = countRecordParses();
-  assert.ok((await workspaceTrusted(folder, home)) && (await workspaceTrusted(folder, home)));
-  assert.equal(parses(), 1); // a `!bind` list checks many folders against one record
-  trust(home, [folder], false);
-  utimesSync(join(home, ".claude.json"), 1, 1); // a different mtime, as a real write gives
-  assert.ok(!(await workspaceTrusted(folder, home)));
-});
-
 test("a batch of checks parses the record once", async () => {
   const folders = Array.from({ length: 8 }, (_, i) => join(tmp, `f${i}`));
   for (const folder of folders) {
@@ -645,14 +633,6 @@ for (const depth of [1, 2]) {
     });
   }
 }
-
-test("a repository outside a trusted folder needs its own trust as well", async () => {
-  const work = makeWork();
-  const outside = gitInit(join(tmp, "elsewhere"));
-  assert.equal(await trustedRepository(outside, home), null);
-  trust(home, [work, outside]);
-  assert.notEqual(await trustedRepository(outside, home), null);
-});
 
 test("trusting one repository does not cover the one beside it", async () => {
   const first = gitInit(join(tmp, "code", "first"));

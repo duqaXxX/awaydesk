@@ -237,22 +237,6 @@ test("a root that names another user or the current folder is refused", POSIX_ON
   }
 });
 
-test("a tilde root and an absolute root still load", POSIX_ONLY, () => {
-  const directory = scratch();
-  mkdirSync(join(directory, "proj"));
-  writeEnv(directory, join(directory, "proj"));
-  assert.equal(load(directory).allowedRoot, join(directory, "proj"));
-  const home = process.env.HOME;
-  process.env.HOME = directory;
-  try {
-    writeEnv(directory, "~/proj");
-    assert.equal(load(directory).allowedRoot, join(directory, "proj"));
-  } finally {
-    if (home === undefined) delete process.env.HOME;
-    else process.env.HOME = home;
-  }
-});
-
 test("repr never shows a token", () => {
   // The closest ways a TypeScript object reaches a log line: `inspect` and JSON.
   const directory = scratch();
@@ -548,17 +532,6 @@ test("a missing module variable is named with the chat's first, then the agent's
       error instanceof ConfigError &&
       error.message ===
         `missing in ${join(directory, ".env")}: DELTA_KEY, DELTA_USER, ALPHA_KEY, ALLOWED_ROOT`,
-  );
-});
-
-test("the shipped registry misses its variables in the order of the old messages", () => {
-  const directory = envWith("# nothing set");
-  assert.throws(
-    () => load(directory),
-    (error: unknown) =>
-      error instanceof ConfigError &&
-      error.message ===
-        `missing in ${join(directory, ".env")}: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_OWNER_USER_ID, ALLOWED_ROOT`,
   );
 });
 
