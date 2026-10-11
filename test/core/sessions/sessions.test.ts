@@ -60,6 +60,7 @@ import {
   THREAD,
 } from "../../support/fake-slack.ts";
 import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
+import { NAMES } from "../../support/names.ts";
 import { GIT_LAYOUT } from "../../support/platform.ts";
 import {
   anyRepository,
@@ -219,7 +220,7 @@ test("a gone session is removed and says so", async (t) => {
     h.clients.map((client) => client.options.resume),
     ["gone"],
   );
-  assert.deepEqual(h.bodies(), [texts.SESSION_GONE]);
+  assert.deepEqual(h.bodies(), [texts.named(texts.SESSION_GONE, NAMES)]);
   assert.equal(h.state.thread(CHANNEL, THREAD), null);
   assert.equal(h.manager.get(CHANNEL, THREAD), null);
   assert.equal(h.slack.pushes(), 1); // the reply's stream stops once
@@ -239,7 +240,10 @@ test("a gone session fails a queued turn and leaks no process", async (t) => {
     h.clients.map((client) => client.options.resume),
     ["gone"],
   );
-  assert.deepEqual(h.bodies(), [texts.SESSION_GONE, texts.SESSION_GONE]);
+  assert.deepEqual(h.bodies(), [
+    texts.named(texts.SESSION_GONE, NAMES),
+    texts.named(texts.SESSION_GONE, NAMES),
+  ]);
   // The worker must not be left spinning on an empty queue nobody will ever fill again: the
   // task says whether it has ended.
   await h.idle();
@@ -284,7 +288,10 @@ test("a turn that races sessiongone while its sink is made gets session gone", a
   at(gates, 1).set(); // only now does "again" reach the point where it would enqueue itself
   const secondTurn = await secondTask;
   await secondTurn.done.wait();
-  assert.deepEqual(h.bodies(), [texts.SESSION_GONE, texts.SESSION_GONE]);
+  assert.deepEqual(h.bodies(), [
+    texts.named(texts.SESSION_GONE, NAMES),
+    texts.named(texts.SESSION_GONE, NAMES),
+  ]);
   await h.idle();
   assert.equal(inside(session).worker?.done, true);
   await h.manager.closeAll();
@@ -339,7 +346,7 @@ test("a direct gone call rescues the worker s taken turn", async (t) => {
   await statusTask;
   assert.ok(session.closed);
   await turn.done.wait(); // must not hang
-  assert.deepEqual(h.bodies(), [texts.SESSION_GONE]);
+  assert.deepEqual(h.bodies(), [texts.named(texts.SESSION_GONE, NAMES)]);
 });
 
 test("a restart rebuilds a stored thread with its bypass", async (t) => {
@@ -495,7 +502,7 @@ test("an answered question stays in the reply and its request goes", async (t) =
   assert.ok(h.slack.callsTo("chat.update").every((args) => args.ts !== requestTs));
   assert.deepEqual(thread(h).requests, []);
   const cards = h.slack.messageCards().flat();
-  const [card, ...more] = cards.filter((c) => c.title === texts.ANSWERED);
+  const [card, ...more] = cards.filter((c) => c.title === texts.named(texts.ANSWERED, NAMES));
   assert.equal(more.length, 0);
   assert.equal(card?.status, "complete");
   const shown = h.slack.apiCalls
@@ -525,7 +532,9 @@ test("answers the reply cannot show stay in the request", async (t) => {
   assert.equal(more.length, 0);
   const text = String(at(at(blocksOf(update), 0).elements as JsonObject[], 0).text);
   const first = at(recorded.questions, 0);
-  assert.ok(text.startsWith(`${texts.ANSWERED}\n${NESTED}· ${first.question} → `));
+  assert.ok(
+    text.startsWith(`${texts.named(texts.ANSWERED, NAMES)}\n${NESTED}· ${first.question} → `),
+  );
   assert.deepEqual(
     blocksOf(update).map((block) => block.type),
     ["context"],
@@ -1788,7 +1797,7 @@ test(
 test("a path the system refuses to look at names no folder", async () => {
   // A null in a path: Node throws before any call to the system, and the folder is missing.
   await assert.rejects(
-    checkDirectory("/home/dev/pro\0ject", async () => true),
+    checkDirectory("/home/dev/pro\0ject", async () => true, NAMES),
     (error: unknown) => error instanceof DirectoryMissing,
   );
 });
@@ -1886,7 +1895,7 @@ test("an approval slack refuses to show is denied and logged", async (t) => {
   await turn.done.wait();
   assert.deepEqual(at(h.clients[0]?.permissionResults ?? [], 0), {
     allow: false,
-    message: texts.APPROVAL_UNPOSTED,
+    message: texts.named(texts.APPROVAL_UNPOSTED, NAMES),
   });
   const line = errors.find((said) => said.includes("could not post an approval request"));
   assert.ok(line?.includes("ratelimited"));
@@ -2365,9 +2374,12 @@ test("status gives the command that forks the session in the terminal", async (t
   assert.ok(lines[3]?.startsWith("Mode: "));
 });
 
+// The shell line of the Claude back end (`AgentWords.terminal`), written out.
+const TERMINAL = "cd {directory} && claude --resume {session} --fork-session";
+
 test("a terminal command holding a backtick is escaped text not a code span", () => {
   // A code span would end at the folder's backtick and the owner would copy half a command.
-  const line = terminalLine("/work/my`proj", "0000-id");
+  const line = terminalLine(TERMINAL, "/work/my`proj", "0000-id");
   assert.equal(
     line,
     "Terminal: cd '/work/my\\`proj' \\&\\& claude --resume 0000-id --fork-session",
@@ -2382,7 +2394,11 @@ test("status leaves the terminal command out of a folder that cannot be used", a
   const text = await h.session().status();
   const stored = thread(h).sessionId;
   assert.ok(text.includes(`Session: \`${stored}\`\nMode: `) && !text.includes("Terminal:"));
-  assert.ok(text.endsWith(texts.fill(texts.DIRECTORY_UNTRUSTED, { directory: h.tmpPath })));
+  assert.ok(
+    text.endsWith(
+      texts.fill(texts.named(texts.DIRECTORY_UNTRUSTED, NAMES), { directory: h.tmpPath }),
+    ),
+  );
 });
 
 test("the terminal command quotes a folder the shell would split", async (t) => {
@@ -2403,7 +2419,9 @@ test("status says why claude code cannot start in place of the footer s values",
   assert.deepEqual(h.clients, []);
   assert.ok(text.includes("Claude Code: `not started`"));
   assert.ok(
-    text.endsWith(`Now: idle\n${texts.fill(texts.DIRECTORY_UNTRUSTED, { directory: h.tmpPath })}`),
+    text.endsWith(
+      `Now: idle\n${texts.fill(texts.named(texts.DIRECTORY_UNTRUSTED, NAMES), { directory: h.tmpPath })}`,
+    ),
   );
 });
 
@@ -2459,7 +2477,9 @@ test("status says claude code s error when it fails to start", async (t) => {
   // The reason a prompt would get in the same state, never less.
   const text = await h.session().status();
   assert.ok(
-    text.endsWith(`Now: idle\n${texts.fill(texts.ERROR_REPLY, { error: "RuntimeError" })}`),
+    text.endsWith(
+      `Now: idle\n${texts.fill(texts.named(texts.ERROR_REPLY, NAMES), { error: "RuntimeError" })}`,
+    ),
   );
   assert.ok(
     warnings.some((line) => line.includes("could not read the footer's values for the status")),

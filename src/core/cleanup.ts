@@ -46,6 +46,8 @@ export type Alive = (
 export interface CleanOptions {
   readonly alive: Alive;
   readonly live: Live;
+  /** The chat's name (`ChatProvider.name`), for the log lines that say whose answer it was. */
+  readonly chat: string;
   /** Seconds since the epoch. */
   readonly now?: () => number;
   readonly logger?: Log;
@@ -56,12 +58,14 @@ export interface CleanOptions {
  * return their ids. A channel with a live session is left for the next pass. When the chat finds
  * none of the bound channels (a channel it gave no answer about is not one it found), nothing is
  * removed: that is what the token of another workspace, or an app removed from every channel,
- * looks like, and forgetting every binding would be the wrong repair.
+ * looks like, and forgetting every binding would be the wrong repair. `chat` is the chat's
+ * name, for the log lines.
  */
 export async function forgetGoneChannels(
   lookup: ChannelLookup,
   state: StateStore,
   live: Live,
+  chat: string,
   log: Log = logger,
 ): Promise<string[]> {
   const bound = state.channels();
@@ -86,7 +90,7 @@ export async function forgetGoneChannels(
   if (gone.length === 0) return [];
   if (found === 0) {
     log.warning(
-      `Slack finds none of the ${bound.length} bound channels: nothing is forgotten (check the ` +
+      `${chat} finds none of the ${bound.length} bound channels: nothing is forgotten (check the ` +
         "workspace of the bot token, and that the bot is still in its channels)",
     );
     return [];
@@ -99,7 +103,7 @@ export async function forgetGoneChannels(
     state.removeChannel(channelId);
     forgotten.push(channelId);
     log.info(
-      `forgot channel ${channelId}: Slack no longer has it (${record.threads.size} thread(s))`,
+      `forgot channel ${channelId}: ${chat} no longer has it (${record.threads.size} thread(s))`,
     );
   }
   return forgotten;
@@ -119,7 +123,7 @@ export async function clean(
   const now = options.now ?? (() => Date.now() / 1000);
   const log = options.logger ?? logger;
   try {
-    await forgetGoneChannels(lookup, state, live, log);
+    await forgetGoneChannels(lookup, state, live, options.chat, log);
   } catch (error) {
     log.warning(`could not check the bound channels: ${errorName(error)}`);
   }

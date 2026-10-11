@@ -85,7 +85,9 @@ test("a channel slack no longer has is forgotten with its threads", async () => 
   // conversations.info reference, read 2026-10-01: `channel_not_found`, also what a private
   // channel the bot is not in answers (measured the same day on deleted channels).
   const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });
-  assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, log), [GONE_CHANNEL]);
+  assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, "Slack", log), [
+    GONE_CHANNEL,
+  ]);
   assert.deepEqual(state.channels(), [CHANNEL]);
   assert.equal(state.thread(GONE_CHANNEL, GONE_THREAD), null);
   assert.notEqual(state.thread(CHANNEL, THREAD), null);
@@ -104,7 +106,7 @@ for (const [label, failure] of failures) {
   test(`anything but not found forgets nothing [${label}]`, async () => {
     // Not an answer about the channel: it cannot be told gone.
     const lookup = channelsInSlack({ [GONE_CHANNEL]: failure });
-    assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, log), []);
+    assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, "Slack", log), []);
     assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
   });
 }
@@ -113,7 +115,7 @@ test("no channel slack can see forgets nothing and says so", async () => {
   // Every bound channel not found: the token of another workspace, or the app removed from
   // them all. Wiping every binding on that would be the wrong repair.
   const lookup = channelsInSlack({}, "channel_not_found");
-  assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, log), []);
+  assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, "Slack", log), []);
   assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
   assert.ok(log.lines.join("\n").includes("none of the 2 bound channels"));
 });
@@ -132,7 +134,7 @@ for (const [label, failure] of [
       [GONE_CHANNEL]: gone,
       [OTHER_GONE]: gone,
     });
-    assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, log), []);
+    assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, "Slack", log), []);
     assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL, OTHER_GONE]);
     assert.ok(log.lines.join("\n").includes("none of the 3 bound channels"));
   });
@@ -141,7 +143,7 @@ for (const [label, failure] of [
 test("a channel with a live session is left for the next pass", async () => {
   const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });
   const live: ThreadRef[] = [{ channel: GONE_CHANNEL, thread: GONE_THREAD }];
-  assert.deepEqual(await forgetGoneChannels(lookup, state, () => live, log), []);
+  assert.deepEqual(await forgetGoneChannels(lookup, state, () => live, "Slack", log), []);
   assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
 });
 
@@ -149,7 +151,7 @@ test("several gone channels go in one pass", async () => {
   state.bind(OTHER_GONE, "/srv/elsewhere");
   const gone = "channel_not_found";
   const lookup = channelsInSlack({ [GONE_CHANNEL]: gone, [OTHER_GONE]: gone });
-  assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, log), [
+  assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, "Slack", log), [
     GONE_CHANNEL,
     OTHER_GONE,
   ]);
@@ -165,7 +167,7 @@ test("clean forgets gone channels then prunes what is left", async () => {
     return new Set(); // the session is gone from the folder
   }
 
-  await clean(lookup, state, { alive, live: nothingLive, logger: log });
+  await clean(lookup, state, { alive, live: nothingLive, chat: "Slack", logger: log });
   assert.deepEqual(state.channels(), [CHANNEL]);
   assert.equal(state.thread(CHANNEL, THREAD), null); // pruned: its session no longer exists
   // the forgotten channel's folder is not read
@@ -178,6 +180,7 @@ test("clean keeps a thread with a live session", async () => {
   await clean(channelsInSlack({}), state, {
     alive: () => new Set(),
     live: () => live,
+    chat: "Slack",
     logger: log,
   });
   assert.notEqual(state.thread(CHANNEL, THREAD), null);
@@ -195,7 +198,7 @@ test("a thread opened while the folders are read is kept", async () => {
     return new Set([SESSION]);
   }
 
-  await clean(channelsInSlack({}), state, { alive, live: nothingLive, logger: log });
+  await clean(channelsInSlack({}), state, { alive, live: nothingLive, chat: "Slack", logger: log });
   assert.notEqual(state.thread("C000LATE", late), null);
 });
 
@@ -211,7 +214,7 @@ test("clean goes on to prune when the channel check itself fails", async () => {
     return NOBODY;
   }
 
-  await clean(lookup, state, { alive: () => new Set(), live, logger: log });
+  await clean(lookup, state, { alive: () => new Set(), live, chat: "Slack", logger: log });
   assert.ok(log.lines.join("\n").includes("could not check the bound channels"));
   assert.equal(state.thread(CHANNEL, THREAD), null); // the prune still ran
 });
@@ -223,7 +226,7 @@ test("clean survives a folder that cannot be read and a slack that fails", async
     throw Object.assign(new Error("transcripts unreadable"), { code: "EACCES" });
   }
 
-  await clean(lookup, state, { alive: broken, live: nothingLive, logger: log }); // never throws
+  await clean(lookup, state, { alive: broken, live: nothingLive, chat: "Slack", logger: log }); // never throws
   assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
   assert.notEqual(state.thread(CHANNEL, THREAD), null);
   assert.ok(log.lines.join("\n").includes("could not prune stale threads"));
@@ -236,7 +239,9 @@ test("a lookup that throws is no answer", async () => {
     return answers[channelId] ?? "no answer";
   };
   state.bind(OTHER_GONE, "/srv/elsewhere");
-  assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, log), [GONE_CHANNEL]);
+  assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, "Slack", log), [
+    GONE_CHANNEL,
+  ]);
   assert.deepEqual(state.channels(), [CHANNEL, OTHER_GONE]);
   assert.ok(log.lines.join("\n").includes(`could not read channel ${OTHER_GONE}`));
 });

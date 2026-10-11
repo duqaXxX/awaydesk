@@ -56,6 +56,7 @@ import type { SessionDeps } from "../../src/core/sessions/deps.ts";
 import { SessionManager } from "../../src/core/sessions/manager.ts";
 import type { ThreadSession } from "../../src/core/sessions/session.ts";
 import { StateStore } from "../../src/core/state.ts";
+import { named } from "../../src/core/texts.ts";
 import { setWriter } from "../../src/log.ts";
 import {
   type AsyncEvent,
@@ -68,6 +69,7 @@ import {
   THREAD,
 } from "./fake-slack.ts";
 import { type JsonObject, sdkJson, sdkRecords } from "./fixtures.ts";
+import { NAMES } from "./names.ts";
 
 /** A point in a scripted turn where the CLI would ask the host for a permission decision. */
 export interface CanUseToolCall {
@@ -304,7 +306,7 @@ export class FakeAgentSession implements AgentSession {
       if (batch === CLOSED) return;
       for (const item of batch) {
         if ("end" in item) {
-          yield { type: "process_lost", reason: PROCESS_EXITED };
+          yield { type: "process_lost", reason: named(PROCESS_EXITED, NAMES) };
           return;
         }
         if ("ask" in item) {
@@ -521,7 +523,7 @@ export class Harness {
   /** A scratch folder, bound to `CHANNEL`, with its symlinks resolved. */
   readonly tmpPath: string;
   readonly state: StateStore;
-  readonly approvals = new Approvals();
+  readonly approvals = new Approvals(NAMES);
   readonly holds = new Holds();
   readonly backend: FakeAgentBackend;
   /** The sessions' own clock. */
@@ -548,6 +550,7 @@ export class Harness {
       slack,
       replies: options.replies ?? slack,
       identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
+      agent: () => this.backend,
       // A generous burst: these tests are about session orchestration, not the shared
       // limiter's own pacing (that lives in the sink's tests).
       limiter: new UpdateLimiter({ burst: 1_000, clock: this.slackClock }),

@@ -21,6 +21,7 @@ function keyOf(channelId: string, threadId: string): string {
 
 export class SessionManager {
   private readonly deps: SessionDeps;
+  private readonly names: texts.Names;
   private readonly sessions = new Map<string, ThreadSession>();
   /** The threads being deleted (`release`): no session is handed out or built in one. */
   private readonly heldThreads = new Set<string>();
@@ -34,6 +35,7 @@ export class SessionManager {
 
   constructor(deps: SessionDeps) {
     this.deps = deps;
+    this.names = texts.namesOf(deps.agent, deps.chat);
   }
 
   /**
@@ -283,7 +285,11 @@ export class SessionManager {
    */
   async unavailable(directory: string): Promise<DirectoryUnavailable | null> {
     try {
-      await checkDirectory(directory, (folder) => this.deps.agent.folderTrusted(folder));
+      await checkDirectory(
+        directory,
+        (folder) => this.deps.agent.folderTrusted(folder),
+        this.names,
+      );
     } catch (error) {
       if (error instanceof DirectoryUnavailable) return error;
       throw error;

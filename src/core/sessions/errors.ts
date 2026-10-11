@@ -24,8 +24,8 @@ export class DirectoryMissing extends DirectoryUnavailable {
  * its settings with no trust dialog.
  */
 export class DirectoryUntrusted extends DirectoryUnavailable {
-  constructor(directory: string) {
-    super(directory, texts.fill(texts.DIRECTORY_UNTRUSTED, { directory }));
+  constructor(directory: string, names: texts.Names) {
+    super(directory, texts.fill(texts.named(texts.DIRECTORY_UNTRUSTED, names), { directory }));
     this.name = "DirectoryUntrusted";
   }
 }
@@ -58,8 +58,8 @@ export class SessionClosed extends Error {
  * needs a new top-level message to start again.
  */
 export class SessionGone extends Error {
-  constructor(options?: ErrorOptions) {
-    super(texts.SESSION_GONE, options);
+  constructor(names: texts.Names, options?: ErrorOptions) {
+    super(texts.named(texts.SESSION_GONE, names), options);
     this.name = "SessionGone";
   }
 }

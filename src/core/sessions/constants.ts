@@ -1,6 +1,7 @@
 /** The waits, the limits and the words of a session. */
 import type { SessionEventType } from "../../agent/seam.ts";
 import type { SessionStatus } from "../../chat/seam.ts";
+import { Named } from "../texts.ts";
 
 // The events that belong to a turn: the first one that arrives with no turn running starts one
 // (a stream event, an assistant or a user message, a result).
@@ -58,7 +59,7 @@ export const ASKED_LIMIT = 100;
 // How much of each message a note about messages that were not sent quotes.
 export const NOT_SENT_START = 60;
 // What the reader says ended the stream when the back end gave no reason of its own.
-export const PROCESS_EXITED = "the Claude Code process exited";
+export const PROCESS_EXITED = new Named("the {agent} process exited");
 // The root's status as `state.json` holds it, the way the Python daemon wrote it: the name of
 // the reaction that showed it. The session index and the crash repair read these words.
 export const STORED_STATUS: Readonly<Record<SessionStatus, string>> = {

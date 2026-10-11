@@ -99,6 +99,8 @@ export class TurnRenderer<Footer = FooterFields> {
   readonly #sink: Sink<Footer>;
   /** The session's folder, which previews name paths from. */
   readonly #cwd: string | null;
+  /** The names the texts that name the agent or the chat take. */
+  readonly #names: texts.Names;
   readonly #lines = new Map<string, TaskUpdate>();
   readonly #rootOf = new Map<string, string>();
   readonly #children = new Map<string, string[]>();
@@ -139,8 +141,9 @@ export class TurnRenderer<Footer = FooterFields> {
   #footer: Footer | null = null;
   #closedOut = false;
 
-  constructor(sink: Sink<Footer>, cwd: string | null = null) {
+  constructor(sink: Sink<Footer>, names: texts.Names, cwd: string | null = null) {
     this.#sink = sink;
+    this.#names = names;
     this.#cwd = cwd;
   }
 
@@ -203,7 +206,10 @@ export class TurnRenderer<Footer = FooterFields> {
         if (!this.#wroteText && event.finalText) {
           await this.#text(event.finalText);
         } else if (!this.#wroteText && this.error !== null) {
-          await this.#text(texts.fill(texts.ERROR_REPLY, { error: this.error }), { notice: true });
+          await this.#text(
+            texts.fill(texts.named(texts.ERROR_REPLY, this.#names), { error: this.error }),
+            { notice: true },
+          );
         }
         break;
       default:
@@ -257,7 +263,7 @@ export class TurnRenderer<Footer = FooterFields> {
     questions: readonly Pick<Question, "text">[],
     answers: Readonly<Record<string, string | readonly string[]>>,
   ): boolean {
-    const shown = answered(questions, answers);
+    const shown = answered(questions, answers, this.#names);
     if (shown === null || !this.#lines.has(callId)) return false;
     this.#answers.set(callId, shown);
     return true;
@@ -279,7 +285,9 @@ export class TurnRenderer<Footer = FooterFields> {
     const interrupted = this.result !== null && this.result.ending === "interrupted";
     if (!this.#wroteText && this.#lines.size === 0) {
       // A command that prints nothing (a local one, say) still gets a visible answer.
-      await this.#text(interrupted ? texts.STOPPED : texts.NO_OUTPUT, { notice: true });
+      await this.#text(interrupted ? texts.STOPPED : texts.named(texts.NO_OUTPUT, this.#names), {
+        notice: true,
+      });
     }
     const running = new Set(this.#running.values());
     const closing: TaskUpdate[] = [];
@@ -372,7 +380,7 @@ export class TurnRenderer<Footer = FooterFields> {
     }
     if (event.kind === "authentication") {
       this.authFailed = true;
-      await this.#text(texts.AUTH_FAILED, { notice: true });
+      await this.#text(texts.named(texts.AUTH_FAILED, this.#names), { notice: true });
       return;
     }
     // The agent wrote this message itself: its words name the failure and what to do next, as

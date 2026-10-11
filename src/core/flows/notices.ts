@@ -17,10 +17,11 @@ export const logger = getLogger("awaydesk.core.flows.notices");
 export async function postUpgradeNotices(
   chat: ChatProvider,
   state: Pick<StateStore, "pendingNotices" | "clearNotice">,
+  names: texts.Names,
 ): Promise<void> {
   for (const channelId of state.pendingNotices()) {
     try {
-      await chat.channel(channelId).notice(texts.UPGRADE_NOTICE);
+      await chat.channel(channelId).notice(texts.named(texts.UPGRADE_NOTICE, names));
     } catch (error) {
       logger.warning(`could not post the upgrade notice in ${channelId}: ${errorName(error)}`);
       continue;

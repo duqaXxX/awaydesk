@@ -62,6 +62,7 @@ import type { ChatContext, CorePort } from "./core/port.ts";
 import { Approvals } from "./core/requests.ts";
 import { SessionManager } from "./core/sessions/manager.ts";
 import { StateError, StateStore } from "./core/state.ts";
+import { namesOf } from "./core/texts.ts";
 import { getLogger } from "./log.ts";
 
 export const logger = getLogger("awaydesk.main");
@@ -285,7 +286,8 @@ export async function run(options: RunOptions = {}): Promise<number> {
       receiver: options.receiver,
       uploads: options.uploads,
     }).build(context);
-    const approvals = new Approvals();
+    const names = namesOf(backend, chat);
+    const approvals = new Approvals(names);
     const holds = new Holds();
     const sessions = new SessionManager({
       chat,
@@ -302,6 +304,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
       clean((channel) => chat.channelState(channel), state, {
         alive: (directory) => backend.aliveSessions(directory),
         live: () => sessions.liveThreads(),
+        chat: chat.name,
       });
     const cleaning = new AbortController();
     let cleaned: Promise<void> | null = null;
@@ -337,7 +340,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
       chat.index?.refresh();
 
       await chat.start(new Inbound());
-      await postUpgradeNotices(chat, state);
+      await postUpgradeNotices(chat, state, names);
       await signals.requested;
       // launchd stops and restarts with SIGTERM: the turns already running finish first. Not on
       // SIGINT: see `StopSignals`. A second signal stops without waiting.

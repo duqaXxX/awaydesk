@@ -13,6 +13,7 @@ import {
 } from "../../src/core/commands.ts";
 import * as texts from "../../src/core/texts.ts";
 import { sdkJson } from "../support/fixtures.ts";
+import { NAMES } from "../support/names.ts";
 
 /**
  * The chat provider's markdown escape, which the core takes as a parameter: the same characters
@@ -24,7 +25,7 @@ function markdownEscape(text: string): string {
 }
 
 function helpOf(commands: readonly CommandInfo[] | null, query = ""): string {
-  return helpText(commands, query, markdownEscape);
+  return helpText(commands, query, markdownEscape, NAMES);
 }
 
 /** A command as the session's list holds it: what the agent module makes of the SDK's raw entry. */
@@ -224,9 +225,9 @@ test("the guide and the help explain every word of the daemon", () => {
   }
   // A WORD the parser does not answer would document a word that reaches Claude instead.
   for (const word of words) assert.notEqual(parseBang(`!${word}`)?.kind, "passthrough", word);
-  const helpLines = texts.HELP_WORDS.join("\n");
+  const helpLines = texts.HELP_WORDS.map((line) => texts.named(line, NAMES)).join("\n");
   for (const word of words) {
-    assert.ok(texts.GUIDE.includes(`\`!${word}`), word);
+    assert.ok(texts.named(texts.GUIDE, NAMES).includes(`\`!${word}`), word);
     assert.ok(helpLines.includes(`\`!${word}`), word);
   }
 });
@@ -278,7 +279,13 @@ test("a description is cut by code points, never inside an emoji", () => {
 });
 
 test("login and logout are answered on the host, whatever their case", () => {
-  assert.equal(hostOnly({ kind: "passthrough", text: "login" }), texts.LOGIN_ON_HOST);
-  assert.equal(hostOnly({ kind: "passthrough", text: "LOGOUT now" }), texts.LOGOUT_ON_HOST);
-  assert.equal(hostOnly({ kind: "passthrough", text: "compact" }), null);
+  assert.equal(
+    hostOnly({ kind: "passthrough", text: "login" }, NAMES),
+    texts.named(texts.LOGIN_ON_HOST, NAMES),
+  );
+  assert.equal(
+    hostOnly({ kind: "passthrough", text: "LOGOUT now" }, NAMES),
+    texts.named(texts.LOGOUT_ON_HOST, NAMES),
+  );
+  assert.equal(hostOnly({ kind: "passthrough", text: "compact" }, NAMES), null);
 });

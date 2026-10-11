@@ -11,7 +11,7 @@
  */
 import type { DiffHunk, FileChange, Question } from "../../agent/seam.ts";
 import type { Preview } from "../../chat/seam.ts";
-import { ANSWERED, fill } from "../texts.ts";
+import { ANSWERED, fill, type Names, named } from "../texts.ts";
 import { spaced, splitLines } from "./words.ts";
 
 // How the terminal folds finished calls of these tools. Captured from the terminal on Claude Code
@@ -122,10 +122,12 @@ function changed(added: number, removed: number): string {
 /**
  * The answers to a question as the terminal keeps them: a line per question that has one,
  * `· question → answer`, a multi-select's answers joined by commas. Null with no answer.
+ * `names` fill the title, which names who wrote the questions.
  */
 export function answered(
   questions: readonly Pick<Question, "text">[],
   answers: Readonly<Record<string, string | readonly string[]>>,
+  names: Names,
 ): Preview | null {
   const lines: string[] = [];
   for (const question of questions) {
@@ -137,7 +139,13 @@ export function answered(
     }
   }
   if (lines.length === 0) return null;
-  return { title: ANSWERED, summary: "", body: lines.join("\n"), language: "", plain: true };
+  return {
+    title: named(ANSWERED, names),
+    summary: "",
+    body: lines.join("\n"),
+    language: "",
+    plain: true,
+  };
 }
 
 /**

@@ -281,6 +281,8 @@ export class ThreadSession {
   // waited for.
   mayHaveOrderedRestart = false;
   private readonly afterRestart = new Set<string>();
+  /** The names the texts of this session take from its agent and its chat. */
+  private readonly names: texts.Names;
 
   constructor(
     channelId: string,
@@ -294,6 +296,7 @@ export class ThreadSession {
     this.directory = directory;
     this.resolved = resolvePath(directory);
     this.deps = deps;
+    this.names = texts.namesOf(deps.agent, deps.chat);
     this.thread = deps.chat.thread({ channel: channelId, thread: threadId });
     this.predecessor = options.predecessor ?? null;
     this.settled.set();
@@ -658,7 +661,11 @@ export class ThreadSession {
         // thread's own entry: that alone is what tells the two apart, since both leave the
         // session closed the same.
         const gone = this.deps.state.thread(this.channelId, this.threadId) === null;
-        await this.fail(turn, gone ? texts.SESSION_GONE : texts.SESSION_CLOSED, { error: true });
+        await this.fail(
+          turn,
+          gone ? texts.named(texts.SESSION_GONE, this.names) : texts.SESSION_CLOSED,
+          { error: true },
+        );
         return turn;
       }
       // (sync) from here to the end: the turn is queued, the worker made and the idle timer
@@ -700,7 +707,11 @@ export class ThreadSession {
         this.predecessor = null;
       }
       await cancellable(
-        checkDirectory(this.directory, (folder) => this.deps.agent.folderTrusted(folder)),
+        checkDirectory(
+          this.directory,
+          (folder) => this.deps.agent.folderTrusted(folder),
+          this.names,
+        ),
         signal,
       );
       const stored = this.deps.state.thread(this.channelId, this.threadId);
@@ -740,14 +751,14 @@ export class ThreadSession {
           this.taken = null;
           if (taken !== null) {
             try {
-              await this.fail(taken, texts.SESSION_GONE, { error: true });
+              await this.fail(taken, texts.named(texts.SESSION_GONE, this.names), { error: true });
             } catch {
               // the queued ones below are still told
             }
           }
         }
-        await this.failQueued(texts.SESSION_GONE);
-        throw new SessionGone({ cause: error });
+        await this.failQueued(texts.named(texts.SESSION_GONE, this.names));
+        throw new SessionGone(this.names, { cause: error });
       }
       let choice: boolean | null;
       let mode: string;
@@ -1092,7 +1103,9 @@ export class ThreadSession {
         logger.warning(
           `could not read the footer's values for the status in ${this.where}: ${errorName(error)}`,
         );
-        unavailable = [texts.fill(texts.ERROR_REPLY, { error: errorName(error) })];
+        unavailable = [
+          texts.fill(texts.named(texts.ERROR_REPLY, this.names), { error: errorName(error) }),
+        ];
       }
     }
     // The daemon closed the session (shutdown, an idle close) while this call was reading it.
@@ -1114,8 +1127,9 @@ export class ThreadSession {
       texts.fill(texts.STATUS, { directory: this.directory, session: sessionId || "new" }),
     ];
     // Left out with a folder the line above cannot use: its `cd` would fail there.
-    if (sessionId && usable) head.push(terminalLine(this.directory, sessionId));
-    const state = texts.fill(texts.STATUS_STATE, {
+    if (sessionId && usable)
+      head.push(terminalLine(this.deps.agent.words.terminal, this.directory, sessionId));
+    const state = texts.fill(texts.named(texts.STATUS_STATE, this.names), {
       mode: this.bypass ? (this.bypassMode ?? this.mode) : this.mode,
       // Only a turn's first event carries the version, never the start (measured).
       version: this.cliVersion || (this.client !== null ? texts.VERSION_PENDING : "not started"),
@@ -1277,7 +1291,9 @@ export class ThreadSession {
     try {
       await client.close();
     } catch (error) {
-      logger.warning(`could not close Claude Code in ${this.where}: ${errorName(error)}`);
+      logger.warning(
+        `could not close ${this.deps.agent.name} in ${this.where}: ${errorName(error)}`,
+      );
     }
   }
 
@@ -1368,9 +1384,13 @@ export class ThreadSession {
           logger.error(`turn failed in ${this.where}: ${errorName(error)}`);
           const at = this.sent.indexOf(turn);
           if (at !== -1) this.sent.splice(at, 1);
-          await this.fail(turn, texts.fill(texts.ERROR_REPLY, { error: errorName(error) }), {
-            error: true,
-          });
+          await this.fail(
+            turn,
+            texts.fill(texts.named(texts.ERROR_REPLY, this.names), { error: errorName(error) }),
+            {
+              error: true,
+            },
+          );
           this.idleTimerCheck(); // the session stays alive; may need arming again
         }
       }
@@ -1379,7 +1399,7 @@ export class ThreadSession {
 
   /** Follow the client's events until they end; whatever ends them, release the thread. */
   private async read(client: AgentSession, signal: AbortSignal): Promise<void> {
-    let reason = PROCESS_EXITED;
+    let reason = texts.named(PROCESS_EXITED, this.names);
     const events = client.events[Symbol.asyncIterator]();
     try {
       for (;;) {
@@ -1412,10 +1432,13 @@ export class ThreadSession {
     logger.error(`session reader stopped in ${this.where}: ${reason}`);
     if (this.client === client) this.client = null;
     try {
-      await this.abandon(texts.fill(texts.ERROR_REPLY, { error: reason }), {
-        error: true,
-        because: texts.BECAUSE_STOPPED,
-      });
+      await this.abandon(
+        texts.fill(texts.named(texts.ERROR_REPLY, this.names), { error: reason }),
+        {
+          error: true,
+          because: texts.named(texts.BECAUSE_STOPPED, this.names),
+        },
+      );
     } finally {
       await client.close().catch(() => {});
     }
@@ -1559,7 +1582,7 @@ export class ThreadSession {
       if (event.type === "agent_error") {
         // A subagent's failed request: the category only, as for the turn's own below.
         logger.warning(
-          `Claude Code reported a subagent's error in ${this.where}: ${event.category}`,
+          `${this.deps.agent.name} reported a subagent's error in ${this.where}: ${event.category}`,
         );
       }
       await origin.feed(event);
@@ -1623,7 +1646,9 @@ export class ThreadSession {
     if (active === null) return; // abandoned while the turn's opening was written
     if (event.type === "agent_error") {
       // The category only: the words Claude Code wrote about it go to the thread.
-      logger.warning(`Claude Code reported an error in ${this.where}: ${event.category}`);
+      logger.warning(
+        `${this.deps.agent.name} reported an error in ${this.where}: ${event.category}`,
+      );
     }
     await active.renderer.feed(event);
     this.adoptPromoted(active.renderer);
@@ -2242,7 +2267,7 @@ export class ThreadSession {
   }
 
   private newRenderer(reply: Reply): TurnRenderer {
-    const renderer = new TurnRenderer(reply, this.directory);
+    const renderer = new TurnRenderer(reply, this.names, this.directory);
     this.replyOf.set(renderer, reply);
     return renderer;
   }
@@ -2352,7 +2377,7 @@ export class ThreadSession {
         // under the answer.
         this.handLatestTo(this.reply(active.renderer));
       }
-      if (released.length > 0) this.endNotes.push(takenNote(released.length));
+      if (released.length > 0) this.endNotes.push(takenNote(released.length, this.names));
       // What a restart dropped meanwhile is said where the running turn ends.
       await this.feedEndNotes(active.renderer);
       // `!stop` cut this turn short, the owner's own or a report's: its reply ends like any
@@ -2425,7 +2450,11 @@ export class ThreadSession {
       readonly because?: string;
     } = {},
   ): Promise<void> {
-    const { error = false, more = [], because = texts.BECAUSE_STOPPED } = options;
+    const {
+      error = false,
+      more = [],
+      because = texts.named(texts.BECAUSE_STOPPED, this.names),
+    } = options;
     // (sync) The turn, the sent prompts and every flag of a turn in progress are taken before
     // the first write: whatever reads the session meanwhile sees it with no turn.
     const active = this.active;
@@ -2563,8 +2592,8 @@ export class ThreadSession {
         // Nobody can answer a request that was never shown: deny it, and say why.
         logger.error(`could not post an approval request in ${this.where}: ${errorName(error)}`);
         return questions === null
-          ? { allow: false, message: texts.APPROVAL_UNPOSTED }
-          : { answered: false, message: texts.APPROVAL_UNPOSTED };
+          ? { allow: false, message: texts.named(texts.APPROVAL_UNPOSTED, this.names) }
+          : { answered: false, message: texts.named(texts.APPROVAL_UNPOSTED, this.names) };
       }
       logger.info(
         `posted ${questions === null ? "an approval" : "a question"} request in ` +

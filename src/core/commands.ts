@@ -89,7 +89,7 @@ export const NEW_SESSION_NAMES: ReadonlySet<string> = new Set(["clear", "reset",
 // Claude Code's `/login` and `/logout` act on the host's own login, which the daemon and every
 // session run on: neither is ever sent to Claude Code, from the channel or from a thread, and
 // each is answered with where it is done instead (`hostOnly`).
-export const HOST_ONLY: ReadonlyMap<string, string> = new Map([
+export const HOST_ONLY: ReadonlyMap<string, texts.Named> = new Map([
   ["login", texts.LOGIN_ON_HOST],
   ["logout", texts.LOGOUT_ON_HOST],
 ]);
@@ -197,15 +197,17 @@ export function unformatted(text: string, blocks: unknown): string {
  * The daemon's words, then every command the session offers now (null: not bound yet) except
  * those its thread refuses (`refusedInThread`), keeping only the lines whose name or description
  * contains `query`, ignoring case. With no query, the rule that tells a command from a text comes
- * first. `escapeMarkdown` is the chat provider's escape for a markdown block.
+ * first. `escapeMarkdown` is the chat provider's escape for a markdown block; `names` fill the
+ * texts that name the agent and the chat.
  */
 export function helpText(
   commands: readonly CommandInfo[] | null,
   query: string,
   escapeMarkdown: (text: string) => string,
+  names: texts.Names,
 ): string {
   const keep = (line: string): boolean => line.toLowerCase().includes(query.toLowerCase());
-  const own = texts.HELP_WORDS.filter(keep);
+  const own = texts.HELP_WORDS.map((word) => texts.named(word, names)).filter(keep);
   const refused = refusedInThread(commands);
   const offered = (commands ?? []).filter((c) => !refused.has(c.name.toLowerCase()));
   const session = offered
@@ -216,9 +218,9 @@ export function helpText(
   // The rule heads the whole list; a search shows its matches alone.
   const lines = [texts.HELP_OWN, ...(query ? [] : [texts.HELP_RULE]), ...own];
   if (commands === null) {
-    lines.push(texts.HELP_UNBOUND);
+    lines.push(texts.named(texts.HELP_UNBOUND, names));
   } else {
-    lines.push(texts.HELP_CLAUDE, ...session);
+    lines.push(texts.named(texts.HELP_AGENT, names), ...session);
   }
   if (query && own.length === 0 && session.length === 0) {
     lines.push(texts.fill(texts.HELP_NO_MATCH, { query }));
@@ -230,8 +232,9 @@ export function helpText(
  * The answer to a command that is only ever run on the host (`HOST_ONLY`), or null for any other:
  * the caller sends that answer and nothing to Claude Code.
  */
-export function hostOnly(command: Passthrough): string | null {
-  return HOST_ONLY.get((command.text.split(" ", 1)[0] as string).toLowerCase()) ?? null;
+export function hostOnly(command: Passthrough, names: texts.Names): string | null {
+  const answer = HOST_ONLY.get((command.text.split(" ", 1)[0] as string).toLowerCase());
+  return answer === undefined ? null : texts.named(answer, names);
 }
 
 /**

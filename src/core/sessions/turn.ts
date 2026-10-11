@@ -56,8 +56,7 @@ export function notSent(turns: readonly Turn[], because: string): string {
 }
 
 /** The note for the reply a turn that took `count` prompts into itself ends with. */
-export function takenNote(count: number): string {
-  return texts.fill(count === 1 ? texts.TAKEN_INTO_REPLY_ONE : texts.TAKEN_INTO_REPLY_MANY, {
-    count,
-  });
+export function takenNote(count: number, names: texts.Names): string {
+  const note = count === 1 ? texts.TAKEN_INTO_REPLY_ONE : texts.TAKEN_INTO_REPLY_MANY;
+  return texts.fill(texts.named(note, names), { count });
 }

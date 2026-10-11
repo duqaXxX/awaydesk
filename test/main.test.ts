@@ -61,6 +61,7 @@ import {
   TEAM,
 } from "./support/fake-slack.ts";
 import { slackPayload } from "./support/fixtures.ts";
+import { NAMES } from "./support/names.ts";
 import { FakeAgentBackend, realWorkDone, type Script, sdkMessages } from "./support/sessions.ts";
 import { homeAction, reply } from "./support/slack-app.ts";
 
@@ -532,12 +533,12 @@ test("the upgrade notice posts top level and clears the flag", async (t) => {
   const state = v1State(configDirectory(t));
   assert.deepEqual(state.pendingNotices(), [CHANNEL]);
   const slack = new FakeSlack();
-  await postUpgradeNotices(chatOver(slack), state);
+  await postUpgradeNotices(chatOver(slack), state, NAMES);
   const [post, ...others] = slack.callsTo("chat.postMessage");
   assert.deepEqual(others, []);
   assert.equal(post?.channel, CHANNEL);
   assert.equal(post?.thread_ts, undefined); // not a reply to any message
-  assert.equal(post?.text, texts.UPGRADE_NOTICE);
+  assert.equal(post?.text, texts.named(texts.UPGRADE_NOTICE, NAMES));
   assert.deepEqual(state.pendingNotices(), []);
 });
 
@@ -545,7 +546,7 @@ test("a failed upgrade notice keeps the flag for next start", async (t) => {
   const state = v1State(configDirectory(t));
   const slack = new FakeSlack();
   slack.responses["chat.postMessage"] = new Error("network down");
-  await postUpgradeNotices(chatOver(slack), state);
+  await postUpgradeNotices(chatOver(slack), state, NAMES);
   assert.deepEqual(state.pendingNotices(), [CHANNEL]);
 });
 
@@ -575,7 +576,7 @@ test("the user token must be the owner s own in the bot s workspace", async (t) 
   const sessions = { release: async () => true, free: () => {} };
   const bot = new FakeSlack();
   // No token: nothing deletes, and Slack is not asked anything.
-  assert.equal(await deleter(null, bot, identity, state, sessions), null);
+  assert.equal(await deleter(null, bot, identity, state, sessions, () => NAMES), null);
   assert.deepEqual(bot.apiCalls, []);
 
   const owner = new FakeSlack();
@@ -583,14 +584,14 @@ test("the user token must be the owner s own in the bot s workspace", async (t) 
   const token = "xox" + "p-fake";
   // `auth.test` names who a token acts as (api-auth-test.json has the same fields for the bot).
   owner.responses["auth.test"] = { ok: true, team_id: TEAM, user_id: OWNER };
-  assert.notEqual(await deleter(token, bot, identity, state, sessions, clients), null);
+  assert.notEqual(await deleter(token, bot, identity, state, sessions, () => NAMES, clients), null);
   for (const who of [
     { team_id: TEAM, user_id: "U000BOB" },
     { team_id: "T000OTHER", user_id: OWNER },
   ]) {
     owner.responses["auth.test"] = { ok: true, ...who };
     await assert.rejects(
-      deleter(token, bot, identity, state, sessions, clients),
+      deleter(token, bot, identity, state, sessions, () => NAMES, clients),
       (error: unknown) => error instanceof ConfigError && /SLACK_USER_TOKEN/.test(error.message),
     );
   }

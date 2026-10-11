@@ -8,7 +8,7 @@
  */
 import { randomBytes } from "node:crypto";
 import type { PermissionAnswer, Question, QuestionAnswer } from "../agent/seam.ts";
-import { DENY_MESSAGE, SKIP_MESSAGE } from "./texts.ts";
+import { DENY_MESSAGE, type Names, named, SKIP_MESSAGE } from "./texts.ts";
 
 /** What the owner chose, before it is turned into the answer the agent takes. */
 export type Outcome =
@@ -29,7 +29,11 @@ export type Decision = PermissionAnswer | QuestionAnswer;
  * The answer the agent takes for what the owner chose. A refusal is a dismissal when the request
  * was a question (`questions` is not null), so Claude is told the form was skipped, not denied.
  */
-export function toAnswer(outcome: Outcome, questions: readonly Question[] | null): Decision {
+export function toAnswer(
+  outcome: Outcome,
+  questions: readonly Question[] | null,
+  names: Names,
+): Decision {
   switch (outcome.kind) {
     case "answer":
       return { answered: true, answers: outcome.answers };
@@ -38,7 +42,7 @@ export function toAnswer(outcome: Outcome, questions: readonly Question[] | null
     case "deny":
       return questions !== null && questions.length > 0
         ? { answered: false, message: SKIP_MESSAGE }
-        : { allow: false, message: DENY_MESSAGE };
+        : { allow: false, message: named(DENY_MESSAGE, names) };
   }
 }
 
@@ -86,6 +90,12 @@ interface Entry {
 /** Requests waiting for the owner, by an id that only the posted buttons carry. */
 export class Approvals {
   private readonly entries = new Map<string, Entry>();
+  private readonly names: Names;
+
+  /** `names` fill the message a denial carries to the agent. */
+  constructor(names: Names) {
+    this.names = names;
+  }
 
   /** Starts waiting for `title`'s request; `questions` makes it a question. */
   open(
@@ -178,7 +188,7 @@ export class Approvals {
 
   private decide(approvalId: string, entry: Entry, outcome: Outcome): void {
     entry.pending.decided = true;
-    entry.settle(toAnswer(outcome, entry.pending.questions));
+    entry.settle(toAnswer(outcome, entry.pending.questions, this.names));
     this.entries.delete(approvalId);
   }
 }
