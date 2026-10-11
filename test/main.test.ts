@@ -65,7 +65,13 @@ import {
 } from "./support/fake-slack.ts";
 import { slackPayload } from "./support/fixtures.ts";
 import { NAMES } from "./support/names.ts";
-import { FakeAgentBackend, realWorkDone, type Script, sdkMessages } from "./support/sessions.ts";
+import {
+  FakeAgentBackend,
+  HELD_BY_A_RUNNING_DAEMON,
+  realWorkDone,
+  type Script,
+  sdkMessages,
+} from "./support/sessions.ts";
 import { homeAction, reply } from "./support/slack-app.ts";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -239,7 +245,7 @@ class Daemon {
     for (let round = 0; round < 100; round += 1) {
       if (done()) return;
       await this.clock.advance(1);
-      await realWorkDone();
+      await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
     }
     assert.ok(done(), "the daemon never reached the state the test waited for");
   }
@@ -1009,7 +1015,7 @@ test("a stop by a signal that waits on a start of the agent ends the process aft
   await d.clock.advance(20);
   hung.set(); // the last step that completes: the shutdown then waits on the start
   await d.clock.advance(0);
-  await realWorkDone();
+  await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
   assert.deepEqual(exits, []);
   assert.equal(standing(timers).length, 1);
   // Thirty seconds after the step, not after the shutdown began.
@@ -1070,8 +1076,17 @@ test("a shutdown that makes progress is not cut by the limit however long it tak
   d.backend.listed = threads.map((_, i) => ({ id: `id-${i}` }) as never);
   const { exits, timers, running } = mainOf(d, new EventEmitter(), true);
   t.after(async () => {
+    // A failed assertion leaves the daemon up: its shutdown needs the clock to go on, so the
+    // clock is driven here until `main` has returned.
     d.signals.emit("SIGINT");
-    await running;
+    let returned = false;
+    void running.finally(() => {
+      returned = true;
+    });
+    for (let i = 0; i < 4000 && !returned; i += 1) {
+      await d.clock.advance(0.5);
+      await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
+    }
   });
   await d.connected.wait();
   for (const thread of threads) void d.deliver(reply("go", thread)).catch(() => undefined);
@@ -1085,7 +1100,7 @@ test("a shutdown that makes progress is not cut by the limit however long it tak
   d.signals.emit("SIGINT");
   for (let i = 0; i < 4000 && exits.length === 0; i += 1) {
     await d.clock.advance(0.5);
-    await realWorkDone();
+    await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
   }
   assert.deepEqual(exits, [0]);
   assert.ok(d.clock.now - began > SHUTDOWN_LIMIT_SECONDS, "the shutdown must outlast the limit");
@@ -1117,7 +1132,7 @@ test("a failure during a signal's shutdown makes its deadline the one a failure 
   assert.equal(timers.at(-1)?.at, 10); // from the failure
   hung.set(); // the steps that follow do not move it
   await d.clock.advance(0);
-  await realWorkDone();
+  await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
   assert.equal(timers.length, armed);
   await running;
   assert.deepEqual(exits, [1]);
