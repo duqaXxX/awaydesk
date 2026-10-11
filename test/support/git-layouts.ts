@@ -9,7 +9,7 @@ import { basename, dirname, join } from "node:path";
 const IDENTITY = ["-c", "user.name=alice", "-c", "user.email=alice@example.com"];
 
 /** The environment of a spawned git: the variables of an outer git (a hook) removed. */
-function gitEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
+export function gitEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, ...extra };
   for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"]) {
     delete env[name];

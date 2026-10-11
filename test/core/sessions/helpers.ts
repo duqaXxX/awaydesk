@@ -16,6 +16,7 @@ import type { Event, Task } from "../../../src/core/sessions/tasks.ts";
 import type { ActiveTurn, Turn } from "../../../src/core/sessions/turn.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { FIXTURES, type JsonObject } from "../../support/fixtures.ts";
+import { gitEnv } from "../../support/git-layouts.ts";
 import {
   type Harness,
   type Item,
@@ -455,6 +456,6 @@ export function taskCards(h: Harness): JsonObject[] {
  */
 export function repoUnder(tmpPath: string): string {
   const repo = join(tmpPath, "app");
-  execFileSync("git", ["init", "-q", "-b", "feature-x", repo]);
+  execFileSync("git", ["init", "-q", "-b", "feature-x", repo], { env: gitEnv() });
   return repo;
 }
