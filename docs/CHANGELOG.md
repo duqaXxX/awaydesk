@@ -270,6 +270,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The agent and the chat are selected, not constructed. `src/main.ts` reads `AWAYDESK_AGENT` and
+  `AWAYDESK_CHAT` from `.env` (absent, they mean `claude` and `slack`, the registry's defaults) and
+  takes each module from the registry in `src/registry.ts`; a name the registry does not hold stops
+  the start and the message lists the valid ones. `src/core/config.ts` reads the file, the two
+  selection variables and `ALLOWED_ROOT`; each module names the variables it needs and gets their
+  values, still hidden from `util.inspect`, `JSON.stringify` and a log line, when it is built. The
+  check of a Slack token's kind moved into the Slack module and runs before any call to Slack, with
+  the same messages. `state.json` is version 3: version 2 plus the names of the agent and the chat
+  that wrote it. A version 2 file is read for the modules running and written as version 3 on its
+  first save; a version 3 file written for other modules stops the start. The cleanup asks the chat
+  when a thread was opened (`ChatProvider.openedAt`) instead of reading its name as a time, so a
+  thread the chat cannot date is never dropped for its age. With Claude and Slack the owner's
+  `.env` and `state.json` work with no edit and nothing in Slack changes.
 - The Slack provider implements the whole chat seam (`ChatProvider`), and the daemon starts it
   through `slackChat` in `src/chat/slack/module.ts`: its clients, identity, thread deleter, Home
   tab and channel guard are built there and read the core only when first used. `SlackChat` now

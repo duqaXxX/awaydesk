@@ -36,6 +36,7 @@ import type {
   RequestHandler,
   StartOptions,
 } from "../../src/agent/seam.ts";
+import type { AppConfig } from "../../src/chat/slack/app/answers.ts";
 import { type BuiltApp, buildApp } from "../../src/chat/slack/app/app.ts";
 import { ChannelGuard, type Identity } from "../../src/chat/slack/app/guards.ts";
 import { HOLD_CONTINUE } from "../../src/chat/slack/hold.ts";
@@ -62,7 +63,6 @@ import {
   SETUP_START,
 } from "../../src/chat/slack/setup.ts";
 import { SlackChat } from "../../src/chat/slack/thread.ts";
-import type { Config } from "../../src/core/config.ts";
 import { UsageCache } from "../../src/core/footer.ts";
 import { Holds } from "../../src/core/hold.ts";
 import { Approvals } from "../../src/core/requests.ts";
@@ -238,7 +238,7 @@ export class World {
   now: () => number = () => Date.now() / 1000;
   readonly limiter: Limiter;
   readonly identity: Identity = { ownerUserId: OWNER, teamId: TEAM, botUserId: BOT };
-  readonly config: Config;
+  readonly config: AppConfig;
   readonly sessions: SessionManager;
   readonly home: Home;
   readonly deleted: Array<[string, string]> = [];
@@ -290,14 +290,7 @@ export class World {
       usage: new UsageCache(async () => ({ session: null, week: null })),
       clock: this.clock,
     });
-    this.config = {
-      botToken: `${"xox"}b-fake`,
-      appToken: `${"xap"}p-fake`,
-      ownerUserId: OWNER,
-      allowedRoot: this.root,
-      configDir: tmpPath,
-      userToken: null,
-    };
+    this.config = { botToken: `${"xox"}b-fake`, allowedRoot: this.root };
     this.home = new Home(slack, {
       ownerUserId: OWNER,
       teamId: TEAM,

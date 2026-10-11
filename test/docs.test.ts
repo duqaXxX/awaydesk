@@ -10,7 +10,8 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { test } from "node:test";
 import { features } from "../probe/features.ts";
 import { WORD } from "../src/core/commands.ts";
-import { REQUIRED } from "../src/core/config.ts";
+import { REQUIRED, SELECTORS } from "../src/core/config.ts";
+import { REGISTRY } from "../src/registry.ts";
 import { sdkJson } from "./support/fixtures.ts";
 import { blank } from "./support/source-scan.ts";
 
@@ -428,7 +429,17 @@ test("the setup guide names every variable scope and word", () => {
   const manifest = JSON.parse(read(join(ROOT, "slack-app-manifest.json"))) as {
     oauth_config: { scopes: { bot: string[] } };
   };
-  for (const name of new Set([...REQUIRED, ...read_, ...manifest.oauth_config.scopes.bot])) {
+  // Every variable the daemon reads: the core's, and those each module of the registry names.
+  const modules = [...Object.values(REGISTRY.agents), ...Object.values(REGISTRY.chats)];
+  const variables = modules.flatMap((entry) => [...entry.required, ...entry.optional]);
+  const names = new Set([
+    ...REQUIRED,
+    ...SELECTORS,
+    ...variables,
+    ...read_,
+    ...manifest.oauth_config.scopes.bot,
+  ]);
+  for (const name of names) {
     assert.ok(text.includes(`\`${name}\``), `docs/setup.md does not name ${name}`);
   }
   const rows = new Set(

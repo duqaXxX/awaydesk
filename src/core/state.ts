@@ -1,7 +1,8 @@
 /**
  * The daemon's only written file: per channel, its bound directory and any pending migration
  * notice; per thread within it, the folder it was opened in, its session id, bypass switch and
- * effort level.
+ * effort level. A file names the agent and the chat it was written for (version 3), since a
+ * session id and a thread's name mean nothing to others.
  */
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
@@ -12,9 +13,21 @@ import { errorName } from "../values.ts";
 
 export const logger = getLogger("awaydesk.core.state");
 
-// A thread with no session id whose root message is older than this never finished its first
-// turn: `prune` drops it. A Slack `thread_ts` is the root message's epoch time in seconds.
+// A thread with no session id that was opened longer ago than this never finished its first
+// turn: `prune` drops it. When it was opened is the chat's to say (`ChatProvider.openedAt`).
 export const ONE_DAY = 24 * 60 * 60;
+
+/** When a thread was opened, in epoch seconds; null when the chat cannot tell. */
+export type OpenedAt = (ref: ThreadRef) => number | null;
+
+/**
+ * The names of the agent and the chat a `state.json` was written for: a session id and a thread's
+ * name mean nothing to another agent or another chat.
+ */
+export interface StateModules {
+  readonly agent: string;
+  readonly chat: string;
+}
 
 /**
  * What an observer is told after a write: the threads it touched, as a set (no order, no
@@ -175,7 +188,7 @@ export function parseThread(raw: Raw): ThreadState {
   };
 }
 
-function parseV2(raw: Raw): Map<string, ChannelRecord> {
+function parseChannels(raw: Raw): Map<string, ChannelRecord> {
   const channels = new Map<string, ChannelRecord>();
   for (const [channelId, rawEntry] of Object.entries(
     asRaw(required(raw, "channels"), "'channels'"),
@@ -243,6 +256,13 @@ function threadKey(channelId: string, threadId: string): string {
 export interface StateStoreOptions {
   /** Where a warning goes; ids and error names only, never message content. */
   warn?: (message: string) => void;
+  /**
+   * The agent and the chat running now. A file written for others is refused (`StateError`), a
+   * version 2 file (it carries no names) is taken for these and written as version 3 on the first
+   * save. A store given none checks nothing, writes version 2 for a file that has none and keeps
+   * the names of one that has.
+   */
+  modules?: StateModules;
 }
 
 /** In-memory copy of state.json, written atomically on every change. */
@@ -250,6 +270,7 @@ export class StateStore {
   private readonly path: string;
   private readonly warn: (message: string) => void;
   private channelsById: Map<string, ChannelRecord>;
+  private modules: StateModules | null;
   // Called after a write that changed which channels are bound, which threads exist, the
   // session one holds, or a root's reaction: what the session index is built from. It is
   // given the (channelId, threadId) of each thread the write touched. Never while loading.
@@ -258,6 +279,7 @@ export class StateStore {
   constructor(path: string, options: StateStoreOptions = {}) {
     this.path = path;
     this.warn = options.warn ?? ((message) => logger.warning(message));
+    this.modules = options.modules ?? null;
     this.channelsById = this.load();
   }
 
@@ -498,7 +520,8 @@ export class StateStore {
 
   /**
    * Remove a thread whose session id is gone from its folder's sessions, and a no-session
-   * thread whose root message is older than `ONE_DAY`. Calls `alive` once per distinct folder;
+   * thread that `openedAt` says was opened more than `ONE_DAY` before `now` (one it cannot date
+   * is kept). Calls `alive` once per distinct folder;
    * null means it cannot tell, and that folder's threads are kept. `keep` names the
    * (channelId, threadId) to leave alone whatever they look like: the threads with a live
    * session, whose id may not be on disk yet. If `alive` throws, nothing is removed or written;
@@ -506,6 +529,7 @@ export class StateStore {
    */
   prune(
     alive: (directory: string) => Iterable<string> | null,
+    openedAt: OpenedAt,
     now: number,
     keep: Iterable<ThreadRef> = [],
   ): number {
@@ -530,9 +554,12 @@ export class StateStore {
             removed += 1;
             continue;
           }
-        } else if (now - rootTime(threadId) > ONE_DAY) {
-          removed += 1;
-          continue;
+        } else {
+          const opened = openedAt({ channel: channelId, thread: threadId });
+          if (opened !== null && now - opened > ONE_DAY) {
+            removed += 1;
+            continue;
+          }
         }
         survivors.set(threadId, thread);
       }
@@ -601,8 +628,10 @@ export class StateStore {
       const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
       const raw = asRaw(JSON.parse(text), "the file");
       const version = required(raw, "version");
-      if (version === 2) {
-        channels = parseV2(raw);
+      if (version === 2 || version === 3) {
+        if (version === 3)
+          this.checkModules(requiredString(raw, "agent"), requiredString(raw, "chat"));
+        channels = parseChannels(raw);
       } else if (version === 1) {
         channels = migrateV1(raw);
         migrated = true;
@@ -625,6 +654,22 @@ export class StateStore {
     return channels;
   }
 
+  /**
+   * A version 3 file names the agent and the chat that wrote it: those now running must be the
+   * same. A store given no names takes the file's, so that it writes them back unchanged.
+   */
+  private checkModules(agent: string, chat: string): void {
+    if (this.modules === null) {
+      this.modules = { agent, chat };
+    } else if (this.modules.agent !== agent || this.modules.chat !== chat) {
+      throw new StateError(
+        `${this.path} belongs to other modules: it was written for the agent "${agent}" and the ` +
+          `chat "${chat}", and this start selects the agent "${this.modules.agent}" and the chat ` +
+          `"${this.modules.chat}"; select the modules it was written for, or delete the file`,
+      );
+    }
+  }
+
   private save(): void {
     this.write(this.channelsById);
   }
@@ -635,7 +680,9 @@ export class StateStore {
    */
   private write(channels: ReadonlyMap<string, ChannelRecord>): void {
     const data = {
-      version: 2,
+      ...(this.modules === null
+        ? { version: 2 }
+        : { version: 3, agent: this.modules.agent, chat: this.modules.chat }),
       channels: Object.fromEntries(
         [...channels].map(([channelId, c]) => [
           channelId,
@@ -694,11 +741,4 @@ export class StateStore {
       }
     }
   }
-}
-
-/** A thread's root time in epoch seconds; throws on a `thread_ts` that is no number, as `float()` did. */
-function rootTime(threadId: string): number {
-  const seconds = threadId.trim() === "" ? Number.NaN : Number(threadId);
-  if (Number.isNaN(seconds)) throw new RangeError(`not a thread_ts: ${threadId}`);
-  return seconds;
 }

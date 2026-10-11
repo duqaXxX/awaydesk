@@ -25,16 +25,17 @@ import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import type { App } from "@slack/bolt";
 import { type FetchFunction, LogLevel, WebAPIRequestError } from "@slack/web-api";
+import type { AgentBackend } from "../src/agent/seam.ts";
 import type { BuildAppOptions } from "../src/chat/slack/app/app.ts";
 import { DELETE_ACTION, EDIT_ACTION, EDIT_ON } from "../src/chat/slack/home.ts";
-import { deleter, makeClients } from "../src/chat/slack/module.ts";
+import { deleter, makeClients, type SlackOptions, slackChat } from "../src/chat/slack/module.ts";
 import { SlackChat } from "../src/chat/slack/thread.ts";
 import type { Clock } from "../src/clock.ts";
 import { CLEAN_EVERY_SECONDS, logger as cleanupLogger } from "../src/core/cleanup.ts";
 import { ConfigError } from "../src/core/config.ts";
 import { postUpgradeNotices } from "../src/core/flows/notices.ts";
 import { AlreadyRunning, singleInstance } from "../src/core/lock.ts";
-import { StateStore } from "../src/core/state.ts";
+import { StateError, StateStore } from "../src/core/state.ts";
 import * as texts from "../src/core/texts.ts";
 import {
   cleanEvery,
@@ -50,6 +51,7 @@ import {
   type Stop,
   StopSignals,
 } from "../src/main.ts";
+import type { Registry } from "../src/registry.ts";
 import {
   AGENT,
   AsyncEvent,
@@ -71,6 +73,19 @@ const GONE = "C000GONE";
 const BOT_TOKEN = "xox" + "b-1";
 const APP_TOKEN = "xap" + "p-1";
 const USER_TOKEN = "xox" + "p-1";
+
+/**
+ * The registry a test runs over: the Slack module on the given clients and receiver, and an agent
+ * entry whose `build` answers the given back end. The names are the daemon's defaults, so the
+ * owner's `.env` selects them with no variable.
+ */
+function registryOf(backend: AgentBackend, slack: SlackOptions = {}): Registry {
+  return {
+    agents: { claude: { required: [], optional: [], build: () => backend } },
+    chats: { slack: slackChat(slack) },
+    defaults: { agent: "claude", chat: "slack" },
+  };
+}
 
 /** A configuration directory with a valid `.env`, as the owner's would be (mode 600). */
 function configDirectory(t: TestContext, options: { readonly userToken?: boolean } = {}): string {
@@ -172,28 +187,25 @@ class Daemon {
   options(extra: RunOptions = {}): RunOptions {
     return {
       configDir: this.dir,
-      clients: {
-        bot: (token) => {
-          this.tokens.push(["bot", token]);
-          return [this.slack, this.replies];
+      registry: registryOf(this.backend, {
+        clients: {
+          bot: (token) => {
+            this.tokens.push(["bot", token]);
+            return [this.slack, this.replies];
+          },
+          owner: (token) => {
+            this.tokens.push(["owner", token]);
+            return this.owner;
+          },
         },
-        owner: (token) => {
-          this.tokens.push(["owner", token]);
-          return this.owner;
+        receiver: (token) => {
+          this.tokens.push(["receiver", token]);
+          return this.receiver;
         },
-      },
-      receiver: (token) => {
-        this.tokens.push(["receiver", token]);
-        return this.receiver;
-      },
-      backend: this.backend,
-      // The usage probe's session: never the real Claude Code, whatever a test runs.
-      bareStart: async () => {
-        throw new Error("no usage in this test");
-      },
+        uploads: join(this.dir, "uploads"),
+      }),
       clock: this.clock,
       signals: this.signals as SignalSource,
-      uploads: join(this.dir, "uploads"),
       ...extra,
     };
   }
@@ -261,10 +273,12 @@ test("a second instance stops before slack", async (t) => {
   const dir = configDirectory(t);
   const unreached: RunOptions = {
     configDir: dir,
-    clients: {
-      bot: () => assert.fail("Slack was reached"),
-      owner: () => assert.fail("Slack was reached"),
-    },
+    registry: registryOf(new FakeAgentBackend([]), {
+      clients: {
+        bot: () => assert.fail("Slack was reached"),
+        owner: () => assert.fail("Slack was reached"),
+      },
+    }),
   };
   const held = await singleInstance(dir);
   try {
@@ -290,6 +304,42 @@ test("run prunes stale threads and survives alive raising", async (t) => {
   await d.booted();
   assert.ok(warnings().some((line) => line.includes("could not prune stale threads")));
   await d.stop();
+});
+
+test("run writes a version 2 state.json as version 3 with the names of the modules running", async (t) => {
+  const d = new Daemon(t);
+  const state = new StateStore(d.path); // a store with no names writes the file of before
+  state.bind(CHANNEL, d.dir);
+  // A thread the first cleanup drops (opened long ago, no session): the first save of the run.
+  state.openThread(CHANNEL, "1000000000.000001");
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(d.path, "utf8"))), ["version", "channels"]);
+
+  d.start();
+  await d.booted();
+  await d.stop();
+  const written = JSON.parse(readFileSync(d.path, "utf8")) as Record<string, unknown>;
+  assert.deepEqual(Object.keys(written), ["version", "agent", "chat", "channels"]);
+  assert.deepEqual([written.version, written.agent, written.chat], [3, "claude", "slack"]);
+  assert.deepEqual(Object.keys(written.channels as object), [CHANNEL]);
+});
+
+test("run refuses a state.json written for other modules, naming both pairs", async (t) => {
+  const d = new Daemon(t);
+  const state = new StateStore(d.path, { modules: { agent: "other-agent", chat: "slack" } });
+  state.bind(CHANNEL, d.dir);
+  const before = readFileSync(d.path, "utf8");
+
+  await assert.rejects(
+    d.start(),
+    (error: unknown) =>
+      error instanceof StateError &&
+      error.message.includes("belongs to other modules") &&
+      error.message.includes('agent "other-agent"') &&
+      error.message.includes('agent "claude"') &&
+      error.message.includes('chat "slack"'),
+  );
+  assert.equal(readFileSync(d.path, "utf8"), before);
+  assert.deepEqual(d.tokens, []); // Slack was not reached
 });
 
 test("run repairs a crashed thread before pruning it", async (t) => {

@@ -132,12 +132,14 @@ platform behaviour" at the end.
 `main.run` starts the daemon in this order. It is the one module that imports all three layers, and
 every client, store and clock the layers use is built here and handed down.
 
-1. It loads the configuration (`config.loadConfig`), so a bad `.env` fails before anything else.
+1. It loads the configuration (`config.loadConfig`) for the modules the registry holds, so a bad
+   `.env` or a name it does not hold fails before anything else.
 2. It takes the single-instance lock (`lock.singleInstance`), so a second daemon fails before it
    opens a Socket Mode connection.
-3. It reads `state.json` (`StateStore`) and builds the `ClaudeBackend`.
-4. It builds the Slack provider (`module.slackChat`, whose `build` reads the core only once it is
-   used): the two Slack clients (`module.makeClients`: `clients.sharedClient` for every call but a
+3. It reads `state.json` (`StateStore`, given the names of the agent and the chat selected) and
+   builds the selected agent from the registry (for Claude, the `ClaudeBackend`).
+4. It builds the selected chat from the registry (for Slack, `module.slackChat`, whose `build`
+   reads the core only once it is used): the two Slack clients (`module.makeClients`: `clients.sharedClient` for every call but a
    reply's, `clients.repliesClient` for replies), `auth.test` for the workspace id and the bot
    user id, the `SlackChat` with the shared `UpdateLimiter`, the `ThreadDeleter` when the owner's
    user token is configured (`module.deleter`, which calls `auth.test` with that token), the
@@ -252,8 +254,17 @@ as soon as the start is over.
 
 `config.loadConfig` reads `~/.config/awaydesk/.env` without copying anything into the process
 environment. It refuses a file that is not a regular file, belongs to another user, or grants any
-permission to group or others, and it refuses tokens of the wrong kind. The ownership and the mode
-are not checked on Windows. [setup.md](setup.md) lists the variables.
+permission to group or others. The ownership and the mode are not checked on Windows.
+[setup.md](setup.md) lists the variables.
+
+`AWAYDESK_AGENT` and `AWAYDESK_CHAT` name the agent and the chat, each a key of the registry
+(`registry.REGISTRY`, the one file outside the two modules that names them). Absent, they mean the
+registry's `defaults`. A name the registry does not hold stops the start with a `ConfigError` that
+lists the valid ones. Each module names the variables it reads (`required` and `optional` on its
+entry), and `config.loadConfig` hands it their values when it is built (`Config.agentVariables`,
+`Config.chatVariables`); a required one that is missing stops the start. What a value must look like
+is the module's to check: the Slack module refuses a token of the wrong kind in
+`module.slackChat`, before it calls Slack.
 
 The file is parsed by Node's `util.parseEnv`, after a leading byte order mark is removed.
 `config.expandEnv` then expands `${NAME}` and `${NAME:-default}` in every value, quoted or not. A
@@ -261,8 +272,9 @@ name resolves from the values the file defines above it, else from the process e
 variable set to nothing counts as set, else to its default, else to nothing. An expanded value is
 not expanded again, and `$NAME` without braces stays as written. A value is trimmed, and a variable
 left empty counts as missing. `ALLOWED_ROOT` takes a leading `~` as the home directory and is stored
-with its symlinks resolved; it must be a directory. The tokens are non-enumerable fields of the
-`Config`, so a log line or a `JSON.stringify` of it never shows them.
+with its symlinks resolved; it must be a directory. The two modules' variables are non-enumerable
+fields of the `Config`, and each holds only non-enumerable properties, so a log line or a
+`JSON.stringify` of either never shows a token.
 
 ## State and the single-instance lock
 
@@ -270,14 +282,18 @@ with its symlinks resolved; it must be a directory. The tokens are non-enumerabl
 the folder it was opened in, its Claude Code session id, its bypass choice (on, off, or never
 chosen), the effort level set with `/effort` and `ended`, the reaction name of its root once ✅ or ❌
 is requested (cleared when the root turns ⏳ or ✋ again; read only by the session index), in
-`~/.config/awaydesk/state.json` (version 2). `bypass` is `true` for on and `false` for not on; an
+`~/.config/awaydesk/state.json` (version 3: version 2 plus `agent` and `chat`, the names of the agent
+and the chat that wrote the file). `bypass` is `true` for on and `false` for not on; an
 explicit off also writes `bypass_off: true`, and a thread with `bypass` false and no `bypass_off`
 has never chosen. A reader that does not know `bypass_off` takes an off as not on. Every change is
 written to a temporary file beside it, synced, and renamed over it, so a crash leaves either the old
 file or the new one; the directory is synced after the rename. A file that cannot be read, or has an
-unknown version, stops the daemon with a `StateError` instead of being replaced. A version 1 file
-(one session id and bypass switch per channel, no threads) is converted on load and written back as
-version 2: each channel keeps its directory and gets an empty thread map and a pending upgrade
+unknown version, stops the daemon with a `StateError` instead of being replaced, and so does a
+version 3 file written for another agent or another chat than the ones selected: a session id and a
+thread's name mean nothing to others, and the message names both pairs. A version 2 file carries no
+names; it is read for the modules running and written back as version 3 on the first save. A
+version 1 file (one session id and bypass switch per channel, no threads) is converted on load and
+written back as version 3: each channel keeps its directory and gets an empty thread map and a pending upgrade
 notice; the session id and bypass switch, which belonged to the channel itself, are dropped.
 
 Each thread also carries three fields for crash repair, ids only, never message content:
@@ -296,7 +312,7 @@ Each thread also carries three fields for crash repair, ids only, never message 
   reaction name the file keeps for each.
 
 All three are optional: a version 2 file without them reads as "nothing open", and a reader that
-does not know them ignores them, so the version stays 2. A graceful close (`ThreadSession.close`)
+does not know them ignores them, so they did not change the version. A graceful close (`ThreadSession.close`)
 clears all three for its thread once it is done, whatever the fields looked like partway through
 (`StateStore.clearRepair`). The exception is a close that could not land a reply's end on Slack: the
 open replies and the status stay, with `ended` set to ❌, so the next start's repair closes the reply
@@ -347,7 +363,8 @@ removes only what an answer makes certain:
 - `StateStore.prune` then drops a thread whose session id is no longer among its folder's sessions
   (`AgentBackend.aliveSessions`, which for Claude is `listing.aliveSessions`: the sessions the SDK
   lists, with every transcript file in the folder's transcript directory) and a no-session thread
-  whose root message is more than a day old. A folder the back end cannot tell about keeps its
+  that the chat (`ChatProvider.openedAt`) says was opened more than a day ago; one it cannot
+  date is kept. A folder the back end cannot tell about keeps its
   threads: one whose transcript directory is there and cannot be read, and one whose name passes
   `listing.LONG_PROJECT_KEY` characters and has no directory under the name the daemon derives (see
   "Slack handlers" for how that name is derived).
@@ -1406,7 +1423,7 @@ the one before it landed, so a filter just chosen is never replaced by an older 
 
 ### Edit mode and Delete
 
-With the owner's user token configured (`Config.userToken`, `SLACK_USER_TOKEN`), `module.deleter`
+With the owner's user token configured (`SLACK_USER_TOKEN`, in `Config.chatVariables`), `module.deleter`
 builds a `ThreadDeleter` (in `delete`) after checking with `auth.test` that the token is the owner's
 own in the bot's workspace, and `main.run` hands its `delete` and `clean` to `Home`. Any other token
 stops the start with a `ConfigError`. The header line is then a section with an **Edit** button

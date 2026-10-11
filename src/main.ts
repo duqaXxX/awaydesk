@@ -44,11 +44,7 @@
  *   this file's path would fail through that symlink.
  */
 import { join } from "node:path";
-import { ClaudeBackend } from "./agent/claude/backend.ts";
-import type { BareStart } from "./agent/claude/usage-probe.ts";
-import type { AgentBackend } from "./agent/seam.ts";
-import { type Clients, type SlackOptions, slackChat } from "./chat/slack/module.ts";
-import { describe } from "./chat/slack/reply/errors.ts";
+import type { AgentEntry } from "./agent/seam.ts";
 import { type Clock, monotonicClock, systemClock } from "./clock.ts";
 import { CLEAN_EVERY_SECONDS, clean } from "./core/cleanup.ts";
 import { CONFIG_DIR, ConfigError, loadConfig } from "./core/config.ts";
@@ -58,12 +54,14 @@ import { repair } from "./core/flows/repair.ts";
 import { UsageCache } from "./core/footer.ts";
 import { Holds } from "./core/hold.ts";
 import { AlreadyRunning, singleInstance } from "./core/lock.ts";
-import type { ChatContext, CorePort } from "./core/port.ts";
+import type { ChatContext, ChatEntry, CorePort } from "./core/port.ts";
 import { Approvals } from "./core/requests.ts";
 import { SessionManager } from "./core/sessions/manager.ts";
-import { StateError, StateStore } from "./core/state.ts";
+import { StateError, type StateModules, StateStore } from "./core/state.ts";
 import { namesOf } from "./core/texts.ts";
 import { getLogger } from "./log.ts";
+import { REGISTRY, type Registry } from "./registry.ts";
+import { errorName } from "./values.ts";
 
 export const logger = getLogger("awaydesk.main");
 
@@ -100,16 +98,11 @@ export interface ProcessEvents {
 export interface RunOptions {
   /** `~/.config/awaydesk`. */
   readonly configDir?: string;
-  readonly clients?: Clients;
-  /** Where Slack's payloads come from: `socketReceiver`. */
-  readonly receiver?: SlackOptions["receiver"];
-  /** The agent: Claude Code over the Agent SDK. */
-  readonly backend?: AgentBackend;
   /**
-   * How the usage probe starts its session: `ClaudeBackend.startBare`. A test that gives
-   * `backend` gives this too, or the probe would start the real Claude Code.
+   * The agents and the chats the configuration may select: `REGISTRY`. What a test replaces of a
+   * module is an option of that module's entry (`slackChat({ clients })`), never of `run`.
    */
-  readonly bareStart?: BareStart;
+  readonly registry?: Registry;
   /**
    * Aborts when the process met what it cannot go on from (see the header): the daemon stops as
    * a SIGINT does, and `run` answers 1.
@@ -119,10 +112,8 @@ export interface RunOptions {
   readonly clock?: Clock;
   /** `process`. */
   readonly signals?: SignalSource;
-  /** `new StateStore(path)`. */
-  readonly openState?: (path: string) => StateStore;
-  /** The folder of the files saved from messages: `$TMPDIR/awaydesk`. */
-  readonly uploads?: string;
+  /** `new StateStore(path, { modules })`. */
+  readonly openState?: (path: string, modules: StateModules) => StateStore;
 }
 
 export interface MainOptions extends RunOptions {
@@ -237,7 +228,7 @@ async function step(name: string, work: () => unknown): Promise<void> {
   try {
     await work();
   } catch (error) {
-    logger.error(`shutdown: could not ${name}: ${describe(error)}`);
+    logger.error(`shutdown: could not ${name}: ${errorName(error)}`);
   }
 }
 
@@ -252,27 +243,26 @@ export async function run(options: RunOptions = {}): Promise<number> {
   const wall = options.clock ?? systemClock;
   const steady = options.clock ?? monotonicClock;
 
-  const config = loadConfig(configDir);
+  const registry = options.registry ?? REGISTRY;
+  const config = loadConfig(registry, configDir);
   const lock = await singleInstance(configDir);
   let stop: StopSignals | null = null;
   const onFailure = (): void => stop?.fail();
   try {
-    const state = (options.openState ?? ((path) => new StateStore(path)))(
+    const state = (options.openState ?? ((path, modules) => new StateStore(path, { modules })))(
       join(configDir, "state.json"),
+      { agent: config.agent, chat: config.chat },
     );
-    const backend =
-      options.backend ?? new ClaudeBackend({ bareStart: options.bareStart, clock: options.clock });
+    // `loadConfig` refused a name the registry does not hold, so both entries exist.
+    const agentEntry = registry.agents[config.agent] as AgentEntry;
+    const chatEntry = registry.chats[config.chat] as ChatEntry;
+    const backend = agentEntry.build({ variables: config.agentVariables, clock: steady });
     const limits = backend.usageLimits?.bind(backend);
     // The core exists once the sessions do, and the chat is built before them: it reads the core
     // through `context.core()` when it first needs it.
     let core: CorePort | null = null;
     const context: ChatContext = {
-      variables: {
-        SLACK_BOT_TOKEN: config.botToken,
-        SLACK_APP_TOKEN: config.appToken,
-        SLACK_OWNER_USER_ID: config.ownerUserId,
-        ...(config.userToken !== null && { SLACK_USER_TOKEN: config.userToken }),
-      },
+      variables: config.chatVariables,
       allowedRoot: config.allowedRoot,
       clock: wall,
       steady,
@@ -281,11 +271,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
         return core;
       },
     };
-    const chat = await slackChat({
-      clients: options.clients,
-      receiver: options.receiver,
-      uploads: options.uploads,
-    }).build(context);
+    const chat = await chatEntry.build(context);
     const names = namesOf(backend, chat);
     const approvals = new Approvals(names);
     const holds = new Holds();
@@ -295,7 +281,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
       state,
       approvals,
       holds,
-      usage: new UsageCache(limits ?? (() => Promise.reject(new Error("no usage limits")))),
+      usage: limits === undefined ? null : new UsageCache(limits),
       clock: steady,
     });
     core = { sessions, state, approvals, holds, agent: backend };
@@ -305,6 +291,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
         alive: (directory) => backend.aliveSessions(directory),
         live: () => sessions.liveThreads(),
         chat: chat.name,
+        openedAt: (ref) => chat.openedAt(ref),
       });
     const cleaning = new AbortController();
     let cleaned: Promise<void> | null = null;
@@ -377,10 +364,10 @@ export async function run(options: RunOptions = {}): Promise<number> {
  */
 export function installProcessHandlers(events: ProcessEvents, stop: () => void): void {
   events.on("unhandledRejection", (reason) => {
-    logger.error(`unhandled rejection: ${describe(reason)}`);
+    logger.error(`unhandled rejection: ${errorName(reason)}`);
   });
   events.on("uncaughtException", (error) => {
-    logger.error(`uncaught exception: ${describe(error)}`);
+    logger.error(`uncaught exception: ${errorName(error)}`);
     stop();
   });
 }
@@ -410,7 +397,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
     ) {
       logger.error(error.message);
     } else {
-      logger.error(`stopped by an unexpected error: ${describe(error)}`);
+      logger.error(`stopped by an unexpected error: ${errorName(error)}`);
     }
     exit(1);
   }

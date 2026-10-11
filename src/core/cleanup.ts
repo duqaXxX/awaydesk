@@ -14,7 +14,7 @@
 import type { ThreadRef } from "../chat/seam.ts";
 import { getLogger, type Logger } from "../log.ts";
 import { errorName } from "../values.ts";
-import type { StateStore } from "./state.ts";
+import type { OpenedAt, StateStore } from "./state.ts";
 
 export const logger = getLogger("awaydesk.core.cleanup");
 
@@ -48,6 +48,8 @@ export interface CleanOptions {
   readonly live: Live;
   /** The chat's name (`ChatProvider.name`), for the log lines that say whose answer it was. */
   readonly chat: string;
+  /** When the chat opened a thread (`ChatProvider.openedAt`): a thread it cannot date is kept. */
+  readonly openedAt: OpenedAt;
   /** Seconds since the epoch. */
   readonly now?: () => number;
   readonly logger?: Log;
@@ -141,7 +143,12 @@ export async function clean(
       const sessions = await alive(folder);
       known.set(folder, sessions === null ? null : [...sessions]);
     }
-    const removed = state.prune((directory) => known.get(directory) ?? null, now(), live());
+    const removed = state.prune(
+      (directory) => known.get(directory) ?? null,
+      options.openedAt,
+      now(),
+      live(),
+    );
     if (removed > 0) log.info(`pruned ${removed} stale thread(s) from state.json`);
   } catch (error) {
     log.warning(`could not prune stale threads: ${errorName(error)}`);

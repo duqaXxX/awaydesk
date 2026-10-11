@@ -182,6 +182,13 @@ named in the message, and an `ALLOWED_ROOT` that is not a directory.
 | `SLACK_OWNER_USER_ID` | your member ID, the only person the bot answers |
 | `ALLOWED_ROOT` | the directory `!bind` accepts paths under, for example `~/code` |
 | `SLACK_USER_TOKEN` | optional: your own `xoxp-…` token, for the Home tab's Delete and Clean up |
+| `AWAYDESK_AGENT` | optional: the agent awaydesk drives; `claude` when absent, the only one this release has |
+| `AWAYDESK_CHAT` | optional: the chat awaydesk is driven from; `slack` when absent, the only one this release has |
+
+Leave `AWAYDESK_AGENT` and `AWAYDESK_CHAT` out unless a release adds a second agent or chat. A
+value awaydesk does not know stops the start, and the message lists the valid ones. The variables
+of the agent and of the chat you select are the ones this table lists for them; a variable of a
+module you did not select is not read.
 
 The workspace ID is not configured: awaydesk reads it from Slack at startup with the bot
 token and rejects events from any other workspace.
@@ -832,13 +839,19 @@ Detail that the install sequence links to, kept out of its way.
 | File | Written by | Holds |
 |---|---|---|
 | `.env` | you | the tokens and the settings of Part 2 |
-| `state.json` | awaydesk | for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice (on, off or never chosen), the effort level set with `/effort` and the status reaction on its root message |
+| `state.json` | awaydesk | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice (on, off or never chosen), the effort level set with `/effort` and the status reaction on its root message |
 
 `state.json` looks like this; you never need to edit it:
 
 ```json
-{"version": 2, "channels": {"C0123456789": {"directory": "/home/dev/code/project", "notice_pending": false, "threads": {"1700000000.000100": {"directory": "/home/dev/code/project", "session_id": "...", "bypass": false, "effort": null}}}}}
+{"version": 3, "agent": "claude", "chat": "slack", "channels": {"C0123456789": {"directory": "/home/dev/code/project", "notice_pending": false, "threads": {"1700000000.000100": {"directory": "/home/dev/code/project", "session_id": "...", "bypass": false, "effort": null}}}}}
 ```
+
+`state.json` belongs to the agent and the chat named in it, since a session id and a thread's name
+mean nothing to another. A file written before `AWAYDESK_AGENT` and `AWAYDESK_CHAT` existed names
+neither; awaydesk takes it for the ones running and writes the names on its next save. If you
+select other modules than the file names, awaydesk does not start and the message names both
+pairs: select the ones the file names again, or delete the file and bind the channels again.
 
 awaydesk keeps `state.json` clean on its own, when it starts and then every 6 hours. It
 forgets a channel Slack answers `channel_not_found` about, with its threads, and a thread whose

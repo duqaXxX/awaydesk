@@ -21,6 +21,9 @@ const GONE_THREAD = "1789000500.000100";
 const SESSION = "68da9311-0000-4000-8000-00000000000a";
 const NOBODY: readonly ThreadRef[] = [];
 
+/** A thread's name read as its opening time in epoch seconds, as a chat whose names are times does. */
+const opened = (ref: ThreadRef): number | null => Number(ref.thread);
+
 function nothingLive(): readonly ThreadRef[] {
   return NOBODY;
 }
@@ -167,7 +170,13 @@ test("clean forgets gone channels then prunes what is left", async () => {
     return new Set(); // the session is gone from the folder
   }
 
-  await clean(lookup, state, { alive, live: nothingLive, chat: "Slack", logger: log });
+  await clean(lookup, state, {
+    alive,
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: opened,
+    logger: log,
+  });
   assert.deepEqual(state.channels(), [CHANNEL]);
   assert.equal(state.thread(CHANNEL, THREAD), null); // pruned: its session no longer exists
   // the forgotten channel's folder is not read
@@ -181,6 +190,7 @@ test("clean keeps a thread with a live session", async () => {
     alive: () => new Set(),
     live: () => live,
     chat: "Slack",
+    openedAt: opened,
     logger: log,
   });
   assert.notEqual(state.thread(CHANNEL, THREAD), null);
@@ -198,7 +208,13 @@ test("a thread opened while the folders are read is kept", async () => {
     return new Set([SESSION]);
   }
 
-  await clean(channelsInSlack({}), state, { alive, live: nothingLive, chat: "Slack", logger: log });
+  await clean(channelsInSlack({}), state, {
+    alive,
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: opened,
+    logger: log,
+  });
   assert.notEqual(state.thread("C000LATE", late), null);
 });
 
@@ -214,7 +230,13 @@ test("clean goes on to prune when the channel check itself fails", async () => {
     return NOBODY;
   }
 
-  await clean(lookup, state, { alive: () => new Set(), live, chat: "Slack", logger: log });
+  await clean(lookup, state, {
+    alive: () => new Set(),
+    live,
+    chat: "Slack",
+    openedAt: opened,
+    logger: log,
+  });
   assert.ok(log.lines.join("\n").includes("could not check the bound channels"));
   assert.equal(state.thread(CHANNEL, THREAD), null); // the prune still ran
 });
@@ -226,7 +248,13 @@ test("clean survives a folder that cannot be read and a slack that fails", async
     throw Object.assign(new Error("transcripts unreadable"), { code: "EACCES" });
   }
 
-  await clean(lookup, state, { alive: broken, live: nothingLive, chat: "Slack", logger: log }); // never throws
+  await clean(lookup, state, {
+    alive: broken,
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: opened,
+    logger: log,
+  }); // never throws
   assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
   assert.notEqual(state.thread(CHANNEL, THREAD), null);
   assert.ok(log.lines.join("\n").includes("could not prune stale threads"));
@@ -244,4 +272,26 @@ test("a lookup that throws is no answer", async () => {
   ]);
   assert.deepEqual(state.channels(), [CHANNEL, OTHER_GONE]);
   assert.ok(log.lines.join("\n").includes(`could not read channel ${OTHER_GONE}`));
+});
+
+test("a thread with no session is dropped for its age only when the chat dates it", async () => {
+  // The chat's names mean nothing to the core: a thread it cannot date is never dropped for age.
+  const undated = "not-a-time";
+  state.openThread(CHANNEL, undated);
+  state.openThread(CHANNEL, GONE_THREAD);
+  const later = Number(GONE_THREAD) + 2 * 24 * 60 * 60;
+  const dated = (ref: ThreadRef): number | null => (ref.thread === undated ? null : opened(ref));
+
+  await clean(channelsInSlack({}), state, {
+    alive: () => new Set([SESSION]),
+    live: nothingLive,
+    chat: "Slack",
+    openedAt: dated,
+    now: () => later,
+    logger: log,
+  });
+  assert.equal(state.thread(CHANNEL, GONE_THREAD), null); // dated and older than a day
+  assert.notEqual(state.thread(CHANNEL, undated), null);
+  assert.notEqual(state.thread(CHANNEL, THREAD), null); // its session is alive
+  assert.ok(log.lines.join("\n").includes("pruned 1 stale thread"));
 });
