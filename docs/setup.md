@@ -57,7 +57,9 @@ It prints the command's path, which ends in `bin/awaydesk`. If it prints nothing
 folder of npm's global prefix is not on your `PATH`: add `$(npm prefix -g)/bin` to it in your
 shell profile and open a new terminal. Running `awaydesk` now, before `.env` exists, ends at
 once with `ERROR awaydesk.main:` and a line that says `.env` does not exist and points to Part 2,
-and exit status 1.
+and exit status 1. On a Node older than 22.18 the same command ends with a line that starts
+`ERROR awaydesk.main: awaydesk needs Node 22.18.0 or later and this is Node`, followed by the
+version found, and also with status 1: install a newer Node.
 
 ## Part 1: the Slack app
 
@@ -151,7 +153,8 @@ awaydesk keeps its files in `~/.config/awaydesk/`. `.env` is the one you write;
 awaydesk refuses to start when `.env` is readable by anyone else, is a symbolic link, or
 belongs to another user, and when a token is of the wrong kind (`xoxb-` for the bot token,
 `xapp-` for the app-level token, `xoxp-` for the user token). It also refuses a missing variable,
-named in the message, and an `ALLOWED_ROOT` that is not a directory.
+named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one starting with
+`~/`) or is not a directory.
 
 7. Create the directory and the file, readable by you only:
 
@@ -208,8 +211,10 @@ How the file is read:
 - `${NAME}` and `${NAME:-default}` inside a value become the value of `NAME` defined above in the
   same file, else the one in awaydesk's own environment, else the default, else nothing.
   `$NAME` without braces stays as written.
-- `ALLOWED_ROOT` may start with `~/`, which becomes your home directory. It must name a directory
-  that exists once links are followed; the message shows the path it resolved to.
+- `ALLOWED_ROOT` is an absolute path, or starts with `~/`, which becomes your home directory. A
+  relative path is refused, since launchd starts awaydesk in `/` and a terminal in its own folder.
+  It must name a directory that exists once links are followed; the message shows the path it
+  resolved to.
 - Nothing is put in the process environment, and the `.env` of a repository is never read.
 
 ### Checkpoint 2: the daemon reads `.env` and connects
@@ -824,6 +829,8 @@ in [features.md](features.md#notifications), not restated here.
 | The terminal shows the trust dialog in a folder you already use from Slack, or Slack asks for approvals the folder's allow rules cover | The folder is outside a repository and only a parent folder is trusted, which Claude Code does not count for the `permissions.allow` rules and `additionalDirectories` of the folder's `.claude/settings.json`. Accept the dialog in that folder: it lists them |
 | `The directory ... no longer exists` | The thread's directory was moved or deleted: restore it to keep using this thread, or, in the channel, bind another folder with `!bind <path>` and send a new message to start a session there |
 | `macOS does not let awaydesk read ...` | The directory is in a folder macOS protects: see Part 4, "Folders macOS protects" |
+| `awaydesk needs Node 22.18.0 or later and this is Node ...` in the log, or on the terminal | The Node that runs awaydesk is older than 22.18; the process ends with status 1. Install a newer Node and run `awaydesk` again. The LaunchAgent names the Node executable in its plist: change it there too |
+| `ALLOWED_ROOT must be an absolute path, or one starting with ~/; it is "..."` | `ALLOWED_ROOT` in `.env` is a relative path, which would be read from the folder the process starts in. Write the whole path, or start it with `~/` |
 | `another awaydesk is running` in the log | A second instance tried to start; only one may run |
 | The app has no **Home** tab, or it stays empty | **Home Tab** is off in the app's settings, and the log says `the Home tab is not enabled in the Slack app`: turn it on under **App Home**, **Show Tabs**, then restart awaydesk |
 | `forgot channel ...: Slack no longer has it` in the log | The channel was deleted, or the bot was removed from it: its binding and its threads are gone from `state.json`. If the bot is back in it, send `!bind` there again |

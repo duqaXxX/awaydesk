@@ -167,6 +167,60 @@ test("rejects a root that is not a directory", () => {
   );
 });
 
+// Review round 2026-10-11: a relative `ALLOWED_ROOT` was read from the working directory, which
+// is the terminal's folder at Checkpoint 2 and `/` under launchd.
+
+test("a relative root is refused whatever the working directory", POSIX_ONLY, () => {
+  const directory = scratch();
+  mkdirSync(join(directory, "proj"));
+  writeEnv(directory, "proj");
+  const before = process.cwd();
+  try {
+    // Once from the folder that holds `proj`, where it used to load, once from `/`.
+    for (const cwd of [directory, "/"]) {
+      process.chdir(cwd);
+      assert.throws(
+        () => load(directory),
+        (error: unknown) =>
+          error instanceof ConfigError &&
+          error.message ===
+            'ALLOWED_ROOT must be an absolute path, or one starting with ~/; it is "proj"',
+      );
+    }
+  } finally {
+    process.chdir(before);
+  }
+});
+
+test("a root that names another user or the current folder is refused", POSIX_ONLY, () => {
+  const directory = scratch();
+  for (const value of ["./proj", "../proj", ".", "~alice/proj"]) {
+    writeEnv(directory, value);
+    assert.throws(
+      () => load(directory),
+      (error: unknown) =>
+        error instanceof ConfigError && error.message.endsWith(`; it is "${value}"`),
+      value,
+    );
+  }
+});
+
+test("a tilde root and an absolute root still load", POSIX_ONLY, () => {
+  const directory = scratch();
+  mkdirSync(join(directory, "proj"));
+  writeEnv(directory, join(directory, "proj"));
+  assert.equal(load(directory).allowedRoot, join(directory, "proj"));
+  const home = process.env.HOME;
+  process.env.HOME = directory;
+  try {
+    writeEnv(directory, "~/proj");
+    assert.equal(load(directory).allowedRoot, join(directory, "proj"));
+  } finally {
+    if (home === undefined) delete process.env.HOME;
+    else process.env.HOME = home;
+  }
+});
+
 test("repr never shows a token", () => {
   // The closest ways a TypeScript object reaches a log line: `inspect` and JSON.
   const directory = scratch();
