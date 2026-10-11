@@ -35,6 +35,7 @@ import {
 import { ThreadSession } from "../../../../src/core/sessions/session.ts";
 import type { Choice } from "../../../../src/core/setup.ts";
 import * as texts from "../../../../src/core/texts.ts";
+import { named } from "../../../../src/core/texts.ts";
 import {
   AsyncEvent,
   CHANNEL,
@@ -44,6 +45,7 @@ import {
   STRANGER,
   THREAD,
 } from "../../../support/fake-slack.ts";
+import { NAMES } from "../../../support/names.ts";
 import { FakeAgentSession } from "../../../support/sessions.ts";
 import {
   answerInsidePost,
@@ -682,7 +684,10 @@ test("bang bypass off in an auto mode thread returns to auto mode", async (t) =>
   await world.dispatch(reply("!bypass on", THREAD));
   await world.dispatch(reply("!bypass off", THREAD));
   assert.deepEqual(world.clients[0]?.modes, ["bypassPermissions", "auto"]);
-  assert.deepEqual(world.ephemerals(), [texts.BYPASS_ON_THREAD, texts.BYPASS_OFF_THREAD]);
+  assert.deepEqual(world.ephemerals(), [
+    texts.BYPASS_ON_THREAD,
+    named(texts.BYPASS_OFF_THREAD, NAMES),
+  ]);
 });
 
 function bypassBox(world: World): Body {

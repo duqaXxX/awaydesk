@@ -40,11 +40,11 @@
  *    debounce waits (cleared by the task itself as it returns, and by whoever cancels it), and
  *    `landedValue` says whether and how the end resolved.
  */
+
 import { isDeepStrictEqual } from "node:util";
 import type { WebClient } from "@slack/web-api";
 import { type Clock, systemClock } from "../../../clock.ts";
-import { Fold, shownPreview } from "../../../core/reply/fold.ts";
-import { cancellable, Mutex } from "../../../core/sessions/tasks.ts";
+import { cancellable, Fold, Mutex, shownPreview } from "../../../core/port.ts";
 import { blank, strip } from "../../../text.ts";
 import type { FooterFields, ReplySink as Sink, TaskUpdate } from "../../seam.ts";
 import { formatFooter } from "../footer.ts";
@@ -102,7 +102,7 @@ import { bannerText, markdownBlocks, markdownCut, plainWords } from "./markdown.
 import { Task } from "./tasks.ts";
 
 export * from "../../../clock.ts";
-export { Cancelled, cancellable, Mutex } from "../../../core/sessions/tasks.ts";
+export { Cancelled, cancellable, Mutex } from "../../../core/port.ts";
 export * from "./blocks.ts";
 export * from "./clients.ts";
 export * from "./errors.ts";

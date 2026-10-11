@@ -8,24 +8,27 @@
  * taken (`Mutex.acquire` inside `arrival`), nothing is awaited except a call to Slack (the
  * old-folder notice). The stretches are marked `(sync)`.
  */
+
 import type { ListedSession, PromptContent } from "../../../agent/seam.ts";
 import {
   type Command,
+  fill,
   helpText,
   hostOnly,
+  Mutex,
+  named,
+  oneLine,
   type Passthrough,
   parseBang,
   refusedInThread,
+  SessionClosed,
+  SessionGone,
+  type SessionPort,
+  texts,
   unformatted,
   WORD,
   type Word,
-} from "../../../core/commands.ts";
-import { oneLine } from "../../../core/reply/words.ts";
-import { SessionClosed, SessionGone } from "../../../core/sessions/errors.ts";
-import type { ThreadSession } from "../../../core/sessions/session.ts";
-import { Mutex } from "../../../core/sessions/tasks.ts";
-import * as texts from "../../../core/texts.ts";
-import { fill } from "../../../core/texts.ts";
+} from "../../../core/port.ts";
 import {
   type DownloadedImage,
   DownloadFailed,
@@ -85,7 +88,7 @@ function firstWord(command: Passthrough): string {
  * session's `commands`): refused inside a thread (one thread is one session), left as an
  * ordinary passthrough everywhere else.
  */
-export function isClear(command: Passthrough, commands: ThreadSession["commands"]): boolean {
+export function isClear(command: Passthrough, commands: SessionPort["commands"]): boolean {
   return refusedInThread(commands).has(firstWord(command).toLowerCase());
 }
 
@@ -207,7 +210,7 @@ export class Messages {
       return;
     }
     if (command !== null) {
-      const answer = hostOnly(command);
+      const answer = hostOnly(command, this.parts.names);
       if (answer !== null) {
         // Answered where a word is: under the owner's message in a session's thread, for the
         // owner alone, and as a post in the channel anywhere else. No session starts.
@@ -231,7 +234,10 @@ export class Messages {
     }
     const opened = sessions.open(channel, threadTs);
     if (opened === null) {
-      await this.answers.inChannel(channel, fill(texts.UNBOUND, { root: config.allowedRoot }));
+      await this.answers.inChannel(
+        channel,
+        fill(named(texts.UNBOUND, this.parts.names), { root: config.allowedRoot }),
+      );
       return;
     }
     await this.submitToSession(channel, threadTs, opened, sent, files, command, {
@@ -243,7 +249,7 @@ export class Messages {
    * Where a word's failure is told: in the channel for a word that acts top-level, under the
    * owner's message for one typed inside a session's thread.
    */
-  wordReport(channel: string, threadTs: string, session: ThreadSession | null): Report {
+  wordReport(channel: string, threadTs: string, session: SessionPort | null): Report {
     return async (told) => {
       if (session === null) await this.answers.inChannel(channel, told);
       else await this.answers.tellOwner(channel, threadTs, told);
@@ -251,10 +257,10 @@ export class Messages {
   }
 
   /** What the old-folder notice says of this thread, or null when its folder is the channel's. */
-  private oldFolderText(channel: string, session: ThreadSession): string | null {
+  private oldFolderText(channel: string, session: SessionPort): string | null {
     const record = this.parts.state.channel(channel);
     if (record === null || session.directory === record.directory) return null;
-    return fill(texts.OLD_THREAD_FOLDER, {
+    return fill(named(texts.OLD_THREAD_FOLDER, this.parts.names), {
       old: mrkdwnEscape(session.directory),
       new: mrkdwnEscape(record.directory),
     });
@@ -284,7 +290,7 @@ export class Messages {
   async submitToSession(
     channel: string,
     threadTs: string,
-    opened: ThreadSession,
+    opened: SessionPort,
     sent: string,
     files: readonly SlackFile[],
     command: Passthrough | null,
@@ -320,7 +326,7 @@ export class Messages {
       // standing on (`holdEnd({ continued: true })` bets on the `submit()` below to replace it
       // with ⏳): kept apart from `session`, which a `SessionClosed` retry below can reassign,
       // so a non-submit exit always restores the reaction on the object that actually shows it.
-      let held: ThreadSession | null = null;
+      let held: SessionPort | null = null;
       let askedSetup = false;
       if (!inThread || session.neverRan) {
         // A session's first prompt: its setup comes before anything else, the hold's question
@@ -373,7 +379,7 @@ export class Messages {
             const fresh = sessions.get(channel, threadTs);
             // Not just closed: its thread's own entry is gone too (a `SessionGone` close), so
             // a retry would find nothing here again either.
-            if (fresh === null) throw new SessionGone();
+            if (fresh === null) throw new SessionGone(this.parts.names);
             session = fresh;
           }
         }
@@ -404,17 +410,21 @@ export class Messages {
     const { fetch, uploads } = this.parts;
     const refuse = async (file: SlackFile, reason: string): Promise<void> => {
       const name = mrkdwnEscape(str(file.name || file.id));
-      await this.answers.tellOwner(channel, threadTs, fill(texts.UPLOAD_FAILED, { name, reason }));
+      await this.answers.tellOwner(
+        channel,
+        threadTs,
+        fill(named(texts.UPLOAD_FAILED, this.parts.names), { name, reason }),
+      );
     };
 
     for (const file of files) {
-      const reason = refusal(file);
+      const reason = refusal(file, this.parts.names);
       if (reason !== null) {
         await refuse(file, reason);
         return null;
       }
     }
-    const together = imagesRefusal(files);
+    const together = imagesRefusal(files, this.parts.names);
     if (together !== null) {
       await this.answers.tellOwner(channel, threadTs, together);
       return null;
@@ -475,7 +485,7 @@ export class Messages {
     threadTs: string,
     ts: string,
     command: Word,
-    options: { readonly session: ThreadSession | null; readonly outside?: boolean },
+    options: { readonly session: SessionPort | null; readonly outside?: boolean },
   ): Promise<void> {
     const { sessions } = this.parts;
     const { open, resumeBind } = this.others;
@@ -490,13 +500,20 @@ export class Messages {
         const query = command.kind === "help" ? command.query : "";
         if (session !== null) await session.ensureConnected();
         const commands = session === null ? null : session.commands;
-        await this.answers.say(channel, where, helpText(commands, query, markdownEscape), {
-          ephemeral: quiet,
-        });
+        await this.answers.say(
+          channel,
+          where,
+          helpText(commands, query, markdownEscape, this.parts.names),
+          {
+            ephemeral: quiet,
+          },
+        );
         return;
       }
       case "guide":
-        await this.answers.say(channel, where, texts.GUIDE, { ephemeral: quiet });
+        await this.answers.say(channel, where, named(texts.GUIDE, this.parts.names), {
+          ephemeral: quiet,
+        });
         return;
       case "bind":
         if (session !== null || (outside && command.path)) {
@@ -524,7 +541,7 @@ export class Messages {
           await this.answers.tellOwner(
             channel,
             threadTs,
-            command.on ? texts.BYPASS_ON_THREAD : texts.BYPASS_OFF_THREAD,
+            command.on ? texts.BYPASS_ON_THREAD : named(texts.BYPASS_OFF_THREAD, this.parts.names),
           );
         }
         return;
@@ -590,7 +607,10 @@ export class Messages {
     const { state, sessions, config } = this.parts;
     const record = state.channel(channel);
     if (record === null) {
-      await this.answers.inChannel(channel, fill(texts.UNBOUND, { root: config.allowedRoot }));
+      await this.answers.inChannel(
+        channel,
+        fill(named(texts.UNBOUND, this.parts.names), { root: config.allowedRoot }),
+      );
       return;
     }
     const lines = [fill(texts.STATUS_CHANNEL_HEADER, { directory: record.directory })];
@@ -640,7 +660,7 @@ export class Messages {
   private async channelStatusRow(
     channel: string,
     channelDirectory: string,
-    session: ThreadSession,
+    session: SessionPort,
     known: ReadonlyMap<string, ListedSession>,
   ): Promise<string> {
     const stored = this.parts.state.thread(channel, session.threadId);

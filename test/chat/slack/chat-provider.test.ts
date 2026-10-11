@@ -13,7 +13,7 @@ import { ChannelGuard } from "../../../src/chat/slack/app/guards.ts";
 import { resetStatusFlags } from "../../../src/chat/slack/reply/status.ts";
 import { SlackChat } from "../../../src/chat/slack/thread.ts";
 import * as texts from "../../../src/core/texts.ts";
-import { CHANNEL, rejected, THREAD } from "../../support/fake-slack.ts";
+import { AGENT, CHANNEL, rejected, THREAD } from "../../support/fake-slack.ts";
 import { worldOf } from "../../support/slack-app.ts";
 import { madeChat } from "../../support/slack-chat.ts";
 
@@ -36,6 +36,53 @@ test("the provider names itself and supports every part of the seam", () => {
     fileUpload: true,
     ownerOnlyNotices: true,
   });
+});
+
+const OTHER_AGENT = {
+  name: "Other Agent",
+  words: {
+    author: "Other",
+    command: "other",
+    terminal: "cd {directory} && other --resume {session}",
+  },
+};
+
+test("the names are the agent's and the chat's, read when first needed and once", () => {
+  let reads = 0;
+  const { chat } = madeChat({
+    agent: () => {
+      reads += 1;
+      return OTHER_AGENT;
+    },
+  });
+  assert.equal(reads, 0, "the agent exists only after the provider was built");
+  chat.thread({ channel: CHANNEL, thread: THREAD });
+  chat.channel(CHANNEL);
+  assert.equal(reads, 0);
+  const expected = { agent: "Other Agent", author: "Other", cli: "other", chat: "Slack" };
+  assert.deepEqual(chat.names(), expected);
+  assert.deepEqual(chat.names(), expected);
+  assert.equal(reads, 1);
+});
+
+test("a thread's answered question names the agent the provider was given", async () => {
+  const { slack, chat } = madeChat({ agent: () => OTHER_AGENT });
+  const thread = chat.thread({ channel: CHANNEL, thread: THREAD });
+  const questions = [{ header: "", text: "Colour?", multiSelect: false, options: [] }];
+  const request = {
+    type: "question",
+    requestId: "request-1",
+    callId: "toolu_1",
+    toolName: "AskUserQuestion",
+    title: null,
+    questions,
+  } as const;
+  const ts = await thread.ask("request-1", request, "a question");
+  await thread.keepAnswers(ts, questions, { "Colour?": "Red" });
+  const [asked] = slack.callsTo("chat.postMessage");
+  assert.match(JSON.stringify(asked?.blocks), /Other Agent has a question/);
+  const [update] = slack.callsTo("chat.update");
+  assert.equal(update?.text, "User answered Other's questions:");
 });
 
 test("a notice escapes mrkdwn's three characters, a reference Markdown's marks", () => {
@@ -91,6 +138,7 @@ function started(world: ReturnType<typeof worldOf>, options: { stuck?: boolean }
     slack: world.slack,
     replies: world.slack,
     identity: world.identity,
+    agent: () => AGENT,
     limiter: world.limiter,
     clock: world.slackClock,
     app: {

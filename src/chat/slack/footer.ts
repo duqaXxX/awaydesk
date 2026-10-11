@@ -1,6 +1,7 @@
 /** The footer as one line of Slack mrkdwn. */
+
 import { basename } from "node:path";
-import { type FooterKey, footerFields } from "../../core/footer.ts";
+import { type FooterKey, footerFields } from "../../core/port.ts";
 import type { FooterFields } from "../seam.ts";
 import { mrkdwnEscape } from "./reply/escape.ts";
 

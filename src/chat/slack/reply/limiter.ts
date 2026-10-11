@@ -1,6 +1,7 @@
 /** The budget of writes every reply in the process shares. */
+
 import { type Clock, monotonicClock } from "../../../clock.ts";
-import { Mutex } from "../../../core/sessions/tasks.ts";
+import { Mutex } from "../../../core/port.ts";
 
 // chat.update is Tier 3, "50+ per minute" per app (chat.update reference, read 2026-09-28): 40
 // per 60 s plus a burst of 5, worst case 45 in one window, a real margin under the documented

@@ -10,6 +10,7 @@ import { logger } from "../../../src/chat/slack/channel.ts";
 import { resetStatusFlags } from "../../../src/chat/slack/reply/status.ts";
 import { resumeBlocks } from "../../../src/chat/slack/resume.ts";
 import { CHANNEL, FakeClock, rejected, THREAD } from "../../support/fake-slack.ts";
+import { NAMES } from "../../support/names.ts";
 import { madeChat } from "../../support/slack-chat.ts";
 
 beforeEach(() => resetStatusFlags());
@@ -70,7 +71,9 @@ test("a list of folders is a post with a row for each", async () => {
     {
       channel: CHANNEL,
       text: "Folders under /work",
-      blocks: JSON.parse(JSON.stringify(bindBlocks("/work", ["/work/b", "/work/a"], "/work/a"))),
+      blocks: JSON.parse(
+        JSON.stringify(bindBlocks("/work", ["/work/b", "/work/a"], "/work/a", NAMES)),
+      ),
       unfurl_links: false,
       unfurl_media: false,
     },

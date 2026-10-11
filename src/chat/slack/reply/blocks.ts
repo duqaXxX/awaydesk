@@ -5,9 +5,7 @@
  * `@slack/types` 3.2.0 declares them as `MarkdownBlock`, `ContextBlock`, `DividerBlock`,
  * `TaskCardBlock`, `ContainerBlock`, `RichTextBlock` and the chunks of `AnyChunk`.
  */
-import { shownPreview } from "../../../core/reply/fold.ts";
-import { STOPPED } from "../../../core/reply/words.ts";
-import { NESTED } from "../../../core/texts.ts";
+import { NESTED, STOPPED, shownPreview } from "../../../core/port.ts";
 import type { TaskStatus, TaskUpdate } from "../../seam.ts";
 import { at, lastNewline, len, take } from "./chars.ts";
 import { shownAsWritten } from "./escape.ts";

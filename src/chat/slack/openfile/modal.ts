@@ -2,11 +2,10 @@
  * The picker `!open` shows: the message with its button, the modal with its search field and its
  * rows, what Slack sends back from it, and the order its updates are written in.
  */
+
 import { createHash } from "node:crypto";
 import type { KnownBlock, ModalView, Option } from "@slack/web-api";
-import { Semaphore } from "../../../core/sessions/tasks.ts";
-import * as texts from "../../../core/texts.ts";
-import { fill } from "../../../core/texts.ts";
+import { fill, Semaphore, texts } from "../../../core/port.ts";
 import { isRecord } from "../../../values.ts";
 import { contextBlock, plainTextObject } from "../reply/blocks.ts";
 import { len, take } from "../reply/chars.ts";

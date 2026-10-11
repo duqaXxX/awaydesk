@@ -3,15 +3,23 @@
  * permission request and Claude's own questions (`core/requests.ts`), the same-folder hold and
  * the session setup (`core/hold.ts`).
  */
+
 import type { KnownBlock, ModalView } from "@slack/web-api";
 import type { ModelInfo } from "../../../agent/seam.ts";
-import type { HoldAnswer, Pending as HoldPending } from "../../../core/hold.ts";
-import { APPROVE, DENY } from "../../../core/requests.ts";
-import { SessionClosed, SessionGone } from "../../../core/sessions/errors.ts";
-import type { ThreadSession } from "../../../core/sessions/session.ts";
-import { type Choice, DEFAULT_CHOICE } from "../../../core/setup.ts";
-import * as texts from "../../../core/texts.ts";
-import { fill } from "../../../core/texts.ts";
+import {
+  APPROVE,
+  type Choice,
+  DEFAULT_CHOICE,
+  DENY,
+  fill,
+  type HoldAnswer,
+  type HoldPending,
+  named,
+  SessionClosed,
+  SessionGone,
+  type SessionPort,
+  texts,
+} from "../../../core/port.ts";
 import { HOLD_CONTINUE, holdBlocks } from "../hold.ts";
 import { contextBlock, noticeText } from "../reply/blocks.ts";
 import { describe } from "../reply/errors.ts";
@@ -71,8 +79,8 @@ export class Requests {
   async holdBeforeSending(
     channel: string,
     threadTs: string,
-    session: ThreadSession,
-    other: ThreadSession,
+    session: SessionPort,
+    other: SessionPort,
   ): Promise<boolean> {
     const link = await this.answers.threadMrkdwnLink(other.channelId, other.threadId, "Session");
     const answer = await this.askOwner(channel, threadTs, session, {
@@ -92,8 +100,8 @@ export class Requests {
   async setupBeforeSending(
     channel: string,
     threadTs: string,
-    asked: ThreadSession,
-  ): Promise<ThreadSession | null> {
+    asked: SessionPort,
+  ): Promise<SessionPort | null> {
     const { sessions, state, slack, limiter } = this.parts;
     let session = asked;
     try {
@@ -106,7 +114,7 @@ export class Requests {
       // Closed during the downloads before this: the retry of the submit never sees this
       // step, so the thread's fresh session is looked up here, as it does.
       const fresh = sessions.get(channel, threadTs);
-      if (fresh === null) throw new SessionGone();
+      if (fresh === null) throw new SessionGone(this.parts.names);
       session = fresh;
       await session.ensureConnected();
     }
@@ -175,7 +183,7 @@ export class Requests {
   async askOwner(
     channel: string,
     threadTs: string,
-    session: ThreadSession,
+    session: SessionPort,
     question: Question,
   ): Promise<HoldAnswer | null> {
     const { sessions, holds, slack, state } = this.parts;
@@ -204,7 +212,7 @@ export class Requests {
       // approval does, rather than send into a folder another session is using.
       logger.error(`could not post a hold in ${channel}/${threadTs}: ${describe(error)}`);
       holds.discard(holdId);
-      await this.answers.tellOwner(channel, threadTs, texts.HOLD_UNPOSTED);
+      await this.answers.tellOwner(channel, threadTs, named(texts.HOLD_UNPOSTED, this.parts.names));
       return null;
     }
     const shownAt = str(posted.ts);
@@ -424,7 +432,11 @@ export class Requests {
       return;
     }
     // trigger_id lives 3 seconds: the checks above are the only work before this call.
-    const view = questionView(newDraft(approvalId, channel, threadTs), pending.questions);
+    const view = questionView(
+      newDraft(approvalId, channel, threadTs),
+      pending.questions,
+      this.parts.names,
+    );
     try {
       const trigger = text(body.trigger_id);
       if (trigger === null) throw new TypeError("the click carries no trigger_id");
@@ -486,7 +498,7 @@ export class Requests {
       const following = draft.active + 1 < questions.length ? draft.active + 1 : missing;
       await ack({
         response_action: "update",
-        view: questionView({ ...draft, active: following }, questions),
+        view: questionView({ ...draft, active: following }, questions, this.parts.names),
       });
       return;
     }
@@ -503,6 +515,6 @@ export class Requests {
       await this.answers.tellOwner(draft.channelId, draft.threadTs, texts.APPROVAL_GONE);
     }
     // The session that asked decides what becomes of the request message: its reply keeps the
-    // answers, or the request itself does (`ThreadSession.keepAnswers`).
+    // answers, or the request itself does (`SessionPort.keepAnswers`).
   };
 }

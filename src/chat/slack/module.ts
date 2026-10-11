@@ -4,9 +4,15 @@
  * the thread deleter, the Home tab, the channel guard, the uploads folder); what needs the core
  * is read through `context.core()` when it is first used, which is after `build` returned.
  */
+
 import type { Receiver } from "@slack/bolt";
-import { ConfigError } from "../../core/config.ts";
-import type { ChatContext, ChatEntry, SessionsPort } from "../../core/port.ts";
+import {
+  type ChatContext,
+  type ChatEntry,
+  ConfigError,
+  type Names,
+  type SessionsPort,
+} from "../../core/port.ts";
 import type { ChatProvider } from "../seam.ts";
 import type { Fetch } from "./app/answers.ts";
 import { socketReceiver } from "./app/app.ts";
@@ -81,6 +87,7 @@ export async function deleter(
   identity: Identity,
   state: DeleterState,
   sessions: Pick<SessionsPort, "release" | "free">,
+  names: () => Names,
   clients: Pick<Clients, "owner"> = CLIENTS,
 ): Promise<ThreadDeleter | null> {
   if (userToken === null) return null;
@@ -96,6 +103,7 @@ export async function deleter(
     botUserId: identity.botUserId,
     ownerUserId: identity.ownerUserId,
     state,
+    names,
     release: (channelId, threadId) => sessions.release(channelId, threadId),
     free: (channelId, threadId) => sessions.free(channelId, threadId),
   });
@@ -135,6 +143,9 @@ export function slackChat(options: SlackOptions = {}): ChatEntry {
         removeThread: (channelId: string, threadId: string) =>
           context.core().state.removeThread(channelId, threadId),
       };
+      // The provider is made last, from these parts; they ask it for the names when they show a
+      // line, which is after the core exists.
+      const names = (): Names => chat.names();
       const threadDeleter = await deleter(
         context.variables.SLACK_USER_TOKEN ?? null,
         slack,
@@ -144,12 +155,14 @@ export function slackChat(options: SlackOptions = {}): ChatEntry {
           release: (channelId, threadId) => context.core().sessions.release(channelId, threadId),
           free: (channelId, threadId) => context.core().sessions.free(channelId, threadId),
         },
+        names,
         clients,
       );
       const home = new Home(slack, {
         ownerUserId: identity.ownerUserId,
         teamId: identity.teamId,
         state,
+        names,
         sessionsOf: (directory) => context.core().agent.listSessions(directory),
         ...(threadDeleter !== null && {
           delete: (channelId, threadId) => threadDeleter.delete(channelId, threadId),
@@ -159,13 +172,14 @@ export function slackChat(options: SlackOptions = {}): ChatEntry {
       });
       const uploads = options.uploads ?? uploadsDir();
       await prepareUploads(uploads);
-      return new SlackChat({
+      const chat = new SlackChat({
         slack,
         replies: replySlack,
         identity,
         limiter,
         clock: context.clock,
         steady: context.steady,
+        agent: () => context.core().agent,
         app: {
           core: () => context.core(),
           config: { botToken, allowedRoot: context.allowedRoot },
@@ -178,6 +192,7 @@ export function slackChat(options: SlackOptions = {}): ChatEntry {
           ...(options.now !== undefined && { now: options.now }),
         },
       });
+      return chat;
     },
   };
 }

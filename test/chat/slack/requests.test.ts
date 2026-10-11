@@ -24,17 +24,18 @@ import {
 } from "../../../src/chat/slack/requests.ts";
 import { THREAD } from "../../support/fake-slack.ts";
 import { sdkJson } from "../../support/fixtures.ts";
+import { NAMES } from "../../support/names.ts";
 
 // biome-ignore lint/suspicious/noExplicitAny: a Slack payload read in a test
 type Json = Record<string, any>;
 
 // The builders return Slack's blocks as plain records; a test reads them by path.
 const approvalBlocks = (id: string, request: PermissionRequest): Json[] =>
-  approvalBlocksOf(id, request) as Json[];
+  approvalBlocksOf(id, request, NAMES) as Json[];
 const questionBlocks = (id: string, questions: readonly Question[]): Json[] =>
-  questionBlocksOf(id, questions) as Json[];
+  questionBlocksOf(id, questions, NAMES) as Json[];
 const questionView = (draft: Draft, questions: readonly Question[]): Json =>
-  questionViewOf(draft, questions) as Json;
+  questionViewOf(draft, questions, NAMES) as Json;
 
 /** The characters of a text as Slack counts them: code points, not UTF-16 units. */
 function chars(text: string): number {

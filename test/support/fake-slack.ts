@@ -31,8 +31,11 @@ import {
   WebAPIRequestError,
   WebClient,
 } from "@slack/web-api";
+import { NAME, WORDS } from "../../src/agent/claude/backend.ts";
 import { type Json, type JsonObject, slackPayload } from "./fixtures.ts";
 
+/** The agent a provider's texts name in a test: the Claude back end's own name and words. */
+export const AGENT = { name: NAME, words: WORDS };
 export const OWNER = "U000ALICE";
 export const STRANGER = "U000BOB";
 export const TEAM = "T000TEAM";

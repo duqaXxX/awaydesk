@@ -2,10 +2,9 @@
  * `!bind` alone, as Slack shows it: one row per folder `src/core/folders.ts` found, a Bind button
  * each.
  */
+
 import { relative, sep } from "node:path";
-import { FOLDER_ROWS } from "../../core/folders.ts";
-import * as texts from "../../core/texts.ts";
-import { fill } from "../../core/texts.ts";
+import { FOLDER_ROWS, fill, type Names, named, texts } from "../../core/port.ts";
 import { compareCodePoints } from "../../text.ts";
 import { type ContextBlock, contextBlock } from "./reply/blocks.ts";
 import { shownAsWritten } from "./reply/escape.ts";
@@ -72,14 +71,19 @@ function row(root: string, index: number, folder: string, current: boolean): Fol
 }
 
 /** The list: the first FOLDER_ROWS folders in path order, the channel's own marked. */
-export function bindBlocks(root: string, folders: string[], current: string | null): BindBlock[] {
+export function bindBlocks(
+  root: string,
+  folders: string[],
+  current: string | null,
+  names: Names,
+): BindBlock[] {
   const shown = folders.slice(0, FOLDER_ROWS).toSorted(comparePaths);
   // The list's own lines are the daemon's notices, small and grey; the rows keep their button.
   if (folders.length === 0) {
-    return [contextBlock(fill(texts.BIND_EMPTY, { root: shownAsWritten(root) }))];
+    return [contextBlock(fill(named(texts.BIND_EMPTY, names), { root: shownAsWritten(root) }))];
   }
   return [
-    contextBlock(fill(texts.BIND_LIST, { root: shownAsWritten(root) })),
+    contextBlock(fill(named(texts.BIND_LIST, names), { root: shownAsWritten(root) })),
     ...shown.map((folder, i) =>
       row(root, i, folder, current !== null && samePath(folder, current)),
     ),

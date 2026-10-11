@@ -44,14 +44,21 @@
  * - `asking` is a `Semaphore` of `THREADS_AT_ONCE` places.
  * - Every wait goes through the injected `Clock`.
  */
+
 import { createHash } from "node:crypto";
 import { WebAPIPlatformError, type WebClient } from "@slack/web-api";
 import type { ListedSession } from "../../agent/seam.ts";
 import { type Clock, systemClock } from "../../clock.ts";
-import type { StatePort } from "../../core/port.ts";
-import { oneLine } from "../../core/reply/words.ts";
-import { Cancelled, Mutex, Semaphore } from "../../core/sessions/tasks.ts";
-import * as texts from "../../core/texts.ts";
+import {
+  Cancelled,
+  Mutex,
+  type Names,
+  named,
+  oneLine,
+  Semaphore,
+  type StatePort,
+  texts,
+} from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import type { ThreadRef } from "../seam.ts";
 import { contextBlock, plainTextObject } from "./reply/blocks.ts";
@@ -417,12 +424,16 @@ function context(text: string): Block {
   return { ...contextBlock(text) };
 }
 
-function deletingLine(count: number): string {
-  return count === 1 ? texts.HOME_DELETING_ONE : texts.fill(texts.HOME_DELETING_MANY, { count });
+function deletingLine(count: number, names: Names): string {
+  return count === 1
+    ? named(texts.HOME_DELETING_ONE, names)
+    : texts.fill(named(texts.HOME_DELETING_MANY, names), { count });
 }
 
-function cleaningLine(count: number): string {
-  return count === 1 ? texts.HOME_CLEANING_ONE : texts.fill(texts.HOME_CLEANING_MANY, { count });
+function cleaningLine(count: number, names: Names): string {
+  return count === 1
+    ? named(texts.HOME_CLEANING_ONE, names)
+    : texts.fill(named(texts.HOME_CLEANING_MANY, names), { count });
 }
 
 /**
@@ -506,11 +517,12 @@ function repliesOf(row: HomeRow): string {
  * The Delete of a session's row, with Slack's own confirmation dialog, which names the thread.
  * The dialog shows before the click is sent (confirmation dialog object reference).
  */
-function deleteButton(row: HomeRow, channelName: string): Block {
+function deleteButton(row: HomeRow, channelName: string, names: Names): Block {
   const replies = repliesOf(row);
-  const named = row.replies ? texts.HOME_DELETE_NAMED : texts.HOME_DELETE_NAMED_BARE;
-  let room = CONFIRM_TEXT - Array.from(texts.HOME_DELETE_TEXT).length;
-  room -= Array.from(texts.fill(named, { title: "", channel: channelName, replies })).length;
+  const naming = row.replies ? texts.HOME_DELETE_NAMED : texts.HOME_DELETE_NAMED_BARE;
+  const warning = named(texts.HOME_DELETE_TEXT, names);
+  let room = CONFIRM_TEXT - Array.from(warning).length;
+  room -= Array.from(texts.fill(naming, { title: "", channel: channelName, replies })).length;
   const title = oneLine(row.title, Math.max(room, 1));
   return {
     type: "button",
@@ -520,9 +532,7 @@ function deleteButton(row: HomeRow, channelName: string): Block {
     value: `${row.channelId}:${row.threadTs}`,
     confirm: {
       title: plainTextObject(texts.HOME_DELETE_TITLE),
-      text: plainTextObject(
-        texts.fill(named, { title, channel: channelName, replies }) + texts.HOME_DELETE_TEXT,
-      ),
+      text: plainTextObject(texts.fill(naming, { title, channel: channelName, replies }) + warning),
       confirm: plainTextObject(texts.HOME_DELETE_CONFIRM),
       deny: plainTextObject(texts.HOME_DELETE_DENY),
       style: "danger",
@@ -530,7 +540,7 @@ function deleteButton(row: HomeRow, channelName: string): Block {
   };
 }
 
-function card(row: HomeRow, channelName: string, editing: boolean): Block[] {
+function card(row: HomeRow, channelName: string, editing: boolean, names: Names): Block[] {
   const icon = row.status ? `:${row.status}:  ` : "";
   const title = shownAsWritten(oneLine(row.title, TITLE_LIMIT));
   const when = row.replies ? texts.HOME_LAST_REPLY : texts.HOME_STARTED;
@@ -548,7 +558,7 @@ function card(row: HomeRow, channelName: string, editing: boolean): Block[] {
   ];
   const head = section(`${icon}*${title}*`);
   if (editing && !row.deleting && !(row.status !== null && IN_USE.has(row.status))) {
-    head.accessory = deleteButton(row, channelName);
+    head.accessory = deleteButton(row, channelName, names);
   }
   return [head, context(details.filter((d) => d).join(" · "))];
 }
@@ -581,6 +591,7 @@ export function homeView(
   rows: readonly HomeRow[],
   channels: ReadonlyMap<string, string>,
   options: HomeViewOptions,
+  names: Names,
 ): HomeView {
   const { teamId, chosen, now } = options;
   const { canEdit = false, deleting = 0, canClean = false } = options;
@@ -589,8 +600,8 @@ export function homeView(
   const blocks: Block[] = [
     ...controlsOf(channels, chosen),
     header(dateToken(Math.trunc(now.getTime() / 1000), "time"), editing, canEdit),
-    ...(deleting ? [section(deletingLine(deleting))] : []),
-    ...(cleaning.size > 0 ? [section(cleaningLine(cleaning.size))] : []),
+    ...(deleting ? [section(deletingLine(deleting, names))] : []),
+    ...(cleaning.size > 0 ? [section(cleaningLine(cleaning.size, names))] : []),
     ...[...(options.notices ?? [])].slice(0, NOTICES_SHOWN).map(context),
   ];
   if (channels.size === 0) return { type: "home", blocks: [...blocks, context(texts.HOME_EMPTY)] };
@@ -640,7 +651,7 @@ export function homeView(
     );
     cards.slice(0, room).forEach((row, index) => {
       if (index) blocks.push(context(SPACER));
-      blocks.push(...card(row, name, editing));
+      blocks.push(...card(row, name, editing, names));
     });
     shown += Math.min(cards.length, room);
     if (cards.length > room) break;
@@ -687,6 +698,8 @@ export interface HomeOptions {
   readonly ownerUserId: string;
   readonly teamId: string;
   readonly state: Pick<StatePort, "channels" | "threads">;
+  /** The names the page's texts take; asked at each publish, which is after the core exists. */
+  readonly names: () => Names;
   /** The sessions Claude Code lists for a folder (the seam's `listSessions`). */
   readonly sessionsOf: (
     directory: string,
@@ -716,6 +729,7 @@ export class Home {
   private readonly owner: string;
   private readonly team: string;
   private readonly state: Pick<StatePort, "channels" | "threads">;
+  private readonly textNames: () => Names;
   private readonly sessionsOf: HomeOptions["sessionsOf"];
   private readonly deleteThread: HomeOptions["delete"];
   private readonly cleanChannel: HomeOptions["clean"];
@@ -768,6 +782,7 @@ export class Home {
     this.owner = options.ownerUserId;
     this.team = options.teamId;
     this.state = options.state;
+    this.textNames = options.names;
     this.sessionsOf = options.sessionsOf;
     this.deleteThread = options.delete;
     this.cleanChannel = options.clean;
@@ -964,17 +979,22 @@ export class Home {
     if (chosen && (!bound.includes(chosen) || this.names.get(chosen) === null)) {
       this.current = { ...this.current, channel: null };
     }
-    const view = homeView(rows, channels, {
-      teamId: this.team,
-      chosen: this.current,
-      now: new Date(this.clock.time() * 1000),
-      canEdit: this.deleteThread !== undefined,
-      editing: this.editing,
-      notices: [...this.notices.values()],
-      deleting: this.deleting.size,
-      canClean: this.cleanChannel !== undefined,
-      cleaning: new Set(this.cleaning),
-    });
+    const view = homeView(
+      rows,
+      channels,
+      {
+        teamId: this.team,
+        chosen: this.current,
+        now: new Date(this.clock.time() * 1000),
+        canEdit: this.deleteThread !== undefined,
+        editing: this.editing,
+        notices: [...this.notices.values()],
+        deleting: this.deleting.size,
+        canClean: this.cleanChannel !== undefined,
+        cleaning: new Set(this.cleaning),
+      },
+      this.textNames(),
+    );
     signal?.throwIfAborted();
     // `@slack/types` declares this shape as `HomeView`.
     await this.slack.views.publish({

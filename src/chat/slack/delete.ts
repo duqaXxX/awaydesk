@@ -32,11 +32,9 @@
  * reference does not say what a parent's count reads in the channel's history once its replies
  * are gone, and a thread taken for a leftover would lose its root.
  */
+
 import type { WebClient } from "@slack/web-api";
-import type { StatePort } from "../../core/port.ts";
-import { Mutex } from "../../core/sessions/tasks.ts";
-import * as texts from "../../core/texts.ts";
-import { fill } from "../../core/texts.ts";
+import { fill, Mutex, type Names, named, type StatePort, texts } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import { isRecord } from "../../values.ts";
 import { describe } from "./reply/errors.ts";
@@ -57,6 +55,8 @@ export interface ThreadDeleterOptions {
   readonly botUserId: string;
   readonly ownerUserId: string;
   readonly state: DeleterState;
+  /** The names the lines it shows take; asked when one is shown, which is after the core exists. */
+  readonly names: () => Names;
   /**
    * Closes the thread's live session when it is idle, holds the thread so that no session is
    * built in it meanwhile, and says whether it did.
@@ -92,6 +92,7 @@ export class ThreadDeleter {
   readonly #botUserId: string;
   readonly #ownerUserId: string;
   readonly #state: DeleterState;
+  readonly #names: () => Names;
   readonly #release: ThreadDeleterOptions["release"];
   readonly #free: ThreadDeleterOptions["free"];
   // One thread at a time: two deletes at once would share Slack's rate limit, and each would
@@ -104,6 +105,7 @@ export class ThreadDeleter {
     this.#botUserId = options.botUserId;
     this.#ownerUserId = options.ownerUserId;
     this.#state = options.state;
+    this.#names = options.names;
     this.#release = options.release;
     this.#free = options.free;
   }
@@ -132,7 +134,7 @@ export class ThreadDeleter {
       const refused = await this.#empty(channelId, threadTs);
       if (refused > 0) {
         // The root stays while a reply does, so the thread can still be opened.
-        return fill(texts.HOME_DELETE_REFUSED, { count: refused });
+        return fill(named(texts.HOME_DELETE_REFUSED, this.#names()), { count: refused });
       }
       this.#state.removeThread(channelId, threadTs);
     } catch (error) {
@@ -210,7 +212,9 @@ export class ThreadDeleter {
         return fill(texts.HOME_CLEAN_FAILED, { error: describe(error) });
       }
       logger.info(`cleaned up ${channelId}: ${loose.size} messages, ${refused} refused`);
-      return refused > 0 ? fill(texts.HOME_CLEAN_REFUSED, { count: refused }) : null;
+      return refused > 0
+        ? fill(named(texts.HOME_CLEAN_REFUSED, this.#names()), { count: refused })
+        : null;
     });
   }
 

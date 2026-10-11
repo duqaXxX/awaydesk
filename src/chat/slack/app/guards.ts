@@ -4,8 +4,9 @@
  * Every inbound path calls these on its own: a button is never trusted because of the message it
  * sits on, and the channel is re-read from Slack each time, since membership can change.
  */
+
 import type { WebClient } from "@slack/web-api";
-import * as texts from "../../../core/texts.ts";
+import { texts } from "../../../core/port.ts";
 import { getLogger, type Logger } from "../../../log.ts";
 import { isSpace } from "../../../text.ts";
 import { describe } from "../reply/errors.ts";

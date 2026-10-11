@@ -1,5 +1,5 @@
+import { texts } from "../../core/port.ts";
 /** The same-folder hold's question as Slack blocks. */
-import * as texts from "../../core/texts.ts";
 
 export const HOLD_CONTINUE = "hold_continue";
 export const HOLD_CANCEL = "hold_cancel";

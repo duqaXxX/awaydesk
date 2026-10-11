@@ -38,7 +38,13 @@
 import { App, LogLevel, type Receiver, SocketModeReceiver } from "@slack/bolt";
 import type { WebClient, WebClientOptions } from "@slack/web-api";
 import { type Clock, monotonicClock } from "../../../clock.ts";
-import type { ApprovalsPort, HoldsPort, SessionsPort, StatePort } from "../../../core/port.ts";
+import type {
+  ApprovalsPort,
+  HoldsPort,
+  Names,
+  SessionsPort,
+  StatePort,
+} from "../../../core/port.ts";
 import { download } from "../attachments.ts";
 import { BIND_ACTION } from "../bind.ts";
 import { HOLD_CANCEL, HOLD_CONTINUE } from "../hold.ts";
@@ -101,6 +107,8 @@ export interface BuildAppOptions {
   readonly holds: HoldsPort;
   readonly guard: ChannelGuard;
   readonly state: StatePort;
+  /** The agent's and the chat's names, which the texts that name them take. */
+  readonly names: Names;
   /** The folder a message's files that are no image are saved in (`attachments.uploadsDir`). */
   readonly uploads: string;
   readonly home: Home;
@@ -213,6 +221,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     holds: options.holds,
     guard: options.guard,
     state: options.state,
+    names: options.names,
     uploads: options.uploads,
     home: options.home,
     limiter: chat.limiter,

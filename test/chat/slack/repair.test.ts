@@ -11,6 +11,7 @@ import { repair } from "../../../src/core/flows/repair.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import * as texts from "../../../src/core/texts.ts";
 import {
+  AGENT,
   type Args,
   BOT,
   CHANNEL,
@@ -36,6 +37,7 @@ function repairCrash(slack: FakeSlack, state: StateStore, limiter: Limiter): Pro
     slack,
     replies: slack,
     identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
+    agent: () => AGENT,
     limiter,
   });
   return repair(chat, state);

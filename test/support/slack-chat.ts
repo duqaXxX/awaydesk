@@ -3,7 +3,7 @@
  * channel it hands out, with the clock the status line counts on.
  */
 import { SlackChat, type SlackChatOptions } from "../../src/chat/slack/thread.ts";
-import { BOT, CHANNEL, FakeClock, FakeSlack, OWNER, TEAM, THREAD } from "./fake-slack.ts";
+import { AGENT, BOT, CHANNEL, FakeClock, FakeSlack, OWNER, TEAM, THREAD } from "./fake-slack.ts";
 
 export interface MadeChat {
   readonly slack: FakeSlack;
@@ -21,6 +21,7 @@ export function madeChat(extra: Partial<SlackChatOptions> = {}): MadeChat {
     slack,
     replies: slack,
     identity: { teamId: TEAM, ownerUserId: OWNER, botUserId: BOT },
+    agent: () => AGENT,
     limiter: { acquire: async () => {}, refund: async () => {} },
     clock,
     ...extra,

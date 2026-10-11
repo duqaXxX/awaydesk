@@ -3,10 +3,10 @@
  * not, and the untracked ones that are not ignored. The measurements behind the git commands are
  * in the `listing.ts` header.
  */
+
 import type { Repository } from "../../../agent/seam.ts";
 import { type Clock, monotonicClock } from "../../../clock.ts";
-import { GIT_TIMEOUT, runGit } from "../../../core/footer.ts";
-import { Semaphore } from "../../../core/sessions/tasks.ts";
+import { GIT_TIMEOUT, runGit, Semaphore } from "../../../core/port.ts";
 import { strip } from "../../../text.ts";
 import { len } from "../reply/chars.ts";
 import { GIT_CHAINS, relation, scoped, under } from "./listing.ts";

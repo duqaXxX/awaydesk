@@ -1,6 +1,7 @@
 /** What the daemon asks Slack about the channels it is bound to. */
+
 import type { WebClient } from "@slack/web-api";
-import type { ChannelLookup } from "../../core/cleanup.ts";
+import type { ChannelLookup } from "../../core/port.ts";
 import { ChatError } from "../seam.ts";
 import { describe } from "./reply/errors.ts";
 

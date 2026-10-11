@@ -34,8 +34,9 @@ import {
   SETUP_START,
 } from "../../../../src/chat/slack/setup.ts";
 import * as texts from "../../../../src/core/texts.ts";
-import { fill } from "../../../../src/core/texts.ts";
+import { fill, named } from "../../../../src/core/texts.ts";
 import { BOT, CHANNEL, OTHER_TEAM, OWNER, STRANGER, THREAD } from "../../../support/fake-slack.ts";
+import { NAMES } from "../../../support/names.ts";
 import {
   type Body,
   CLICK_THREAD,
@@ -450,7 +451,7 @@ for (const [who, fields] of [
     await world.settle();
     assert.deepEqual(world.queries(), []);
     assert.deepEqual(world.clients, []);
-    assert.equal(world.ephemerals().at(-1), texts.CLIP_NOT_YOURS);
+    assert.equal(world.ephemerals().at(-1), named(texts.CLIP_NOT_YOURS, NAMES));
   });
 }
 

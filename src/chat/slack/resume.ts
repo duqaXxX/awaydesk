@@ -9,9 +9,9 @@
  * 2026-09-25). The rows come from the agent's session listing, newest first. Ordering that list
  * by the sessions' last message belongs to the Claude back end, which reads the transcripts.
  */
+
 import type { ListedSession } from "../../agent/seam.ts";
-import { oneLine } from "../../core/reply/words.ts";
-import * as texts from "../../core/texts.ts";
+import { oneLine, texts } from "../../core/port.ts";
 import { type ContextBlock, contextBlock } from "./reply/blocks.ts";
 import { take } from "./reply/chars.ts";
 import { shownAsWritten } from "./reply/escape.ts";

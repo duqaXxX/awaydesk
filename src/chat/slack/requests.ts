@@ -8,10 +8,9 @@
  * to Slack with `&`, `<` and `>` escaped and a zero-width space after each backtick, so no
  * `<url|label>` can hide what it links and no text can close its code block.
  */
+
 import type { PermissionRequest, Question, QuestionOption } from "../../agent/seam.ts";
-import { oneLine } from "../../core/reply/words.ts";
-import { answerOf } from "../../core/requests.ts";
-import * as texts from "../../core/texts.ts";
+import { answerOf, type Names, named, oneLine, texts } from "../../core/port.ts";
 import { PY_SPACE, strip } from "../../text.ts";
 import { isRecord } from "../../values.ts";
 import { shownAsWritten } from "./reply/escape.ts";
@@ -98,10 +97,14 @@ function code(chunk: string): Block {
  * The request the owner approves: everything the tool will run with, never cut silently, since
  * Approve hands the agent the whole input whatever was shown.
  */
-export function approvalBlocks(approvalId: string, request: PermissionRequest): Block[] {
+export function approvalBlocks(
+  approvalId: string,
+  request: PermissionRequest,
+  names: Names,
+): Block[] {
   const heading = request.title
     ? shownAsWritten(request.title)
-    : texts.fill(texts.APPROVAL_PROMPT, { tool: shownAsWritten(request.toolName) });
+    : texts.fill(named(texts.APPROVAL_PROMPT, names), { tool: shownAsWritten(request.toolName) });
   const blocks: Block[] = [
     { type: "section", text: { type: "mrkdwn", text: head(heading, SECTION_LIMIT) } },
   ];
@@ -141,8 +144,9 @@ export function approvalBlocks(approvalId: string, request: PermissionRequest): 
 export function answeredBlocks(
   questions: readonly Question[],
   answers: Readonly<Record<string, string | readonly string[]>>,
+  names: Names,
 ): Block[] {
-  const lines = [texts.ANSWERED];
+  const lines = [named(texts.ANSWERED, names)];
   for (const q of questions) {
     const answer = Object.hasOwn(answers, q.text) ? (answers[q.text] as string | string[]) : "";
     const shown = typeof answer === "string" ? answer : answer.join(", ");
@@ -156,12 +160,16 @@ export function answeredBlocks(
  * The request in the channel: one line naming the questions, with Answer (which opens the form)
  * and Skip. It stays one line however many questions the agent asks.
  */
-export function questionBlocks(approvalId: string, questions: readonly Question[]): Block[] {
+export function questionBlocks(
+  approvalId: string,
+  questions: readonly Question[],
+  names: Names,
+): Block[] {
   const headers = questions.map((q) => `*${shownAsWritten(q.header || q.text)}*`).join(" · ");
   const count =
     questions.length === 1
-      ? texts.QUESTIONS_ONE
-      : texts.fill(texts.QUESTIONS_MANY, { count: questions.length });
+      ? named(texts.QUESTIONS_ONE, names)
+      : texts.fill(named(texts.QUESTIONS_MANY, names), { count: questions.length });
   return [
     {
       type: "section",
@@ -388,7 +396,7 @@ function optionWhole(option: QuestionOption): Block {
  * option are shown whole above the choice, which keeps the labels alone under the question's
  * header (issue #47).
  */
-export function questionView(draft: Draft, questions: readonly Question[]): Block {
+export function questionView(draft: Draft, questions: readonly Question[], names: Names): Block {
   const blocks: Block[] = [];
   const count = questions.length;
   const at = draft.active;
@@ -449,7 +457,7 @@ export function questionView(draft: Draft, questions: readonly Question[]): Bloc
     type: "modal",
     callback_id: QUESTION_FORM,
     private_metadata: dumpDraft(draft),
-    title: { type: "plain_text", text: texts.QUESTION_TITLE },
+    title: { type: "plain_text", text: named(texts.QUESTION_TITLE, names) },
     submit: {
       type: "plain_text",
       text: at < count - 1 ? texts.fill(texts.QUESTION_NEXT, { number: at + 1, count }) : "Submit",

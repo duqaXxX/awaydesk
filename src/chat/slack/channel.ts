@@ -5,6 +5,7 @@
  */
 import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../clock.ts";
+import type { Names } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import type { ChannelChat, MessageId, OwnerList } from "../seam.ts";
 import { bindBlocks } from "./bind.ts";
@@ -25,6 +26,8 @@ export interface ChannelParts {
   readonly clock: Clock;
   /** Aborts when the provider stops: nothing is posted from then on. */
   readonly stopped: AbortSignal;
+  /** The names the lists' texts take, asked when a list is drawn. */
+  readonly names: () => Names;
 }
 
 export class SlackChannel implements ChannelChat {
@@ -64,11 +67,11 @@ export class SlackChannel implements ChannelChat {
   }
 
   async offer(list: OwnerList, title: string): Promise<void> {
-    const { slack, ownerUserId, clock, stopped } = this.#parts;
+    const { slack, ownerUserId, clock, stopped, names } = this.#parts;
     if (stopped.aborted) return;
     const blocks =
       list.type === "folders"
-        ? bindBlocks(list.root, [...list.folders], list.bound)
+        ? bindBlocks(list.root, [...list.folders], list.bound, names())
         : resumeBlocks(
             list.folder,
             list.sessions,

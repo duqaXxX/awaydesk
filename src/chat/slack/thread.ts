@@ -10,12 +10,12 @@
  * every reply draws from; and a failed post or rewrite crosses the seam as a `ChatError` named
  * by Slack's code.
  */
+
 import type { Receiver } from "@slack/bolt";
 import type { KnownBlock, WebClient } from "@slack/web-api";
-import type { Question } from "../../agent/seam.ts";
+import type { AgentBackend, Question } from "../../agent/seam.ts";
 import { type Clock, monotonicClock, systemClock } from "../../clock.ts";
-import type { CorePort } from "../../core/port.ts";
-import * as texts from "../../core/texts.ts";
+import { type CorePort, type Names, named, texts } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import {
   type ChannelChat,
@@ -111,6 +111,11 @@ export interface SlackChatOptions {
    * A test's one clock serves for both.
    */
   readonly steady?: Clock;
+  /**
+   * The agent the texts name. Read when a text that names it is first needed, never in `build`:
+   * the core, and with it the agent, exists only after the provider was built.
+   */
+  readonly agent: () => Pick<AgentBackend, "name" | "words">;
   /** `sinks.DEBOUNCE_SECONDS`, unless a test shortens it. */
   readonly debounceSeconds?: number;
   /** `sinks.FINAL_RETRY_SECONDS`, unless a test shortens it. */
@@ -141,6 +146,7 @@ export class SlackChat implements ChatProvider {
   private readonly options: SlackChatOptions;
   private readonly stopping = new AbortController();
   private built: BuiltApp | null = null;
+  private named: Names | null = null;
 
   constructor(options: SlackChatOptions) {
     this.options = options;
@@ -169,8 +175,14 @@ export class SlackChat implements ChatProvider {
     this.stopping.abort();
   }
 
+  /** The names the texts take, the agent's and this chat's, made when first asked for. */
+  names(): Names {
+    this.named ??= texts.namesOf(this.options.agent(), this);
+    return this.named;
+  }
+
   thread(ref: ThreadRef): SlackThread {
-    return new SlackThread(ref.channel, ref.thread, this.options, this.stopped);
+    return new SlackThread(ref.channel, ref.thread, this.options, () => this.names(), this.stopped);
   }
 
   /**
@@ -179,7 +191,14 @@ export class SlackChat implements ChatProvider {
    * again.
    */
   answering(ref: ThreadRef, written: () => void): SlackThread {
-    return new SlackThread(ref.channel, ref.thread, this.options, this.stopped, written);
+    return new SlackThread(
+      ref.channel,
+      ref.thread,
+      this.options,
+      () => this.names(),
+      this.stopped,
+      written,
+    );
   }
 
   channel(channel: string): ChannelChat {
@@ -190,6 +209,7 @@ export class SlackChat implements ChatProvider {
       limiter,
       clock: clock ?? systemClock,
       stopped: this.stopped,
+      names: () => this.names(),
     });
   }
 
@@ -224,6 +244,7 @@ export class SlackChat implements ChatProvider {
       sessions: core.sessions,
       approvals: core.approvals,
       holds: core.holds,
+      names: this.names(),
       guard: app.guard,
       state: core.state,
       uploads: app.uploads,
@@ -259,6 +280,7 @@ export class SlackThread implements ThreadChat {
   private readonly channel: string;
   private readonly threadTs: string;
   private readonly options: SlackChatOptions;
+  private readonly names: () => Names;
   private readonly slack: WebClient;
   private readonly clock: Clock;
   // One reaction on the session's root message, which `threadTs` always is (a top-level owner
@@ -278,12 +300,14 @@ export class SlackThread implements ThreadChat {
     channelId: string,
     threadTs: string,
     options: SlackChatOptions,
+    names: () => Names,
     stopped: AbortSignal,
     written?: () => void,
   ) {
     this.channel = channelId;
     this.threadTs = threadTs;
     this.options = options;
+    this.names = names;
     this.stopped = stopped;
     this.slack = options.slack;
     this.clock = options.clock ?? systemClock;
@@ -363,10 +387,10 @@ export class SlackThread implements ThreadChat {
     let blocks: readonly object[];
     switch (request.type) {
       case "question":
-        blocks = questionBlocks(requestId, request.questions);
+        blocks = questionBlocks(requestId, request.questions, this.names());
         break;
       case "permission":
-        blocks = approvalBlocks(requestId, request);
+        blocks = approvalBlocks(requestId, request, this.names());
         break;
       case "hold":
         blocks = holdBlocks(requestId, request.link);
@@ -410,8 +434,8 @@ export class SlackThread implements ThreadChat {
       await this.slack.chat.update({
         channel: this.channel,
         ts: request,
-        text: texts.ANSWERED,
-        blocks: answeredBlocks(questions, answers) as unknown as KnownBlock[],
+        text: named(texts.ANSWERED, this.names()),
+        blocks: answeredBlocks(questions, answers, this.names()) as unknown as KnownBlock[],
       });
     } catch (error) {
       throw new ChatError(describe(error), { cause: error });

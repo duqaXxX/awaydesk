@@ -36,7 +36,7 @@ import {
 } from "../../../../src/chat/slack/openfile/modal.ts";
 import { regularFiles } from "../../../../src/chat/slack/openfile/read.ts";
 import * as texts from "../../../../src/core/texts.ts";
-import { fill } from "../../../../src/core/texts.ts";
+import { fill, named } from "../../../../src/core/texts.ts";
 import {
   type Args,
   AsyncEvent,
@@ -51,6 +51,7 @@ import {
   THREAD,
 } from "../../../support/fake-slack.ts";
 import { commitAt, committed, git, gitInit } from "../../../support/git-layouts.ts";
+import { NAMES } from "../../../support/names.ts";
 import { GIT_LAYOUT } from "../../../support/platform.ts";
 import {
   askedOpen,
@@ -1257,7 +1258,9 @@ test("a file over one megabyte is refused", GIT_LAYOUT, async (t) => {
   writeFileSync(join(project, "big.log"), Buffer.alloc((1 << 20) + 1, "x"));
   await askedOpen(world, "!open big.log");
   assert.deepEqual(calls(world, "files.getUploadURLExternal"), []);
-  assert.deepEqual(world.ephemerals(), [fill(texts.OPEN_TOO_LARGE, { path: "big.log" })]);
+  assert.deepEqual(world.ephemerals(), [
+    fill(named(texts.OPEN_TOO_LARGE, NAMES), { path: "big.log" }),
+  ]);
 });
 
 test("an empty file is refused before anything is uploaded", GIT_LAYOUT, async (t) => {

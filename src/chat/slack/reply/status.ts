@@ -23,10 +23,10 @@
  *   `show` finishes first.
  * - The two process-wide flags are module state; `resetStatusFlags` clears them for the tests.
  */
+
 import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
-import { Mutex } from "../../../core/sessions/tasks.ts";
-import * as texts from "../../../core/texts.ts";
+import { Mutex, texts } from "../../../core/port.ts";
 import { getLogger, type Logger } from "../../../log.ts";
 import { describe } from "./errors.ts";
 

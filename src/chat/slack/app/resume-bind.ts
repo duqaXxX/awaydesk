@@ -2,12 +2,16 @@
  * `!bind` and `!resume`, typed or clicked: which folder a channel's next thread starts in, and
  * which stored session a thread continues.
  */
+
 import type { ListedSession } from "../../../agent/seam.ts";
-import { oneLine } from "../../../core/reply/words.ts";
-import { resolveDirectory } from "../../../core/sessions/directory.ts";
-import type { DirectoryUnavailable } from "../../../core/sessions/errors.ts";
-import * as texts from "../../../core/texts.ts";
-import { fill } from "../../../core/texts.ts";
+import {
+  type DirectoryUnavailable,
+  fill,
+  named,
+  oneLine,
+  resolveDirectory,
+  texts,
+} from "../../../core/port.ts";
 import { compareCodePoints } from "../../../text.ts";
 import { bindBlocks } from "../bind.ts";
 import { contextBlock, noticeText } from "../reply/blocks.ts";
@@ -103,11 +107,21 @@ export class ResumeBind {
     const root = config.allowedRoot;
     const record = state.channel(channel);
     const folders = await sessions.foldersIn(root);
-    const blocks = bindBlocks(root, folders, record === null ? null : record.directory);
+    const blocks = bindBlocks(
+      root,
+      folders,
+      record === null ? null : record.directory,
+      this.parts.names,
+    );
     await this.answers.deliver(
       channel,
       null,
-      fill(folders.length > 0 ? texts.BIND_LIST : texts.BIND_EMPTY, { root }),
+      fill(
+        folders.length > 0
+          ? named(texts.BIND_LIST, this.parts.names)
+          : named(texts.BIND_EMPTY, this.parts.names),
+        { root },
+      ),
       blocks,
       { ephemeral: false },
     );
@@ -158,7 +172,10 @@ export class ResumeBind {
     const { config, sessions, state, now } = this.parts;
     const record_ = state.channel(channel);
     if (record_ === null) {
-      await this.answers.inChannel(channel, fill(texts.UNBOUND, { root: config.allowedRoot }));
+      await this.answers.inChannel(
+        channel,
+        fill(named(texts.UNBOUND, this.parts.names), { root: config.allowedRoot }),
+      );
       return;
     }
     const directory = record_.directory;
@@ -267,7 +284,10 @@ export class ResumeBind {
     const { config, sessions, state } = this.parts;
     const record_ = state.channel(channel);
     if (record_ === null) {
-      await this.answers.inChannel(channel, fill(texts.UNBOUND, { root: config.allowedRoot }));
+      await this.answers.inChannel(
+        channel,
+        fill(named(texts.UNBOUND, this.parts.names), { root: config.allowedRoot }),
+      );
       return;
     }
     // The button is not trusted: the session must still belong to the channel's directory,

@@ -6,9 +6,7 @@
  * up when the click is done: a walk or a git call in flight is never cut, the signal only stops
  * what would follow it.
  */
-import { Cancelled } from "../../../core/sessions/tasks.ts";
-import * as texts from "../../../core/texts.ts";
-import { fill } from "../../../core/texts.ts";
+import { Cancelled, fill, named, texts } from "../../../core/port.ts";
 import { strip } from "../../../text.ts";
 import { changedIn } from "../openfile/changed.ts";
 import type { Found } from "../openfile/listing.ts";
@@ -182,7 +180,7 @@ export class Open {
         await this.answers.tellOwner(
           channel,
           threadTs,
-          fill(texts.OPEN_TOO_LARGE, { path: shown }),
+          fill(named(texts.OPEN_TOO_LARGE, this.parts.names), { path: shown }),
         );
         return;
       }
@@ -203,7 +201,8 @@ export class Open {
       logger.warning(`could not share a file in ${channel}: ${code}`);
       let told: string;
       if (code === "missing_scope") told = texts.OPEN_NO_SCOPE;
-      else if (code === "snippet_too_large") told = fill(texts.OPEN_TOO_LARGE, { path: shown });
+      else if (code === "snippet_too_large")
+        told = fill(named(texts.OPEN_TOO_LARGE, this.parts.names), { path: shown });
       else told = fill(texts.OPEN_FAILED, { path: shown, error: code });
       await this.answers.tellOwner(channel, threadTs, told);
       return;

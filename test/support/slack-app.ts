@@ -71,6 +71,7 @@ import { StateStore } from "../../src/core/state.ts";
 import * as texts from "../../src/core/texts.ts";
 import { setWriter } from "../../src/log.ts";
 import {
+  AGENT,
   type AsyncEvent,
   BOT,
   CHANNEL,
@@ -83,6 +84,7 @@ import {
 } from "./fake-slack.ts";
 import { type JsonObject, sdkJson, slackPayload, slackPayloads } from "./fixtures.ts";
 import { commitAt, gitInit } from "./git-layouts.ts";
+import { NAMES } from "./names.ts";
 import {
   FakeAgentBackend,
   FakeAgentSession,
@@ -205,7 +207,7 @@ export class World {
   /** The allowed root; `root/app` is the channel's folder. */
   readonly root: string;
   readonly state: StateStore;
-  readonly approvals = new Approvals();
+  readonly approvals = new Approvals(NAMES);
   readonly holds = new Holds();
   readonly backend = new WorldBackend();
   /** What each file URL downloads to: bytes, or the failure the download rejects with. */
@@ -275,6 +277,7 @@ export class World {
       slack,
       replies: slack,
       identity: this.identity,
+      agent: () => AGENT,
       limiter: this.limiter,
       clock: this.slackClock,
     });
@@ -299,6 +302,7 @@ export class World {
       ownerUserId: OWNER,
       teamId: TEAM,
       state: this.state,
+      names: () => NAMES,
       sessionsOf: () => this.storedSessions,
       delete: async (channelId, threadTs) => {
         this.deleted.push([channelId, threadTs]);
@@ -328,6 +332,7 @@ export class World {
       holds: this.holds,
       guard: new ChannelGuard(slack, this.identity),
       state: this.state,
+      names: NAMES,
       uploads: this.uploads,
       home: this.home,
       chat: this.chat,

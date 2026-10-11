@@ -6,7 +6,7 @@ import { after, test } from "node:test";
 import { PAGE, ThreadDeleter } from "../../../src/chat/slack/delete.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import * as texts from "../../../src/core/texts.ts";
-import { fill } from "../../../src/core/texts.ts";
+import { fill, named } from "../../../src/core/texts.ts";
 import {
   type Answer,
   type Args,
@@ -16,6 +16,7 @@ import {
   rejected,
 } from "../../support/fake-slack.ts";
 import type { JsonObject } from "../../support/fixtures.ts";
+import { NAMES } from "../../support/names.ts";
 
 const ROOT = "1790000000.000001";
 const OWNER = "U000ALICE";
@@ -81,6 +82,7 @@ class World {
       botUserId: BOT,
       ownerUserId: OWNER,
       state: this.state,
+      names: () => NAMES,
       release: async (channelId, threadTs) => {
         this.released.push([channelId, threadTs]);
         return this.free;
@@ -183,7 +185,7 @@ test("messages slack refuses to delete are counted and the root stays", async ()
   ]);
   world.owner.responses["chat.delete"] = rejected("cant_delete_message");
   const notice = await world.deleter.delete(CHANNEL, ROOT);
-  assert.equal(notice, fill(texts.HOME_DELETE_REFUSED, { count: 2 }));
+  assert.equal(notice, fill(named(texts.HOME_DELETE_REFUSED, NAMES), { count: 2 }));
   assert.deepEqual(world.deleted(world.bot), ["1790000002.000001"]); // the rest still goes
   // the root was never tried: no reply is left under a deleted root
   assert.ok(!world.deleted(world.owner).includes(ROOT));
@@ -378,6 +380,9 @@ test("a clean up counts what slack refuses and deletes the rest", async () => {
     loose("1790000011.000001", BOT, "Stopped."),
   ]);
   world.owner.responses["chat.delete"] = rejected("cant_delete_message");
-  assert.equal(await world.deleter.clean(CHANNEL), fill(texts.HOME_CLEAN_REFUSED, { count: 1 }));
+  assert.equal(
+    await world.deleter.clean(CHANNEL),
+    fill(named(texts.HOME_CLEAN_REFUSED, NAMES), { count: 1 }),
+  );
   assert.deepEqual(world.deleted(world.bot), ["1790000011.000001"]);
 });

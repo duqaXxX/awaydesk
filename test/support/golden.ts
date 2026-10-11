@@ -18,6 +18,7 @@ import { ReplySink, UpdateLimiter } from "../../src/chat/slack/reply/sinks.ts";
 import { type Sink, TurnRenderer } from "../../src/core/reply/renderer.ts";
 import { BOT, CHANNEL, FakeClock, FakeSlack, OWNER, TEAM, THREAD } from "./fake-slack.ts";
 import type { Json, JsonObject } from "./fixtures.ts";
+import { NAMES } from "./names.ts";
 import { recordedEvents, splitTurns } from "./replay.ts";
 
 // The renderer never reads a footer, so any string stands for the one a session hands it.
@@ -82,7 +83,7 @@ class RecordingSink implements Sink<string> {
 /** One renderer fed `events`, then closed as a finished turn is. */
 async function replayReply(events: readonly SessionEvent[]): Promise<unknown> {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink);
+  const renderer = new TurnRenderer<string>(sink, NAMES);
   for (const event of events) await renderer.feed(event);
   await renderer.close(FOOTER);
   await renderer.closeOut();

@@ -4,6 +4,7 @@
  * message to the channel or to its thread, and a message rewritten into a notice.
  */
 import type { KnownBlock, WebClient } from "@slack/web-api";
+import { Cancelled } from "../../core/port.ts";
 import { ChatError } from "../seam.ts";
 import { contextBlock, FALLBACK_LIMIT, noticeText } from "./reply/blocks.ts";
 import { take } from "./reply/chars.ts";
@@ -63,11 +64,15 @@ export function deliverNotice(
   return deliver(slack, ownerUserId, place, text, [contextBlock(noticeText(text))], options);
 }
 
-/** `call`, with a failure crossing the seam as a `ChatError` named by Slack's code. */
+/**
+ * `call`, with a failure crossing the seam as a `ChatError` named by Slack's code. A `Cancelled`
+ * is no failure of the chat: it crosses as it is.
+ */
 export async function crossing<T>(call: () => Promise<T>): Promise<T> {
   try {
     return await call();
   } catch (error) {
+    if (error instanceof Cancelled) throw error;
     throw new ChatError(describe(error), { cause: error });
   }
 }

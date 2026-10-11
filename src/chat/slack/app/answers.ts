@@ -4,15 +4,25 @@
  *
  * The work handed to `replyOnFailure` is a function, called inside its guard.
  */
+
 import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
-import type { ApprovalsPort, HoldsPort, SessionsPort, StatePort } from "../../../core/port.ts";
-import { oneLine } from "../../../core/reply/words.ts";
-import { DirectoryUnavailable, SessionClosed, SessionGone } from "../../../core/sessions/errors.ts";
-import type { ThreadSession } from "../../../core/sessions/session.ts";
-import { Cancelled } from "../../../core/sessions/tasks.ts";
-import * as texts from "../../../core/texts.ts";
-import { fill } from "../../../core/texts.ts";
+import {
+  type ApprovalsPort,
+  Cancelled,
+  DirectoryUnavailable,
+  fill,
+  type HoldsPort,
+  type Names,
+  named,
+  oneLine,
+  SessionClosed,
+  SessionGone,
+  type SessionPort,
+  type SessionsPort,
+  type StatePort,
+  texts,
+} from "../../../core/port.ts";
 import { getLogger } from "../../../log.ts";
 import type { Home } from "../home.ts";
 import { deliver } from "../notice.ts";
@@ -65,6 +75,8 @@ export interface AppParts {
   readonly holds: HoldsPort;
   readonly guard: ChannelGuard;
   readonly state: StatePort;
+  /** The agent's and the chat's names, which the texts that name them take. */
+  readonly names: Names;
   /** The folder a message's files that are no image are saved in. */
   readonly uploads: string;
   readonly home: Home;
@@ -220,7 +232,7 @@ export class Answers {
         return;
       }
       logger.error(`a request failed in ${channel}/${threadTs}: ${describe(error)}`);
-      await guarded(fill(texts.ERROR_REPLY, { error: describe(error) }));
+      await guarded(fill(named(texts.ERROR_REPLY, this.parts.names), { error: describe(error) }));
     }
   }
 
@@ -322,7 +334,7 @@ export class Answers {
       }
     }
 
-    const row = async (session: ThreadSession, hold: string): Promise<string> => {
+    const row = async (session: SessionPort, hold: string): Promise<string> => {
       const stored = state.thread(session.channelId, session.threadId);
       const title = stored === null ? "" : (known.get(String(stored.sessionId)) ?? "");
       const label = mrkdwnEscape(oneLine(title, TITLE_LIMIT)) || texts.RESTART_WAIT_SESSION;

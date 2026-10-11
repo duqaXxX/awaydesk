@@ -90,3 +90,25 @@ export interface ChatEntry {
    */
   build(context: ChatContext): Promise<ChatProvider>;
 }
+
+// ---- the core's values a provider's own code works with
+
+export type { ChannelLookup } from "./cleanup.ts";
+export type { Command, Passthrough, Word } from "./commands.ts";
+export { helpText, hostOnly, parseBang, refusedInThread, unformatted, WORD } from "./commands.ts";
+export { ConfigError } from "./config.ts";
+export { FOLDER_ROWS, foldersWithin } from "./folders.ts";
+export type { FooterKey } from "./footer.ts";
+export { footerFields, GIT_TIMEOUT, runGit } from "./footer.ts";
+export type { HoldAnswer, Pending as HoldPending } from "./hold.ts";
+export { Fold, shownPreview } from "./reply/fold.ts";
+export { oneLine, STOPPED } from "./reply/words.ts";
+export { APPROVE, answerOf, DENY } from "./requests.ts";
+export { resolveDirectory } from "./sessions/directory.ts";
+export { DirectoryUnavailable, SessionClosed, SessionGone } from "./sessions/errors.ts";
+export { Cancelled, cancellable, Mutex, Semaphore, Task } from "./sessions/tasks.ts";
+export type { Choice, Summary } from "./setup.ts";
+export { choiceOf, DEFAULT, DEFAULT_CHOICE, effortLevels, summaryOf } from "./setup.ts";
+export type { Names } from "./texts.ts";
+export * as texts from "./texts.ts";
+export { fill, NESTED, named } from "./texts.ts";

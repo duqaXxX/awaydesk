@@ -3,6 +3,7 @@
  * model, the effort and bypass, and the owner's choice read back from `state.values`. Pure
  * functions: the handlers post and wait, the session applies the choice.
  */
+
 import type { ModelInfo } from "../../agent/seam.ts";
 import {
   type Choice,
@@ -11,8 +12,8 @@ import {
   effortLevels,
   type Summary,
   summaryOf,
-} from "../../core/setup.ts";
-import * as texts from "../../core/texts.ts";
+  texts,
+} from "../../core/port.ts";
 
 export const SETUP_BLOCK = "setup"; // the one `actions` block that holds every control
 export const SETUP_MODEL = "setup_model";
