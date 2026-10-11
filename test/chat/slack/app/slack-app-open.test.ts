@@ -25,7 +25,7 @@ import { type TestContext, test } from "node:test";
 import { trustedRepository } from "../../../../src/agent/claude/trust.ts";
 import type { Repository } from "../../../../src/agent/seam.ts";
 import { logger } from "../../../../src/chat/slack/app/answers.ts";
-import { actionKey } from "../../../../src/chat/slack/app/app.ts";
+import { actionKey } from "../../../../src/chat/slack/app/wire.ts";
 import {
   type Listing,
   Listings,

@@ -85,10 +85,6 @@ import { Requests } from "./requests.ts";
 import { ResumeBind } from "./resume-bind.ts";
 import { type Ack, type Payload, str, text } from "./wire.ts";
 
-export type { Fetch } from "./answers.ts";
-export { logger } from "./answers.ts";
-export { actionKey, clickThread } from "./wire.ts";
-
 export const DECISION_ACTIONS = [APPROVAL_ALLOW, APPROVAL_DENY, QUESTION_SKIP] as const;
 
 /** What `buildApp` is given: every client, store and clock comes from outside. */

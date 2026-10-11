@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { isDeepStrictEqual } from "node:util";
 import { type Question, ResumeRefused } from "../../../../src/agent/seam.ts";
-import { logger } from "../../../../src/chat/slack/app/app.ts";
+import { logger } from "../../../../src/chat/slack/app/answers.ts";
 import { slackUnescape } from "../../../../src/chat/slack/app/messages.ts";
 import { DownloadFailed } from "../../../../src/chat/slack/attachments.ts";
 import { HOLD_CONTINUE, holdBlocks } from "../../../../src/chat/slack/hold.ts";
