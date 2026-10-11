@@ -15,7 +15,7 @@ import type { Receiver } from "@slack/bolt";
 import type { KnownBlock, WebClient } from "@slack/web-api";
 import type { AgentBackend, Question } from "../../agent/seam.ts";
 import { type Clock, monotonicClock, systemClock } from "../../clock.ts";
-import { type CorePort, type Names, named, texts } from "../../core/port.ts";
+import { Cancelled, type CorePort, type Names, named, texts } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import {
   type ChannelChat,
@@ -41,7 +41,7 @@ import { SlackChannel } from "./channel.ts";
 import { channelLookup } from "./channels.ts";
 import { holdBlocks } from "./hold.ts";
 import type { Home } from "./home.ts";
-import { crossing, deliver, deliverNotice, rewriteAsNotice } from "./notice.ts";
+import { crossing, deliver, deliverNotice } from "./notice.ts";
 import type { Listings } from "./openfile/listing.ts";
 import { endReply } from "./repair.ts";
 import { contextBlock, noticeText, split } from "./reply/blocks.ts";
@@ -278,6 +278,12 @@ export class SlackChat implements ChatProvider {
   }
 }
 
+// The requests a provider withdrew lately, by channel and message, per provider (the options it
+// was built over). A rewrite that waited for the budget while its message was withdrawn writes
+// nothing.
+const WITHDRAWN_KEPT = 64;
+const withdrawn = new WeakMap<SlackChatOptions, Set<string>>();
+
 export class SlackThread implements ThreadChat {
   private readonly channel: string;
   private readonly threadTs: string;
@@ -414,6 +420,8 @@ export class SlackThread implements ThreadChat {
       });
       ts = posted.ts;
     } catch (error) {
+      // A wait that was cancelled is no refusal of the chat: it crosses as it is.
+      if (error instanceof Cancelled) throw error;
       throw new ChatError(describe(error), { cause: error });
     }
     // The message is the only handle on its buttons: one Slack did not name cannot be removed.
@@ -422,6 +430,8 @@ export class SlackThread implements ThreadChat {
   }
 
   async withdraw(request: MessageId): Promise<void> {
+    // (sync) Noted before the first await: a rewrite waiting for the budget sees it.
+    this.noteWithdrawn(request);
     await deleteRequest(this.slack, { channel: this.channel, ts: request });
   }
 
@@ -445,7 +455,33 @@ export class SlackThread implements ThreadChat {
   }
 
   rewrite(message: MessageId, text: string): Promise<void> {
-    return rewriteAsNotice(this.slack, this.options.limiter, this.channel, message, text);
+    return crossing(async () => {
+      await this.options.limiter.acquire();
+      // The wait can outlast the message (withdrawn by a `!stop`) and the daemon: nothing is
+      // left to edit then, and the edit would only be refused.
+      if (this.stopped.aborted || this.wasWithdrawn(message)) return;
+      await this.slack.chat.update({
+        channel: this.channel,
+        ts: message,
+        text,
+        blocks: [contextBlock(noticeText(text))],
+      });
+    });
+  }
+
+  private noteWithdrawn(message: MessageId): void {
+    const kept = withdrawn.get(this.options) ?? new Set<string>();
+    withdrawn.set(this.options, kept);
+    kept.add(`${this.channel}/${message}`);
+    // Only a rewrite that is waiting right now cares: the oldest go.
+    for (const old of kept) {
+      if (kept.size <= WITHDRAWN_KEPT) break;
+      kept.delete(old);
+    }
+  }
+
+  private wasWithdrawn(message: MessageId): boolean {
+    return withdrawn.get(this.options)?.has(`${this.channel}/${message}`) ?? false;
   }
 
   async tell(text: string, options: { readonly stays?: boolean } = {}): Promise<void> {

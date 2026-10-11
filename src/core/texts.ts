@@ -243,6 +243,9 @@ export const HOLD_GONE =
 export const NOT_SENT = "Not sent.";
 // Session setup: asked once per top-level message, before the first prompt of a new session.
 export const SETUP_FALLBACK = "Set up this session";
+// The line that replaces the setup's controls once the owner started the session.
+export const SETUP_SUMMARY = "Model: {model} · Effort: {effort} · Bypass: {bypass}";
+export const SETUP_EFFORT_DEFAULT = "Default";
 export const STATUS = "Directory: `{directory}`\nSession: `{session}`";
 export const STATUS_STATE = naming("Mode: `{mode}`\n{agent}: `{version}`\nNow: {activity}");
 // The line between the two once the thread has a session id (issue #12). Claude Code leaves a

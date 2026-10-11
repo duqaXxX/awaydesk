@@ -5,15 +5,8 @@
  */
 
 import type { ModelInfo } from "../../agent/seam.ts";
-import {
-  type Choice,
-  choiceOf,
-  DEFAULT,
-  effortLevels,
-  type Summary,
-  summaryOf,
-  texts,
-} from "../../core/port.ts";
+import { type Choice, choiceOf, DEFAULT, effortLevels, texts } from "../../core/port.ts";
+import type { SetupSelection } from "../seam.ts";
 import * as slackTexts from "./texts.ts";
 
 export const SETUP_BLOCK = "setup"; // the one `actions` block that holds every control
@@ -116,10 +109,10 @@ function record(value: unknown): Readonly<Record<string, unknown>> {
 }
 
 /**
- * The owner's choice from a payload's `state.values`. A control with no selection, or one naming
- * something the agent did not list, reads as its default (`choiceOf`).
+ * What the controls hold in a payload's `state.values`, as they stand: a control with no
+ * selection reads as `DEFAULT`. The core checks it against what the request offered.
  */
-export function readChoice(values: unknown, models: readonly ModelInfo[]): Choice {
+export function readSelection(values: unknown): SetupSelection {
   const row = record(record(values)[SETUP_BLOCK]);
   const selected = (action: string): string => {
     const value = record(record(row[action]).selected_option).value;
@@ -127,19 +120,13 @@ export function readChoice(values: unknown, models: readonly ModelInfo[]): Choic
   };
   const picked = record(row[SETUP_BYPASS]).selected_options;
   const bypass = Array.isArray(picked) && picked.some((o) => record(o).value === BYPASS_ON);
-  return choiceOf(models, {
-    model: selected(SETUP_MODEL),
-    effort: selected(SETUP_EFFORT),
-    bypass,
-  });
+  return { model: selected(SETUP_MODEL), effort: selected(SETUP_EFFORT), bypass };
 }
 
-/** The one line that replaces the controls once the owner pressed Start. */
-export function summary(models: readonly ModelInfo[], choice: Choice): string {
-  const data: Summary = summaryOf(models, choice);
-  return texts.fill(slackTexts.SETUP_SUMMARY, {
-    model: data.model,
-    effort: data.effort ?? slackTexts.SETUP_EFFORT_DEFAULT,
-    bypass: data.bypass ? "on" : "off",
-  });
+/**
+ * The owner's choice from a payload's `state.values`. A control with no selection, or one naming
+ * something the agent did not list, reads as its default (`choiceOf`).
+ */
+export function readChoice(values: unknown, models: readonly ModelInfo[]): Choice {
+  return choiceOf(models, readSelection(values));
 }
