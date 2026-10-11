@@ -6,22 +6,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CAPABILITIES } from "../../../src/agent/claude/capabilities.ts";
 
-test("the Claude back end supports every capability of the seam", () => {
+test("the Claude back end declares what the core adapts to", () => {
   assert.deepEqual(CAPABILITIES, {
-    subagents: true,
-    backgroundTasks: true,
-    compaction: true,
-    effort: true,
     effortLevels: ["low", "medium", "high", "xhigh", "max"],
     liveEffort: true,
     permissionModes: { default: "default", auto: "auto", bypass: "bypassPermissions" },
-    changedInput: true,
-    questions: true,
-    usageLimits: true,
-    models: true,
-    commands: true,
-    promptDuringTurn: true,
-    sessionListing: true,
   });
 });
 

@@ -30,14 +30,11 @@ export interface PermissionModes {
   readonly bypass: PermissionMode | null;
 }
 
-/** What a back end supports. The core shows a feature only when its capability is present. */
+/**
+ * What differs between back ends and the core adapts to. A capability is here because the core
+ * reads it: what every back end does alike needs none.
+ */
 export interface Capabilities {
-  /** Calls of a subagent arrive with their parent call. */
-  readonly subagents: boolean;
-  /** Task events and `stopTask`. */
-  readonly backgroundTasks: boolean;
-  readonly compaction: boolean;
-  readonly effort: boolean;
   /**
    * The levels `StartOptions.effort` and `setEffort` take. A stored level outside them is never
    * sent: the core drops it, with a line in the log.
@@ -46,15 +43,6 @@ export interface Capabilities {
   /** `setEffort` changes the live session; without it the core restarts the session. */
   readonly liveEffort: boolean;
   readonly permissionModes: PermissionModes;
-  /** An allow can rewrite the call's input. */
-  readonly changedInput: boolean;
-  readonly questions: boolean;
-  readonly usageLimits: boolean;
-  readonly models: boolean;
-  readonly commands: boolean;
-  /** A prompt sent while a turn runs is taken by the agent; without it the core queues it. */
-  readonly promptDuringTurn: boolean;
-  readonly sessionListing: boolean;
 }
 
 export type SettingsSource = "user" | "project" | "local";

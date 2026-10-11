@@ -2,10 +2,6 @@
 import type { Capabilities } from "../seam.ts";
 
 export const CAPABILITIES: Capabilities = Object.freeze({
-  subagents: true,
-  backgroundTasks: true,
-  compaction: true,
-  effort: true,
   // The SDK's `EffortLevel`.
   effortLevels: Object.freeze(["low", "medium", "high", "xhigh", "max"]),
   // The TypeScript SDK changes the effort of a live session (`applyFlagSettings`, no reconnect,
@@ -17,12 +13,4 @@ export const CAPABILITIES: Capabilities = Object.freeze({
     auto: "auto",
     bypass: "bypassPermissions",
   }),
-  changedInput: true,
-  questions: true,
-  // On a claude.ai subscription, which is the login the daemon runs on.
-  usageLimits: true,
-  models: true,
-  commands: true,
-  promptDuringTurn: true,
-  sessionListing: true,
 });
