@@ -311,6 +311,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `ChatCapabilities` loses `homeIndex` and `ownerOnlyNotices`, which no code of the core read. A
+  chat with no index of the sessions leaves `ChatProvider.index` out; whether a chat can show a
+  line to the owner alone is stated by the conformance rig (`ChatRig.ownerOnlyNotices` in
+  `test/conformance/chat.ts`), which is the only reader it had. Two values that existed twice
+  exist once: `TITLE_LIMIT` (`src/core/reply/words.ts`), and the set of characters a markdown
+  reference escapes, which the core no longer copies: `directory.terminalLine` takes the chat's
+  `ChatProvider.escape` for a command that holds a backtick. What the owner reads in Slack is
+  unchanged (#266).
 - The agent seam and the Slack provider lose what nothing read. In the seam: `requestId` on
   `PermissionRequest` and `QuestionRequest`, `StartOptions.permissionMode`, `messageId` on the
   message and text events, `compaction_ended.result`, and `parentCallId` on the three text events

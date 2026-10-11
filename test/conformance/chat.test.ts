@@ -92,6 +92,7 @@ async function memoryRig(): Promise<ChatRig> {
     thread: chat.openThread(channel),
     owner: memoryPerson(chat.as(OWNER)),
     other: memoryPerson(chat.as(SOMEONE)),
+    ownerOnlyNotices: false,
     read: (scope) =>
       chat.messages(scope.channel, scope.thread).map((m) => ({
         id: m.id,
@@ -318,6 +319,7 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
     thread: { channel: CHANNEL, thread: THREAD },
     owner: slackPerson(world, app, asked, world.identity.ownerUserId),
     other: slackPerson(world, app, asked, STRANGER),
+    ownerOnlyNotices: true,
     read: (scope) => slackRead(world.slack, scope),
     settle: async () => {
       await world.slackClock.advance(2);

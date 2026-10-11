@@ -32,9 +32,7 @@ test("the provider names itself and supports every part of the seam", () => {
     nativeStreaming: true,
     reactions: true,
     activityLine: true,
-    homeIndex: true,
     fileUpload: true,
-    ownerOnlyNotices: true,
   });
 });
 

@@ -6,11 +6,11 @@
 import type { ListedSession } from "../../agent/seam.ts";
 import type { ListPick, MessageId, ThreadRef } from "../../chat/seam.ts";
 import { errorName } from "../../values.ts";
-import { oneLine } from "../reply/words.ts";
+import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
 import * as texts from "../texts.ts";
 import { fill, named } from "../texts.ts";
 import type { ResumeFlow } from "./contract.ts";
-import { type FlowDeps, isCancelled, logger, type Talk, TITLE_LIMIT } from "./talk.ts";
+import { type FlowDeps, isCancelled, logger, type Talk } from "./talk.ts";
 
 /**
  * The fewest characters of a session's id that `!resume` reads as an id and not as a name: what

@@ -82,22 +82,22 @@ export function shellQuote(word: string): string {
   return `'${word.replaceAll("'", "'\"'\"'")}'`;
 }
 
-// Slack's markdown block: the characters that start inline formatting there, each escapable
-// with a backslash. The same set as the Slack provider's `markdownEscape`, which the core may
-// not import: a reply's text is markdown on both sides of the chat seam.
-const MARKDOWN_INLINE = /([\\`*_{}[\]()&~])/g;
-
 /**
  * The `!status` line with the command that forks a session in the terminal (the agent's
  * `words.terminal`, `template`), run from the thread's folder, where `!resume` in its channel
- * then finds the fork.
+ * then finds the fork. `escapeMarkup` is the chat's, for a reference (`ChatProvider.escape`).
  */
-export function terminalLine(template: string, directory: string, sessionId: string): string {
+export function terminalLine(
+  template: string,
+  directory: string,
+  sessionId: string,
+  escapeMarkup: (text: string) => string,
+): string {
   const command = texts.fill(template, {
     directory: shellQuote(directory),
     session: sessionId,
   });
   // A code span cannot hold a backtick: such a command is plain text, escaped.
-  const shown = command.includes("`") ? command.replace(MARKDOWN_INLINE, "\\$1") : `\`${command}\``;
+  const shown = command.includes("`") ? escapeMarkup(command) : `\`${command}\``;
   return texts.fill(texts.STATUS_TERMINAL, { command: shown });
 }

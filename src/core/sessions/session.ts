@@ -1181,7 +1181,11 @@ export class ThreadSession {
     ];
     // Left out with a folder the line above cannot use: its `cd` would fail there.
     if (sessionId && usable)
-      head.push(terminalLine(this.deps.agent.words.terminal, this.directory, sessionId));
+      head.push(
+        terminalLine(this.deps.agent.words.terminal, this.directory, sessionId, (text) =>
+          this.deps.chat.escape(text, "reference"),
+        ),
+      );
     const state = texts.fill(texts.named(texts.STATUS_STATE, this.names), {
       mode: this.bypass ? (this.bypassMode ?? this.mode) : this.mode,
       // Only a turn's first event carries the version, never the start (measured).

@@ -195,8 +195,7 @@ and `SLACK_OWNER_USER_ID` and reads `SLACK_USER_TOKEN`.
 
 A capability names a feature that the core offers only when the module supports it. A module
 declares what it supports; for a feature it does not declare, the core does not offer the feature
-and never calls what serves it. The core invents no substitute: the one in the last row of the chat
-table is the provider's, and no code of the core reads `ownerOnlyNotices`. What every module does
+and never calls what serves it. The core invents no substitute. What every module does
 alike needs no capability. `effortLevels` and
 `permissionModes` are values, not switches, and their rows say what the core reads them for.
 
@@ -226,12 +225,14 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `nativeStreaming` | the renderer holds the pieces of a text and hands the reply sink each text whole |
 | `reactions` | the session asks for no status on the root, a word that took effect is not marked, and the crash repair sets no error status |
 | `activityLine` | the session shows no activity line, and no message says that a restart waits |
-| `homeIndex` | `ChatProvider.index` is absent and `main` asks for no session index |
 | `fileUpload` | `ChatProvider.openFile` is absent and `!open` answers that the chat cannot show a file (`texts.OPEN_UNAVAILABLE`) |
-| `ownerOnlyNotices` | the core calls `ThreadChat.tell` and `ThreadChat.say` in the same way, and the provider posts them as messages of the thread, which show the same text |
 
 A chat is required to receive a message, to write a reply it can edit, and to put a request or a
-form to the owner, and a session is a thread: none of these has a capability.
+form to the owner, and a session is a thread: none of these has a capability. Two things a chat
+may lack have none either, because the core does nothing differently without them. A chat with no
+index of the sessions leaves `ChatProvider.index` out, and `main` asks for none. A chat that
+cannot show a line to the owner alone posts what `ThreadChat.tell` and `ThreadChat.say` hand it
+as messages of the thread, which show the same text.
 
 The core reaches a provider only through `src/core/port.ts`. `CorePort` has the members
 `sessions`, `state`, `approvals`, `holds` and `agent`, each a set of `Pick` types over the class that
@@ -1574,7 +1575,7 @@ Code session id, and `!resume` never touches or waits on any other thread.
 
 `Home` (in `home`) publishes the owner's Home tab with `views.publish`, which takes no scope and
 needs no event from the owner. It always publishes to the configured owner's user id. The page is
-the Slack provider's: `ChatProvider.index` is present with the capability `homeIndex`, `main` asks
+the Slack provider's: `ChatProvider.index` is present, `main` asks
 it to refresh when `state.json`'s sessions change, and `Home` reads the core through the port
 (`CorePort.state`, `CorePort.agent`) alone.
 

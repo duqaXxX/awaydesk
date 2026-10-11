@@ -2396,11 +2396,14 @@ const TERMINAL = "cd {directory} && claude --resume {session} --fork-session";
 
 test("a terminal command holding a backtick is escaped text not a code span", () => {
   // A code span would end at the folder's backtick and the owner would copy half a command.
-  const line = terminalLine(TERMINAL, "/work/my`proj", "0000-id");
-  assert.equal(
-    line,
-    "Terminal: cd '/work/my\\`proj' \\&\\& claude --resume 0000-id --fork-session",
-  );
+  // The escape is the chat's: this one marks what it was handed.
+  const line = terminalLine(TERMINAL, "/work/my`proj", "0000-id", (text) => `<${text}>`);
+  assert.equal(line, "Terminal: <cd '/work/my`proj' && claude --resume 0000-id --fork-session>");
+});
+
+test("a terminal command with no backtick is a code span and is not escaped", () => {
+  const line = terminalLine(TERMINAL, "/work/proj", "0000-id", (text) => `<${text}>`);
+  assert.equal(line, "Terminal: `cd /work/proj && claude --resume 0000-id --fork-session`");
 });
 
 test("status leaves the terminal command out of a folder that cannot be used", async (t) => {

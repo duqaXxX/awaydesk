@@ -132,9 +132,7 @@ const CAPABILITIES: ChatCapabilities = {
   nativeStreaming: true,
   reactions: true,
   activityLine: true,
-  homeIndex: true,
   fileUpload: true,
-  ownerOnlyNotices: true,
 };
 
 /** The Slack provider: one `SlackThread` per thread, one `SlackChannel` per channel. */
