@@ -8,6 +8,19 @@
  * waits for anything. So a new task starts, and the waiters of an event wake, on the next turn
  * of the event loop (`setImmediate`), in the order they became ready.
  */
+import { getLogger } from "../../log.ts";
+import { errorName } from "../../values.ts";
+
+export const logger = getLogger("awaydesk.core.sessions.tasks");
+
+/** Where an error was thrown, as a log line may say it: the first frame of its stack, never its words. */
+function thrownAt(error: unknown): string {
+  const frame =
+    error instanceof Error
+      ? error.stack?.split("\n").find((line) => /^\s+at /.test(line))
+      : undefined;
+  return frame === undefined ? "" : ` (${frame.trim()})`;
+}
 
 /** Resolves on the next turn of the event loop, after every promise callback that is ready. */
 function nextTurn(): Promise<void> {
@@ -56,25 +69,37 @@ export function cancellable<T>(promise: Promise<T>, signal?: AbortSignal): Promi
  * `asyncio.create_task`. The function starts on the next turn of the event loop, never inside
  * the call that made the task: asyncio ran a new task only once the code that created it had
  * yielded, and the sessions set state right after creating one. A task cancelled before it
- * started never runs.
+ * started never runs. With `immediate`, the function has started running when the task is made,
+ * which is the rule of the chat provider's passes (the header of `sinks.ts`).
  * `cancel` aborts the task's signal with `Cancelled`; the function decides which of its waits
- * take it. A task that fails rejects `result()` and nothing else: it never surfaces as an
- * unhandled rejection.
+ * take it. A task that fails rejects `result()` and never surfaces as an unhandled rejection.
+ * When nobody has asked for its result, the failure is logged by its name and by where it was
+ * thrown: asyncio's `Task exception was never retrieved`, without which a task that broke
+ * would leave no trace.
  */
 export class Task<T = void> {
   private readonly controller = new AbortController();
   private readonly promise: Promise<T>;
   private finished = false;
+  private retrieved = false;
 
-  constructor(run: (signal: AbortSignal) => Promise<T>) {
-    this.promise = this.start(run);
-    this.promise.catch(() => {});
+  constructor(
+    run: (signal: AbortSignal) => Promise<T>,
+    options: { readonly immediate?: boolean } = {},
+  ) {
+    this.promise = this.start(run, options.immediate === true);
+    this.promise.catch((error: unknown) => {
+      if (this.retrieved || error instanceof Cancelled) return;
+      logger.error(`a task failed: ${errorName(error)}${thrownAt(error)}`);
+    });
   }
 
-  private async start(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  private async start(run: (signal: AbortSignal) => Promise<T>, immediate: boolean): Promise<T> {
     try {
-      await nextTurn();
-      this.controller.signal.throwIfAborted();
+      if (!immediate) {
+        await nextTurn();
+        this.controller.signal.throwIfAborted();
+      }
       return await run(this.controller.signal);
     } finally {
       this.finished = true;
@@ -94,8 +119,9 @@ export class Task<T = void> {
     if (!this.finished && !this.controller.signal.aborted) this.controller.abort(new Cancelled());
   }
 
-  /** The function's own outcome. */
+  /** The function's own outcome: whoever asks for it answers for its failure. */
   result(): Promise<T> {
+    this.retrieved = true;
     return this.promise;
   }
 
