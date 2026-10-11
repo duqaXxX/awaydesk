@@ -965,6 +965,16 @@ All notable changes to this project are documented here. The format follows
   process's turn as lost. The back end's `canUseTool` callback still ignores the abort of its
   `signal`; ending a request on that signal needs a word from the back end to the core that the
   agent seam does not have.
+- A close that does not drain ends the reply of a turn whose end it cut (`ThreadSession.finish`,
+  `ThreadSession.cutBeforeClose`). SIGINT, a second signal, the drain's limit and the stop after
+  an uncaught exception could land between a turn's `turn_ended` and the reply's last write (the
+  footer's context usage and git state, then the body). The cancelled reader settled the turn and
+  cleared it on its way out, `close` found no active turn to abandon, and the reply's stream was
+  never stopped: no ending line, no footer, and `close` had already cleared the thread's open
+  replies in `state.json`, so the next start's repair did not end it either. The turn now stays
+  active when the cancel comes before the reply was closed out, and the reply ends as one cut
+  short does. Seen in a test on 2026-10-11 that closed the session one event apart: `chat.stopStream`
+  was called once with the turn running and never with the turn ending.
 - A table's delimiter row in a reply is recognised in linear time (`markdown.markdownStarts`).
   One pattern read the whole row, and on a line of spaces around a single dash, under a line
   holding a `|`, it backtracked in cubic time: 200 ms at 800 spaces a side and 3.1 s at 2,000
