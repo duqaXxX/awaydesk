@@ -258,6 +258,23 @@ test("changing the model rewrites the efforts", async (t) => {
   assert.deepEqual(manual.queries(), []); // still waiting
 });
 
+test("an agent with no bypass mode: the setup has no Bypass checkbox, before and after a model change", async (t) => {
+  const manual = manualWorld(t);
+  manual.backend.capabilities = {
+    ...manual.backend.capabilities,
+    permissionModes: { default: "default", auto: null, bypass: null },
+  };
+  await manual.dispatch(message("hello", { ts: THREAD }));
+  const posted = setupControls(postedBlocks(manual));
+  assert.ok(!(SETUP_BYPASS in posted));
+  assert.ok(SETUP_MODEL in posted);
+  await manual.dispatch(setupClick(manual, SETUP_MODEL, { model: "opus" }));
+  const update = manual.slack.callsTo("chat.update").at(-1) as Body;
+  const redrawn = setupControls(update.blocks);
+  assert.deepEqual(Object.keys(redrawn), Object.keys(posted));
+  assert.equal(control(redrawn, SETUP_MODEL).initial_option.value, "opus");
+});
+
 test("an effort or bypass change only acks", async (t) => {
   const manual = manualWorld(t);
   await manual.dispatch(message("hello", { ts: THREAD }));

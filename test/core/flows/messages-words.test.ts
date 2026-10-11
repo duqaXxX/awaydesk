@@ -20,14 +20,18 @@ const identity = (text: string): string => text;
 // The plain agent has no bypass mode and the memory chat no file upload: `!bypass` and `!open`
 // are refused when typed, and the help does not list them.
 const UNSERVED = new Set(["bypass", "open"]);
+// It keeps no record of trust either, so its `!bind` line speaks of none.
+const NO_TRUST = false;
 
 test("!help in the channel lists the daemon's words and says where the agent's commands are", async (t) => {
   const world = await MessagesWorld.make(t);
   await world.says("!help");
   assert.deepEqual(world.inChannel().slice(1), [
-    helpText(null, "", identity, PLAIN_NAMES, true, UNSERVED),
+    helpText(null, "", identity, PLAIN_NAMES, true, UNSERVED, NO_TRUST),
   ]);
   assert.ok(world.inChannel().at(-1)?.includes(named(texts.HELP_UNBOUND, PLAIN_NAMES)));
+  // The plain agent keeps no record of trust: nothing in the list says its folders are trusted.
+  assert.ok(!world.inChannel().at(-1)?.includes("trusts"));
   assert.deepEqual(await world.prompts(), []);
 });
 
@@ -37,12 +41,12 @@ test("!help in a session's thread adds the commands the session offers, less tho
   await world.says("!help", ref.thread);
   assert.equal(
     world.shown(ref).at(-1),
-    helpText(PLAIN_COMMANDS, "", identity, PLAIN_NAMES, true, UNSERVED),
+    helpText(PLAIN_COMMANDS, "", identity, PLAIN_NAMES, true, UNSERVED, NO_TRUST),
   );
   await world.says("!help count", ref.thread);
   assert.equal(
     world.shown(ref).at(-1),
-    helpText(PLAIN_COMMANDS, "count", identity, PLAIN_NAMES, true, UNSERVED),
+    helpText(PLAIN_COMMANDS, "count", identity, PLAIN_NAMES, true, UNSERVED, NO_TRUST),
   );
 });
 
@@ -51,7 +55,7 @@ test("!help for an agent with no commands lists none", async (t) => {
   const ref = await world.opened();
   await world.says("!help", ref.thread);
   const answer = world.shown(ref).at(-1) ?? "";
-  assert.equal(answer, helpText(null, "", identity, PLAIN_NAMES, false, UNSERVED));
+  assert.equal(answer, helpText(null, "", identity, PLAIN_NAMES, false, UNSERVED, NO_TRUST));
   assert.ok(!answer.includes(named(texts.HELP_AGENT, PLAIN_NAMES)));
   assert.ok(!answer.includes(named(texts.HELP_UNBOUND, PLAIN_NAMES)));
 });
@@ -60,7 +64,7 @@ test("a mistyped word gets the full list", async (t) => {
   const world = await MessagesWorld.make(t);
   await world.says("!bypass maybe");
   assert.deepEqual(world.inChannel().slice(1), [
-    helpText(null, "", identity, PLAIN_NAMES, true, UNSERVED),
+    helpText(null, "", identity, PLAIN_NAMES, true, UNSERVED, NO_TRUST),
   ]);
 });
 

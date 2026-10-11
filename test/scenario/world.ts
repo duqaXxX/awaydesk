@@ -382,7 +382,11 @@ export class World {
   /** Stops the daemon if it runs, then checks what no test may leave: no stray call either way. */
   async finish(): Promise<void> {
     if (this.running !== null) await this.stop("SIGINT");
-    assert.deepEqual(this.chat.strayCalls(), [], "the core called what the chat does not declare");
+    assert.deepEqual(
+      this.chat.strayCalls(),
+      [],
+      "the core called what the chat does not declare, or a thread it never issued",
+    );
     assert.deepEqual(this.undeclared, [], "the core called what the agent does not declare");
   }
 }

@@ -5,7 +5,8 @@
  *
  * The seam is read as written. A member that "never rejects" swallows a refusal of the room; one
  * that rejects with `ChatError` lets the room's through. A call for a capability this chat lacks
- * does nothing but leave a record in `Room.strayCalls`, which a test asserts empty.
+ * does nothing but leave a record in `Room.strayCalls`, which a test asserts empty. So does a
+ * thread asked for that the chat never issued.
  */
 import type { Question } from "../../../src/agent/seam.ts";
 import {
@@ -351,6 +352,8 @@ export class MemoryProvider implements ChatProvider {
   }
 
   thread(ref: ThreadRef): ThreadChat {
+    // A thread is a name the chat gave out: the core builds none from something else (a message id).
+    if (this.#room.openedAt(ref) === null) this.#room.stray(`thread ${ref.channel}/${ref.thread}`);
     return new MemoryThread(this.#room, ref);
   }
 

@@ -47,7 +47,7 @@ export function isClear(
 }
 
 export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): MessagesFlow {
-  const { chat, agent, sessions, state, names, allowedRoot } = deps;
+  const { chat, agent, sessions, state, names } = deps;
   const word = wordFlow(deps, talk, others);
   // One lock per thread, alive only while someone holds or waits on it (a channel keeps
   // opening new threads for as long as it runs; a lock kept forever would leak).
@@ -274,7 +274,7 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
     }
     const opened = sessions.open(channel, thread);
     if (opened === null) {
-      await talk.inChannel(channel, fill(named(texts.UNBOUND, names), { root: allowedRoot }));
+      await talk.unbound(channel);
       return;
     }
     await submitToSession(message, opened, command, { inThread: false });

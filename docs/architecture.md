@@ -19,7 +19,13 @@ registry. The agent module (`src/agent/claude/`) implements the agent seam; the 
 `main`. Four files sit above them and any layer imports them: `src/clock.ts`, `src/log.ts`,
 `src/text.ts` (Python's whitespace and its order of strings, where JavaScript's differ) and
 `src/values.ts` (reading a parsed value or a caught error by what it is). `test/imports.test.ts`
-reads the imports of every source file and fails on one the table does not allow.
+reads the imports of every source file and fails on one the table does not allow. The rules are
+written by layer, so that they hold for a module that is not there yet: the core imports no
+module, a module imports no other module, only `src/main.ts` imports `src/registry.ts` and
+nothing imports `src/main.ts`, and a package is imported only by the module that lists it in
+`LIBRARIES` (`@anthropic-ai/claude-agent-sdk` for `agent/claude`, `@slack/` for `chat/slack`).
+The scan reads a specifier written as a string or a plain template, and fails on an `import()` or
+`require()` whose specifier is not a literal and on `createRequire`, which it cannot read.
 
 | Layer | Holds | Imports |
 |---|---|---|
@@ -31,10 +37,10 @@ reads the imports of every source file and fails on one the table does not allow
 
 The core talks to the two libraries through the seams alone. No type of the Agent SDK appears in
 `src/agent/seam.ts` and no type of a Slack package in `src/chat/seam.ts`. The same holds for
-words: `test/vocabulary.test.ts` fails on an identifier or a string outside `src/agent/claude/`,
-`src/chat/slack/` and `src/registry.ts` that names an agent, a chat or what only one of them has
-(`claude`, `anthropic`, `slack`, `bolt`, `threadTs`, `mrkdwn`, `modal`, `ephemeral`, `emoji`;
-comments are exempt). A text of the core that names the agent or the chat takes the name from the
+words: `test/vocabulary.test.ts` fails on an identifier or a string outside the module directories
+(`src/agent/<name>/`, `src/chat/<name>/`, read from the disk) and `src/registry.ts` that names an
+agent, a chat or what only one of them has: the name of each module directory, and `anthropic`,
+`bolt`, `threadTs`, `mrkdwn`, `modal`, `ephemeral`, `emoji` (comments are exempt). A text of the core that names the agent or the chat takes the name from the
 module (`texts.Named`, `texts.named`, `texts.namesOf`); the Slack provider's own words are in
 `src/chat/slack/texts.ts`.
 
@@ -207,7 +213,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `commands` | `AgentInfo.commands` is ignored: a `!name` that is no word of the daemon is sent as typed, and `!help` lists no command of the agent |
 | `promptDuringTurn` | the next prompt is sent once the running turn has ended |
 | `sessionListing` | `!resume` answers that the agent keeps no list of its sessions (`texts.RESUME_UNLISTED`), and the cleanup never drops a thread for a session it cannot find. The Slack Home tab does not check it: it calls `AgentBackend.listSessions` through the port (`HomeAgent`) for the titles of the threads it lists |
-| `folderTrust` | every folder counts as trusted, `!bind` offers every folder under the root, and the daemon's own git runs in no folder, so the footer shows no branch and no changes |
+| `folderTrust` | every folder counts as trusted, `!bind` offers every folder under the root (`texts.BIND_LIST_ANY`; the notice of an unbound channel, `texts.UNBOUND_ANY`, and the `!bind` line of `!help`, `texts.HELP_WORDS_ANY`, say nothing of trust either), and the daemon's own git runs in no folder, so the footer shows no branch and no changes |
 
 | Chat capability | What the core does without it |
 |---|---|
@@ -229,8 +235,10 @@ values of the core that a provider's own code works with.
 
 Two tests hold the boundary. `test/imports.test.ts` allows a chat provider to import the chat seam,
 the agent seam's types and the core's port, and refuses any other import of the core, an import of
-the other module and an import of a library outside its own. `test/vocabulary.test.ts` refuses a
-word of one module outside it.
+any other module, of the registry or of `src/main.ts`, and an import of a package outside the
+module that lists it. `test/vocabulary.test.ts` refuses a word of one module outside it. A new
+module adds its package to `LIBRARIES` in the first test, and the words only it has (not its
+name, which comes from its directory) to `MODULE_WORDS` in the second.
 
 A conformance suite per seam runs the same checks against both implementations of that seam:
 `test/conformance/agent.ts` against the Claude back end (over the recorded SDK streams) and the
@@ -1325,19 +1333,20 @@ closed when the start returns (`ThreadSession.connect`).
   levels to offer when it lists none, whether a bypass mode is offered, and what the controls show
   at first. The Slack provider draws it as one message in the thread (`setup.setupBlocks`): a
   header (`texts.SETUP_HEADER`) and one `actions` block (block_id `setup`, one row that Slack wraps
-  on a narrow screen) holding the four controls. A Model select lists the
+  on a narrow screen) holding the controls the request offers. A Model select lists the
   CLI's own models (the models of `AgentSession.info`, kept as `ThreadSession.models` and stored
   with the pending setup, so a click reads its choice against the list the message was built from),
   each option showing the model's `displayName` and, under it, the CLI's own `description` (cut to
   Slack's 75 characters, left out when the entry has none); the select is left out when the agent
   lists no model. An Effort select offers `Effort: default` (which passes nothing) and
   `Effort: <level>` for the chosen model's `supportedEffortLevels`, or for the agent's own
-  `effortLevels` when it lists no model. A Bypass checkbox is shown only when the agent has a
-  bypass mode, and is ticked when the folder's own Claude Code settings start the process in
+  `effortLevels` when it lists no model (left out when the agent has none either). A Bypass
+  checkbox is shown only when the request offers a bypass mode, and is ticked when the folder's own Claude Code settings start the process in
   bypassPermissions, so unticking is an explicit off, with `!bypass off`'s semantics. Start carries the setup id. `state.values` is keyed
   by that block_id, then by each control's action_id (`setup.readSelection`). Changing the model
   rewrites the message (`chat.update`, which never notifies, and is skipped once the setup is
-  decided) with the new model's levels. Start reads every control from the click's `state.values`
+  decided) with the new model's levels, drawn from what the request said (`SlackChat.drawnSetup`,
+  kept for the last 64 setups posted). Start reads every control from the click's `state.values`
   (`setup.readSelection`) into the selection of an `OwnerAnswer`, the core reads that against the
   models, efforts and bypass the request offered (`setup.chosen`), and `ThreadSession.applySetup` applies it, and Start is authoritative:
   effort and bypass are written from the choice whatever `state.json` held (a restart can have left

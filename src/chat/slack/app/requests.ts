@@ -115,8 +115,13 @@ export class Requests {
       await this.answers.tellOwner(channel, threadTs, texts.HOLD_GONE);
       return;
     }
-    const models = pending.context ?? [];
-    const choice = readChoice(record(body.state).values, models);
+    const draw = this.parts.chat.drawnSetup(setupId);
+    if (draw === undefined) {
+      // Not kept (a long-forgotten request): the controls keep what they showed.
+      this.logRefusedClick("setup model, draw not kept", body, { open_at_message: true });
+      return;
+    }
+    const choice = readChoice(record(body.state).values, draw.models);
     try {
       await limiter.acquire();
       // The wait above can outlast Start: a decided setup now shows its summary, which this
@@ -126,7 +131,7 @@ export class Requests {
         channel,
         ts: shownAt,
         text: texts.SETUP_FALLBACK,
-        blocks: setupBlocks(setupId, models, choice) as unknown as KnownBlock[],
+        blocks: setupBlocks(setupId, draw, choice) as unknown as KnownBlock[],
       });
     } catch (error) {
       if (isCancelled(error)) throw error;

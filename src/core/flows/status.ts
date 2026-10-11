@@ -7,7 +7,7 @@ import { errorName } from "../../values.ts";
 import { oneLine } from "../reply/words.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
-import { fill, named } from "../texts.ts";
+import { fill } from "../texts.ts";
 import { type FlowDeps, isCancelled, logger, type Talk, TITLE_LIMIT } from "./talk.ts";
 
 /** How long ago, in one unit, as a channel's `!status` says it of an idle session. */
@@ -23,7 +23,7 @@ export function ago(seconds: number): string {
 export type ChannelStatus = (channel: string) => Promise<void>;
 
 export function channelStatus(deps: FlowDeps, talk: Talk): ChannelStatus {
-  const { state, sessions, names, allowedRoot } = deps;
+  const { state, sessions } = deps;
 
   async function row(
     channel: string,
@@ -63,7 +63,7 @@ export function channelStatus(deps: FlowDeps, talk: Talk): ChannelStatus {
   return async (channel) => {
     const record = state.channel(channel);
     if (record === null) {
-      await talk.inChannel(channel, fill(named(texts.UNBOUND, names), { root: allowedRoot }));
+      await talk.unbound(channel);
       return;
     }
     const lines = [fill(texts.STATUS_CHANNEL_HEADER, { directory: record.directory })];

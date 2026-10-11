@@ -8,11 +8,14 @@ import type { ModelInfo } from "../../../src/agent/seam.ts";
 import { ChatError, type HoldRequest, type SetupRequest } from "../../../src/chat/seam.ts";
 import { holdBlocks } from "../../../src/chat/slack/hold.ts";
 import { resetStatusFlags } from "../../../src/chat/slack/reply/status.ts";
-import { setupBlocks } from "../../../src/chat/slack/setup.ts";
+import { SETUP_EFFORT, SETUP_START, setupBlocks } from "../../../src/chat/slack/setup.ts";
 import { CHANNEL, OTHER_THREAD, rejected, THREAD } from "../../support/fake-slack.ts";
 import { madeChat } from "../../support/slack-chat.ts";
 
 beforeEach(() => resetStatusFlags());
+
+// biome-ignore lint/suspicious/noExplicitAny: a Slack payload read in a test
+type Json = Record<string, any>;
 
 const HOLD: HoldRequest = {
   type: "hold",
@@ -65,11 +68,32 @@ test("a setup is posted in the thread with its controls and answers with its ts"
     channel: CHANNEL,
     thread_ts: THREAD,
     text: "Set up this session",
-    blocks: setupBlocks("setup-1", MODELS, SETUP.selection),
+    blocks: setupBlocks("setup-1", SETUP, SETUP.selection),
     unfurl_links: false,
     unfurl_media: false,
   });
   assert.equal(ts, slack.postedTs.at(-1));
+});
+
+test("a setup is drawn as its request says: no Bypass checkbox and the agent's efforts", async () => {
+  const { slack, thread } = madeChat();
+  const request: SetupRequest = {
+    ...SETUP,
+    models: [],
+    efforts: ["brief", "full"],
+    bypassOffered: false,
+    selection: { model: "default", effort: "default", bypass: false },
+  };
+  await thread.ask("setup-1", request, "Set up this session");
+  const blocks = slack.callsTo("chat.postMessage").at(-1)?.blocks as Json[];
+  const actions = blocks.find((block) => block.type === "actions") as Json;
+  const ids = (actions.elements as Json[]).map((element) => element.action_id);
+  assert.deepEqual(ids, [SETUP_EFFORT, SETUP_START]);
+  const efforts = (actions.elements as Json[])[0]?.options as Json[];
+  assert.deepEqual(
+    efforts.map((option) => option.value),
+    ["default", "brief", "full"],
+  );
 });
 
 test("a request Slack refuses rejects with a ChatError named by its code", async () => {

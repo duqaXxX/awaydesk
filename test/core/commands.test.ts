@@ -103,6 +103,19 @@ test("help leaves out the words the agent or the chat cannot serve", () => {
   );
 });
 
+test("help speaks of trust in the !bind line only for an agent that keeps a record of it", () => {
+  const bindLine = (text: string): string =>
+    text.split("\n").find((line) => line.startsWith("`!bind")) ?? "";
+  const trusting = helpText(null, "", (text) => text, NAMES);
+  const open = helpText(null, "", (text) => text, NAMES, true, new Set(), false);
+  assert.ok(bindLine(trusting).includes("trusts"));
+  assert.ok(bindLine(open) !== "" && !bindLine(open).includes("trust"));
+  assert.deepEqual(
+    trusting.split("\n").filter((line) => !line.startsWith("`!bind")),
+    open.split("\n").filter((line) => !line.startsWith("`!bind")),
+  );
+});
+
 test("help says how a command is told from a text", () => {
   const commands = recordedCommands();
   for (const listed of [null, commands]) {

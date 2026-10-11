@@ -365,6 +365,9 @@ class ClaudeWorld implements AgentWorld {
 }
 
 agentConformance("Claude back end", {
+  // The fake query accepts any resume unless refuseResume() scripts a refusal, and the record
+  // Claude Code checks is a transcript the fake does not write.
+  refusesUnrecordedResume: false,
   capabilities: CAPABILITIES,
   create: (t) => ClaudeWorld.create(t),
 } satisfies AgentHarness);
@@ -482,6 +485,7 @@ class PlainWorld implements AgentWorld {
 }
 
 agentConformance("plain agent", {
+  refusesUnrecordedResume: true,
   capabilities: PLAIN_CAPABILITIES,
   create: async () => new PlainWorld(),
 } satisfies AgentHarness);

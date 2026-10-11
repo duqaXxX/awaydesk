@@ -1,12 +1,12 @@
 /**
  * Session setup in Slack: the message asked before the first prompt of a new session, with the
- * model, the effort and bypass, and the owner's choice read back from `state.values`. Pure
- * functions: the handlers post and wait, the session applies the choice.
+ * model, the effort and bypass the request offers, and the owner's choice read back from
+ * `state.values`. Pure functions: the handlers post and wait, the session applies the choice.
  */
 
 import type { ModelInfo } from "../../agent/seam.ts";
 import { type Choice, choiceOf, DEFAULT, effortLevels, texts } from "../../core/port.ts";
-import type { SetupSelection } from "../seam.ts";
+import type { SetupRequest, SetupSelection } from "../seam.ts";
 import * as slackTexts from "./texts.ts";
 
 export const SETUP_BLOCK = "setup"; // the one `actions` block that holds every control
@@ -47,8 +47,11 @@ function modelOptions(models: readonly ModelInfo[]): Block[] {
   );
 }
 
-function effortOptions(models: readonly ModelInfo[], model: string): Block[] {
-  return [DEFAULT, ...effortLevels(models, model)].map((level) =>
+/** What a setup request says to draw: the part of `SetupRequest` the controls are made from. */
+export type SetupDraw = Pick<SetupRequest, "models" | "efforts" | "bypassOffered">;
+
+function effortOptions(levels: readonly string[]): Block[] {
+  return [DEFAULT, ...levels].map((level) =>
     option(texts.fill(slackTexts.SETUP_EFFORT_OPTION, { level }), level),
   );
 }
@@ -68,27 +71,30 @@ function select(actionId: string, options: Block[], value: string): Block {
 
 /**
  * The setup message: a header and one row of controls (Slack wraps it on a narrow screen): a
- * Model select (left out when the agent listed no model), an Effort select with the chosen
- * model's levels, the Bypass checkbox and Start. `choice` is what each control shows; Start
- * carries `setupId`, the one thing that resolves the question.
+ * Model select (left out when the request lists no model), an Effort select (the chosen model's
+ * levels, or the request's `efforts` when it lists no model; left out when there are none), the
+ * Bypass checkbox (left out when the request does not offer it) and Start. `choice` is what each
+ * control shows; Start carries `setupId`, the one thing that resolves the question.
  */
-export function setupBlocks(
-  setupId: string,
-  models: readonly ModelInfo[],
-  choice: Choice,
-): Block[] {
+export function setupBlocks(setupId: string, draw: SetupDraw, choice: Choice): Block[] {
+  const { models, efforts, bypassOffered } = draw;
   const elements: Block[] = [];
   if (models.length > 0) {
     elements.push(select(SETUP_MODEL, modelOptions(models), choice.model));
   }
-  elements.push(select(SETUP_EFFORT, effortOptions(models, choice.model), choice.effort));
-  const bypass = option(slackTexts.SETUP_BYPASS_OPTION, BYPASS_ON, {
-    type: "mrkdwn",
-    text: slackTexts.SETUP_BYPASS_DESCRIPTION,
-  });
-  const checkboxes: Block = { type: "checkboxes", action_id: SETUP_BYPASS, options: [bypass] };
-  if (choice.bypass) checkboxes.initial_options = [bypass];
-  elements.push(checkboxes);
+  const levels = models.length > 0 ? effortLevels(models, choice.model) : efforts;
+  if (models.length > 0 || levels.length > 0) {
+    elements.push(select(SETUP_EFFORT, effortOptions(levels), choice.effort));
+  }
+  if (bypassOffered) {
+    const bypass = option(slackTexts.SETUP_BYPASS_OPTION, BYPASS_ON, {
+      type: "mrkdwn",
+      text: slackTexts.SETUP_BYPASS_DESCRIPTION,
+    });
+    const checkboxes: Block = { type: "checkboxes", action_id: SETUP_BYPASS, options: [bypass] };
+    if (choice.bypass) checkboxes.initial_options = [bypass];
+    elements.push(checkboxes);
+  }
   elements.push({
     type: "button",
     action_id: SETUP_START,
@@ -110,7 +116,8 @@ function record(value: unknown): Readonly<Record<string, unknown>> {
 
 /**
  * What the controls hold in a payload's `state.values`, as they stand: a control with no
- * selection reads as `DEFAULT`. The core checks it against what the request offered.
+ * selection, or one the message does not draw, reads as `DEFAULT` (bypass off). The core checks
+ * it against what the request offered.
  */
 export function readSelection(values: unknown): SetupSelection {
   const row = record(record(values)[SETUP_BLOCK]);
