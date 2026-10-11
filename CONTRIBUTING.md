@@ -50,7 +50,11 @@ may find a seam that needs a change: open an issue before writing one.
    `test/conformance/chat.test.ts`, call `chatConformance` with a function that builds a rig: the
    provider, a channel and a thread, the owner and somebody else as people who write and click, and
    a way to read what the chat shows. A check that needs a capability the module does not declare
-   is skipped by name. `node --test test/conformance/agent.test.ts` runs one file.
+   is skipped by name. A session is named by `session_started` only once a start that resumes its
+   id would succeed (the core stores the id at once, and the setup's Start resumes it before any
+   prompt); the suite checks that for a harness whose world refuses a resume of an id the agent
+   has no record of (`AgentHarness.refusesUnrecordedResume`). `node --test
+   test/conformance/agent.test.ts` runs one file.
 5. Add the entry to `REGISTRY` in `src/registry.ts`.
 6. Name its variables in [docs/setup.md](docs/setup.md); `test/docs.test.ts` fails on a variable
    of any entry that the page does not name.

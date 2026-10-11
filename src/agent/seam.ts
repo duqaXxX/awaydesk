@@ -202,7 +202,13 @@ export interface ModelTokens {
  * The events of one message arrive in the order the agent produced them.
  */
 export type SessionEvent =
-  /** The agent names its session. It can come again, and the id can change (a cleared conversation). */
+  /**
+   * The agent names its session. It can come again, and the id can change (a cleared conversation).
+   * An id is announced only once a `start` that resumes it would succeed: the core stores it as
+   * the event arrives, and the setup's Start may start a fresh client that resumes it before any
+   * prompt was sent. An agent that keeps no record until its first prompt names the session with
+   * that prompt.
+   */
   | {
       readonly type: "session_started";
       readonly sessionId: string | null;

@@ -102,6 +102,12 @@ export interface AgentWorld {
 export interface AgentHarness {
   /** The capabilities the back end declares; the suite checks it declares these. */
   readonly capabilities: Capabilities;
+  /**
+   * Whether the world refuses a resume of an id the agent holds no record of. A world that
+   * accepts any id (a fake that never looks at the record) cannot play the checks that need the
+   * refusal, and they are skipped for it.
+   */
+  readonly refusesUnrecordedResume: boolean;
   create(t: TestContext): Promise<AgentWorld>;
 }
 
@@ -876,6 +882,45 @@ export function agentConformance(name: string, harness: AgentHarness): void {
     );
 
     // Sessions on disk.
+
+    check(
+      "an id that session_started names can be resumed at once",
+      {
+        ...LIMIT,
+        skip: harness.refusesUnrecordedResume
+          ? false
+          : `${name}'s world accepts any resume, so it cannot refuse a named id`,
+      },
+      async (world, t) => {
+        // The core stores the id as the event arrives, and a setup's Start may then start a
+        // fresh client that resumes it before any prompt was sent. An agent that names its
+        // session at start, or with the first prompt, must hold a record by then.
+        world.say("Named.");
+        const first = await open(t, world);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        if (!first.events.seen.some((event) => event.type === "session_started")) {
+          await first.session.send(prompt("name it"));
+        }
+        const named = await first.events.through(
+          (event) => event.type === "session_started",
+          "the session was named",
+        );
+        const id = sessionIdOf(named);
+        await first.session.close();
+        try {
+          const again = await world.backend.start(
+            startOptions(world, { resume: id }),
+            new Requests(),
+          );
+          await again.close();
+        } catch (error) {
+          if (error instanceof ResumeRefused) {
+            assert.fail(`session_started named ${id}, which a start refuses to resume`);
+          }
+          throw error;
+        }
+      },
+    );
 
     check("a session that ran can be resumed after a restart", LIMIT, async (world, t) => {
       world.say("First.");
