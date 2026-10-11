@@ -10,6 +10,7 @@
  */
 import assert from "node:assert/strict";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   realpathSync,
@@ -23,6 +24,7 @@ import { dirname, join } from "node:path";
 import { type TestContext, test } from "node:test";
 import { trustedRepository } from "../../../../src/agent/claude/trust.ts";
 import type { Repository } from "../../../../src/agent/seam.ts";
+import { logger } from "../../../../src/chat/slack/app/answers.ts";
 import { actionKey } from "../../../../src/chat/slack/app/app.ts";
 import {
   type Listing,
@@ -1162,6 +1164,50 @@ for (const value of ["../outside.txt", "link.txt", "dir-link/secret.txt", "/etc/
     assert.deepEqual(world.ephemerals(), [fill(slackTexts.OPEN_NOT_A_FILE, { path: value })]);
   });
 }
+
+/** What the app's logger is asked to write at `info` from here on. */
+function loggedInfo(t: TestContext): string[] {
+  const lines: string[] = [];
+  t.mock.method(logger, "info", (line: string) => lines.push(line));
+  return lines;
+}
+
+test("a file the daemon may not read is told as no file, and the log names the code", {
+  ...GIT_LAYOUT,
+  skip: process.platform === "win32" || process.getuid?.() === 0 ? "no closed file" : false,
+}, async (t) => {
+  const world = openWorld(t);
+  const project = projectOf(world);
+  await inAThread(world);
+  const file = put(project, "notes.md");
+  chmodSync(file, 0o000);
+  // The world removes the folder first, in the other order than the file would be restored.
+  t.after(() => existsSync(file) && chmodSync(file, 0o600));
+  const lines = loggedInfo(t);
+  await world.dispatch(submitted("notes.md"));
+  assert.deepEqual(world.ephemerals(), [fill(slackTexts.OPEN_NOT_A_FILE, { path: "notes.md" })]);
+  const unread = lines.filter((line) => line.includes("could not open"));
+  assert.equal(unread.length, 1, lines.join("\n"));
+  const line = String(unread[0]);
+  assert.ok(line.includes("EACCES"));
+  assert.ok(!line.includes("notes.md")); // the code, never the path
+});
+
+test("a value that leaves the folder logs no cause", { ...GIT_LAYOUT, ...SYMLINKS }, async (t) => {
+  const world = openWorld(t);
+  await inAThread(world);
+  put(world.tmpPath, "outside.txt");
+  put(world.root, "outside.txt");
+  const lines = loggedInfo(t);
+  await world.dispatch(submitted("../outside.txt"));
+  assert.deepEqual(world.ephemerals(), [
+    fill(slackTexts.OPEN_NOT_A_FILE, { path: "../outside.txt" }),
+  ]);
+  assert.deepEqual(
+    lines.filter((line) => line.includes("could not open")),
+    [],
+  );
+});
 
 test("open resolves in the folder of the thread s own session", GIT_LAYOUT, async (t) => {
   // The channel was bound to another folder after the thread began.
