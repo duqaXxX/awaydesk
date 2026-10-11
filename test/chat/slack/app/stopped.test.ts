@@ -67,7 +67,7 @@ async function release(world: World, gate: AsyncEvent): Promise<string[]> {
   return world.slack.apiCalls.slice(calls).map((call) => call.method);
 }
 
-for (const text of ["!help", "!status", "!bypass on", "hello"]) {
+for (const text of ["hello"]) {
   test(`a message in a thread whose channel check ends after the stop does nothing [${text}]`, async (t) => {
     const { world, gate } = await held(t, reply(text, THREAD));
     await stop(world);

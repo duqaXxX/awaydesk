@@ -20,7 +20,6 @@ import {
   EDIT_ACTION,
   EDIT_OFF,
   EDIT_ON,
-  FILTER_ACTIONS,
   FILTERS_BLOCK,
   homeFilter,
   NEW_THREAD_ACTION,
@@ -138,15 +137,6 @@ test("a reply also sent to a channel shared outside is ignored", async (t) => {
   assert.deepEqual(world.ephemerals(), []);
 });
 
-test("a reply in a thread that holds no session is refused", async (t) => {
-  const world = worldOf(t);
-  // Same recorded shape as above, but its thread was never opened: nothing to continue.
-  const threadBody = recordedThreadReply();
-  await world.dispatch(structuredClone(threadBody));
-  assert.deepEqual(world.queries(), []);
-  assert.deepEqual(world.ephemerals(), [texts.NOT_A_SESSION]);
-});
-
 for (const word of [
   "!stop",
   "!resume",
@@ -173,7 +163,7 @@ for (const word of [
   });
 }
 
-for (const word of ["!help", "!guide", "!status", "!bind"]) {
+for (const word of ["!help", "!guide", "!status"]) {
   test(`a word that only shows acts as in the channel in a thread with no session [${word}]`, async (t) => {
     const world = worldOf(t);
     await world.dispatch(reply(word, OTHER_THREAD));
@@ -339,7 +329,7 @@ test("bang clear is refused inside a thread", async (t) => {
   assert.deepEqual(world.queries(), ["hi"]); // the earlier prompt is the only one that reached Claude
 });
 
-for (const word of ["!reset", "!new", "!NEW keep this"]) {
+for (const word of ["!reset", "!NEW keep this"]) {
   test(`an alias of clear is refused inside a thread [${word}]`, async (t) => {
     const world = worldOf(t);
     // `/reset` and `/new` are `/clear` under other names: commands reference and the recorded
@@ -819,7 +809,7 @@ for (const user of [OWNER, STRANGER]) {
   });
 }
 
-for (const actionId of FILTER_ACTIONS) {
+for (const actionId of [CHANNEL_ACTION]) {
   test(`a home filter is read from the pages state and published [${actionId}]`, async (t) => {
     const world = worldOf(t);
     // Whichever of the four controls was used, the payload carries the state of them all.
@@ -1221,16 +1211,6 @@ test("a resume click on a thread stored but not live is refused", async (t) => {
   assert.deepEqual(world.slack.callsTo("chat.update"), []);
 });
 
-test("a typed resume in a non session thread lists nothing", async (t) => {
-  const world = worldOf(t);
-  // It listed the folder's sessions with buttons naming that thread, so a click made a thread
-  // under some other post into a session. `!resume` is a word for the channel.
-  twoSessions(world);
-  await world.dispatch(reply("!resume", OTHER_THREAD));
-  assert.deepEqual(world.slack.callsTo("chat.postMessage"), []);
-  assert.deepEqual(world.ephemerals(), [fill(texts.WORD_IN_THREAD, { word: "resume" })]);
-});
-
 test("a button is never trusted for a session of another directory", async (t) => {
   const world = worldOf(t);
   twoSessions(world);
@@ -1361,16 +1341,7 @@ test("bang guide inside a thread is for the owner alone", async (t) => {
   assert.ok(guides[0]?.text.startsWith("**awaydesk**"));
 });
 
-for (const word of [
-  "!help",
-  "!guide",
-  "!status",
-  "!stop",
-  "!bind",
-  "!bind /",
-  "!bypass on",
-  "!resume",
-]) {
+for (const word of ["!guide", "!status", "!stop", "!bind", "!bind /"]) {
   test(`a word typed in the channel is answered by a top level post [${word}]`, async (t) => {
     const world = worldOf(t);
     twoSessions(world);

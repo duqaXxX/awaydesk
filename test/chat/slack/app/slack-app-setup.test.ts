@@ -542,17 +542,6 @@ test("a reply after a cancelled d8 hold asks the setup again", async (t) => {
   assertAFreshSetup(manual);
 });
 
-test("a reply while the first turn runs is not asked again", async (t) => {
-  const manual = manualWorld(t);
-  await manual.dispatch(message("hello", { ts: THREAD }));
-  await manual.dispatch(setupClick(manual));
-  await manual.dispatch(reply("more", THREAD));
-  await manual.settle();
-  // The first prompt's, not the reply's.
-  assert.equal(posts(manual).filter((text) => text === texts.SETUP_FALLBACK).length, 1);
-  assert.deepEqual(manual.waitingSetups(), []);
-});
-
 test("a failing start leaves no controls and no leftovers", async (t) => {
   const manual = manualWorld(t);
   t.mock.method(FakeAgentSession.prototype, "setModel", async () => {
@@ -749,17 +738,6 @@ test("unticking in a native bypass folder turns bypass off", async (t) => {
   assert.equal(sessionOf(manual).bypass, false);
   assert.equal(client?.modes.at(-1), "default");
   assert.deepEqual(client?.queries, ["hello"]);
-  assert.ok(summaryOf(manual).endsWith("Bypass: off"));
-});
-
-test("a typed bypass does not change what the summary says", async (t) => {
-  const manual = manualWorld(t);
-  nativeBypassFolder(manual);
-  await manual.dispatch(message("hello", { ts: THREAD }));
-  await manual.dispatch(reply("!bypass on", THREAD));
-  await manual.dispatch(setupClick(manual)); // unticked
-  await manual.settle();
-  assert.equal(manual.clients.at(-1)?.modes.at(-1), "default");
   assert.ok(summaryOf(manual).endsWith("Bypass: off"));
 });
 

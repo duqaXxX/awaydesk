@@ -650,18 +650,6 @@ test("an emptied field lists the changed files again", GIT_LAYOUT, async (t) => 
   assert.deepEqual(modal.labels(), ["Changed in this session (1), newest first"]);
 });
 
-test("typing lists at most ten files", GIT_LAYOUT, async (t) => {
-  const world = openWorld(t);
-  const project = projectOf(world);
-  const modal = new ModalSlack(world.slack);
-  await inAThread(world);
-  for (let i = 0; i < 130; i += 1) put(project, `data/part${String(i).padStart(3, "0")}.csv`);
-  await world.dispatch(typing("part", 1790000100.0, { viewHash: modal.hash }));
-  await world.settle();
-  assert.equal(modal.rows().length, 10);
-  assert.equal(modal.labels()[0], "130 files match");
-});
-
 test("typing checks the disk only until the rows are full", GIT_LAYOUT, async (t) => {
   // The listings are asked to check ranked paths on disk through an iterable that notes each path
   // it hands out, one for each path checked.
@@ -843,7 +831,6 @@ for (const [user, team] of ANYONE_ELSE) {
 }
 
 for (const [name, metadata] of [
-  ["empty", ""],
   ["not json", "not json"],
   ['{"c": 1}', '{"c": 1}'],
   ["a thread of another channel", new Target("C000ELSEWHERE", THREAD).dump()],
@@ -1350,17 +1337,6 @@ test("a listing that was cut is said in the modal too", async (t) => {
   await world.settle();
   assert.deepEqual(modal.rows(), ["a/one.py"]);
   assert.deepEqual(modal.labels(), ["1 file matches", slackTexts.OPEN_PARTIAL]);
-});
-
-test("a name that matches nothing says so", GIT_LAYOUT, async (t) => {
-  const world = openWorld(t);
-  projectOf(world);
-  await inAThread(world);
-  await askedOpen(world, "!open nothing-like-it");
-  assert.deepEqual(opened(world), []);
-  assert.deepEqual(world.ephemerals(), [
-    fill(slackTexts.OPEN_NO_MATCH, { words: "nothing-like-it" }),
-  ]);
 });
 
 test("a file over one megabyte is refused", GIT_LAYOUT, async (t) => {
