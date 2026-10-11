@@ -133,7 +133,8 @@ no such token.
    - Create a channel and turn on **Make private**. Name it after the project, with a common
      prefix so the channels sort together, for example `cc-myproject`. Custom sidebar sections
      would group them better, but Slack offers those on paid plans only.
-   - In the channel, run `/invite @awaydesk`.
+   - In the channel, run `/invite @awaydesk`, with the name you gave the bot in step 2 if you
+     changed it.
    - Open the channel's notification settings. A reply, an approval request and a question post
      inside their own Slack thread, and Slack notifies you on a new message in a thread you
      started, whatever this setting is. It governs only the bot's top-level messages (the answer
@@ -429,9 +430,13 @@ What a restart waits for, and what each way of stopping does, is under
 ### Bind the channel and send the first message
 
 13. In the channel of step 6, send `!bind <folder>`, with the folder given relative to
-    `ALLOWED_ROOT` (`!bind my-project`) and trusted in step 9. Then send a message. The thread
-    shows `Choose how this session starts`; choose **Start**, and Claude Code's reply grows in
-    the thread. `!bind` alone lists the folders it accepts, with a **Bind** button each.
+    `ALLOWED_ROOT` (`!bind my-project`) and trusted in step 9. The folder must already exist
+    under `ALLOWED_ROOT`: for one that does not, the answer starts with the path you typed and
+    `is not a folder under`. For one that does, the answer starts `Bound this channel to`. Then
+    send a message. The thread shows `Choose how this session starts`; choose **Start**, and
+    Claude Code's reply grows in the thread. `!bind` alone lists the folders it accepts, with a
+    **Bind** button each. A message sent before any `!bind` starts nothing and is answered
+    `This channel is not bound to a folder yet`, with the same two ways to bind.
 
 When the reply arrives, the install is done. Go through the checklist in Part 5 next.
 

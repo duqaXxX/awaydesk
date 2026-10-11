@@ -53,6 +53,9 @@ be measured first.
 |---|---|---|---|
 | Speaking a message | Dictation writes your words as you speak | You send an audio clip and choose **Generate transcript** on it: Slack writes no transcript by itself | none |
 | The language of what you said | The `language` setting decides | Slack picks the language it hears, clip by clip, and nothing lets an app choose it | [#220](https://github.com/duqaXxX/awaydesk/issues/220) |
+| Being told that Claude waits for your approval | The request appears where you work | A push to your phone does not come for every request. With iOS locked and Slack open in a browser (2026-09-29), a turn that asked two or three times brought no push for any of them. Slack gives an app no way to ask for one | [#71](https://github.com/duqaXxX/awaydesk/issues/71) |
+| Watching a reply grow on a phone | The reply is drawn as it is written | Seen once (iOS, 2026-10-08, desktop open on the same thread): the reply stopped growing 34 seconds into a turn of 116 and showed neither its text nor its footer, while desktop showed all of it. Not reproduced since | [#200](https://github.com/duqaXxX/awaydesk/issues/200) |
+| Coming back to an old thread | The conversation stays on disk for as long as Claude Code keeps it | On Slack's free plan, messages older than 90 days are hidden (Slack's help pages, read 2026-10-08). What awaydesk does with a thread whose first message is hidden has not been measured | [#196](https://github.com/duqaXxX/awaydesk/issues/196) |
 
 Of three clips spoken in Italian in a workspace set to English (Slack free plan, iOS app,
 2026-10-09), Slack first wrote one in Italian and two as English words that were not what was

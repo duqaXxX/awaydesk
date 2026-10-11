@@ -167,6 +167,7 @@ The other sections are internals for someone changing the code: "Startup", "Stat
 single-instance lock", "Writing to Slack", "Footer", "Opening a file", the rest of "Sessions",
 "The session index" and "Slack handlers". The limits those sections quote from Slack and the SDK
 are gathered, with their dates and versions, in "Measured platform behaviour" at the end.
+For when a channel or a thread leaves the state file, read "When a thread leaves `state.json`".
 
 ## Modules
 
@@ -559,6 +560,18 @@ A pass leaves alone every thread and channel with a live session object
 once the session has closed. `clean` never throws: a pass that fails is logged and the next one
 tries again.
 
+### When a thread leaves `state.json`
+
+A thread's entry is removed in four cases, and no other code removes one. An idle close, `!stop`
+and a restart keep it.
+
+| Case | What removes it | Described in |
+|---|---|---|
+| The chat no longer has its channel | `cleanup.forgetGoneChannels`, which removes the channel with all its threads | "Cleaning `state.json`" |
+| Its session is no longer among its folder's sessions, or it has no session and was opened more than a day ago | `StateStore.prune`, at every pass of the cleaning | "Cleaning `state.json`" |
+| Its stored session cannot be resumed | `ThreadSession.ensureConnected`, when the back end's start fails with `ResumeRefused` | "Starting and resuming the agent session", under "Sessions" |
+| The owner deletes the thread from the session index in edit mode | `ThreadDeleter.delete`, once the thread is emptied to its root and past it | "Edit mode and Delete" |
+
 ## Who may talk to it
 
 The chat provider checks that it was the owner on every inbound path that acts (a message,
@@ -747,6 +760,8 @@ case 45 in one window, under the documented floor of `chat.update` (Tier 3, 50 o
 app), so several busy threads together stay under the app's own budget instead of racing through it
 and then freezing until it resets.
 
+### Retries and writes in flight
+
 The retries of a Slack call are the daemon's own policy, in `clients`. Both clients are built with
 the library's retries switched off (`clients.SENT_ONCE`), and the policy is applied around the
 client's `apiCall`:
@@ -769,6 +784,8 @@ twice. What can be cancelled is a wait outside a pass: the debounce before a wri
 the end's one retry, the stream's 280 seconds, and a caller's own wait for a pass. `finish`,
 `closeOut`, `waitLanded` and `settle` take an `AbortSignal`: aborting it rejects that call and
 leaves the pass running. `ReplySink.settle` then waits for what is in flight.
+
+### Order, runs of calls and cards
 
 Within a reply, writes happen in the order things happen. Claude's text goes as `markdown_text`
 chunks. Tools go as `task_update` chunks, each a card Slack updates in place by its id.
@@ -822,6 +839,8 @@ as `unknown` and does not document it; any shape other than the one measured giv
 and the call shows its generic card, and the release probe's claim P13 checks the shape on each new
 SDK.
 
+### The stream and the 280 seconds
+
 The stream stays open until the reply ends, or until `sinks.STREAM_SECONDS` (280 seconds) after it
 started, whichever comes first. Slack closes a stream 5 minutes after `chat.startStream` (measured:
 "Stream lifetime"), and the daemon stops it a little earlier itself.
@@ -866,6 +885,8 @@ started, whichever comes first. Slack closes a stream 5 minutes after `chat.star
   new message shows empty in one known case: a turn that ended well with an answer of text alone,
   whose footer could not be built.
 
+### Message limits and continuation
+
 Slack holds a message to 12,000 characters and 50 blocks or task cards (measured: "Message limits");
 the daemon stops at `blocks.MESSAGE_LIMIT` (11,000) and `blocks.BLOCKS_LIMIT` (45), which leave room
 for a preview that arrives after its card and for the footer. Slack translates Claude's text into a
@@ -887,6 +908,8 @@ update takes by a `chat.update` of the same message (`ReplySink.postStep`). An u
 content that held a container is tried once more with the containers counted, as a post counts them
 (`containersCounted`, kept for the message): what fits is written, and the rest goes on in a new
 message, or is cut with the preview note when the span is fixed.
+
+### When a reply ends
 
 The reply ends once its turn has ended and none of its tasks still runs or still waits on a turn
 Claude Code starts to report it (the held-open reply): a task the turn started keeps its card open
@@ -915,35 +938,10 @@ reply's text with no line of the daemon's between. A turn that did nothing and h
 would (`ThreadSession.saidNothing`, `ThreadSession.nothingReported`). With an end line waiting, it
 is the turn that writes that line, as before.
 
-A prompt taken into a report turn: every prompt a session sends is one user message under a uuid of
-the daemon's own (`Turn.uuid`, `prompt.userMessage`), and the back end starts Claude Code with
-`--replay-user-messages`, so Claude Code re-emits it as a `user` record with that uuid, which the
-back end turns into `prompt_taken` (`ThreadSession.acknowledge`; measured: "Prompt replay"). A
-prompt that gets a turn of its own is replayed after that turn's `init` and before its first stream
-event, so no turn runs when its replay arrives; one the CLI takes into a running turn is replayed
-inside that turn, and that turn ends with one result, with the origin `task-notification`, for both.
-The session never waits for a replay: the back end makes `prompt_taken` only of a record whose uuid
-it sent, and the session ignores one that names no prompt it still holds as sent
-(`ThreadSession.sent`, or the active turn's own). A replay that arrives with no turn running names
-the prompt of the turn that starts next (`ThreadSession.whoseTurn`): that turn takes the prompt's
-reply whatever the session was waiting for. When a task's notification is waiting to be reported, a
-turn that opens with words and no replay is that report, so it does not take the reply of a prompt
-of plain text that waits beside it (measured: "Prompt replay", "Prompt sent before a notification").
-In every other case the session takes the turn for the first waiting prompt's unless it awaits a
-report: no recording covers them. A turn that opens with a compaction starts before its replay, a
-command is not replayed as a prompt is, and a prompt with an image or a turn that fails before its
-first word (a logged-out CLI, a limit reached) was not recorded. A replay that arrives while a turn
-runs lands on `ActiveTurn.taken`; when that turn's `turn_ended` says the agent started it,
-`ThreadSession.finish` releases those prompts (`ThreadSession.settle`: out of `sent`, `Turn.done`
-set) and adds the note `texts.TAKEN_INTO_REPLY_ONE` to the reply, through the same end notes as a
-restart's `N messages were not sent`. A prompt whose replay did not come during the turn waits for
-its own turn. The worker sends one prompt at a time, so a turn takes in at most one. An
-`AgentSession.interrupt` with such a prompt queued ends the report turn with
-`error_during_execution`, and the prompt then runs as a turn of its own. A prompt already taken in
-when `!stop` ends the turn with a result the agent started is released with the note like any other
-(not measured: what Claude Code does with it on an interrupt). If the session is abandoned first
-(`ThreadSession.abandon`: a lost process, a close, a restart), the prompt is listed among the
-messages not sent, whether or not Claude Code had taken it in; its replay is not kept.
+What happens to a prompt the owner sends while a turn runs, and how a turn takes one in, is under
+"Sessions" ("A prompt taken into a running turn").
+
+### A reply cut short
 
 `!stop`, a restart, an error that cuts a turn, an idle close and `SessionGone` end the reply through
 the same path, at once: the stream stops with the footer and, for `!stop`, the stopped command's
@@ -968,6 +966,8 @@ keeps its footer, the record of how its last turn ended; only the thread's lates
 counts of what still runs to it (`Reply.setLatest`). A card left `in_progress` in a stopped message
 is stored as an error until it is updated (measured: "Open card stored as error"), so every end
 closes its cards first.
+
+### Pushes and threads
 
 Slack's push behaviour is what makes this shape: a stream in a thread the owner started notifies
 once, when it stops, with its first text as the banner, and never when it starts (measured: "Push on
@@ -1250,6 +1250,8 @@ agent's start, a git call. The signal releases whoever waited for it, and where 
 call would be lost an explicit cleanup picks it up: an agent session whose start was given up is
 closed when the start returns (`ThreadSession.connect`).
 
+### Starting and resuming the agent session
+
 - The agent session is started on first use (`ThreadSession.ensureConnected`), and only in a folder
   the owner has trusted in Claude Code. An SDK session never shows Claude Code's trust dialog, and
   Claude Code uses a repository's own hooks, `env` block and helper commands there whether the
@@ -1344,6 +1346,8 @@ closed when the start returns (`ThreadSession.connect`).
   `!stop` has nothing left to deny. The open reply ends with an error line, every waiting message
   is told, and the next message starts a new process, once the lost process's reader has ended.
   A Slack failure while a reply is written never stops the session or the running turn.
+### Messages, the same-folder hold and the setup
+
 - Messages are queued and run one at a time; each gets its own reply in the thread. `!stop`
   interrupts the running turn, denies its pending approvals and stops the thread's background tasks
   (`AgentSession.stopTask`); an interrupt or a stop of one task that the agent refuses is logged by
@@ -1410,6 +1414,8 @@ closed when the start returns (`ThreadSession.connect`).
   is cancelled or fails, when the same-folder hold cancels after Start, and before each new setup,
   so the setup asked again shows the defaults. A setup shows ✋ and pauses the idle timer; crash
   repair deletes a setup message left standing.
+### Status and the activity line
+
 - Each `ThreadSession` asks its `ThreadChat` for one of four statuses (`working`, `waiting`, `done`,
   `error`; for a chat that declares `reactions` only), and the Slack provider keeps one `StatusReaction` (in `status`) on the thread's own root
   message, which `thread_ts` always is: a top-level owner message, or the owner's own `!resume`
@@ -1476,6 +1482,8 @@ closed when the start returns (`ThreadSession.connect`).
   the method (`status.THREAD_STATUS_REFUSED`) stops every `ThreadStatus` from calling Slack for the
   rest of the run. Nothing about it is stored, and a crash leaves at most a status Slack removes by
   itself.
+### Turns and background tasks
+
 - One reader task follows `AgentSession.events` for the life of the agent session
   (`ThreadSession.read`). A turn has no start event: it starts at the first event of
   `constants.TURN_EVENTS` that arrives with no turn running (a message's start, a text, a call, an
@@ -1529,6 +1537,40 @@ closed when the start returns (`ThreadSession.connect`).
   and both disappear when nothing runs.
 - When the Claude Code process goes away (shutdown, an idle close, a process that exits), its tasks
   go with it: their lines close with `Stopped` and the list empties. The map lives in memory only.
+### A prompt taken into a running turn
+
+A prompt taken into a report turn: every prompt a session sends is one user message under a uuid of
+the daemon's own (`Turn.uuid`, `prompt.userMessage`), and the back end starts Claude Code with
+`--replay-user-messages`, so Claude Code re-emits it as a `user` record with that uuid, which the
+back end turns into `prompt_taken` (`ThreadSession.acknowledge`; measured: "Prompt replay"). A
+prompt that gets a turn of its own is replayed after that turn's `init` and before its first stream
+event, so no turn runs when its replay arrives; one the CLI takes into a running turn is replayed
+inside that turn, and that turn ends with one result, with the origin `task-notification`, for both.
+The session never waits for a replay: the back end makes `prompt_taken` only of a record whose uuid
+it sent, and the session ignores one that names no prompt it still holds as sent
+(`ThreadSession.sent`, or the active turn's own). A replay that arrives with no turn running names
+the prompt of the turn that starts next (`ThreadSession.whoseTurn`): that turn takes the prompt's
+reply whatever the session was waiting for. When a task's notification is waiting to be reported, a
+turn that opens with words and no replay is that report, so it does not take the reply of a prompt
+of plain text that waits beside it (measured: "Prompt replay", "Prompt sent before a notification").
+In every other case the session takes the turn for the first waiting prompt's unless it awaits a
+report: no recording covers them. A turn that opens with a compaction starts before its replay, a
+command is not replayed as a prompt is, and a prompt with an image or a turn that fails before its
+first word (a logged-out CLI, a limit reached) was not recorded. A replay that arrives while a turn
+runs lands on `ActiveTurn.taken`; when that turn's `turn_ended` says the agent started it,
+`ThreadSession.finish` releases those prompts (`ThreadSession.settle`: out of `sent`, `Turn.done`
+set) and adds the note `texts.TAKEN_INTO_REPLY_ONE` to the reply, through the same end notes as a
+restart's `N messages were not sent`. A prompt whose replay did not come during the turn waits for
+its own turn. The worker sends one prompt at a time, so a turn takes in at most one. An
+`AgentSession.interrupt` with such a prompt queued ends the report turn with
+`error_during_execution`, and the prompt then runs as a turn of its own. A prompt already taken in
+when `!stop` ends the turn with a result the agent started is released with the note like any other
+(not measured: what Claude Code does with it on an interrupt). If the session is abandoned first
+(`ThreadSession.abandon`: a lost process, a close, a restart), the prompt is listed among the
+messages not sent, whether or not Claude Code had taken it in; its replay is not kept.
+
+### Idle close, effort and shutdown
+
 - A thread's process closes on its own (the idle close) after `constants.IDLE_CLOSE_SECONDS` (an
   hour) with nothing running, sent, taken or queued, and no approval, question or background task
   pending (`ThreadSession.idle`); the next message rebuilds the `ThreadSession` and starts it again
@@ -1558,6 +1600,8 @@ closed when the start returns (`ThreadSession.connect`).
   resolves once the process's stream has ended, and resuming the same session id any sooner would
   race the old process (measured: "Close, then resume").
 - Logs carry channel and thread ids and error names, never prompt or reply text.
+
+### Bypass
 
 Bypass is a thread's own `ThreadState.bypass` in `state.json` (on, off or never chosen), which
 `ThreadSession.bypassChoice` reads: an idle close and a restart of the daemon, whatever its cause,
@@ -1731,6 +1775,8 @@ of the classes of `src/chat/slack/app/` (`Requests`, `Open`, `ResumeBind`, `Clip
 `HomeControls`), which share `Answers`: the checks, where an answer goes, and how a failure is told.
 The app registers no slash command.
 
+### The message listener
+
 The `message` listener is the one that keeps an order. It checks the owner and the workspace
 first, with nothing awaited (`Answers.fromOwner`), so that an event from anyone else takes no
 place and reaches no Slack call. Then it takes its place among the messages of its thread
@@ -1767,6 +1813,8 @@ reaches Claude Code as typed; a link the owner named reaches it as `label (url)`
 not lost; a mention stays in Slack's form (`<@U…>`), since naming the user would need a scope the
 app does not have (`messages.slackUnescape`).
 
+### Audio clips
+
 An audio clip: a message whose one file Slack shows as audio (`media_display_type`) is held instead
 of being sent (`voice.clip`, `Clips.takeClip`), since Claude Code takes no audio and the daemon
 transcribes nothing. Slack writes a clip's transcript when asked for it and sends `file_change`
@@ -1780,6 +1828,8 @@ difference: a transcript is never read as a word of the daemon or as a command, 
 cannot change the permission mode. A clip that a typed message could not follow (a thread with no
 session, an unbound channel, a file somebody else uploaded) is refused when it comes, before any
 wait. A clip waits `voice.WAIT_SECONDS`, in memory only.
+
+### Routing a message
 
 A message is routed by the message flow, by whether it is a reply in an existing thread:
 `messages.messages` reads `SessionManager.get` for a reply (null for a thread that holds no
@@ -1823,6 +1873,8 @@ session (freshly opened, at the top level) offers `name`, as the text itself oth
 message with no existing thread opens a new session (`SessionManager.open`); a message in a thread
 that holds no session and is not a daemon word gets `texts.NOT_A_SESSION`, with nowhere to send it.
 
+### Resuming a session
+
 `!resume` stands in for Claude Code's interactive `/resume`, which an SDK session does not offer:
 `resume` lists the directory's sessions from the back end's listing (`AgentBackend.listSessions`,
 the SDK's `listSessions`) with the columns of the terminal's picker (name or title, time since the
@@ -1840,6 +1892,8 @@ holds a session (`texts.RESUME_HELD`: a resume is never a swap), when another th
 the chosen session (`texts.RESUME_ELSEWHERE`, with a link to it: one session lives in one thread),
 or when the channel was bound to another folder while the chosen session was read from the old one
 (`texts.RESUME_GONE`); it never waits on, or touches, any other thread of the channel.
+
+### Notices
 
 The daemon's notices (the answer to `!bind`, `!bypass` and `!stop`, a word used in the wrong place,
 a resume that did not happen or is refused, a refused attachment, a restart, and the ephemeral
