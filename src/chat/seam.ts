@@ -407,6 +407,11 @@ export interface ChatInbound {
   ): Promise<boolean>;
   /** The owner used a control of a list a word posted. */
   picked(pick: ListPick): Promise<void>;
+  /**
+   * The owner wrote in a channel the provider found bound to no folder, before it had a message
+   * to hand over; the core tells the owner how to bind.
+   */
+  unbound(channel: string): Promise<void>;
 }
 
 /** Whether a chat still has a channel; `no answer` when it could not say, with no reason to give. */

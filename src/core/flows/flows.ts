@@ -22,6 +22,7 @@ export function buildFlows(deps: FlowDeps): Built {
       message: (message) => all.message(message),
       answer: (ref, requestId, answer, message) => answers.answer(ref, requestId, answer, message),
       picked: (pick) => picks.picked(pick),
+      unbound: (channel) => talk.unbound(channel),
     }),
   };
 }

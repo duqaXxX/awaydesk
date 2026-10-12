@@ -283,6 +283,7 @@ class Recorder implements ChatInbound {
     readonly message: MessageId | null;
   }> = [];
   readonly picks: ListPick[] = [];
+  readonly unboundChannels: string[] = [];
 
   async message(message: InboundMessage): Promise<void> {
     this.messages.push(message);
@@ -302,8 +303,18 @@ class Recorder implements ChatInbound {
     this.picks.push(pick);
   }
 
+  async unbound(channel: string): Promise<void> {
+    this.unboundChannels.push(channel);
+  }
+
   get empty(): boolean {
-    return this.messages.length + this.answers.length + this.picks.length === 0;
+    return (
+      this.messages.length +
+        this.answers.length +
+        this.picks.length +
+        this.unboundChannels.length ===
+      0
+    );
   }
 }
 

@@ -62,7 +62,7 @@ What crosses the chat seam, in both directions:
 | a channel | core to provider | `ChannelChat`, from `ChatProvider.channel`: `notice`, `say`, `rewrite`, and the lists a word posts (`offer`, `withdraw`) |
 | the provider | core to provider | `ChatProvider`: `name`, `capabilities`, `escape` and `channelName` (what a core text relies on to write a name and a channel for the chat's markup, beside `ThreadChat.link`), `openedAt`, `channelState`, `index` and `openFile` where declared, and `start`, `stop` and `close` |
 | a request | core to provider | typed by what it asks, never by how it is drawn: `OwnerRequest` is a `PermissionRequest`, a `QuestionRequest`, a `HoldRequest` or a `SetupRequest`; a list is an `OwnerList`, of folders or of sessions |
-| an owner's act | provider to core | `ChatInbound`: `message` (an `InboundMessage`), `answer` (an `OwnerAnswer` to the request `requestId` names) and `picked` (a `ListPick` from an `OwnerList`). The provider calls them for the owner alone |
+| an owner's act | provider to core | `ChatInbound`: `message` (an `InboundMessage`), `answer` (an `OwnerAnswer` to the request `requestId` names), `picked` (a `ListPick` from an `OwnerList`) and `unbound` (the owner wrote in a channel bound to no folder: the core tells how to bind). The provider calls them for the owner alone |
 | a failure | provider to core | `ChatError`, whose name is the provider's code for the failed call |
 
 The core decides what is asked, which choices exist and what follows an answer; the provider
@@ -74,7 +74,7 @@ else of it.
 |---|---|
 | `main` | the startup order, the single-instance lock, the build of both modules from the registry, signals and the shutdown drain |
 | `registry.REGISTRY` | the agents and the chats by name, and the two names taken when `.env` selects none |
-| `flows.buildFlows`, `Inbound` | the core's side of `ChatInbound`: what a message, an answer and a pick mean and what follows each (`src/core/flows/`: `messages`, `words`, `status`, `asking`, `lists`, `resume`, `bind`, `repair`, `notices`), all answering the owner through `Talk` |
+| `flows.buildFlows`, `Inbound` | the core's side of `ChatInbound`: what a message, an answer, a pick and an unbound channel mean and what follows each (`src/core/flows/`: `messages`, `words`, `status`, `asking`, `lists`, `resume`, `bind`, `repair`, `notices`), all answering the owner through `Talk` |
 | `CorePort` | what a provider may call and read of the core: the live sessions, `state.json`, the pending requests and holds, the agent's name, words and session listing |
 | `SessionManager` | the live `ThreadSession` objects, one per open thread, and what spans them: `!bind`, `!resume`, the drain |
 | `ThreadSession` | one thread: its agent session, prompt queue, turns, requests, status and idle close |

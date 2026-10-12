@@ -54,6 +54,16 @@ test("a message in a channel bound to no folder says where sessions start", asyn
   assert.deepEqual(world.chat.requests(), []);
 });
 
+test("the chat says the owner wrote in an unbound channel and the core tells how to bind, with no word of trust for an agent with none", async (t) => {
+  const world = await MessagesWorld.make(t);
+  const free = world.chat.openChannel("free");
+  await world.inbound.unbound(free);
+  assert.deepEqual(world.chat.texts(free), [
+    fill(texts.UNBOUND_ANY, { root: world.folder }),
+  ]);
+  assert.deepEqual(await world.prompts(), []);
+});
+
 test("a reply in a session's thread is sent at once, with no second setup", async (t) => {
   const world = await MessagesWorld.make(t);
   const ref = await world.opened("first");

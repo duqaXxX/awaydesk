@@ -318,6 +318,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `ChatInbound.unbound(channel)` is how a provider says the owner wrote in a channel bound to no
+  folder before it had a message to hand over. The core answers with `Talk.unbound`, so an audio
+  clip in such a channel gets the words of an agent that keeps no record of trust where it has
+  none; `Clips.takeClip` no longer builds the notice itself. For Claude Code and Slack the text is
+  as before (#266).
 - `ChatProvider.channelName(channel, markup)` writes a channel as the chat does inside a line, and
   `texts.RESTART_WAIT_ROW` takes it, where it held Slack's `<#channel>` syntax. No text of
   `src/core/texts.ts` holds Slack's `<#`, `<@` or `<!` now, and a test says so. The Slack provider

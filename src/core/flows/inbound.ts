@@ -21,6 +21,7 @@ export interface Flows {
     message: MessageId | null,
   ) => Promise<boolean>;
   readonly picked?: (pick: ListPick) => Promise<void>;
+  readonly unbound?: (channel: string) => Promise<void>;
 }
 
 export class Inbound implements ChatInbound {
@@ -45,6 +46,10 @@ export class Inbound implements ChatInbound {
 
   picked(pick: ListPick): Promise<void> {
     return this.#flow("picked")(pick);
+  }
+
+  unbound(channel: string): Promise<void> {
+    return this.#flow("unbound")(channel);
   }
 
   #flow<Name extends keyof Flows>(name: Name): NonNullable<Flows[Name]> {

@@ -49,7 +49,7 @@ export class Clips {
     event: Payload,
     file: Payload,
   ): Promise<void> {
-    const { identity, sessions, state, config } = this.parts;
+    const { identity, sessions, state } = this.parts;
     if (!isOwner(identity, text(file.user), text(file.user_team))) {
       await this.answers.tellOwner(
         channel,
@@ -63,10 +63,7 @@ export class Clips {
       return;
     }
     if (threadTs === ts && state.channel(channel) === null) {
-      await this.answers.inChannel(
-        channel,
-        fill(named(texts.UNBOUND, this.parts.names), { root: config.allowedRoot }),
-      );
+      await this.parts.inbound.unbound(channel);
       return;
     }
     const waiting: WaitingClip = { channel, threadTs, ts, event, expiry: null };

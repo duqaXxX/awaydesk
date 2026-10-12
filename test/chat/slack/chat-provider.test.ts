@@ -23,6 +23,7 @@ const NOBODY: ChatInbound = {
   message: async () => {},
   answer: async () => false,
   picked: async () => {},
+  unbound: async () => {},
 };
 
 test("the provider names itself and supports every part of the seam", () => {
