@@ -1006,6 +1006,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A stop that does not drain and lands between a turn's end and the close of its reply no longer
+  says two things that were not true of that turn (#263). The reply held the whole answer and
+  then `This reply ended before an answer: awaydesk stopped.`, and the root got the status of an
+  error: it now ends with no such line, and the root gets the status of a turn that ended, unless
+  a prompt was dropped, an error already stood on the root or a task of any reply still ran. The
+  footer is missing when the stop came while it was read. A prompt the agent had
+  taken into that turn was listed under `1 message was not sent because awaydesk stopped: send
+  it again.`: the reply now ends with the note of a normal end, that the agent took the message
+  into this reply. `ThreadSession.abandon` returns whether the turn it ended had ended well, and
+  `ActiveTurn.released` holds the prompts a cut turn's result released.
+
 - A request the agent makes while its session closes is denied at once and never shown (issue
   #240). A close denies the open requests and waits for their handlers, and the agent could ask
   again on that denial: the new request was posted with live buttons in a thread whose session

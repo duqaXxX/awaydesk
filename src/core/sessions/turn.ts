@@ -30,9 +30,19 @@ export interface ActiveTurn {
   readonly taken: Turn[];
   /**
    * Set by `ThreadSession.finish` when a close cancelled it before the reply was closed out: the
-   * turn is then left unsettled, for `abandon` to end.
+   * turn is then left unsettled, for `abandon` to end. The turn's result had arrived by then: its
+   * answer is whole, and only the reply's footer is missing.
    */
   cut: boolean;
+  /** With `cut`: the prompts the turn's result released (`taken`, for a turn the agent started). */
+  released: readonly Turn[];
+  /** With `cut`: the note about `released` was already handed to the reply. */
+  takenNoted: boolean;
+  /**
+   * With `cut`: the owner's prompt this turn was opened for, when the result that ended it was a
+   * report's and did not release it. A normal end sends it back to wait for a turn of its own.
+   */
+  unanswered: Turn | null;
 }
 
 /** The owner's question on one line, as a note about a message that was not sent quotes it. */

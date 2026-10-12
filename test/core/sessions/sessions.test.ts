@@ -2721,22 +2721,32 @@ async function closedAround(t: TestContext, ending: boolean) {
   return { h, turn };
 }
 
-for (const ending of [false, true]) {
-  test(`a close ${ending ? "while the turn's end is being written" : "while the turn runs"} stops the reply's stream and says awaydesk stopped`, async (t) => {
-    const { h, turn } = await closedAround(t, ending);
-    assert.equal(h.slack.callsTo("chat.stopStream").length, 1);
-    assert.equal(
-      h
-        .replies()
-        .filter((reply) =>
-          reply.includes(texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN })),
-        ).length,
-      1,
-    );
-    assert.deepEqual(thread(h).openReplies, []);
-    assert.ok(turn.done.isSet);
-  });
-}
+test("a close while the turn runs stops the reply's stream and says awaydesk stopped", async (t) => {
+  const { h, turn } = await closedAround(t, false);
+  assert.equal(h.slack.callsTo("chat.stopStream").length, 1);
+  assert.equal(
+    h
+      .replies()
+      .filter((reply) => reply.includes(texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN })))
+      .length,
+    1,
+  );
+  assert.deepEqual(thread(h).openReplies, []);
+  assert.equal(thread(h).ended, "error");
+  assert.ok(turn.done.isSet);
+});
+
+// Issue #263: the turn had ended, so its answer is whole. The reply does not say it ended before
+// an answer, and the root does not get the status of a turn cut short.
+test("a close while the turn's end is being written stops the reply's stream and leaves the answer as it is", async (t) => {
+  const { h, turn } = await closedAround(t, true);
+  assert.equal(h.slack.callsTo("chat.stopStream").length, 1);
+  const ended = texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN });
+  assert.ok(!h.replies().some((reply) => reply.includes(ended)));
+  assert.deepEqual(thread(h).openReplies, []);
+  assert.equal(thread(h).ended, "done");
+  assert.ok(turn.done.isSet);
+});
 
 test("a reader cancelled while the session is not closing settles the turn it was ending", async (t) => {
   // `dropClient` cancels the reader too (a reconnect): only a close hands the turn to `abandon`.
@@ -2793,6 +2803,38 @@ test("a close that cancels the sweep after a turn ended normally finds no turn t
   await session.close();
   assert.ok(turn.done.isSet);
   assert.equal(activeAtAbandon, null);
+});
+
+// Issue #263, from the review: a restart's drain dropped a queued prompt, and its error stands.
+test("a close that cuts a turn's end keeps the error a dropped prompt left on the root", async (t) => {
+  const messages = sdkMessages("tools");
+  const h = harnessFor(t)({ turns: [messages.slice(0, -1)] });
+  const session = h.session();
+  const turn = await session.submit("first");
+  await h.until(() => h.clients.length > 0 && h.clients[0]?.queries.join() === "first");
+  const client = at(h.clients, 0);
+  const footerRead = new AsyncEvent();
+  let reading = false;
+  const original = client.contextUsage.bind(client);
+  client.contextUsage = async () => {
+    reading = true;
+    await footerRead.wait();
+    return original();
+  };
+  await h.until(() => h.slack.streamTs.length > 0);
+  // Queued, and dropped before the worker takes it, as the drain of a restart does.
+  const queuing = session.submit("next");
+  const dropping = session.dropQueued({ error: true });
+  const second = await queuing;
+  await dropping;
+  client.inject([at(messages, -1)]);
+  await h.until(() => reading); // the reader is inside `finish`, waiting for the footer
+  await session.close();
+  footerRead.set();
+  await h.idle();
+  assert.ok(turn.done.isSet && second.done.isSet);
+  assert.ok(h.replies().some((reply) => reply.includes("was not sent")));
+  assert.equal(thread(h).ended, "error");
 });
 
 test("a close after the turn's reply was closed leaves that reply as it ended", async (t) => {
