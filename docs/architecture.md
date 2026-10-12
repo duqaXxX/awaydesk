@@ -445,8 +445,8 @@ fields of the `Config`, and each holds only non-enumerable properties, so a log 
 
 `StateStore` (in `state`) keeps, for each bound channel, its directory and, for each of its threads,
 the folder it was opened in, its Claude Code session id, its bypass choice (on, off, or never
-chosen), the effort level set with `/effort` and `ended`, the reaction name of its root once ✅ or ❌
-is requested (cleared when the root turns ⏳ or ✋ again; read only by the session index), in
+chosen), the effort level set with `/effort` and `ended`, the status of its root once it is done or
+in error (cleared when the root turns working or waiting again; read only by the session index), in
 `~/.config/awaydesk/state.json` (version 3: version 2 plus `agent` and `chat`, the names of the agent
 and the chat that wrote the file). `bypass` is `true` for on and `false` for not on; an
 explicit off also writes `bypass_off: true`, and a thread with `bypass` false and no `bypass_off`
@@ -473,9 +473,11 @@ Each thread also carries three fields for crash repair, ids only, never message 
   session writes it (`StateStore.replaceOpenReply`).
 - `requests`: the id of every approval, question, setup and same-folder hold message still carrying
   buttons (added on post, removed on delete or answer).
-- `status`: the root's reaction name while it is ⏳ or ✋ (cleared once ✅ or ❌ is requested). The
-  session asks the chat for a status by one of four words, and `constants.STORED_STATUS` gives the
-  reaction name the file keeps for each.
+- `status`: the root's status while it is ⏳ or ✋ (cleared once ✅ or ❌ is requested). The session
+  asks the chat for a status by one of four words (`SessionStatus`), and the file keeps that word:
+  `working`, `waiting`, `done` or `error`, whatever the chat draws it as. A file written before the
+  words were stored holds the name of the Slack reaction for each; `StateStore` reads those four
+  names as their words, keeps the file at version 3 and writes words at its next save.
 
 All three are optional: a version 2 file without them reads as "nothing open", and a reader that
 does not know them ignores them, so they did not change the version. A graceful close (`ThreadSession.close`)

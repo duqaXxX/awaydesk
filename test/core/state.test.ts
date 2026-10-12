@@ -555,7 +555,7 @@ test("repair fields round trip and are ignored by code that predates them", () =
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "1790000000.000001");
   store.addRequest(CHANNEL, THREAD_TS, "1790000000.000002");
   store.addRequest(CHANNEL, THREAD_TS, "1790000000.000003");
-  store.setStatusPending(CHANNEL, THREAD_TS, "hourglass_flowing_sand");
+  store.setStatusPending(CHANNEL, THREAD_TS, "working");
 
   const reloaded = new StateStore(path).thread(CHANNEL, THREAD_TS);
   assert.deepEqual(
@@ -563,7 +563,7 @@ test("repair fields round trip and are ignored by code that predates them", () =
     threadState(join(dir, "project"), {
       openReplies: ["1790000000.000001"],
       requests: ["1790000000.000002", "1790000000.000003"],
-      status: "hourglass_flowing_sand",
+      status: "working",
     }),
   );
   // Code that only knows `parseThread`'s old fields ignores the extra keys.
@@ -624,7 +624,7 @@ test("repair setters are a no op for an unknown thread", () => {
   store.bind(CHANNEL, dir);
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "ts-1");
   store.addRequest(CHANNEL, THREAD_TS, "ts-1");
-  store.setStatusPending(CHANNEL, THREAD_TS, "x");
+  store.setStatusPending(CHANNEL, THREAD_TS, "error");
   assert.equal(store.thread(CHANNEL, THREAD_TS), null);
 });
 
@@ -648,7 +648,7 @@ test("clear repair fields clears all three and is a no op after", () => {
   store.openThread(CHANNEL, THREAD_TS);
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "ts-1");
   store.addRequest(CHANNEL, THREAD_TS, "ts-2");
-  store.setStatusPending(CHANNEL, THREAD_TS, "x");
+  store.setStatusPending(CHANNEL, THREAD_TS, "error");
   store.clearRepair(CHANNEL, THREAD_TS);
   assert.deepEqual(store.thread(CHANNEL, THREAD_TS), threadState(join(dir, "project")));
   assert.deepEqual(
@@ -671,10 +671,13 @@ test("clear repair keeps what an unlanded answer still needs", () => {
   store.openThread(CHANNEL, THREAD_TS);
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "ts-1");
   store.addRequest(CHANNEL, THREAD_TS, "ts-2");
-  store.setStatusPending(CHANNEL, THREAD_TS, "x");
+  store.setStatusPending(CHANNEL, THREAD_TS, "error");
   store.clearRepair(CHANNEL, THREAD_TS, { keepOpen: true });
   const kept = new StateStore(path).thread(CHANNEL, THREAD_TS);
-  assert.deepEqual(kept, threadState(join(dir, "project"), { openReplies: ["ts-1"], status: "x" }));
+  assert.deepEqual(
+    kept,
+    threadState(join(dir, "project"), { openReplies: ["ts-1"], status: "error" }),
+  );
 });
 
 test("prune keeps every thread of a folder it cannot decide", () => {
@@ -750,13 +753,13 @@ test("the ended reaction round trips and a pending one replaces it", () => {
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD_TS);
 
-  store.setStatusPending(CHANNEL, THREAD_TS, null, "white_check_mark");
+  store.setStatusPending(CHANNEL, THREAD_TS, null, "done");
   assert.equal(written(path).status, null);
-  assert.equal(written(path).ended, "white_check_mark");
-  assert.equal(mustThread(new StateStore(path)).ended, "white_check_mark");
+  assert.equal(written(path).ended, "done");
+  assert.equal(mustThread(new StateStore(path)).ended, "done");
 
-  store.setStatusPending(CHANNEL, THREAD_TS, "hourglass_flowing_sand");
-  assert.equal(written(path).status, "hourglass_flowing_sand");
+  store.setStatusPending(CHANNEL, THREAD_TS, "working");
+  assert.equal(written(path).status, "working");
   assert.equal(written(path).ended, null);
 });
 
@@ -767,8 +770,8 @@ test("a cross shown over a kept status keeps both", () => {
   const store = new StateStore(path);
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD_TS);
-  store.setStatusPending(CHANNEL, THREAD_TS, "hourglass_flowing_sand", "x");
-  assert.deepEqual([written(path).status, written(path).ended], ["hourglass_flowing_sand", "x"]);
+  store.setStatusPending(CHANNEL, THREAD_TS, "working", "error");
+  assert.deepEqual([written(path).status, written(path).ended], ["working", "error"]);
   assert.deepEqual(
     store.repairsPending().map(([, ts]) => ts),
     [THREAD_TS],
@@ -795,7 +798,7 @@ test("an ended reaction is nothing for crash repair to find", () => {
   const store = new StateStore(join(dir, "state.json"));
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD_TS);
-  store.setStatusPending(CHANNEL, THREAD_TS, null, "x");
+  store.setStatusPending(CHANNEL, THREAD_TS, null, "error");
   assert.deepEqual(store.repairsPending(), []);
 });
 
@@ -804,10 +807,10 @@ test("clear repair keeps the ended reaction", () => {
   const store = new StateStore(join(dir, "state.json"));
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD_TS);
-  store.setStatusPending(CHANNEL, THREAD_TS, null, "x");
+  store.setStatusPending(CHANNEL, THREAD_TS, null, "error");
   store.addRequest(CHANNEL, THREAD_TS, "1790549807.000001");
   store.clearRepair(CHANNEL, THREAD_TS);
-  assert.equal(mustThread(store).ended, "x");
+  assert.equal(mustThread(store).ended, "error");
 });
 
 test("a file without the ended key loads with none", () => {
@@ -842,8 +845,8 @@ test("the observer hears what the session index shows and nothing else", () => {
   store.openThread(CHANNEL, THREAD_TS);
   store.openThread(CHANNEL, OTHER_THREAD_TS);
   store.setSession(CHANNEL, THREAD_TS, SESSION);
-  store.setStatusPending(CHANNEL, THREAD_TS, "hourglass_flowing_sand");
-  store.setStatusPending(CHANNEL, THREAD_TS, null, "white_check_mark");
+  store.setStatusPending(CHANNEL, THREAD_TS, "working");
+  store.setStatusPending(CHANNEL, THREAD_TS, null, "done");
   assert.equal(heard.length, 6);
   // Each time, the thread the write touched and no other.
   assert.deepEqual(heard[1], [{ channel: CHANNEL, thread: THREAD_TS }]);
@@ -930,10 +933,60 @@ test("prune leaves alone the threads it is told to keep", () => {
   assert.equal(store.thread(CHANNEL, OTHER_THREAD_TS), null);
 });
 
+// The status a thread holds is a word. Files written before the words were stored hold the name
+// of the reaction that showed it.
+
+test("a file that holds the four reaction names loads as the four words", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  const names: Array<[string, string]> = [
+    ["hourglass_flowing_sand", "working"],
+    ["raised_hand", "waiting"],
+    ["white_check_mark", "done"],
+    ["x", "error"],
+  ];
+  for (const [name, word] of names) {
+    writeThreadFile(path, dir, { directory: dir, status: name, ended: name });
+    const thread = mustThread(new StateStore(path));
+    assert.deepEqual([thread.status, thread.ended], [word, word], name);
+  }
+});
+
+test("a file that holds words loads as words", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  for (const word of ["working", "waiting", "done", "error"]) {
+    writeThreadFile(path, dir, { directory: dir, status: word, ended: word });
+    const thread = mustThread(new StateStore(path));
+    assert.deepEqual([thread.status, thread.ended], [word, word]);
+  }
+});
+
+test("an unknown status loads as null", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  writeThreadFile(path, dir, { directory: dir, status: "eyes", ended: 3 });
+  const thread = mustThread(new StateStore(path));
+  assert.deepEqual([thread.status, thread.ended], [null, null]);
+});
+
+test("a save after loading reaction names writes words", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  writeThreadFile(path, dir, {
+    directory: dir,
+    status: "hourglass_flowing_sand",
+    ended: "x",
+  });
+  const store = new StateStore(path);
+  store.setEffort(CHANNEL, THREAD_TS, "high");
+  assert.deepEqual([written(path).status, written(path).ended], ["working", "error"]);
+});
+
 // The cases below pin the bytes the store writes and how it reads a file.
 
-// The bytes of `state.json` for the calls below, as the Python daemon wrote them (captured on
-// 2026-10-10): a file already on an owner's disk has this form, and the store keeps writing it.
+// The bytes of `state.json` for the calls below: the form of the Python daemon's file (captured on
+// 2026-10-10), with a status stored as a word. The store keeps writing this form.
 // Two-space indent, key order of the code, every non-ASCII character and DEL escaped, empty
 // containers as `[]` and `{}`, and no trailing newline.
 const STATE_BYTES = String.raw`{
@@ -955,7 +1008,7 @@ const STATE_BYTES = String.raw`{
           "requests": [
             "1790549807.000002"
           ],
-          "status": "hourglass_flowing_sand",
+          "status": "working",
           "ended": null
         },
         "1790549900.100000": {
@@ -988,14 +1041,14 @@ const STATE_BYTES = String.raw`{
           "open_replies": [],
           "requests": [],
           "status": null,
-          "ended": "white_check_mark"
+          "ended": "done"
         }
       }
     }
   }
 }`;
 
-test("the file is written byte for byte as the Python store wrote it", () => {
+test("the file is written with these exact bytes, and read back into the same state", () => {
   const dir = scratch();
   const path = join(dir, "state.json");
   const [c, e, o] = ["C000CHAN", "C000EMPT", "C000OTHR"];
@@ -1013,8 +1066,8 @@ test("the file is written byte for byte as the Python store wrote it", () => {
   store.replaceOpenReply(c, t1, null, "1790549807.000001");
   store.replaceOpenReply(c, t1, null, "1790549807.000009");
   store.addRequest(c, t1, "1790549807.000002");
-  store.setStatusPending(c, t1, "hourglass_flowing_sand");
-  store.setStatusPending(o, t3, null, "white_check_mark");
+  store.setStatusPending(c, t1, "working");
+  store.setStatusPending(o, t3, null, "done");
   store.setSession(c, t2, "s-é ");
   assert.equal(readFileSync(path, "utf8"), STATE_BYTES);
   // And the same bytes read back into the same state.

@@ -662,8 +662,8 @@ function world(t: TestContext): World {
   state.openThread(CHANNEL, OLD_THREAD, OLD);
   state.openThread(OTHER_CHANNEL, NEW_THREAD, NEW);
   state.openThread(CHANNEL, EMPTY_THREAD); // its setup is still open: no session yet
-  state.setStatusPending(CHANNEL, OLD_THREAD, null, Status.DONE);
-  state.setStatusPending(OTHER_CHANNEL, NEW_THREAD, Status.WAITING);
+  state.setStatusPending(CHANNEL, OLD_THREAD, null, "done");
+  state.setStatusPending(OTHER_CHANNEL, NEW_THREAD, "waiting");
   inSlack(slack, roots);
   const clock = new FakeClock();
   clock.now = EPOCH;
@@ -809,7 +809,7 @@ test("a thread is read again only once its session moved", async (t) => {
   assert.equal(w.slack.callsTo("conversations.replies").length, 2); // one per thread, not per publish
   // A turn starts in one thread: that thread alone is read again.
   w.roots[OLD_THREAD] = root(OLD_THREAD, { reply_count: 20, latest_reply: `${EPOCH - 5}.000300` });
-  w.state.setStatusPending(CHANNEL, OLD_THREAD, Status.WORKING);
+  w.state.setStatusPending(CHANNEL, OLD_THREAD, "working");
   await home.publish();
   assert.deepEqual(
     w.slack
@@ -831,8 +831,8 @@ test("a turn that starts and ends between two pages is still read", async (t) =>
   toldByState(home, w.state);
   await home.publish();
   w.roots[OLD_THREAD] = root(OLD_THREAD, { reply_count: 21, latest_reply: `${EPOCH - 5}.000300` });
-  w.state.setStatusPending(CHANNEL, OLD_THREAD, Status.WORKING);
-  w.state.setStatusPending(CHANNEL, OLD_THREAD, null, Status.DONE);
+  w.state.setStatusPending(CHANNEL, OLD_THREAD, "working");
+  w.state.setStatusPending(CHANNEL, OLD_THREAD, null, "done");
   await home.publish();
   assert.ok(
     notes(published(w.slack).at(-1) as Json).some((n) => n.startsWith("ended · 21 replies")),
@@ -856,7 +856,7 @@ test("a thread with no kept reaction shows the one on its root", async (t) => {
 test("a cross over a kept status shows the cross", async (t) => {
   // An answer that never reached Slack: the root shows ❌ while crash repair still holds ⏳.
   const w = world(t);
-  w.state.setStatusPending(CHANNEL, OLD_THREAD, Status.WORKING, Status.ERROR);
+  w.state.setStatusPending(CHANNEL, OLD_THREAD, "working", "error");
   await makeHome(w, listing(w)).publish();
   assert.ok(titles(published(w.slack)[0] as Json).includes(":x:  *Fix the footer*"));
 });
@@ -974,7 +974,7 @@ test("a thread slack did not answer about keeps what was read", async (t) => {
   toldByState(home, w.state);
   await home.publish();
   w.roots[OLD_THREAD] = new OSError("network down");
-  w.state.setStatusPending(CHANNEL, OLD_THREAD, Status.WORKING);
+  w.state.setStatusPending(CHANNEL, OLD_THREAD, "working");
   await home.publish();
   const page = published(w.slack).at(-1) as Json;
   // The status is the daemon's.
@@ -1095,7 +1095,7 @@ test("open links to the thread s last reply and to the root while it has none", 
   // A reply arrives in one thread: its link alone is asked again, for the new last reply.
   const newer = `${EPOCH - 5}.000300`;
   w.roots[OLD_THREAD] = root(OLD_THREAD, { reply_count: 20, latest_reply: newer });
-  w.state.setStatusPending(CHANNEL, OLD_THREAD, Status.WORKING);
+  w.state.setStatusPending(CHANNEL, OLD_THREAD, "working");
   await home.publish();
   await home.publish();
   assert.deepEqual(
@@ -1238,7 +1238,7 @@ test("a change during a publish is not lost", async (t) => {
   home.request();
   await w.clock.advance(0.01);
   await w.slack.gated.wait();
-  w.state.setStatusPending(CHANNEL, OLD_THREAD, Status.WORKING);
+  w.state.setStatusPending(CHANNEL, OLD_THREAD, "working");
   home.request();
   release.set();
   await settle(w.clock); // the loop sees the request and waits out its debounce
@@ -1646,7 +1646,7 @@ test("clean publishes at once takes no second click and shows a failure", async 
 
 test("one delete s notice is not erased by the next one s result", async (t) => {
   const w = world(t);
-  w.state.setStatusPending(OTHER_CHANNEL, NEW_THREAD, null, Status.DONE);
+  w.state.setStatusPending(OTHER_CHANNEL, NEW_THREAD, null, "done");
   const answers: Record<string, string | null> = {
     [OLD_THREAD]: texts.fill(slackTexts.HOME_DELETE_FAILED, { error: "ratelimited" }),
     [NEW_THREAD]: null,

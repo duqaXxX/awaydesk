@@ -836,7 +836,7 @@ Detail that the install sequence links to, kept out of its way.
 | File | Written by | Holds |
 |---|---|---|
 | `.env` | you | the tokens and the settings of Part 2 |
-| `state.json` | awaydesk | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice (on, off or never chosen), the effort level set with `/effort`, the status reaction on its root message and the reaction it ended with, and the ids (`open_replies`, `requests`) of the replies and request messages still open, which the repair after a crash needs. Never a message's text |
+| `state.json` | awaydesk | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice (on, off or never chosen), the effort level set with `/effort`, the status of its root message (`working` or `waiting`) and the one it ended with (`done` or `error`), and the ids (`open_replies`, `requests`) of the replies and request messages still open, which the repair after a crash needs. Never a message's text |
 
 `state.json` looks like this; you never need to edit it:
 

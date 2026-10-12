@@ -7,7 +7,7 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import { dirname, join } from "node:path";
-import type { ThreadRef } from "../chat/seam.ts";
+import type { SessionStatus, ThreadRef } from "../chat/seam.ts";
 import { getLogger } from "../log.ts";
 import { errorName } from "../values.ts";
 
@@ -57,14 +57,13 @@ export interface ThreadState {
   readonly openReplies: readonly string[];
   /** ts of every approval, question or same-folder hold request still carrying buttons. */
   readonly requests: readonly string[];
-  // The root's reaction name while it is ⏳ or ✋ (`render.status.Status.value`); cleared once
-  // ✅ or ❌ is requested.
-  readonly status: string | null;
-  // The root's reaction name once ✅ or ❌ is requested, cleared when it turns ⏳ or ✋ again:
-  // what the Home tab shows for a session with nothing running. Never read by crash repair.
-  // ❌ stands here next to a kept `status` when an answer never reached Slack: the root shows
-  // ❌, and repair still owes the thread its notice.
-  readonly ended: string | null;
+  // The root's status while it is working or waiting; cleared once done or error is requested.
+  readonly status: SessionStatus | null;
+  // The root's status once done or error is requested, cleared when it turns working or waiting
+  // again: what the session index shows for a session with nothing running. Never read by crash
+  // repair. Error stands here next to a kept `status` when an answer never reached the chat: the
+  // root shows the error, and repair still owes the thread its notice.
+  readonly ended: SessionStatus | null;
 }
 
 export interface ChannelRecord {
@@ -149,6 +148,29 @@ function stringOrNull(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
+// Files written before the words were stored hold the name of the reaction that showed each
+// status. They are read as the word they stand for; no file is rewritten for it.
+const LEGACY_STATUS: ReadonlyMap<string, SessionStatus> = new Map<string, SessionStatus>([
+  ["hourglass_flowing_sand", "working"],
+  ["raised_hand", "waiting"],
+  ["white_check_mark", "done"],
+  ["x", "error"],
+]);
+
+const STATUS_WORDS: ReadonlySet<unknown> = new Set<SessionStatus>([
+  "working",
+  "waiting",
+  "done",
+  "error",
+]);
+
+/** A stored status as a word: a word as it is, a reaction name of an older file as its word. */
+function statusOrNull(value: unknown): SessionStatus | null {
+  if (typeof value !== "string") return null;
+  if (STATUS_WORDS.has(value)) return value as SessionStatus;
+  return LEGACY_STATUS.get(value) ?? null;
+}
+
 function stringList(value: unknown): readonly string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
@@ -183,8 +205,8 @@ export function parseThread(raw: Raw): ThreadState {
     effort: stringOrNull(raw.effort),
     openReplies: stringList(raw.open_replies),
     requests: stringList(raw.requests),
-    status: stringOrNull(raw.status),
-    ended: stringOrNull(raw.ended),
+    status: statusOrNull(raw.status),
+    ended: statusOrNull(raw.ended),
   };
 }
 
@@ -428,20 +450,20 @@ export class StateStore {
   }
 
   /**
-   * Record the root's reaction while it is ⏳ or ✋ (`name`), or clear it once ✅ or ❌ is
-   * requested (crash repair) and keep that one as `ended`; both null for a root left bare, both
-   * set for a ❌ shown while repair still owes the thread. A no-op for a thread that does not
-   * exist.
+   * Record the root's status while it is working or waiting (`status`), or clear it once done or
+   * error is requested (crash repair) and keep that one as `ended`; both null for a root left
+   * bare, both set for an error shown while repair still owes the thread. A no-op for a thread
+   * that does not exist.
    */
   setStatusPending(
     channelId: string,
     threadId: string,
-    name: string | null,
-    ended: string | null = null,
+    status: SessionStatus | null,
+    ended: SessionStatus | null = null,
   ): void {
     const current = this.thread(channelId, threadId);
-    if (current !== null && (current.status !== name || current.ended !== ended)) {
-      this.setThread(channelId, threadId, { ...current, status: name, ended });
+    if (current !== null && (current.status !== status || current.ended !== ended)) {
+      this.setThread(channelId, threadId, { ...current, status, ended });
     }
   }
 

@@ -4,10 +4,12 @@
  * reaches the core, and a second chat that draws gets the same behaviour as Slack.
  */
 import assert from "node:assert/strict";
+import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import type { HoldRequest, SetupRequest } from "../../../src/chat/seam.ts";
 import { logger } from "../../../src/core/flows/talk.ts";
 import { SessionClosed, SessionGone } from "../../../src/core/sessions/errors.ts";
+import { StateStore } from "../../../src/core/state.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { fill, named } from "../../../src/core/texts.ts";
 import { OWNER, SOMEONE } from "../../support/memory-chat.ts";
@@ -546,6 +548,21 @@ test("a denied permission tells the agent so", async (t) => {
     [{ allow: false, message: named(texts.DENY_MESSAGE, PLAIN_NAMES) }],
   );
   assert.deepEqual(world.open(ref), []);
+});
+
+test("a chat with no reactions stores the status as words, and the file reads them back", async (t) => {
+  const world = await AskingWorld.make(t);
+  const { ref, turn, open } = await permissionAsked(world);
+  const stored = () => world.state.thread(ref.channel, ref.thread);
+  assert.deepEqual([stored()?.status, stored()?.ended], ["waiting", null]);
+
+  await world.answers(open.requestId, { type: "permission", allow: true });
+  await turn.done.wait();
+  for (let round = 0; round < 200 && stored()?.ended !== "done"; round += 1) await settledTurn();
+  assert.deepEqual([stored()?.status, stored()?.ended], [null, "done"]);
+  // The words are what the file holds.
+  const again = new StateStore(join(world.folder, "state.json"));
+  assert.deepEqual(again.thread(ref.channel, ref.thread), stored());
 });
 
 test("a permission answered twice is refused the second time: the owner is told", async (t) => {

@@ -568,7 +568,7 @@ test("the status field tracks working then clears once done", async (t) => {
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
   const session = h.session();
   const turn = await session.submit("list the files");
-  assert.equal(thread(h).status, Status.WORKING);
+  assert.equal(thread(h).status, "working");
   await turn.done.wait();
   await h.until(() => thread(h).status === null);
 });
@@ -579,10 +579,10 @@ test("the ended field keeps the roots final reaction until work starts again", a
   const turn = await session.submit("list the files");
   assert.equal(thread(h).ended, null);
   await turn.done.wait();
-  await h.until(() => thread(h).ended === Status.DONE);
+  await h.until(() => thread(h).ended === "done");
   await session.submit("and again");
   const stored = thread(h);
-  assert.deepEqual([stored.status, stored.ended], [Status.WORKING, null]);
+  assert.deepEqual([stored.status, stored.ended], ["working", null]);
 });
 
 test("a close that cuts a turn short keeps x as the ended reaction", async (t) => {
@@ -593,7 +593,7 @@ test("a close that cuts a turn short keeps x as the ended reaction", async (t) =
   await h.until(() => pending(h.approvals).length > 0);
   await session.close();
   const stored = thread(h);
-  assert.deepEqual([stored.status, stored.ended], [null, Status.ERROR]);
+  assert.deepEqual([stored.status, stored.ended], [null, "error"]);
 });
 
 test("close leaves every repair field cleared", async (t) => {

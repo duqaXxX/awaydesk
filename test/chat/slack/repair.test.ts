@@ -251,7 +251,7 @@ test("a start Slack did not serve leaves the repair to the next one", async (t) 
   t.mock.method(logger, "warning", () => {});
   state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
   state.addRequest(CHANNEL, THREAD, "1790000000.000002");
-  state.setStatusPending(CHANNEL, THREAD, Status.WAITING);
+  state.setStatusPending(CHANNEL, THREAD, "waiting");
   for (const method of [
     "chat.stopStream",
     "conversations.replies",
@@ -263,9 +263,9 @@ test("a start Slack did not serve leaves the repair to the next one", async (t) 
   await repairCrash(slack, state, new UpdateLimiter());
   assert.deepEqual(thread(state).openReplies, ["1790000000.000001"]);
   assert.deepEqual(thread(state).requests, ["1790000000.000002"]);
-  assert.equal(thread(state).status, Status.WAITING);
+  assert.equal(thread(state).status, "waiting");
   // What the Home tab shows meanwhile: a session that does not run, and can be deleted.
-  assert.equal(thread(state).ended, Status.ERROR);
+  assert.equal(thread(state).ended, "error");
 
   const served = new FakeSlack();
   served.responses["conversations.replies"] = {
@@ -287,7 +287,7 @@ test("a start Slack did not serve leaves the repair to the next one", async (t) 
   assert.deepEqual(thread(state).openReplies, []);
   assert.deepEqual(thread(state).requests, []);
   assert.equal(thread(state).status, null);
-  assert.equal(thread(state).ended, Status.ERROR);
+  assert.equal(thread(state).ended, "error");
 
   const third = new FakeSlack();
   await repairCrash(third, state, new UpdateLimiter());
@@ -301,7 +301,7 @@ test("a reply, a request and a root Slack no longer has count as repaired", asyn
   t.mock.method(logger, "warning", () => {});
   state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
   state.addRequest(CHANNEL, THREAD, "1790000000.000002");
-  state.setStatusPending(CHANNEL, THREAD, Status.WORKING);
+  state.setStatusPending(CHANNEL, THREAD, "working");
   slack.responses["chat.stopStream"] = rejected("message_not_found");
   slack.responses["conversations.replies"] = rejected("thread_not_found");
   slack.responses["chat.delete"] = rejected("message_not_found");
@@ -382,7 +382,7 @@ test("stale requests are deleted and a gone one still counts as done", async () 
 test("a root left waiting or working gets x and the field clears", async () => {
   resetStatusFlags();
   const { state, slack } = makeState();
-  state.setStatusPending(CHANNEL, THREAD, Status.WAITING);
+  state.setStatusPending(CHANNEL, THREAD, "waiting");
   await repairCrash(slack, state, new UpdateLimiter());
   // Through `StatusReaction` (fix round item 9): a fresh instance's first `show` also strips
   // every other stray reaction on the root, not just the one name state.json recorded.
@@ -392,13 +392,13 @@ test("a root left waiting or working gets x and the field clears", async () => {
   assert.deepEqual(added, [Status.ERROR]);
   assert.equal(thread(state).status, null);
   // What the Home tab shows for it from now on.
-  assert.equal(thread(state).ended, Status.ERROR);
+  assert.equal(thread(state).ended, "error");
 });
 
 test("already reacted and no reaction count as done", async () => {
   resetStatusFlags();
   const { state, slack } = makeState();
-  state.setStatusPending(CHANNEL, THREAD, Status.WORKING);
+  state.setStatusPending(CHANNEL, THREAD, "working");
   slack.responses["reactions.remove"] = rejected("no_reaction");
   slack.responses["reactions.add"] = rejected("already_reacted");
   await repairCrash(slack, state, new UpdateLimiter());
@@ -410,7 +410,7 @@ test("one threads failure does not stop the others", async () => {
   const { state, slack } = makeState();
   state.openThread(CHANNEL, OTHER_THREAD);
   state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
-  state.setStatusPending(CHANNEL, OTHER_THREAD, Status.WORKING);
+  state.setStatusPending(CHANNEL, OTHER_THREAD, "working");
   slack.responses["conversations.replies"] = new Error("boom");
   await repairCrash(slack, state, new UpdateLimiter());
   assert.deepEqual(thread(state).openReplies, ["1790000000.000001"]);

@@ -380,9 +380,10 @@ title comes from Claude Code: the listing `Home` is given (its `sessionsOf` opti
 `Session` and the start of its id. The rest comes from Slack: `conversations.replies` with the
 root's `ts` and `limit=1` returns the root alone, and `home.threadFacts` reads its `reply_count`,
 its `latest_reply` and, among its `reactions`, the status one. A row is dated by the last reply, or
-by the root while it has none, and the rows are ordered by that date. The status is the root's
-reaction name: `ThreadState.ended` when it is set, `ThreadState.status` otherwise, and the reaction
-read from the root for a thread that has neither (one that ended before the daemon kept it). `ended`
+by the root while it has none, and the rows are ordered by that date. The status is a reaction
+name: the one `reply.status.REACTIONS` draws for the word in `ThreadState.ended` when it is set,
+for the word in `ThreadState.status` otherwise, and the reaction read from the root for a thread
+that has neither (one that ended before the daemon kept it). `ended`
 and `status` are both set only for an answer that never reached Slack, where the root shows ❌ and
 `status` stays for crash repair. A root is read again only for a thread a state write touched since
 the last read, which every turn does at its start and at its end (`StateStore.onSessionsChange`

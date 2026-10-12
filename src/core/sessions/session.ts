@@ -89,7 +89,6 @@ import {
   INJECTED_TURN_WAIT,
   PROCESS_EXITED,
   STOP_TAIL_WAIT,
-  STORED_STATUS,
   SUMMARY_IS_END_LINE,
   TASK_EVENTS,
   TASK_REPLIES_KEPT,
@@ -1310,12 +1309,7 @@ export class ThreadSession {
       try {
         this.deps.state.clearRepair(this.channelId, this.threadId, { keepOpen: lost });
         if (lost) {
-          this.deps.state.setStatusPending(
-            this.channelId,
-            this.threadId,
-            STORED_STATUS.working,
-            STORED_STATUS.error,
-          );
+          this.deps.state.setStatusPending(this.channelId, this.threadId, "working", "error");
         }
       } catch (error) {
         logger.warning(
@@ -2012,8 +2006,8 @@ export class ThreadSession {
       this.deps.state.setStatusPending(
         this.channelId,
         this.threadId,
-        pending ? STORED_STATUS[state] : null,
-        pending ? null : STORED_STATUS[state],
+        pending ? state : null,
+        pending ? null : state,
       ),
     );
   }
@@ -2042,12 +2036,7 @@ export class ThreadSession {
     const stored = this.deps.state.thread(this.channelId, this.threadId);
     if (stored !== null) {
       this.recordStatus(() =>
-        this.deps.state.setStatusPending(
-          this.channelId,
-          this.threadId,
-          stored.status,
-          STORED_STATUS.error,
-        ),
+        this.deps.state.setStatusPending(this.channelId, this.threadId, stored.status, "error"),
       );
     }
   }

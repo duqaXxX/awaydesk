@@ -49,19 +49,11 @@ import { deleteRequest, describe } from "./reply/errors.ts";
 import { markdownEscape, mrkdwnEscape } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
 import { ReplySink } from "./reply/sinks.ts";
-import { Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
+import { REACTIONS, StatusReaction, ThreadStatus } from "./reply/status.ts";
 import { answeredBlocks, approvalBlocks, questionBlocks } from "./requests.ts";
 import { type SetupDraw, setupBlocks } from "./setup.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.thread");
-
-/** The reaction that shows each status of a session on its root message. */
-export const REACTIONS: Readonly<Record<SessionStatus, Status>> = {
-  working: Status.WORKING,
-  waiting: Status.WAITING,
-  done: Status.DONE,
-  error: Status.ERROR,
-};
 
 /** Who a reply's stream is addressed to, and whose messages are read back after a reset. */
 export interface SlackIdentity {

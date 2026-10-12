@@ -318,6 +318,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `state.json` keeps a thread's `status` and `ended` as the words `working`, `waiting`, `done` and
+  `error`, and no longer as the name of a Slack reaction (`constants.STORED_STATUS` is gone): the
+  core stores what the session asks of the chat, and the Slack provider maps the word to its
+  reaction for the session index (`reply.status.REACTIONS`). The file keeps version 3. A file
+  written before is read: `hourglass_flowing_sand`, `raised_hand`, `white_check_mark` and `x` load
+  as their words and the next save writes words; any other value loads as none. A daemon older than
+  this change that reads a file this one wrote does not know the words: its session index writes
+  the word between colons where the icon goes, shows no status word, matches no status filter, and
+  does not treat a working or waiting thread as in use, until the newer daemon runs again (#266).
 - A request the agent gives up is taken back from the owner. `RequestHandler.permission` and
   `RequestHandler.question` take an `AbortSignal` as their second parameter: the agent aborts it
   when it no longer waits for the answer, and the core refuses that one request

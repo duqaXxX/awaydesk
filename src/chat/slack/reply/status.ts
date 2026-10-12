@@ -28,6 +28,7 @@ import type { WebClient } from "@slack/web-api";
 import type { Clock } from "../../../clock.ts";
 import { Mutex, texts } from "../../../core/port.ts";
 import { getLogger, type Logger } from "../../../log.ts";
+import type { SessionStatus } from "../../seam.ts";
 import { describe, gone } from "./errors.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.reply.status");
@@ -51,6 +52,14 @@ export const Status = {
   ERROR: "x",
 } as const;
 export type Status = (typeof Status)[keyof typeof Status];
+
+/** The reaction that shows each status of a session on its root message. */
+export const REACTIONS: Readonly<Record<SessionStatus, Status>> = {
+  working: Status.WORKING,
+  waiting: Status.WAITING,
+  done: Status.DONE,
+  error: Status.ERROR,
+};
 
 // Process-wide, once true: no instance calls Slack for reactions again this run.
 let missingScope = false;
