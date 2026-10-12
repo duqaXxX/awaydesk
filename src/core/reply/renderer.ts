@@ -14,9 +14,8 @@ import { blank } from "../../text.ts";
 import { formatTokens } from "../footer.ts";
 import * as texts from "../texts.ts";
 import { answered, PREVIEWED, preview } from "./previews.ts";
-import { BACKGROUND, oneLine, STOPPED, splitLines } from "./words.ts";
+import { BACKGROUND, oneLine, STOPPED, splitLines, TITLE_LIMIT } from "./words.ts";
 
-export const TITLE_LIMIT = 80;
 export const OUTPUT_LIMIT = 200;
 export const CHILD_LINES = 10;
 

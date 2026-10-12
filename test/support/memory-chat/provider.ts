@@ -34,9 +34,7 @@ const CAPABILITIES: ChatCapabilities = {
   nativeStreaming: false,
   reactions: false,
   activityLine: false,
-  homeIndex: false,
   fileUpload: false,
-  ownerOnlyNotices: false,
 };
 
 /** The footer as one line of words. */

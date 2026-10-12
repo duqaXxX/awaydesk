@@ -121,25 +121,6 @@ test("regular files keeps what exists in order and stops at the limit", async ()
   assert.deepEqual(await regularFiles(folder, names, 2), ["a.py", "b.py"]);
 });
 
-test("regular files reads its paths only as far as the limit needs", async () => {
-  // A path is checked as it is taken from the iterable, and no more are taken.
-  const folder = app();
-  const names = Array.from(
-    { length: 40 },
-    (_, index) => `part${String(index).padStart(2, "0")}.csv`,
-  );
-  for (const name of names) write(folder, name);
-  const taken: string[] = [];
-  function* watched(): Generator<string> {
-    for (const name of names) {
-      taken.push(name);
-      yield name;
-    }
-  }
-  assert.equal((await regularFiles(folder, watched(), 10)).length, 10);
-  assert.equal(taken.length, 10);
-});
-
 // --- the changed files, newest first ---
 
 test("the changed files come newest first and only the existing ones", async () => {

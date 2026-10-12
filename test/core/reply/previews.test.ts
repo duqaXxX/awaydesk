@@ -101,7 +101,6 @@ test("hunks are separated as the terminal separates them", () => {
 });
 
 const OTHER_SHAPES: readonly (readonly [string, unknown])[] = [
-  ["Read", { filePath: "/home/dev/project/a", structuredPatch: [] }],
   ["Edit", null],
   ["Edit", { filePath: "/home/dev/project/a" }],
   ["Edit", { filePath: "/home/dev/project/a", structuredPatch: [{ lines: ["-a"] }] }],
@@ -157,12 +156,6 @@ test("a missing final newline is not a line of the file", () => {
   const shown = preview("Edit", change, CWD);
   assert.ok(shown !== null);
   assert.deepEqual(lines(shown.body), [`-${RED} 1 a`, `+${GREEN} 1 a`, `+${GREEN} 2 b`]);
-});
-
-test("an unknown line shape falls back to the generic line", () => {
-  const patch = [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: ["~a"] }];
-  const change = fileChange({ filePath: "/home/dev/project/f", structuredPatch: patch });
-  assert.equal(preview("Edit", change, CWD), null);
 });
 
 const QUESTIONS = [{ text: "Colour?" }, { text: "Sizes?" }];

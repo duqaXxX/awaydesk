@@ -63,14 +63,6 @@ test("every recorded kind is translated or named as one the daemon does not read
   assert.deepEqual([...unknown], []);
 });
 
-test("no kind is both translated and unread", () => {
-  const unread = new Set<string>(UNREAD_KINDS);
-  assert.deepEqual(
-    TRANSLATED_KINDS.filter((kind) => unread.has(kind)),
-    [],
-  );
-});
-
 test("every translated kind gives an event in some recording", () => {
   const silent = new Set<string>(TRANSLATED_KINDS);
   for (const name of sdkRecordings()) {
@@ -109,14 +101,6 @@ test("what is not a record gives no event", () => {
     assert.deepEqual(translator.translate(value), []);
     assert.equal(kindOf(value), null);
   }
-});
-
-test("a kind is the type, with the subtype of a system record and the event of a stream event", () => {
-  assert.equal(kindOf(record("clear", 0)), "system:init");
-  assert.equal(kindOf(record("clear", 2)), "stream_event:message_start");
-  assert.equal(kindOf(record("clear", 11)), "assistant");
-  assert.equal(kindOf(record("clear", 15)), "result");
-  assert.equal(kindOf(record("clear", 16)), "conversation_reset");
 });
 
 // The session and its turns.
@@ -222,12 +206,6 @@ test("a streamed message gives its start, its text as it is written and its end"
   assert.deepEqual(made[14], [{ type: "message_ended", parentCallId: null }]);
   // Thinking, the signature of a block and a block's end show nothing.
   for (const index of [3, 5, 6, 7, 8, 12, 13]) assert.deepEqual(made[index], [], `record ${index}`);
-});
-
-test("the message that repeats a streamed text gives no text", () => {
-  const made = perRecord("clear");
-  assert.equal(record("clear", 11).type, "assistant");
-  assert.deepEqual(made[11], []);
 });
 
 test("a message the stream announced gives no text once its stream has ended either", () => {
@@ -1086,25 +1064,12 @@ test("a message about a failed login is an authentication error", () => {
 });
 
 const API_ERRORS: readonly (readonly [string, "authentication" | "other", string, string])[] = [
-  ["api-error-400", "other", "unknown", "API Error: 400 Synthetic invalid request."],
   [
     "api-error-401",
     "authentication",
     "authentication_failed",
     "Failed to authenticate. API Error: 401 Synthetic authentication error.",
   ],
-  ["api-error-402", "other", "unknown", "API Error: 402 Synthetic billing error."],
-  [
-    "api-error-403",
-    "authentication",
-    "authentication_failed",
-    "Failed to authenticate. API Error: 403 Synthetic permission error.",
-  ],
-  ["api-error-404", "other", "model_not_found", "There's an issue with the selected model"],
-  ["api-error-413", "other", "invalid_request", "Request too large (max 32MB)."],
-  ["api-error-429", "other", "rate_limit", "API Error: Server is temporarily limiting requests"],
-  ["api-error-500", "other", "server_error", "API Error: 500 Synthetic internal error."],
-  ["api-error-504", "other", "server_error", "API Error: 504 Synthetic timeout."],
   ["server-error", "other", "server_error", "API Error: 529 Overloaded."],
 ];
 

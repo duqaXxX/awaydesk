@@ -118,12 +118,8 @@ export interface ChatCapabilities {
   readonly reactions: boolean;
   /** `ThreadChat.showActivity`. */
   readonly activityLine: boolean;
-  /** `ChatProvider.index`. */
-  readonly homeIndex: boolean;
   /** `ChatProvider.openFile`. */
   readonly fileUpload: boolean;
-  /** A line only the owner sees; without it `ThreadChat.tell` and `say` post in the thread. */
-  readonly ownerOnlyNotices: boolean;
 }
 
 /**
@@ -443,7 +439,7 @@ export interface ChatProvider {
    * rejects with a `ChatError` whose name is the reason: the core logs it and forgets nothing.
    */
   channelState(channel: string): Promise<ChannelState>;
-  /** Present with `homeIndex`. */
+  /** The chat's index of the sessions. A chat with none leaves it out, and nothing asks for one. */
   readonly index?: SessionIndex;
   /**
    * `!open` typed in a session's thread: offers the files of `folder`, or shares the one

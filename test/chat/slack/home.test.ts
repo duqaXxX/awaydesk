@@ -997,22 +997,27 @@ test("a root slack returns in a shape it cannot read does not stop the page", as
   ]);
 });
 
-for (const method of ["conversations.info", "conversations.replies", "chat.getPermalink"]) {
-  for (const code of ["internal_error", "ratelimited", "service_unavailable"]) {
-    test(`an error that is not a refusal is asked about again [${method}-${code}]`, async (t) => {
-      // Only `channel_not_found`, `message_not_found` and `thread_not_found` say a thing is gone.
-      // Anything else is Slack having a bad moment: kept as final, one such answer would hide a
-      // channel or a thread until the daemon restarts.
-      const w = world(t);
-      const working = w.slack.responses[method] as Scripted;
-      w.slack.responses[method] = rejected(code);
-      const home = makeHome(w, listing(w));
-      await home.publish();
-      w.slack.responses[method] = working;
-      await home.publish();
-      assert.equal(cards(published(w.slack).at(-1) as Json).length, 2);
-    });
-  }
+// One code per call site; `service_unavailable` once more, since a code wrongly listed as gone is
+// caught by the row of its own code alone.
+for (const [method, code] of [
+  ["conversations.info", "internal_error"],
+  ["conversations.info", "service_unavailable"],
+  ["conversations.replies", "internal_error"],
+  ["chat.getPermalink", "internal_error"],
+] as const) {
+  test(`an error that is not a refusal is asked about again [${method}-${code}]`, async (t) => {
+    // Only `channel_not_found`, `message_not_found` and `thread_not_found` say a thing is gone.
+    // Anything else is Slack having a bad moment: kept as final, one such answer would hide a
+    // channel or a thread until the daemon restarts.
+    const w = world(t);
+    const working = w.slack.responses[method] as Scripted;
+    w.slack.responses[method] = rejected(code);
+    const home = makeHome(w, listing(w));
+    await home.publish();
+    w.slack.responses[method] = working;
+    await home.publish();
+    assert.equal(cards(published(w.slack).at(-1) as Json).length, 2);
+  });
 }
 
 test("a page slack did not fully answer for is tried again and a whole one is not", async (t) => {

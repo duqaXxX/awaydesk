@@ -77,7 +77,7 @@ export { FOLDER_ROWS, foldersWithin } from "./folders.ts";
 export type { FooterKey } from "./footer.ts";
 export { footerFields, GIT_TIMEOUT, runGit } from "./footer.ts";
 export { Fold, shownPreview } from "./reply/fold.ts";
-export { oneLine, STOPPED } from "./reply/words.ts";
+export { oneLine, STOPPED, TITLE_LIMIT } from "./reply/words.ts";
 export { answerOf } from "./requests.ts";
 export { DirectoryUnavailable, SessionClosed, SessionGone } from "./sessions/errors.ts";
 export { Cancelled, cancellable, Mutex, Semaphore, Task } from "./sessions/tasks.ts";

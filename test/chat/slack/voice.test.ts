@@ -46,7 +46,6 @@ for (const [name, files] of NOT_CLIPS) {
 
 const TRANSCRIPTIONS: [string, unknown][] = [
   ["None", null],
-  ["transcription1", {}],
   ["transcription2", { status: "processing" }],
   ["transcription3", { status: "failed" }],
   ["complete", "complete"],

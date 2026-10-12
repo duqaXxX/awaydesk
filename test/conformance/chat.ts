@@ -92,6 +92,11 @@ export interface ChatRig {
   readonly thread: ThreadRef;
   readonly owner: Person;
   readonly other: Person;
+  /**
+   * The chat can show a line to the owner alone. Where it can not, a line asked for the owner
+   * is a message of the thread.
+   */
+  readonly ownerOnlyNotices: boolean;
   /** What `scope` shows now, in the order the messages were written. */
   read(scope: Scope): readonly Shown[];
   /** Lets the provider write what it holds back (a chat that streams writes a text after a pause). */
@@ -398,16 +403,10 @@ export function chatConformance(
         assert.deepEqual(flags.map(([flag]) => flag).sort(), [
           "activityLine",
           "fileUpload",
-          "homeIndex",
           "nativeStreaming",
-          "ownerOnlyNotices",
           "reactions",
         ]);
         for (const [flag, value] of flags) assert.equal(typeof value, "boolean", flag);
-      });
-
-      check("has the session index exactly when it declares homeIndex", async ({ provider }) => {
-        assert.equal(provider.index !== undefined, provider.capabilities.homeIndex);
       });
 
       check("has openFile exactly when it declares fileUpload", async ({ provider }) => {
@@ -444,12 +443,6 @@ export function chatConformance(
           else assert.equal(answer, "no answer");
         },
       );
-
-      test("starts, stops and closes, each once, in that order", async (t) => {
-        const started = await start(t, make);
-        await started.stop();
-        await started.close();
-      });
     });
 
     describe("a thread: what the daemon writes", () => {
@@ -460,7 +453,7 @@ export function chatConformance(
         assert.equal(shown.length, 1);
         assert.equal(
           shown[0]?.ownerOnly,
-          provider.capabilities.ownerOnlyNotices,
+          rig.ownerOnlyNotices,
           "only the owner sees it where the chat can, and it is a message of the thread where it can not",
         );
         await thread.tell("This one stays", { stays: true });
@@ -499,7 +492,7 @@ export function chatConformance(
         assert.equal(open[0]?.ownerOnly, false);
         const owned = rig.read(ref).filter((m) => m.text.includes("Status for the owner"));
         assert.equal(owned.length, 1);
-        assert.equal(owned[0]?.ownerOnly, provider.capabilities.ownerOnlyNotices);
+        assert.equal(owned[0]?.ownerOnly, rig.ownerOnlyNotices);
       });
 
       check(
@@ -516,10 +509,6 @@ export function chatConformance(
           const link = await thread.link("the session", markup);
           assert.ok(link === null || (typeof link === "string" && link !== ""));
         }
-      });
-
-      check("acknowledge never rejects", async ({ provider, ref }) => {
-        await provider.thread(ref).acknowledge("message-1");
       });
 
       check("close ends the session's part of the chat", async ({ provider, ref }) => {

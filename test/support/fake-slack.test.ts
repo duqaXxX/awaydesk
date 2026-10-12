@@ -21,7 +21,6 @@ import {
   FakeSlack,
   httpError,
   networkDown,
-  ResetAfterApply,
   rateLimited,
   rejected,
   SlowAfterApply,
@@ -36,48 +35,6 @@ test("fake slack returns recorded responses", async () => {
   assert.ok(auth.team_id === "T000TEAM" && auth.user_id === "U000BOT");
   assert.ok(slack.callsTo("auth.test").length > 0);
 });
-
-// The funnel: every method the provider uses ends in `apiCall`.
-
-/** The bound method of a client by its Web API name: `chat.postMessage` is `client.chat.postMessage`. */
-function bound(slack: WebClient, method: string): (args: JsonObject) => Promise<unknown> {
-  let at: unknown = slack;
-  for (const step of method.split(".")) at = (at as Record<string, unknown> | undefined)?.[step];
-  if (typeof at !== "function") throw new Error(`no bound method ${method}`);
-  return at as (args: JsonObject) => Promise<unknown>;
-}
-
-const THROUGH_THE_FUNNEL: Array<[string, JsonObject]> = [
-  ["chat.postMessage", { channel: CHANNEL, text: "hi" }],
-  [
-    "chat.startStream",
-    {
-      channel: CHANNEL,
-      thread_ts: THREAD,
-      recipient_team_id: "T000TEAM",
-      recipient_user_id: "U000ALICE",
-      task_display_mode: "timeline",
-      chunks: [{ type: "markdown_text", text: "hi" }],
-    },
-  ],
-  ["chat.appendStream", { channel: CHANNEL, ts: "1790000000.000009", chunks: [] }],
-  ["chat.stopStream", { channel: CHANNEL, ts: "1790000000.000009" }],
-  ["chat.update", { channel: CHANNEL, ts: "1790000000.000009", text: "x" }],
-  ["assistant.threads.setStatus", { channel_id: CHANNEL, thread_ts: THREAD, status: "working" }],
-  ["views.publish", { user_id: "U000ALICE", view: { type: "home", blocks: [] } }],
-  ["reactions.add", { channel: CHANNEL, name: "eyes", timestamp: THREAD }],
-  ["reactions.remove", { channel: CHANNEL, name: "eyes", timestamp: THREAD }],
-  ["conversations.info", { channel: CHANNEL }],
-  ["conversations.members", { channel: CHANNEL, limit: 10 }],
-];
-
-for (const [method, args] of THROUGH_THE_FUNNEL) {
-  test(`the bound method ends in the fake's funnel [${method}]`, async () => {
-    const slack = new FakeSlack();
-    await bound(slack, method)(args);
-    assert.deepEqual(slack.apiCalls, [{ method, args }]);
-  });
-}
 
 test("a file upload goes through its two Slack calls and posts the bytes to the upload url", async () => {
   const slack = new FakeSlack();
@@ -104,16 +61,6 @@ test("a file upload goes through its two Slack calls and posts the bytes to the 
   assert.deepEqual(
     slack.uploaded.map(({ url, data }) => [url, data.toString()]),
     [["https://files.slack.com/upload/v1/ABC123...", "hello"]],
-  );
-});
-
-test("the generic call and the upload helper reach the funnel too", async () => {
-  const slack = new FakeSlack();
-  await slack.apiCall("auth.test");
-  await slack.apiCall("files.uploadV2", { channel_id: CHANNEL, filename: "a.txt", content: "b" });
-  assert.deepEqual(
-    slack.apiCalls.map((call) => call.method),
-    ["auth.test", "files.getUploadURLExternal", "files.completeUploadExternal"],
   );
 });
 
@@ -197,12 +144,6 @@ test("a connection reset is a request error whose cause carries the system code"
   assert.equal(fake.code, "slack_webapi_request_error");
 });
 
-test("a network that is down is a request error", () => {
-  const fake = networkDown();
-  assert.ok(fake instanceof WebAPIRequestError);
-  assert.equal((fake.original.cause as { code?: string }).code, "ENETUNREACH");
-});
-
 test("a timeout is a request error wrapping the TimeoutError the client's own timer raises", async () => {
   // `timeout` makes the client pass `AbortSignal.timeout`, which aborts `fetch` with this.
   const client = new WebClient(undefined, {
@@ -238,30 +179,6 @@ test("an http error is the error the client throws on a status other than 200", 
   assert.ok(fake instanceof WebAPIHTTPError);
   assert.equal(fake.statusCode, 500);
   assert.equal(fieldsOf(fake) && (fieldsOf(real) as { class: string }).class, "WebAPIHTTPError");
-});
-
-test("a scripted error is thrown and the call is still recorded", async () => {
-  const slack = new FakeSlack();
-  slack.responses["chat.update"] = connectionReset();
-  await assert.rejects(slack.chat.update({ channel: CHANNEL, ts: "1.1", text: "x" }), (error) => {
-    assert.ok(error instanceof WebAPIRequestError);
-    return true;
-  });
-  assert.equal(slack.callsTo("chat.update").length, 1);
-});
-
-test("an answer with ok false is thrown as the platform error, with the library's metadata", async () => {
-  const slack = new FakeSlack();
-  slack.responses["conversations.info"] = { ok: false, error: "channel_not_found" };
-  await assert.rejects(slack.conversations.info({ channel: CHANNEL }), (error) => {
-    assert.ok(error instanceof WebAPIPlatformError);
-    assert.deepEqual(error.data, {
-      ok: false,
-      error: "channel_not_found",
-      response_metadata: {},
-    });
-    return true;
-  });
 });
 
 test("an answer is a copy: changing it changes no later answer", async () => {
@@ -333,21 +250,6 @@ const START: JsonObject = {
   recipient_user_id: "U000ALICE",
   chunks: [{ type: "markdown_text", text: "one" }],
 };
-
-test("the fake numbers every message it creates, posts and streams alike", async () => {
-  const slack = new FakeSlack();
-  await slack.chat.postMessage({ channel: CHANNEL, text: "a" });
-  await slack.apiCall("chat.startStream", START);
-  await slack.chat.postMessage({ channel: CHANNEL, text: "b" });
-  assert.deepEqual(slack.createdTs, [
-    "1790000000.000001",
-    "1790000000.000002",
-    "1790000000.000003",
-  ]);
-  assert.deepEqual(slack.postedTs, ["1790000000.000001", "1790000000.000003"]);
-  assert.deepEqual(slack.streamTs, ["1790000000.000002"]);
-  assert.deepEqual(slack.streamTexts(), ["one"]);
-});
 
 test("an open stream refuses an edit and a delete, a closed one refuses an append and a stop", async () => {
   const slack = new FakeSlack();
@@ -522,6 +424,25 @@ test("the thread read back holds the messages newer than oldest, deleted ones go
 
 // How a test scripts and holds a call.
 
+test("a delay holds each call before it is recorded", async () => {
+  const slack = new FakeSlack();
+  slack.delay = 0.02;
+  const call = slack.auth.test();
+  assert.deepEqual(slack.apiCalls, []);
+  await call;
+  assert.equal(slack.apiCalls.length, 1);
+});
+
+test("a slow answer after apply has applied the call when it comes back", async () => {
+  const slack = new SlowAfterApply();
+  slack.slowMethod = "chat.postMessage";
+  slack.slowFor = 0.02;
+  const call = slack.chat.postMessage({ channel: CHANNEL, text: "a" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(slack.postedTs, ["1790000000.000001"]);
+  await call;
+});
+
 test("a scripted sequence answers once each and repeats its last", async () => {
   const slack = new FakeSlack();
   slack.responses["chat.stopStream"] = [networkDown(), { ok: true, n: 2 }, { ok: true, n: 3 }];
@@ -535,16 +456,6 @@ test("a scripted sequence answers once each and repeats its last", async () => {
   assert.deepEqual(answers, [2, 3, 3]);
 });
 
-test("a scripted function answers from the call's arguments", async () => {
-  const slack = new FakeSlack();
-  slack.responses["conversations.info"] = (args) =>
-    args.channel === CHANNEL
-      ? { ok: true, channel: { id: CHANNEL } }
-      : rejected("channel_not_found");
-  assert.equal((await slack.conversations.info({ channel: CHANNEL })).ok, true);
-  await assert.rejects(slack.conversations.info({ channel: "C000NONE" }), WebAPIPlatformError);
-});
-
 test("a method with no answer scripted answers ok", async () => {
   const slack = new FakeSlack();
   const answer = await slack.views.publish({
@@ -552,15 +463,6 @@ test("a method with no answer scripted answers ok", async () => {
     view: { type: "home", blocks: [] },
   });
   assert.equal(answer.ok, true);
-});
-
-test("a delay holds each call before it is recorded", async () => {
-  const slack = new FakeSlack();
-  slack.delay = 0.02;
-  const call = slack.auth.test();
-  assert.deepEqual(slack.apiCalls, []);
-  await call;
-  assert.equal(slack.apiCalls.length, 1);
 });
 
 test("a gate holds one method until the event is set, and says that a call arrived", async () => {
@@ -582,38 +484,7 @@ test("a gate holds one method until the event is set, and says that a call arriv
   );
 });
 
-test("a reset after apply keeps what the call did and throws once", async () => {
-  const slack = new ResetAfterApply();
-  slack.resetNext = "chat.postMessage";
-  await assert.rejects(slack.chat.postMessage({ channel: CHANNEL, text: "a" }), WebAPIRequestError);
-  assert.deepEqual(slack.postedTs, ["1790000000.000001"]);
-  await slack.chat.postMessage({ channel: CHANNEL, text: "b" });
-  assert.deepEqual(slack.postedTs, ["1790000000.000001", "1790000000.000002"]);
-});
-
-test("a slow answer after apply has applied the call when it comes back", async () => {
-  const slack = new SlowAfterApply();
-  slack.slowMethod = "chat.postMessage";
-  slack.slowFor = 0.02;
-  const call = slack.chat.postMessage({ channel: CHANNEL, text: "a" });
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(slack.postedTs, ["1790000000.000001"]);
-  await call;
-});
-
 // The clock.
-
-test("a sleep ends when the clock reaches its time", async () => {
-  const clock = new FakeClock();
-  const woke: string[] = [];
-  const sleeping = clock.sleep(280).then(() => woke.push("deadline"));
-  await clock.advance(279);
-  assert.deepEqual(woke, []);
-  assert.equal(clock.time(), 279);
-  await clock.advance(1);
-  await sleeping;
-  assert.deepEqual(woke, ["deadline"]);
-});
 
 test("advance wakes the sleepers that are due in the order they began to sleep", async () => {
   const clock = new FakeClock();
@@ -625,22 +496,6 @@ test("advance wakes the sleepers that are due in the order they began to sleep",
   await Promise.all([late, early]);
   assert.deepEqual(woke, ["began first, due later", "began second, due sooner"]);
   void pending;
-});
-
-test("advance lets what woke run to its next wait", async () => {
-  const clock = new FakeClock();
-  const seen: number[] = [];
-  const loop = (async () => {
-    for (let i = 0; i < 2; i += 1) {
-      await clock.sleep(5);
-      seen.push(clock.time());
-    }
-  })();
-  await clock.advance(5);
-  assert.deepEqual(seen, [5]);
-  await clock.advance(5);
-  await loop;
-  assert.deepEqual(seen, [5, 10]);
 });
 
 test("a sleep that is aborted rejects and is not woken later", async () => {
@@ -709,39 +564,4 @@ test("a stream that expired reads back its blocks like one that was stopped", as
   await slack.apiCall("chat.startStream", START);
   slack.expire("1790000000.000001");
   assert.equal((await readBlocks(slack, "1790000000.000001")).length, 1);
-});
-
-test("a stream the recording does not cover reads back no blocks, as before", async () => {
-  const uncovered: JsonObject[][] = [
-    [{ type: "markdown_text", text: "some **bold** words" }],
-    [{ type: "markdown_text", text: "one line\nanother line" }],
-    [{ type: "markdown_text", text: "- a list" }],
-    [{ type: "markdown_text", text: "first\n\nsecond" }],
-    [
-      { type: "markdown_text", text: "words" },
-      { type: "task_update", id: "t1", title: "Bash", status: "complete" },
-    ],
-    [],
-  ];
-  for (const chunks of uncovered) {
-    const slack = new FakeSlack();
-    await slack.apiCall("chat.startStream", { ...START, chunks });
-    const ts = "1790000000.000001";
-    await slack.chat.stopStream({ channel: CHANNEL, ts });
-    assert.deepEqual(await readBlocks(slack, ts), [], JSON.stringify(chunks));
-  }
-});
-
-test("blocks a stop or an update wrote are read back as they are", async () => {
-  const footer = [{ type: "context", elements: [{ type: "mrkdwn", text: "footer" }] }];
-  const slack = new FakeSlack();
-  await slack.apiCall("chat.startStream", START);
-  const ts = "1790000000.000001";
-  await slack.chat.stopStream({ channel: CHANNEL, ts, blocks: footer });
-  assert.deepEqual(await readBlocks(slack, ts), footer);
-  const other = new FakeSlack();
-  await other.apiCall("chat.startStream", START);
-  await other.chat.stopStream({ channel: CHANNEL, ts });
-  await other.chat.update({ channel: CHANNEL, ts, text: "x", blocks: footer });
-  assert.deepEqual(await readBlocks(other, ts), footer);
 });

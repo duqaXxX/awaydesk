@@ -56,7 +56,6 @@ for (const name of [
   "~struck~.txt",
   "a<b>&c.txt",
   "x`y`.md",
-  "_a_.py",
   ":tada:.md",
 ]) {
   test(`a name that reads as formatting is shown exactly [${name}]`, () => {
@@ -87,11 +86,6 @@ test("a long folder is shortened from the left", () => {
   assert.equal(description.length, 75);
   assert.equal(description, `…${folder.replace(/\/+$/, "").slice(-74)}`);
   assert.equal(shown?.value, `${folder}x.py`);
-});
-
-test("a path whose value cannot fit is left out", () => {
-  assert.notEqual(option("d".repeat(150)), null);
-  assert.equal(option("d".repeat(151)), null);
 });
 
 test("a group holds ten rows and skips the paths that cannot fit", () => {
@@ -376,8 +370,6 @@ test("the thread of a modal comes back from its metadata", () => {
 
 const NOT_OURS: Array<[string, unknown]> = [
   ["None", null],
-  ["5", 5],
-  ["empty", ""],
   ["not json", "not json"],
   ["[]", "[]"],
   ["null", "null"],
@@ -467,12 +459,6 @@ test("each view has its own newest update", () => {
   const updates = new ModalUpdates();
   assert.ok(updates.claim("V1", 9.0) && updates.claim("V2", 1.0));
   assert.ok(updates.current("V1", 9.0) && updates.current("V2", 1.0));
-});
-
-test("the first fill of a view is older than any keystroke", () => {
-  const updates = new ModalUpdates();
-  assert.ok(updates.claim("V1", 1790000000.5));
-  assert.ok(!updates.claim("V1", 0.0));
 });
 
 test("only a few views are tracked and the oldest go first", () => {

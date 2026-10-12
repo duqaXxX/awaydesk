@@ -311,6 +311,24 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The architecture reference is two pages, cut along the module boundary. `docs/architecture.md`
+  keeps the overview, the modules, the core's parts and the measured platform behaviour;
+  `docs/slack-provider.md` holds the four sections that describe the Slack provider alone
+  (writing to Slack, opening a file, the session index, the Slack handlers), moved as they were.
+  The references between the two are links. The Claude back end has no page of its own: its
+  facts stay in "Sessions" and "Rendering" (#267).
+- `ChatCapabilities` loses `homeIndex` and `ownerOnlyNotices`, which no code of the core read. A
+  chat with no index of the sessions leaves `ChatProvider.index` out; whether a chat can show a
+  line to the owner alone is stated by the conformance rig (`ChatRig.ownerOnlyNotices` in
+  `test/conformance/chat.ts`), which is the only reader it had. Two values that existed twice
+  exist once: `TITLE_LIMIT` (`src/core/reply/words.ts`), and the set of characters a markdown
+  reference escapes, which the core no longer copies: `directory.terminalLine` takes the chat's
+  `ChatProvider.escape` for a command that holds a backtick. What the owner reads in Slack is
+  unchanged (#266).
+- The Claude back end names no chat: a call nobody could be asked about is denied with
+  `awaydesk could not show this request to the owner, so nobody approved it.`, a text only Claude
+  reads. `test/chat/slack/resume.test.ts` fails when the rows the Slack picker shows and the rows
+  the back end dates sessions for (`RESUME_ROWS` in each module) differ (#239).
 - The agent seam and the Slack provider lose what nothing read. In the seam: `requestId` on
   `PermissionRequest` and `QuestionRequest`, `StartOptions.permissionMode`, `messageId` on the
   message and text events, `compaction_ended.result`, and `parentCallId` on the three text events

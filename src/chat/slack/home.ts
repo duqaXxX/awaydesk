@@ -57,6 +57,7 @@ import {
   oneLine,
   Semaphore,
   type StatePort,
+  TITLE_LIMIT,
   texts,
 } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
@@ -67,7 +68,7 @@ import { describe, gone } from "./reply/errors.ts";
 import { mrkdwnEscape, shownAsWritten } from "./reply/escape.ts";
 import { Status } from "./reply/status.ts";
 import { Task } from "./reply/tasks.ts";
-import { ID_SHOWN, TITLE_LIMIT } from "./resume.ts";
+import { ID_SHOWN } from "./resume.ts";
 import * as slackTexts from "./texts.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.home");

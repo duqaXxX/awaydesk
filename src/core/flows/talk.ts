@@ -9,7 +9,7 @@ import type { ChatProvider, MessageId, ThreadChat, ThreadRef } from "../../chat/
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import type { Holds } from "../hold.ts";
-import { oneLine } from "../reply/words.ts";
+import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
 import type { Approvals } from "../requests.ts";
 import { DirectoryUnavailable, SessionClosed, SessionGone } from "../sessions/errors.ts";
 import type { SessionManager } from "../sessions/manager.ts";
@@ -24,8 +24,6 @@ export const logger = getLogger("awaydesk.core.flows");
 // Rows of threads a stop waits for in one notice: a row holds a link and a title of
 // `TITLE_LIMIT`, and the whole must fit one notice of any chat.
 export const RESTART_WAIT_ROWS = 8;
-// The most of a session's title a row shows.
-export const TITLE_LIMIT = 80;
 
 /** What every flow is built over: the two modules, the core's stores and the daemon's stop. */
 export interface FlowDeps {

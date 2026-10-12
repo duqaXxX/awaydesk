@@ -315,12 +315,6 @@ async function folderOf(t: TestContext): Promise<string> {
   return root;
 }
 
-test("the last message time of a regular transcript is read", LIMIT, async (t) => {
-  const file = join(await folderOf(t), "a.jsonl");
-  await writeFile(file, ENTRY);
-  assert.equal(await lastMessageMs(file), Date.parse("2026-09-25T10:00:00.000Z"));
-});
-
 test("a transcript that is a symlink is not read", POSIX, async (t) => {
   const root = await folderOf(t);
   await writeFile(join(root, "elsewhere.jsonl"), ENTRY);

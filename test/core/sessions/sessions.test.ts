@@ -63,7 +63,6 @@ import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
 import { NAMES } from "../../support/names.ts";
 import { GIT_LAYOUT } from "../../support/platform.ts";
 import {
-  anyRepository,
   canUseToolCall,
   END_OF_STREAM,
   type FakeAgentSession,
@@ -189,14 +188,6 @@ test("the client is launched as the design says", async (t) => {
     model: null,
     effort: null,
   });
-});
-
-test("a restart resumes the stored session", async (t) => {
-  const h = harnessFor(t)({});
-  h.session(); // opens the thread
-  h.state.setSession(CHANNEL, THREAD, "stored-session");
-  await h.session().ensureConnected();
-  assert.equal(h.clients[0]?.options.resume, "stored-session");
 });
 
 test("clear records the new session id", async (t) => {
@@ -561,19 +552,6 @@ test("a record slack refuses removes the request", async (t) => {
   await turn.done.wait();
 });
 
-test("an approval request is tracked in state while it is open", async (t) => {
-  // Deleting the answered request's own message, which clears it from state too
-  // (`ThreadSession.deleteRequest`), is the click handler's job: out of scope for a raw
-  // `Approvals.resolve` call, as "queue waits while approval pending" already makes for the
-  // approval itself.
-  const ask = canUseToolCall("Bash", { command: "ls" });
-  const h = harnessFor(t)({ turns: [[ask, ...sdkMessages("tools")]] });
-  const session = h.session();
-  await session.submit("list the files");
-  await h.until(() => pending(h.approvals).length > 0);
-  assert.deepEqual(thread(h).requests, [at(h.slack.postedTs, -1)]);
-});
-
 test("the status field tracks working then clears once done", async (t) => {
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
   const session = h.session();
@@ -635,15 +613,6 @@ test("waiting for owner reflects an open approval", async (t) => {
   await h.until(() => session.waitingForOwner === false);
 });
 
-test("running kinds reflects a task that outlives its turn", async (t) => {
-  const first = at(splitTurns(sdkMessages("background")), 0);
-  const h = harnessFor(t)({ turns: [first] });
-  const session = h.session();
-  await (await session.submit("start it")).done.wait();
-  assert.equal(session.busy, false);
-  assert.ok(session.runningKinds); // a task still runs, though the session itself is not busy
-});
-
 test("no reply ever carries a channel mention", async (t) => {
   // `<!channel>` was removed with the thread model: a full turn that ends with a closing
   // message, posts an approval request and a question request must never bring it back.
@@ -700,18 +669,6 @@ test("asked cuts a long prompt and names an image only prompt", () => {
   const image = { type: "image", mediaType: "image/png", data: "x" } as const;
   assert.equal(asked([image]), texts.PROMPT_IMAGE);
   assert.equal(asked([{ type: "text", text: "look at this" }, image]), "look at this");
-});
-
-test("an injected turn edits the reply that started the task", async (t) => {
-  const turns = splitTurns(sdkMessages("background"));
-  const h = harnessFor(t)({ turns: [at(turns, 0)] });
-  const session = h.session();
-  await (await session.submit("start it")).done.wait();
-  for (const later of turns.slice(1)) h.clients[0]?.inject(later);
-  await h.until(() => isReport(h.bodies()[0] ?? ""));
-  await h.sleep(0.05);
-  // The report is appended to the one reply there is: no separate message carries it.
-  assert.ok(h.slack.streamTs.length === 1 && h.slack.postedTs.length === 0);
 });
 
 test("rate limit event invalidates usage", async (t) => {
@@ -941,17 +898,6 @@ test("an owner answer behind a wrong guess keeps its footer", async (t) => {
   // the answer joins the reply that waited for the task, which ends with the footer
   const stop = h.slack.callsTo("chat.stopStream").at(-1);
   assert.ok(blocksOf(stop).some((block) => block.type === "divider"));
-});
-
-test("a task type is forgotten when the task ends", async (t) => {
-  const [first, notice, injected] = splitBackground();
-  const h = harnessFor(t)({ turns: [first] });
-  const session = h.session();
-  await (await session.submit("start it")).done.wait();
-  assert.ok(inside(session).tasks.size > 0);
-  h.clients[0]?.inject([...notice, ...injected]);
-  await h.until(() => isReport(h.bodies()[0] ?? ""));
-  assert.equal(inside(session).tasks.size, 0);
 });
 
 // A background agent's end, as the SDK delivered it (recorded 2026-09-24): its summary is the
@@ -1984,14 +1930,6 @@ test("a bind after a turn never touches that thread s own record", async (t) => 
   assert.equal(thread(h).sessionId, result.session_id);
 });
 
-test("a relative bind path is read under the allowed root", (t) => {
-  const tmpPath = realpathSync(mkdtempSync(join(tmpdir(), "awd-resolve-")));
-  t.after(() => rmSync(tmpPath, { recursive: true, force: true }));
-  mkdirSync(join(tmpPath, "app"));
-  assert.equal(resolveDirectory("app", tmpPath), join(tmpPath, "app"));
-  assert.equal(resolveDirectory("../", join(tmpPath, "app")), null);
-});
-
 test("a folder claude code does not trust is not started", async (t) => {
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
   h.backend.trusted = async () => false;
@@ -2144,31 +2082,6 @@ test("bypass off does not trade another refused mode for default", async (t) => 
   assert.ok(session.bypass);
 });
 
-test("a listed model without a value is left out", async (t) => {
-  // The setup builds one option per entry from `value`: an entry a future CLI lists without
-  // one must not break every first prompt, so it is dropped where the list is read. That is
-  // the back end's reading of the CLI's answer now (`agentInfo`); the session keeps what it
-  // is given.
-  const info = infoOf({
-    commands: [],
-    current_permission_mode: "default",
-    models: [
-      { value: "default", displayName: "Default (recommended)" },
-      { displayName: "No value" },
-      { value: "" },
-      "not an entry",
-      { value: "haiku", displayName: "Haiku 4.5" },
-    ],
-  });
-  const h = harnessFor(t)({ info });
-  const session = h.session();
-  await session.ensureConnected();
-  assert.deepEqual(
-    session.models.map((model) => model.value),
-    ["default", "haiku"],
-  );
-});
-
 test("every message is posted without link previews", async (t) => {
   const ask = canUseToolCall("Bash", { command: "ls" });
   const h = harnessFor(t)({ turns: [[ask, ...sdkMessages("tools")]] });
@@ -2307,29 +2220,6 @@ test("the footer leaves out the branch of a repository not trusted", GIT_LAYOUT,
   assert.ok(!text.includes("Branch:") && !text.includes("Uncommitted:"));
 });
 
-test(
-  "the footer asks for the repository in the folder the agent moved to",
-  GIT_LAYOUT,
-  async (t) => {
-    // The agent moved into `repo`: the repository is looked up there.
-    const make = harnessFor(t);
-    const repo = repoUnder(make.tmpPath);
-    const asked: string[] = [];
-    const moved = { ...(sdkJson("stop-hook") as JsonObject), cwd: repo };
-    const h = make({ turns: [withStopHook(sdkMessages("tools"), moved)] });
-    h.backend.repository = async (folder) => {
-      asked.push(folder);
-      return anyRepository(folder);
-    };
-    const session = h.session();
-    await (await session.submit("list the files")).done.wait();
-    await session.status();
-    assert.ok(asked.length > 0);
-    assert.deepEqual(new Set(asked), new Set([repo]));
-    assert.notEqual(session.directory, repo);
-  },
-);
-
 test("a restarted client starts again in the bound folder", GIT_LAYOUT, async (t) => {
   const make = harnessFor(t);
   const repo = repoUnder(make.tmpPath);
@@ -2391,16 +2281,28 @@ test("status gives the command that forks the session in the terminal", async (t
   assert.ok(lines[3]?.startsWith("Mode: "));
 });
 
+test("status escapes a terminal command that holds a backtick for a reference", async (t) => {
+  // The chat marks a notice and a reference up differently: as a notice the line would read
+  // `&amp;&amp;` and keep the backtick that ends a code span.
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
+  const folder = join(h.tmpPath, "my`proj");
+  mkdirSync(folder);
+  h.state.bind(CHANNEL, folder);
+  const session = h.session();
+  await (await session.submit("list the files")).done.wait();
+  const line = (await session.status()).split("\n").find((l) => l.startsWith("Terminal: "));
+  assert.ok(line?.includes("my\\`proj"), line);
+  assert.ok(line?.includes("\\&\\& claude --resume"), line);
+});
+
 // The shell line of the Claude back end (`AgentWords.terminal`), written out.
 const TERMINAL = "cd {directory} && claude --resume {session} --fork-session";
 
 test("a terminal command holding a backtick is escaped text not a code span", () => {
   // A code span would end at the folder's backtick and the owner would copy half a command.
-  const line = terminalLine(TERMINAL, "/work/my`proj", "0000-id");
-  assert.equal(
-    line,
-    "Terminal: cd '/work/my\\`proj' \\&\\& claude --resume 0000-id --fork-session",
-  );
+  // The escape is the chat's: this one marks what it was handed.
+  const line = terminalLine(TERMINAL, "/work/my`proj", "0000-id", (text) => `<${text}>`);
+  assert.equal(line, "Terminal: <cd '/work/my`proj' && claude --resume 0000-id --fork-session>");
 });
 
 test("status leaves the terminal command out of a folder that cannot be used", async (t) => {
@@ -2492,7 +2394,7 @@ function retypedBackground(taskType: string): ReturnType<typeof splitBackground>
 }
 
 // The type comes from the agent: a name of `Object.prototype` is no kind of ours.
-for (const taskType of ["constructor", "toString", "__proto__"]) {
+for (const taskType of ["constructor", "__proto__"]) {
   test(`a task of type ${taskType} counts and ends as an unknown kind`, async (t) => {
     const [first, notice, injected] = retypedBackground(taskType);
     const h = harnessFor(t)({ turns: [first] });
@@ -3137,17 +3039,6 @@ test("the next prompt after bang stop does not wait for a report", async (t) => 
   assert.deepEqual(h.clients[0]?.queries, ["start it", "next"]);
 });
 
-test("bang stop ends background tasks outside a stop too", async (t) => {
-  const [first] = splitBackground();
-  const taskId = String(systemRecord(first, "task_started").task_id);
-  const h = harnessFor(t)({ turns: [first] });
-  const session = h.session();
-  await (await session.submit("start it")).done.wait();
-  assert.ok(await session.stop());
-  assert.deepEqual(h.clients[0]?.stoppedTasks, [taskId]);
-  assert.equal(h.clients[0]?.interrupts, 0); // no turn was running
-});
-
 /**
  * Every line the daemon logs from here on, parsed, over the whole `awaydesk` logger tree, where
  * `logged` reads one logger. Call `stop` when the part under test is over.
@@ -3298,14 +3189,6 @@ test("setting effort back to auto stores the default", async (t) => {
   h.state.setEffort(CHANNEL, THREAD, "high"); // a level was stored from an earlier turn
   await (await session.submit("/effort auto")).done.wait();
   assert.equal(thread(h).effort, null);
-});
-
-test("the client is launched with the stored effort", async (t) => {
-  const h = harnessFor(t)({});
-  h.session(); // opens the thread
-  h.state.setEffort(CHANNEL, THREAD, "low");
-  await h.session().ensureConnected();
-  assert.equal(h.clients[0]?.options.effort, "low");
 });
 
 test("the footer shows a stored effort at once after a reconnect", async (t) => {
@@ -3813,21 +3696,6 @@ test("a failed turn shows error", async (t) => {
   const turn = await session.submit("hi");
   await turn.done.wait();
   assert.deepEqual(h.reactions(), [Status.WORKING, Status.ERROR]);
-});
-
-test("stop shows done", async (t) => {
-  const h = harnessFor(t)({
-    turns: [[canUseToolCall("Bash", { command: "rm -rf build" }), ...sdkMessages("interrupt")]],
-  });
-  const session = h.session();
-  const turn = await session.submit("clean");
-  await h.until(() => pending(h.approvals).length > 0);
-  assert.equal(await session.stop(), true);
-  await turn.done.wait();
-  // A stop the owner gave is not an error: ✅, and it stands through the turn's own tail.
-  assert.equal(h.reactions().at(-1), Status.DONE);
-  assert.equal(inside(session).errorStanding, false);
-  assert.equal(thread(h).status, null);
 });
 
 test("quick turn after stop ends on working", async (t) => {

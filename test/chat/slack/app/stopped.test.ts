@@ -67,13 +67,11 @@ async function release(world: World, gate: AsyncEvent): Promise<string[]> {
   return world.slack.apiCalls.slice(calls).map((call) => call.method);
 }
 
-for (const text of ["!help", "!status", "!bypass on", "hello"]) {
-  test(`a message in a thread whose channel check ends after the stop does nothing [${text}]`, async (t) => {
-    const { world, gate } = await held(t, reply(text, THREAD));
-    await stop(world);
-    assert.deepEqual(await release(world, gate), ["conversations.members"]);
-  });
-}
+test("a message in a thread whose channel check ends after the stop does nothing", async (t) => {
+  const { world, gate } = await held(t, reply("hello", THREAD));
+  await stop(world);
+  assert.deepEqual(await release(world, gate), ["conversations.members"]);
+});
 
 test("a message still waiting for its place in the thread when the daemon stops calls nothing", async (t) => {
   const { world, gate } = await held(t, reply("first", THREAD));

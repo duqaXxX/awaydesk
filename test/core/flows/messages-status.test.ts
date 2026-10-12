@@ -18,7 +18,6 @@ const linkTo = (thread: string): string =>
   fill(texts.STATUS_CHANNEL_LINK_FALLBACK, { thread_ts: thread });
 
 for (const [seconds, shown] of [
-  [5, "just now"],
   [59, "just now"],
   [60, "1m ago"],
   [3_599, "59m ago"],

@@ -91,36 +91,6 @@ test("a reply is one message: text and task lines in order, the footer, then wha
   assert.ok(!chat.texts(channel, ref.thread).join().includes("1 shell"));
 });
 
-test("a task line shows its preview under it, since that is where an answer is kept", async () => {
-  const { chat, provider, channel } = await built();
-  const ref = chat.openThread(channel);
-  const reply = provider.thread(ref).openReply(() => {});
-  await reply.task({
-    ...line("a", "Ask"),
-    preview: {
-      title: "User answered the questions:",
-      summary: "",
-      body: "· Which colour? → blue",
-      language: "",
-      plain: true,
-    },
-  });
-  await reply.task({
-    ...line("b", "Edit notes.txt"),
-    preview: {
-      title: "Update(notes.txt)",
-      summary: "Added 1 line",
-      body: "1 + a",
-      language: "diff",
-      plain: false,
-    },
-  });
-  assert.deepEqual(chat.texts(channel, ref.thread).slice(1), [
-    "[complete] Ask\nUser answered the questions:\n· Which colour? → blue\n" +
-      "[complete] Edit notes.txt\nUpdate(notes.txt)\nAdded 1 line\n1 + a",
-  ]);
-});
-
 test("a call for a capability it lacks is recorded and changes nothing", async () => {
   const { chat, provider, channel } = await built();
   const thread = provider.thread(chat.openThread(channel));

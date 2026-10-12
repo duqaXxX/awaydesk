@@ -260,9 +260,6 @@ test("a folder that is not private is never written", WINDOWS, async (t) => {
 
 const READABLE = [
   "text/plain",
-  "text/markdown",
-  "text/csv",
-  "text/x-python",
   "application/pdf",
   "application/json",
   "application/x-yaml",

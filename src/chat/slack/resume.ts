@@ -11,7 +11,7 @@
  */
 
 import type { ListedSession } from "../../agent/seam.ts";
-import { oneLine, texts } from "../../core/port.ts";
+import { oneLine, TITLE_LIMIT, texts } from "../../core/port.ts";
 import { type ContextBlock, contextBlock } from "./reply/blocks.ts";
 import { take } from "./reply/chars.ts";
 import { shownAsWritten } from "./reply/escape.ts";
@@ -19,7 +19,6 @@ import * as slackTexts from "./texts.ts";
 
 export const RESUME_ROWS = 20;
 export const RESUME_ACTION = "session_resume";
-export const TITLE_LIMIT = 80;
 // The first characters of a session id the list shows, and the fewest `!resume` takes as an id:
 // the core's `ID_PREFIX_MIN`.
 export const ID_SHOWN = 8;

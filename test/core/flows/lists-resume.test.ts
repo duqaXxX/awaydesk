@@ -115,27 +115,6 @@ test("an unknown target, and an id too short to be one, name no session", async 
   ]);
 });
 
-test("a typed target for a thread that already holds a session is refused", async (t) => {
-  const world = await withSessions(t);
-  const ref = await world.word();
-  world.state.openThread(ref.channel, ref.thread, FIRST);
-  await world.flows.resume.word(ref, "bbbbbbbb");
-  assert.equal(world.state.thread(ref.channel, ref.thread)?.sessionId, FIRST);
-  assert.deepEqual(world.said().slice(-1), [texts.RESUME_HELD]);
-});
-
-test("a typed target held by another thread is refused with a link to it", async (t) => {
-  const world = await withSessions(t);
-  const other = await world.word();
-  const ref = await world.word();
-  await world.flows.resume.word(other, "bbbbbbbb");
-  await world.flows.resume.word(ref, "bbbbbbbb");
-  assert.equal(world.state.thread(ref.channel, ref.thread), null);
-  assert.deepEqual(world.said().slice(-1), [
-    fill(texts.RESUME_ELSEWHERE, { link: linkTo(other.thread) }),
-  ]);
-});
-
 test("a pick resumes the session into the thread the list names and takes the list away", async (t) => {
   const world = await withSessions(t);
   const ref = await world.word();

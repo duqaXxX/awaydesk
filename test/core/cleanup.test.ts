@@ -100,21 +100,13 @@ test("a channel slack no longer has is forgotten with its threads", async () => 
   assert.ok(text.includes(GONE_CHANNEL) && text.includes("1 thread"));
 });
 
-const failures: [string, Reply][] = [
-  ["internal_error", "internal_error"],
-  ["ratelimited", "ratelimited"],
-  ["missing_scope", "missing_scope"],
-  ["network down", new Error("network down")],
-];
-
-for (const [label, failure] of failures) {
-  test(`anything but not found forgets nothing [${label}]`, async () => {
-    // Not an answer about the channel: it cannot be told gone.
-    const lookup = channelsInSlack({ [GONE_CHANNEL]: failure });
-    assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, "Slack", log), []);
-    assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
-  });
-}
+// The lookup maps every answer but `channel_not_found` to `no answer`, so one row stands for all.
+test("anything but not found forgets nothing", async () => {
+  // Not an answer about the channel: it cannot be told gone.
+  const lookup = channelsInSlack({ [GONE_CHANNEL]: "internal_error" });
+  assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, "Slack", log), []);
+  assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL]);
+});
 
 test("no channel slack can see forgets nothing and says so", async () => {
   // Every bound channel not found: the token of another workspace, or the app removed from
@@ -125,25 +117,20 @@ test("no channel slack can see forgets nothing and says so", async () => {
   assert.ok(log.lines.join("\n").includes("none of the 2 bound channels"));
 });
 
-for (const [label, failure] of [
-  ["network down", new Error("network down")],
-  ["ratelimited", "ratelimited"],
-] as [string, Reply][]) {
-  test(`a pass in which slack found no channel forgets nothing [${label}]`, async () => {
-    // The token of another workspace, and one call that failed for a reason of its own: a
-    // channel Slack did not answer about is not a channel it found.
-    state.bind(OTHER_GONE, "/srv/elsewhere");
-    const gone = "channel_not_found";
-    const lookup = channelsInSlack({
-      [CHANNEL]: failure,
-      [GONE_CHANNEL]: gone,
-      [OTHER_GONE]: gone,
-    });
-    assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, "Slack", log), []);
-    assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL, OTHER_GONE]);
-    assert.ok(log.lines.join("\n").includes("none of the 3 bound channels"));
+test("a pass in which slack found no channel forgets nothing", async () => {
+  // The token of another workspace, and one call that failed for a reason of its own: a
+  // channel Slack did not answer about is not a channel it found.
+  state.bind(OTHER_GONE, "/srv/elsewhere");
+  const gone = "channel_not_found";
+  const lookup = channelsInSlack({
+    [CHANNEL]: new Error("network down"),
+    [GONE_CHANNEL]: gone,
+    [OTHER_GONE]: gone,
   });
-}
+  assert.deepEqual(await forgetGoneChannels(lookup, state, nothingLive, "Slack", log), []);
+  assert.deepEqual(state.channels(), [CHANNEL, GONE_CHANNEL, OTHER_GONE]);
+  assert.ok(log.lines.join("\n").includes("none of the 3 bound channels"));
+});
 
 test("a channel with a live session is left for the next pass", async () => {
   const lookup = channelsInSlack({ [GONE_CHANNEL]: "channel_not_found" });

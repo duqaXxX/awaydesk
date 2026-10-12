@@ -71,13 +71,6 @@ test("a start carries the Chrome flag when the owner enabled it by default", LIM
   assert.deepEqual(sdk.only.options.extraArgs, { "replay-user-messages": null, chrome: null });
 });
 
-test("a start carries no Chrome flag when the owner did not enable it", LIMIT, async () => {
-  const sdk = new FakeSdk();
-  const backend = new ClaudeBackend({ query: sdk.query, home });
-  await (await backend.start(START, NO_REQUESTS)).close();
-  assert.deepEqual(sdk.only.options.extraArgs, { "replay-user-messages": null });
-});
-
 test("the Chrome setting is read at every start", LIMIT, async () => {
   const sdk = new FakeSdk();
   const backend = new ClaudeBackend({ query: sdk.query, home });

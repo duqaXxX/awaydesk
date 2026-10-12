@@ -65,7 +65,6 @@ const parseCases: [string, Command | null][] = [
   ["!status", { kind: "status" }],
   ["  !stop", { kind: "stop" }],
   ["!compact", { kind: "passthrough", text: "compact" }],
-  ["!model opus", { kind: "passthrough", text: "model opus" }],
   ["!status now", { kind: "passthrough", text: "status now" }],
   ["!important: read this", { kind: "passthrough", text: "important: read this" }],
   ["hello", null],

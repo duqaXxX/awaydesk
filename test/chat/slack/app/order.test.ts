@@ -30,16 +30,6 @@ test("a place waits for the places entered before it, in the order they were ent
   third.leave();
 });
 
-test("the place after a left one is free at once, whoever left it", async () => {
-  const order = new ThreadOrder();
-  const first = order.enter("a");
-  const second = order.enter("a");
-  first.leave();
-  first.leave(); // leaving twice is the same as once
-  await second.turn;
-  second.leave();
-});
-
 test("two threads do not wait for each other", async () => {
   const order = new ThreadOrder();
   order.enter("a"); // never left

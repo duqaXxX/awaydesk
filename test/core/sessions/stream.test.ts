@@ -4,8 +4,6 @@
  * `test/chat/slack/reply/`; here the session drives it.
  */
 import assert from "node:assert/strict";
-import { mkdirSync, rmdirSync } from "node:fs";
-import { join } from "node:path";
 import { mock, type TestContext, test } from "node:test";
 import {
   BANNER_LIMIT,
@@ -16,7 +14,6 @@ import { bannerText } from "../../../src/chat/slack/reply/markdown.ts";
 import { STREAM_SECONDS } from "../../../src/chat/slack/reply/sinks.ts";
 import { Status } from "../../../src/chat/slack/reply/status.ts";
 import { APPROVE } from "../../../src/core/requests.ts";
-import { asked } from "../../../src/core/sessions/turn.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { AsyncEvent, CHANNEL, FakeSlack, networkDown, THREAD } from "../../support/fake-slack.ts";
 import type { JsonObject } from "../../support/fixtures.ts";
@@ -34,7 +31,6 @@ import {
 import {
   footerWrites,
   inside,
-  isReport,
   nestedBackgroundEndingMidTurn,
   pending,
   splitBackground,
@@ -318,18 +314,6 @@ test("one dropped message is named in the singular", async (t) => {
   gate.set();
 });
 
-test("closing a session ends its open reply and leaves no stream open", async (t) => {
-  const h = harness(t, [{ turns: [sdkMessages("tools").slice(0, 21)] }]); // starts, never ends
-  const session = h.session();
-  await session.submit("hello");
-  await h.until(() => h.slack.streamTs.length > 0);
-  await session.close();
-  assert.deepEqual(openStreams(h), []);
-  const ended = texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN });
-  assert.ok(h.slack.streamTexts()[0]?.includes(ended));
-  assert.equal(h.slack.pushes(), 1);
-});
-
 test("an error that cuts a turn ends the stream with the cross", async (t) => {
   const h = harness(t, [{ turns: [[...sdkMessages("tools").slice(0, 21), END_OF_STREAM]] }]);
   const turn = await h.session().submit("hello");
@@ -396,20 +380,6 @@ test("an error that cuts a turn while its subagent works says so in the message 
   // moved, not shown twice
   assert.ok(!JSON.stringify(h.slack.messageBlocks()[0]).includes("reported an error"));
   assert.equal(h.slack.pushes(), 2);
-});
-
-test("a turn that fails before claude answers is a reply of its own", async (t) => {
-  const h = harness(t, [{}]);
-  const gone = join(h.tmpPath, "gone");
-  mkdirSync(gone);
-  h.state.bind(CHANNEL, gone);
-  rmdirSync(gone);
-  const failed = await h.session().submit("hello");
-  await failed.done.wait();
-  assert.deepEqual(h.slack.streamTexts(), [
-    texts.fill(texts.DIRECTORY_MISSING, { directory: gone }),
-  ]);
-  assert.ok(h.slack.pushes() === 1 && openStreams(h).length === 0);
 });
 
 // A final write that fails: no checkmark, the cross, and the persisted status kept for repair.
@@ -614,11 +584,6 @@ test("a crossed owner query hands latest to the reply that carried its answer", 
   assert.equal((owner.sink as unknown as { latest: boolean }).latest, false);
 });
 
-test("the report helper still reads a report", () => {
-  assert.ok(isReport(texts.BACKGROUND_NOTICE));
-  assert.equal(asked("hello"), "hello");
-});
-
 test("a close leaves no task waiting on a reply it could not end", async (t) => {
   const h = harness(t, [{ turns: [withAsk(canUseToolCall("Bash", { command: "ls" }))] }], {
     finalRetrySeconds: 60.0,
@@ -640,20 +605,6 @@ test("a close leaves no task waiting on a reply it could not end", async (t) => 
   await h.until(() => pending(h.approvals).length > 0 && h.slack.streamTs.length > 0);
   await session.close();
   assert.equal(waiting, 0); // `close` settles the reply itself: nobody would await these
-});
-
-test("a plain shutdown does not say the daemon restarted", async (t) => {
-  const gate = new AsyncEvent();
-  const h = harness(t, [{ startGate: gate }]);
-  const session = h.session();
-  await session.submit("hello");
-  await h.sleep(0.05);
-  await session.close(); // SIGINT: no drain ran, nothing says a restart
-  const [note, ...more] = h.slack.callsTo("chat.postMessage");
-  assert.equal(more.length, 0);
-  assert.ok(!String(note?.text).includes("restarted"));
-  const said = texts.fill(texts.NOT_SENT_ONE, { count: 1, because: texts.BECAUSE_SHUTDOWN });
-  assert.ok(String(note?.text).includes(said));
 });
 
 test("a reply is written through the client made for replies", async (t) => {

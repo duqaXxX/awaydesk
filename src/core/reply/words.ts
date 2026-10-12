@@ -4,6 +4,9 @@ import { escaped, PY_SPACE } from "../../text.ts";
 export const BACKGROUND = "Running in background";
 export const STOPPED = "Stopped";
 
+// The most of a title one line shows, a call's in a reply or a session's in a list.
+export const TITLE_LIMIT = 80;
+
 const SPACES = new RegExp(`[${PY_SPACE}]+`);
 
 /** `value` with its runs of whitespace as one space and none at its ends: `" ".join(value.split())`. */

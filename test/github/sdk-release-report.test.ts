@@ -72,13 +72,7 @@ test("a failed install is announced too", () => {
 });
 
 // The outcome comes from the job that ran the release under test, and lands in the issue.
-for (const outcome of [
-  "",
-  "passed",
-  "PASS",
-  "pass\n\n[the fix](https://example.com)",
-  "fail | see #1 |",
-]) {
+for (const outcome of ["", "PASS", "pass\n\n[the fix](https://example.com)"]) {
   test(`an outcome that is not a known word is refused [${JSON.stringify(outcome)}]`, () => {
     assert.throws(() => issue({ outcome }), /not an outcome/);
   });

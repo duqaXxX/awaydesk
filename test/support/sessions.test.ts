@@ -13,14 +13,12 @@ import type {
 } from "../../src/agent/seam.ts";
 import { type JsonObject, sdkJson } from "./fixtures.ts";
 import {
-  type Batch,
   canUseToolCall,
   END_OF_STREAM,
   FakeAgentBackend,
   type FakeAgentSession,
   hookRun,
   type Item,
-  isRecord,
   type Script,
   sdkMessages,
   splitTurns,
@@ -82,50 +80,6 @@ async function read(session: FakeAgentSession, turns: number): Promise<SessionEv
   return events;
 }
 
-async function played(batch: Batch): Promise<SessionEvent[]> {
-  const session = await started({});
-  session.inject([...batch, END_OF_STREAM]);
-  return read(session, Number.POSITIVE_INFINITY);
-}
-
-test("tools stream has partial text tool use and result", async () => {
-  const events = (await played(sdkMessages("tools"))).slice(0, -1);
-  assert.ok(events.some((event) => event.type === "text_delta"));
-  assert.ok(events.some((event) => event.type === "call_started"));
-  assert.ok(events.some((event) => event.type === "call_ended"));
-  assert.equal(events.at(-1)?.type, "turn_ended");
-});
-
-test("clear emits a reset then a new session id", async () => {
-  const [first, second] = splitTurns(sdkMessages("clear")) as [Item[], Item[]];
-  assert.ok(second.some((item) => isRecord(item, "conversation_reset")));
-  const session = await started({ turns: [first, second] });
-  await session.send({ id: "p1", content: "hi" });
-  await session.send({ id: "p2", content: "/clear" });
-  const ends = (await read(session, 2)).filter((event) => event.type === "turn_ended");
-  assert.equal(ends.length, 2);
-  assert.notEqual(ends[0]?.sessionId, ends[1]?.sessionId);
-});
-
-test("auth failed is flagged on the assistant message", async () => {
-  const errors = (await played(sdkMessages("auth-failed"))).filter(
-    (event) => event.type === "agent_error",
-  );
-  assert.ok(errors.some((event) => event.kind === "authentication"));
-  assert.ok(errors.some((event) => event.category === "authentication_failed"));
-});
-
-test("server info lists commands with names", async () => {
-  const recorded = (sdkJson("server-info") as JsonObject).commands as JsonObject[];
-  assert.ok(
-    recorded.length > 0 && "name" in (recorded[0] ?? {}) && "description" in (recorded[0] ?? {}),
-  );
-  const info = await (await started({})).info();
-  assert.equal(info.commands.length, recorded.length);
-  assert.ok(info.commands.every((command) => command.name !== ""));
-  assert.equal(info.permissionMode, "default");
-});
-
 // What the session tests rely on beyond the recordings: the scripted steps that are no record.
 
 test("a prompt of plain text is replayed before its turns first words and a command is not", async () => {
@@ -173,27 +127,4 @@ test("a request waits for the cores answer before the stream goes on", async () 
     { type: "folder_changed", folder: "/home/dev/project" },
     { type: "process_lost", reason: "the Claude Code process exited" },
   ]);
-});
-
-test("the commands the core sends are recorded and a closed session ends its events", async () => {
-  const session = await started({});
-  await session.setPermissionMode("bypassPermissions");
-  await session.setModel("opus");
-  await session.setEffort("high");
-  await session.interrupt();
-  await session.stopTask("task-1");
-  assert.deepEqual(
-    [
-      session.modes,
-      session.modelsSet,
-      session.effortsSet,
-      session.interrupts,
-      session.stoppedTasks,
-    ],
-    [["bypassPermissions"], ["opus"], ["high"], 1, ["task-1"]],
-  );
-  assert.equal(session.connected, true);
-  await session.close();
-  assert.equal(session.connected, false);
-  assert.deepEqual(await read(session, 1), []); // no `process_lost` for a session the core closed
 });

@@ -4,11 +4,11 @@
  */
 import type { ListedSession } from "../../agent/seam.ts";
 import { errorName } from "../../values.ts";
-import { oneLine } from "../reply/words.ts";
+import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
 import type { ThreadSession } from "../sessions/session.ts";
 import * as texts from "../texts.ts";
 import { fill } from "../texts.ts";
-import { type FlowDeps, isCancelled, logger, type Talk, TITLE_LIMIT } from "./talk.ts";
+import { type FlowDeps, isCancelled, logger, type Talk } from "./talk.ts";
 
 /** How long ago, in one unit, as a channel's `!status` says it of an idle session. */
 export function ago(seconds: number): string {

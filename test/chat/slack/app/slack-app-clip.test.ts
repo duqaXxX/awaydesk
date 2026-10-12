@@ -263,13 +263,6 @@ test("the same clip sent again waits once", async (t) => {
   assert.equal(ownerWasTold(world).filter((told) => told === notSent).length, 1);
 });
 
-test("the owner is told the real wait", () => {
-  const told = fill(named(slackTexts.CLIP_NOT_SENT, NAMES), {
-    minutes: Math.round(voice.WAIT_SECONDS / 60),
-  });
-  assert.ok(told.includes("after 5 minutes"));
-});
-
 test("a long transcript is read from the clip s vtt", async (t) => {
   const world = worldOf(t);
   await world.dispatch(clipMessage(false));

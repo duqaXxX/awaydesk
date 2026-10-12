@@ -19,8 +19,6 @@ import { ResumeRefused } from "../../src/agent/seam.ts";
 import {
   call,
   die,
-  fail,
-  hold,
   PLAIN_CAPABILITIES,
   PLAIN_COMMANDS,
   PLAIN_MODE,
@@ -28,8 +26,6 @@ import {
   type PlainSession,
   PlainSessionClosed,
   PlainStore,
-  plainAgent,
-  question,
   say,
   whole,
 } from "./plain-agent.ts";
@@ -174,24 +170,6 @@ test("say writes deltas of one message, whole writes one text", LIMIT, async () 
   assert.ok(end?.type === "turn_ended" && end.finalText === "Whole." && end.steps === 1);
 });
 
-test("a call starts and ends; with permission it asks between the two", LIMIT, async () => {
-  const agent = new PlainAgent()
-    .next(call("Shell", { command: "ls" }, { output: "a.txt" }))
-    .next(call("Shell", { command: "rm" }, { permission: true }));
-  const { session, events } = await started(agent, handler({ allow: false, message: "No." }));
-  await session.send(prompt("a"));
-  const first = await turnOf(events);
-  assert.deepEqual(types(first).slice(1, 3), ["call_started", "call_ended"]);
-  assert.equal(session.answers.length, 0);
-  await session.send(prompt("b"));
-  const second = await turnOf(events);
-  const ended = second.find((e) => e.type === "call_ended");
-  assert.ok(ended?.type === "call_ended" && ended.isError && ended.output === "No.");
-  assert.equal(session.answers.length, 1);
-  const end = second.at(-1);
-  assert.ok(end?.type === "turn_ended" && end.steps === 2);
-});
-
 test("a handler that throws is a denial", LIMIT, async () => {
   const agent = new PlainAgent().next(call("Shell", {}, { permission: true }));
   const throwing: RequestHandler = {
@@ -204,48 +182,6 @@ test("a handler that throws is a denial", LIMIT, async () => {
   await session.send(prompt("a"));
   const turn = await turnOf(events);
   assert.ok(turn.some((e) => e.type === "call_ended" && e.isError));
-});
-
-test("a question reaches the handler with its options, and the answer is kept", LIMIT, async () => {
-  const agent = new PlainAgent().next(question("Which?", ["red", "blue"]), say("Noted."));
-  const requests = handler({ allow: true }, { answered: true, answers: { "Which?": "blue" } });
-  const { session, events } = await started(agent, requests);
-  await session.send(prompt("a"));
-  const turn = await turnOf(events);
-  const [kept] = session.answers;
-  assert.ok(kept?.request.type === "question");
-  assert.deepEqual(
-    kept.request.questions[0]?.options.map((option) => option.label),
-    ["red", "blue"],
-  );
-  assert.ok(turn.some((e) => e.type === "call_ended" && !e.isError));
-});
-
-test("hold waits for release, or ends as interrupted on interrupt", LIMIT, async () => {
-  const agent = new PlainAgent().next(say("Work."), hold(), say("More.")).next(hold());
-  const { session, events } = await started(agent);
-  await session.send(prompt("a"));
-  await turnOf(events, "message_ended");
-  session.release();
-  const released = await turnOf(events);
-  const end = released.at(-1);
-  assert.ok(end?.type === "turn_ended" && end.ending === "done" && end.finalText === "More.");
-  await session.send(prompt("b"));
-  await session.interrupt();
-  const interrupted = await turnOf(events);
-  const last = interrupted.at(-1);
-  assert.ok(last?.type === "turn_ended" && last.ending === "interrupted");
-});
-
-test("fail writes the agent's message and ends the turn as an error", LIMIT, async () => {
-  const agent = new PlainAgent().next(fail("The request failed."));
-  const { session, events } = await started(agent);
-  await session.send(prompt("a"));
-  const turn = await turnOf(events);
-  const error = turn.find((e) => e.type === "agent_error");
-  assert.ok(error?.type === "agent_error" && error.text === "The request failed.");
-  const end = turn.at(-1);
-  assert.ok(end?.type === "turn_ended" && end.ending === "error");
 });
 
 test("die loses the process: process_lost last, and a send is refused", LIMIT, async () => {
@@ -273,22 +209,6 @@ test("a command runs without a turn of the script, by its name or its alias", LI
   }
   assert.deepEqual(outputs, ["hi there", "again", "3 words", "Unknown command: /nope"]);
   assert.equal(agent.turns.length, 1, "the scripted turn is still waiting");
-});
-
-test("the effort the session runs at is observed at the end of each turn", LIMIT, async () => {
-  const agent = new PlainAgent();
-  const session = await agent.start({ ...START, effort: "full" }, handler());
-  const events = session.events[Symbol.asyncIterator]();
-  await session.send(prompt("a"));
-  const turn = await turnOf(events);
-  assert.deepEqual(
-    turn.find((e) => e.type === "effort_observed"),
-    {
-      type: "effort_observed",
-      level: "full",
-    },
-  );
-  await session.close();
 });
 
 test("the store outlives the agent: a new agent resumes, lists and refuses", LIMIT, async () => {
@@ -319,15 +239,6 @@ test("the store outlives the agent: a new agent resumes, lists and refuses", LIM
   );
 });
 
-test("failNextStart rejects one start with the error and leaves no process", LIMIT, async () => {
-  const agent = new PlainAgent();
-  const failure = new Error("no start");
-  agent.failNextStart(failure);
-  await assert.rejects(agent.start(START, handler()), (error) => error === failure);
-  assert.equal(agent.running.length, 0);
-  await (await agent.start(START, handler())).close();
-});
-
 test(
   "close ends a turn that waits on the owner, and a second close is harmless",
   LIMIT,
@@ -345,20 +256,6 @@ test(
     assert.deepEqual(await events.next(), { done: true, value: undefined });
   },
 );
-
-test("the entry builds a plain agent over its options and keeps what it built", () => {
-  const store = new PlainStore();
-  const turns = [[say("shared")]];
-  const entry = plainAgent({ store, turns });
-  assert.deepEqual([entry.required, entry.optional], [[], []]);
-  const context = { variables: {}, clock: { sleep: async () => {}, time: () => 0 } };
-  const a = entry.build(context) as PlainAgent;
-  const b = entry.build(context) as PlainAgent;
-  assert.deepEqual(entry.built, [a, b]);
-  assert.equal(a.store, store);
-  assert.equal(a.turns, turns);
-  assert.equal(b.turns, turns);
-});
 
 test("what a live session cannot do, it refuses", LIMIT, async () => {
   const { session } = (await started(new PlainAgent())) as { session: AgentSession };

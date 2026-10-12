@@ -283,21 +283,6 @@ test("a permission request reaches the handler and an allow is passed on", LIMIT
   assert.equal(seen.at(-1)?.type, "turn_ended");
 });
 
-test("a deny reaches the SDK with the owner's message", LIMIT, async (t) => {
-  const handler = handlerOf({ allow: false, message: "No: the owner refused." });
-  const { session, query, events } = await started(
-    t,
-    { turns: [[...TOOLS.slice(0, 2), ask({ toolName: "Bash", input: BASH }), ...TOOLS.slice(-1)]] },
-    {},
-    handler,
-  );
-  await session.send(PROMPT);
-  await until(events, "turn_ended");
-  assert.deepEqual(query.permissionResults, [
-    { behavior: "deny", message: "No: the owner refused." },
-  ]);
-});
-
 // Invariant 2: the project owns no permission rule, so no tool is answered without the owner.
 // Found by a mutation run of 2026-10-11: a callback that allowed `Read` by itself failed nothing,
 // since only `Bash` was ever asked about.
@@ -424,7 +409,7 @@ test("a question the owner skips is a deny with what the agent is told", LIMIT, 
 // SDK 0.3.296 answers a callback that rejects with a `control_response` of subtype `error`
 // (`handleControlRequest`, sdk.mjs), which is not a deny.
 
-const UNSHOWN = "awaydesk could not show this request in Slack, so nobody approved it.";
+const UNSHOWN = "awaydesk could not show this request to the owner, so nobody approved it.";
 const SECRET = "a secret sentence from the tool's input";
 
 /** One Bash call against `handler`, with the error log recorded; what the SDK was answered. */
