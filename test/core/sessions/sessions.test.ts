@@ -624,6 +624,8 @@ test("a request that comes while the session closes is refused and never shown",
   await session.submit("clean");
   await h.until(() => pending(h.approvals).length > 0);
   await session.close();
+  // Both requests reached the session and were answered: the second was not simply never sent.
+  assert.equal(h.clients[0]?.permissionResults.length, 2);
   assert.deepEqual(pending(h.approvals), []);
   const shown = h.slack
     .callsTo("chat.postMessage")

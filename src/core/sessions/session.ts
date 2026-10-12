@@ -2748,7 +2748,8 @@ export class ThreadSession {
    * with what the owner chose, for as long as that takes; with a refusal when the chat could
    * not show the request, since nobody can answer one that was never shown. `signal` is the
    * agent's: aborted, the request is refused and its message withdrawn; aborted before the
-   * request arrives, nothing is posted.
+   * request arrives, nothing is posted. Nothing is posted either for a request that arrives once
+   * the session is closing: it is refused at once.
    */
   private async askOwner(
     request: PermissionRequest | QuestionRequest,
