@@ -1010,8 +1010,9 @@ All notable changes to this project are documented here. The format follows
   a few lines apart. The report gets a reply of its own, under `Background task update`, and both
   replies ended with a footer. Once the report has ended with its footer, the reply above it now
   gives its own up, by an edit that does not notify (`Reply.withdrawFooter`, a new member of the
-  chat seam that every provider implements). An owner's next prompt takes no footer away: a reply
-  that ended still keeps the record of how its turn ended. Three cases keep both footers: the
+  chat seam that every provider implements). The reply above is the thread's latest when the report opens, whether or not it started the
+  task: two replies of the daemon's in a row show one footer, the last. An owner's next prompt
+  takes no footer away. Three cases keep both footers: the
   reply above is a closing message that is the footer alone (a long answer of text alone), since
   the edit would leave it empty; the daemon restarted between the two replies, since the first is
   no longer held; and a report that ends with no footer of its own.

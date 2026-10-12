@@ -2504,9 +2504,12 @@ export class ThreadSession {
   }
 
   /**
-   * `newReply` for a report of a background task whose own reply has ended: the report follows
-   * the thread's latest reply as part of the same exchange, so once it ends with a footer that
-   * reply gives its own up (`footerMoved`). An owner's new prompt takes no footer away.
+   * `newReply` for a report of a background task whose own reply has ended: the report comes
+   * right under the thread's latest reply, with no message of the owner's between them, so once
+   * it ends with a footer that reply gives its own up (`footerMoved`), whichever turn it was:
+   * the one that started the task or a later one of the owner's (decided by the owner,
+   * 2026-10-12: two replies of the daemon's in a row show one footer, the last). An owner's new
+   * prompt takes no footer away.
    */
   private newReportReply(): Reply {
     const previous = this.latest;

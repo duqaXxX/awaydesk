@@ -228,9 +228,10 @@ end counts as not landed and the root shows ❌. The update that only folds the 
 all of its span is the exception, since nothing of the reply is missing. Every reply that has ended
 keeps its footer, the record of how its last turn ended; only the thread's latest reply adds the
 counts of what still runs to it (`Reply.setLatest`). One reply gives its footer up
-(`Reply.withdrawFooter`): the one a report of a background task follows in a reply of its own, once
-that report has ended with a footer, so that the two read as one exchange with the footer at its
-end. `ReplySink.withdrawFooter` takes it out by an edit, which does not notify, where the footer
+(`Reply.withdrawFooter`): the one right above a report of a background task that has a reply of its
+own, once that report has ended with a footer. Two replies of the daemon's in a row, with no
+message of the owner's between them, show one footer, the last; the reply above is the thread's
+latest when the report opens, whether or not it is the one that started the task. `ReplySink.withdrawFooter` takes it out by an edit, which does not notify, where the footer
 shares its message with the reply's content; a closing message that is the footer alone keeps it,
 since the edit would leave it empty. A card left `in_progress` in a stopped message
 is stored as an error until it is updated (measured: "Open card stored as error"), so every end
