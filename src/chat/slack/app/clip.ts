@@ -113,6 +113,10 @@ export class Clips {
     // `round` to even).
     const minutes = Math.round(voice.WAIT_SECONDS / 60);
     await this.endWait(waiting);
+    // What follows is a post anyone in the channel reads, minutes after the clip passed the
+    // check: the channel is read again, and a refused one is said to the owner alone.
+    const { channel, threadTs, ts } = waiting;
+    if (!(await this.answers.channelAllowed(channel, threadTs, ts))) return;
     await this.say(waiting, fill(named(slackTexts.CLIP_NOT_SENT, this.parts.names), { minutes }));
   }
 
@@ -188,23 +192,27 @@ export class Clips {
     if (waiting === undefined || !voice.ready(file)) return;
     this.clips.delete(fileId);
     waiting.expiry?.cancel();
-    await this.endWait(waiting);
-    const user = text(file.user);
-    const team = text(file.user_team);
-    if (!isOwner(identity, user, team)) {
-      await this.answers.tellOwnerAbout(
-        waiting.channel,
-        waiting.threadTs,
-        waiting.ts,
-        named(slackTexts.CLIP_NOT_YOURS, this.parts.names),
-      );
-      return;
+    // Started now and awaited last: the transcript never waits on the line's removal.
+    const lineGone = this.endWait(waiting);
+    try {
+      const user = text(file.user);
+      const team = text(file.user_team);
+      if (!isOwner(identity, user, team)) {
+        await this.answers.tellOwnerAbout(
+          waiting.channel,
+          waiting.threadTs,
+          waiting.ts,
+          named(slackTexts.CLIP_NOT_YOURS, this.parts.names),
+        );
+        return;
+      }
+      // The channel is read again: its members can have changed while the clip waited.
+      const { channel, threadTs, ts } = waiting;
+      if (!(await this.answers.admitted(user, team, channel, threadTs, ts))) return;
+      await this.answers.replyOnFailure(channel, threadTs, () => this.sendClip(waiting, file));
+    } finally {
+      await lineGone;
     }
-    // The channel is read again: its members can have changed while the clip waited.
-    if (!(await this.answers.admitted(user, team, waiting.channel, waiting.threadTs))) return;
-    await this.answers.replyOnFailure(waiting.channel, waiting.threadTs, () =>
-      this.sendClip(waiting, file),
-    );
   };
 
   /**

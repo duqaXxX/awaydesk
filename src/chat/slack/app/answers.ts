@@ -25,7 +25,7 @@ import {
 import { getLogger } from "../../../log.ts";
 import type { ChatInbound } from "../../seam.ts";
 import type { Home } from "../home.ts";
-import { deliver, deliverNotice } from "../notice.ts";
+import { deliver } from "../notice.ts";
 import { contextBlock, noticeText } from "../reply/blocks.ts";
 import { describe } from "../reply/errors.ts";
 import type { Limiter } from "../reply/limiter.ts";
@@ -115,7 +115,8 @@ export class Answers {
   /**
    * One message to the channel: a normal post (in `threadTs`'s thread, or top-level when it is
    * null) or, with `ephemeral`, one only the owner sees, under `threadTs`. A normal post pushes
-   * only inside a thread the owner started; an ephemeral message never does.
+   * only inside a thread the owner started; an ephemeral message never does. Returns the `ts`
+   * of a normal post, null for an ephemeral message and once the daemon has stopped.
    */
   async deliver(
     channel: string,
@@ -123,15 +124,23 @@ export class Answers {
     text: string,
     blocks: readonly object[],
     options: { readonly ephemeral: boolean },
-  ): Promise<void> {
+  ): Promise<string | null> {
     const { slack, identity, sessions } = this.parts;
-    if (this.stopped) return;
-    await deliver(slack, identity.ownerUserId, { channel, threadTs }, text, blocks, options);
+    if (this.stopped) return null;
+    const posted = await deliver(
+      slack,
+      identity.ownerUserId,
+      { channel, threadTs },
+      text,
+      blocks,
+      options,
+    );
     if (threadTs !== null) {
       // Slack clears a thread's status line when the app replies: the session's is set
       // again, so `Working…` does not go for a minute after the answer to a word.
       sessions.wrote(channel, threadTs);
     }
+    return posted;
   }
 
   /**
@@ -193,18 +202,15 @@ export class Answers {
     ts: string,
     text: string,
   ): Promise<string | null> {
-    const { slack, identity, sessions } = this.parts;
-    if (this.stopped) return null;
-    const place = { channel, threadTs: threadTs === ts ? null : threadTs };
     try {
-      const posted = await deliverNotice(slack, identity.ownerUserId, place, text, {
-        ephemeral: false,
-      });
-      // Slack clears a thread's status line when the app replies: the session's is set again.
-      if (place.threadTs !== null) sessions.wrote(channel, place.threadTs);
-      return posted;
+      return await this.deliver(
+        channel,
+        threadTs === ts ? null : threadTs,
+        text,
+        [contextBlock(noticeText(text))],
+        { ephemeral: false },
+      );
     } catch (error) {
-      if (isCancelled(error)) throw error;
       logger.warning(`could not reach the owner in ${channel}: ${describe(error)}`);
       return null;
     }
@@ -216,7 +222,6 @@ export class Answers {
     try {
       await this.parts.slack.chat.delete({ channel, ts });
     } catch (error) {
-      if (isCancelled(error)) throw error;
       if (describe(error) !== "message_not_found") {
         logger.warning(`could not take back a notice in ${channel}: ${describe(error)}`);
       }
@@ -281,16 +286,18 @@ export class Answers {
   /**
    * The two checks every inbound path that names a channel runs on its own: the owner acting from
    * the workspace read at startup, then the channel as Slack describes it now. Anyone else gets
-   * nothing; the owner, in a channel the guard refuses, is told why.
+   * nothing; the owner, in a channel the guard refuses, is told why (`about` as in
+   * `channelAllowed`).
    */
   async admitted(
     user: string | null,
     team: string | null,
     channel: string | null,
     threadTs: string,
+    about: string | null = null,
   ): Promise<boolean> {
     if (!this.fromOwner(user, team, channel) || channel === null) return false;
-    return this.channelAllowed(channel, threadTs);
+    return this.channelAllowed(channel, threadTs, about);
   }
 
   /**
@@ -309,23 +316,24 @@ export class Answers {
   }
 
   /**
-   * The second check: the channel as Slack describes it now, the owner told why when refused,
-   * under the message `ts` that asked or in `threadTs` when no message did (a click).
+   * The second check: the channel as Slack describes it now, the owner told why when refused.
+   * `about` is the `ts` of the message that asked, null when none did (a click): a refusal about
+   * a message at the top level goes to the channel, any other to `threadTs`'s thread.
    */
-  async channelAllowed(channel: string, threadTs: string, ts?: string): Promise<boolean> {
+  async channelAllowed(
+    channel: string,
+    threadTs: string,
+    about: string | null = null,
+  ): Promise<boolean> {
     const reason = await this.parts.guard.refusal(channel);
     // The check can outlast the daemon: nothing is said, not even to refuse the channel.
     if (this.stopped) return false;
     if (reason !== null) {
       // For the owner alone, even from a top-level message: a channel the guard refuses may
       // hold people who must not read the bot's words.
-      // `ts` is the message that asked, when a message did: at the top level it has no thread.
-      await this.tellOwnerAbout(
-        channel,
-        threadTs,
-        ts ?? "",
-        fill(slackTexts.CHANNEL_REFUSED, { reason }),
-      );
+      const told = fill(slackTexts.CHANNEL_REFUSED, { reason });
+      if (about === null) await this.tellOwner(channel, threadTs, told);
+      else await this.tellOwnerAbout(channel, threadTs, about, told);
       return false;
     }
     return true;

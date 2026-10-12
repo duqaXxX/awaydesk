@@ -21,9 +21,11 @@ import * as texts from "../../../../src/core/texts.ts";
 import { fill, named } from "../../../../src/core/texts.ts";
 import { setWriter } from "../../../../src/log.ts";
 import {
+  BOT,
   CHANNEL,
   OTHER_TEAM,
   OTHER_THREAD,
+  OWNER,
   STRANGER,
   THREAD,
 } from "../../../support/fake-slack.ts";
@@ -237,6 +239,36 @@ test("a top-level clip given up after its wait is answered in the channel", asyn
   const calls = world.slack.callsTo("chat.postMessage") as Record<string, unknown>[];
   assert.equal(calls.length, 2);
   assert.ok(calls.every((call) => !("thread_ts" in call)));
+});
+
+// The channel can change while a clip waits: what is said then is for the owner alone, and where
+// he sees it.
+test("a top-level clip in a channel refused meanwhile is refused in the channel", async (t) => {
+  const world = worldOf(t);
+  await world.dispatch(clipMessage(false));
+  world.slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
+  clipInfo(world);
+  await world.dispatch(recorded("event_callback-file_change"));
+  assert.deepEqual(world.queries(), []);
+  assert.deepEqual(standing(world), []);
+  const [refused] = world.slack.callsTo("chat.postEphemeral") as Record<string, unknown>[];
+  assert.equal(
+    refused?.text,
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
+  );
+  assert.ok(!("thread_ts" in (refused ?? {})));
+});
+
+test("a clip given up in a channel refused meanwhile posts nothing there", async (t) => {
+  const world = worldOf(t);
+  await world.dispatch(clipMessage(false));
+  world.slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
+  await world.appClock.advance(voice.WAIT_SECONDS);
+  assert.deepEqual(standing(world), []);
+  assert.equal(said(world).length, 1); // the line about the wait alone, taken back
+  assert.deepEqual(ownerWasTold(world), [
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
+  ]);
 });
 
 test("a change to a file nobody waits for does nothing", async (t) => {
