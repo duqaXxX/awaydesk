@@ -21,9 +21,11 @@ import * as texts from "../../../../src/core/texts.ts";
 import { fill, named } from "../../../../src/core/texts.ts";
 import { setWriter } from "../../../../src/log.ts";
 import {
+  BOT,
   CHANNEL,
   OTHER_TEAM,
   OTHER_THREAD,
+  OWNER,
   STRANGER,
   THREAD,
 } from "../../../support/fake-slack.ts";
@@ -41,6 +43,7 @@ import {
   said,
   setupClick,
   startAHold,
+  type World,
   worldFor,
   worldOf,
 } from "../../../support/slack-app.ts";
@@ -166,25 +169,42 @@ test("a second hold click is logged", async (t) => {
 // sends when a clip is posted was not recorded, so the envelope is the snippet's. `file_change`
 // follows the event reference (read 2026-10-09): the daemon's log names the event, not its body.
 
+// A line about a clip is a normal post, so that the one that says it waits can be taken back:
+// Slack lets nobody delete or update an ephemeral message ("Modifying messages", read
+// 2026-10-12).
+
+/** The posted lines that still stand; `said` reads every one, taken back or not. */
+function standing(world: World): string[] {
+  return world.slack.postedTs
+    .map((ts) => world.slack.messages.get(ts))
+    .filter((message) => message !== undefined && !message.deleted)
+    .map((message) => message?.text ?? "");
+}
+
 test("a clip with its transcript is sent as the owner s words", async (t) => {
   const world = worldOf(t);
   await world.dispatch(clipMessage(true));
   assert.deepEqual(world.queries(), ["What day is it today?"]);
   assert.deepEqual(ownerWasTold(world), []);
+  assert.ok(!said(world).includes(named(slackTexts.CLIP_WAITING, NAMES)));
 });
 
 test("a clip waits for its transcript and is sent when slack has it", async (t) => {
   const world = worldOf(t);
   await world.dispatch(clipMessage(false));
   assert.deepEqual(world.queries(), []);
-  assert.deepEqual(ownerWasTold(world), [named(slackTexts.CLIP_WAITING, NAMES)]);
+  assert.deepEqual(standing(world), [named(slackTexts.CLIP_WAITING, NAMES)]);
   // Slack sends the event while it still writes the transcript, then again when it is done.
   clipInfo(world, { transcription: { status: "processing" } });
   await world.dispatch(recorded("event_callback-file_change"));
   assert.deepEqual(world.queries(), []);
+  assert.deepEqual(standing(world), [named(slackTexts.CLIP_WAITING, NAMES)]);
   clipInfo(world);
   await world.dispatch(recorded("event_callback-file_change"));
   assert.deepEqual(world.queries(), ["What day is it today?"]);
+  // The clip no longer waits: the line that said so is gone.
+  assert.ok(!standing(world).includes(named(slackTexts.CLIP_WAITING, NAMES)));
+  assert.equal(world.slack.callsTo("chat.delete").length, 1);
   await world.dispatch(recorded("event_callback-file_change"));
   assert.deepEqual(world.queries(), ["What day is it today?"]); // once
 });
@@ -195,10 +215,11 @@ test("a clip waits for its transcript and is sent when slack has it", async (t) 
 test("a clip at the top level is answered in the channel, where the owner sees it", async (t) => {
   const world = worldOf(t);
   await world.dispatch(clipMessage(false));
-  const [told] = world.slack.callsTo("chat.postEphemeral") as Record<string, unknown>[];
+  const [told] = world.slack.callsTo("chat.postMessage") as Record<string, unknown>[];
   assert.equal(told?.text, named(slackTexts.CLIP_WAITING, NAMES));
   assert.equal(told?.channel, CHANNEL);
   assert.ok(!("thread_ts" in (told ?? {})));
+  assert.deepEqual(ownerWasTold(world), []);
 });
 
 test("a clip in a thread is answered in that thread", async (t) => {
@@ -215,9 +236,39 @@ test("a top-level clip given up after its wait is answered in the channel", asyn
   const world = worldOf(t);
   await world.dispatch(clipMessage(false));
   await world.appClock.advance(voice.WAIT_SECONDS);
-  const calls = world.slack.callsTo("chat.postEphemeral") as Record<string, unknown>[];
+  const calls = world.slack.callsTo("chat.postMessage") as Record<string, unknown>[];
   assert.equal(calls.length, 2);
   assert.ok(calls.every((call) => !("thread_ts" in call)));
+});
+
+// The channel can change while a clip waits: what is said then is for the owner alone, and where
+// he sees it.
+test("a top-level clip in a channel refused meanwhile is refused in the channel", async (t) => {
+  const world = worldOf(t);
+  await world.dispatch(clipMessage(false));
+  world.slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
+  clipInfo(world);
+  await world.dispatch(recorded("event_callback-file_change"));
+  assert.deepEqual(world.queries(), []);
+  assert.deepEqual(standing(world), []);
+  const [refused] = world.slack.callsTo("chat.postEphemeral") as Record<string, unknown>[];
+  assert.equal(
+    refused?.text,
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
+  );
+  assert.ok(!("thread_ts" in (refused ?? {})));
+});
+
+test("a clip given up in a channel refused meanwhile posts nothing there", async (t) => {
+  const world = worldOf(t);
+  await world.dispatch(clipMessage(false));
+  world.slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
+  await world.appClock.advance(voice.WAIT_SECONDS);
+  assert.deepEqual(standing(world), []);
+  assert.equal(said(world).length, 1); // the line about the wait alone, taken back
+  assert.deepEqual(ownerWasTold(world), [
+    fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
+  ]);
 });
 
 test("a change to a file nobody waits for does nothing", async (t) => {
@@ -236,10 +287,10 @@ for (const [index, other] of [{ user: STRANGER }, { user_team: OTHER_TEAM }].ent
     clipInfo(world, other);
     await world.dispatch(recorded("event_callback-file_change"));
     assert.deepEqual(world.queries(), []);
-    assert.deepEqual(ownerWasTold(world), [
-      named(slackTexts.CLIP_WAITING, NAMES),
-      named(slackTexts.CLIP_NOT_YOURS, NAMES),
-    ]);
+    assert.deepEqual(said(world), [named(slackTexts.CLIP_WAITING, NAMES)]);
+    assert.deepEqual(standing(world), []);
+    // For the owner alone: the file is somebody else's, who may read the channel.
+    assert.deepEqual(ownerWasTold(world), [named(slackTexts.CLIP_NOT_YOURS, NAMES)]);
   });
 }
 
@@ -303,9 +354,11 @@ test("the same clip sent again waits once", async (t) => {
   await world.dispatch(clipMessage(false, { ts: "1790190000.777777" }));
   // Past the first wait's end, inside the second's.
   await world.appClock.advance((voice.WAIT_SECONDS * 2) / 3);
-  assert.ok(!ownerWasTold(world).includes(notSent));
+  assert.ok(!said(world).includes(notSent));
+  // One line says the clip waits: the first clip's went when the second came.
+  assert.deepEqual(standing(world), [named(slackTexts.CLIP_WAITING, NAMES)]);
   await world.appClock.advance((voice.WAIT_SECONDS * 5) / 6);
-  assert.equal(ownerWasTold(world).filter((told) => told === notSent).length, 1);
+  assert.deepEqual(standing(world), [notSent]);
 });
 
 test("a long transcript is read from the clip s vtt", async (t) => {
@@ -337,21 +390,23 @@ test("a transcript that cannot be read or is empty sends nothing", async (t) => 
   world.downloads.set(file.vtt, new TextEncoder().encode("WEBVTT\n\n"));
   await world.dispatch(clipMessage(true, { transcription: { status: "complete" } }));
   assert.deepEqual(world.queries(), []);
-  assert.deepEqual(ownerWasTold(world), [
+  assert.deepEqual(said(world), [
     named(slackTexts.CLIP_WAITING, NAMES),
     fill(named(slackTexts.CLIP_UNREADABLE, NAMES), { reason: "HTTP 404" }),
     named(slackTexts.CLIP_EMPTY, NAMES),
   ]);
+  // What was not sent stays said; only the line about the wait goes.
+  assert.deepEqual(standing(world), said(world).slice(1));
 });
 
 test("a clip with no transcript in time is given up", async (t) => {
   const world = worldOf(t);
   await world.dispatch(clipMessage(false));
   await world.appClock.advance(voice.WAIT_SECONDS);
-  assert.deepEqual(ownerWasTold(world), [
-    named(slackTexts.CLIP_WAITING, NAMES),
+  assert.deepEqual(standing(world), [
     fill(named(slackTexts.CLIP_NOT_SENT, NAMES), { minutes: Math.round(voice.WAIT_SECONDS / 60) }),
   ]);
+  assert.equal(said(world).length, 2); // the line about the wait, taken back
   clipInfo(world);
   await world.dispatch(recorded("event_callback-file_change"));
   assert.deepEqual(world.queries(), []); // the wait is over: a late transcript sends nothing

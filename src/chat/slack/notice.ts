@@ -21,7 +21,8 @@ export interface Place {
  * One message to `place`: a normal post or, with `ephemeral`, one only `ownerUserId` sees. A
  * normal post pushes only inside a thread the owner started; an ephemeral message never does.
  * `blocks` are built to Block Kit's reference by the modules that make them: opaque to the
- * library's types.
+ * library's types. Returns the `ts` of a normal post, which `chat.delete` takes; null for an
+ * ephemeral message, which Slack lets nobody delete or update.
  */
 export async function deliver(
   slack: WebClient,
@@ -30,7 +31,7 @@ export async function deliver(
   text: string,
   blocks: readonly object[],
   options: { readonly ephemeral: boolean },
-): Promise<void> {
+): Promise<string | null> {
   const where = place.threadTs === null ? {} : { thread_ts: place.threadTs };
   const shown = blocks as unknown as KnownBlock[];
   if (options.ephemeral) {
@@ -41,16 +42,17 @@ export async function deliver(
       blocks: shown,
       ...where,
     });
-  } else {
-    await slack.chat.postMessage({
-      channel: place.channel,
-      text: take(text, FALLBACK_LIMIT),
-      blocks: shown,
-      unfurl_links: false,
-      unfurl_media: false,
-      ...where,
-    });
+    return null;
   }
+  const posted = await slack.chat.postMessage({
+    channel: place.channel,
+    text: take(text, FALLBACK_LIMIT),
+    blocks: shown,
+    unfurl_links: false,
+    unfurl_media: false,
+    ...where,
+  });
+  return posted.ts ?? null;
 }
 
 /** One of the daemon's notices, small and grey as the footer; `text` is mrkdwn. */
@@ -60,7 +62,7 @@ export function deliverNotice(
   place: Place,
   text: string,
   options: { readonly ephemeral: boolean },
-): Promise<void> {
+): Promise<string | null> {
   return deliver(slack, ownerUserId, place, text, [contextBlock(noticeText(text))], options);
 }
 
