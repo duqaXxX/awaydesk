@@ -147,6 +147,8 @@ class Daemon {
   readonly events: string[] = [];
   /** The token each client constructor was given, in order: `[constructor, token]`. */
   readonly tokens: Array<readonly [string, string]> = [];
+  /** The signal the bot clients were built with: it ends their pause after a rate limit. */
+  clientsStopped: AbortSignal | null = null;
   /** The app the receiver was given, once built: where a test delivers a payload from. */
   app: App | null = null;
   readonly dir: string;
@@ -195,8 +197,9 @@ class Daemon {
       configDir: this.dir,
       registry: registryOf(this.backend, {
         clients: {
-          bot: (token) => {
+          bot: (token, stopped) => {
             this.tokens.push(["bot", token]);
+            this.clientsStopped = stopped ?? null;
             return [this.slack, this.replies];
           },
           owner: (token) => {
@@ -292,6 +295,17 @@ test("a second instance stops before slack", async (t) => {
   } finally {
     await held.release();
   }
+});
+
+// Issue #236: a call Slack rate limited waits as long as Slack says before it is sent again, and
+// a stop does not wait for that pause.
+test("the clients are told when the daemon stops, and not before", async (t) => {
+  const d = new Daemon(t);
+  d.start();
+  await d.booted();
+  assert.equal(d.clientsStopped?.aborted, false);
+  await d.stop();
+  assert.equal(d.clientsStopped?.aborted, true);
 });
 
 test("run prunes stale threads and survives alive raising", async (t) => {

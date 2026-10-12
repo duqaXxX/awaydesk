@@ -2,7 +2,9 @@
  * The daemon's two Slack clients on one token, with the daemon's retry policy:
  *
  * - every call that Slack rate limited (HTTP 429) is sent again after the `Retry-After` Slack
- *   gave, up to 3 times. That is safe for every method: a rate limited call never ran.
+ *   gave, up to 3 times. That is safe for every method: a rate limited call never ran. Once the
+ *   daemon stops (`ClientOptions.stopped`) such a call is thrown as it is and the pause of one
+ *   that waits ends: Slack names the length of that pause, and a stop does not wait for it.
  * - a call that failed on the connection (a reset, a refused or unreachable host: a
  *   `WebAPIRequestError` that is not a timeout) is sent again once, after a backoff pause.
  *   `sharedClient` does so for every method, which is safe for a post that is an approval, a
@@ -88,6 +90,12 @@ export interface ClientOptions extends Omit<WebClientOptions, keyof typeof SENT_
   readonly clock?: Clock;
   /** The jitter added to a pause, in [0, 1) seconds. */
   readonly random?: () => number;
+  /**
+   * Aborts when the daemon stops: from then on a rate limited call is thrown as it is, and the
+   * pause of one that waits ends. Nothing is in flight during that pause, and Slack did not apply
+   * the call it answered `ratelimited`.
+   */
+  readonly stopped?: AbortSignal;
 }
 
 /** A request that failed before an answer, and not by the client's own timeout. */
@@ -109,13 +117,15 @@ class PolicyClient extends WebClient {
   readonly #notRetried: ReadonlySet<string>;
   readonly #clock: Clock;
   readonly #random: () => number;
+  readonly #stopped: AbortSignal | undefined;
 
   constructor(token: string | undefined, notRetried: readonly string[], options: ClientOptions) {
-    const { clock, random, ...rest } = options;
+    const { clock, random, stopped, ...rest } = options;
     super(token, { timeout: REQUEST_TIMEOUT_MS, ...rest, ...SENT_ONCE, logger: silentLogger() });
     this.#notRetried = new Set(notRetried);
     this.#clock = clock ?? systemClock;
     this.#random = random ?? Math.random;
+    this.#stopped = stopped;
   }
 
   /** Seconds to wait before sending the call again, or null when it is not sent again. */
@@ -144,7 +154,19 @@ class PolicyClient extends WebClient {
       } catch (error) {
         const pause = this.#pause(method, error, retries);
         if (pause === null) throw error;
-        await this.#clock.sleep(pause);
+        if (error instanceof WebAPIRateLimitedError) {
+          // The one pause that can last minutes (Slack names its length), and the one a stop
+          // may leave: see `ClientOptions.stopped`.
+          if (this.#stopped?.aborted) throw error;
+          try {
+            await this.#clock.sleep(pause, this.#stopped);
+          } catch (stop) {
+            if (this.#stopped?.aborted) throw error;
+            throw stop;
+          }
+        } else {
+          await this.#clock.sleep(pause);
+        }
       }
     }
   }
