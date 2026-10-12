@@ -423,13 +423,6 @@ export class ThreadSession {
       // them, and a second line under a footer would say the same twice.
       return ["", ""];
     }
-    const names = this.runningNames();
-    if (names !== null) {
-      return [
-        texts.fill(texts.STILL_RUNNING_NAMES, { names }),
-        texts.fill(texts.STILL_RUNNING_NAMES_STATUS, { names }),
-      ];
-    }
     return [
       texts.fill(texts.STILL_RUNNING, { counts: kinds }),
       texts.fill(texts.STILL_RUNNING_STATUS, { counts: kinds }),
@@ -2424,25 +2417,6 @@ export class ThreadSession {
       .map(([taskId]) => taskId);
     const current = this.active?.renderer.runningTasks ?? [];
     return [...new Set([...outlived, ...current])];
-  }
-
-  /**
-   * `Review the diff · Run the test suite`: what outlived its turn, each task by the first line
-   * of its description, in the order they started. Null when a task has no description or the
-   * line passes `STILL_RUNNING_NAMES_LIMIT`: the counts say it then.
-   */
-  private runningNames(): string | null {
-    const names: string[] = [];
-    for (const [taskId, renderer] of this.taskReplies) {
-      if (!renderer.runningTasks.includes(taskId)) continue;
-      // The first line, whatever ends it: a status is one line.
-      const name =
-        (this.tasks.get(taskId)?.[1] ?? "").split(/[\n\r\u2028\u2029]/, 1)[0]?.trim() ?? "";
-      if (name === "") return null;
-      names.push(name);
-    }
-    const line = names.join(" · ");
-    return names.length > 0 && line.length <= texts.STILL_RUNNING_NAMES_LIMIT ? line : null;
   }
 
   /**
