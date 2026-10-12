@@ -1292,6 +1292,8 @@ messages not sent, whether or not Claude Code had taken it in; its replay is not
   thread's own session also closes on its own: from the idle close, or at once when its stored
   session id can no longer be resumed (`SessionGone`). Either way, every reply still waiting in it
   (running, sent or queued) ends with `This reply ended before an answer:` and the reason. A closing
+  session denies its open requests and takes them back, and denies without showing it a request
+  the agent makes from then on (`ThreadSession.askOwner`). A closing
   session waits for an agent session that a daemon word (`!help`, `!bypass`, `!status`) is still
   starting, then closes it, and starts no other: the word gets `SessionClosed`, which tells the
   owner to send it again, and `!bypass` stores nothing. A session rebuilt to replace one still

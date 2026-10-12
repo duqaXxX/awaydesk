@@ -2756,6 +2756,11 @@ export class ThreadSession {
   ): Promise<Decision> {
     const questions = request.type === "question" ? request.questions : null;
     if (signal.aborted) return toAnswer(DENY, questions, this.names);
+    // A session that is closing has denied its open requests (`close`), and the agent can ask
+    // again on that denial while the close still waits for the first handler: this one would be
+    // shown in a thread whose session is going away, and nothing would ever settle it. It gets
+    // the answer the others got.
+    if (this.closedFlag) return toAnswer(DENY, questions, this.names);
     const title =
       request.title ||
       (request.type === "question" ? request.toolName : taskTitle(request.toolName, request.input));
