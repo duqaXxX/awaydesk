@@ -18,7 +18,9 @@ most once every `sinks.DEBOUNCE_SECONDS` per reply, and each append draws from o
 `chat.update`: a token bucket that paces writes evenly at 40 per 60 seconds plus a burst of 5, worst
 case 45 in one window, under the documented floor of `chat.update` (Tier 3, 50 or more a minute, per
 app), so several busy threads together stay under the app's own budget instead of racing through it
-and then freezing until it resets.
+and then freezing until it resets. A write that waited `limiter.UPDATE_WAIT_LOGGED_SECONDS` or more
+for its turn is logged with the time it waited, which is what tells whether the budget ever held
+back what the owner sees.
 
 ### Retries and writes in flight
 

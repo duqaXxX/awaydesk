@@ -2,6 +2,9 @@
 
 import { type Clock, monotonicClock } from "../../../clock.ts";
 import { Mutex } from "../../../core/port.ts";
+import { getLogger, type Logger } from "../../../log.ts";
+
+export const logger = getLogger("awaydesk.chat.slack.reply.limiter");
 
 // chat.update is Tier 3, "50+ per minute" per app (chat.update reference, read 2026-09-28): 40
 // per 60 s plus a burst of 5, worst case 45 in one window, a real margin under the documented
@@ -13,6 +16,11 @@ export const UPDATE_WINDOW_SECONDS = 60.0;
 // How many writes the budget lets through at once before pacing kicks in: enough for a reply
 // that just started to show its first few lines without waiting on threads that were already busy.
 export const UPDATE_BURST = 5;
+// A write that waited this long for its turn is logged (issue #203): one token takes
+// `UPDATE_WINDOW_SECONDS / UPDATE_LIMIT` (1.5 s) to come back, so a wait this long is a line of
+// writes ahead, which is when the budget delays what the owner sees. The number is the
+// project's own.
+export const UPDATE_WAIT_LOGGED_SECONDS = 5.0;
 
 /** What a reply asks of the budget: its turn before a write, and a token back when none followed. */
 export interface Limiter {
@@ -27,6 +35,8 @@ export interface UpdateLimiterOptions {
   readonly burst?: number;
   /** What the bucket refills and waits by; monotonic seconds by default. */
   readonly clock?: Clock;
+  /** Where a long wait is logged; the module's logger by default. */
+  readonly logger?: Pick<Logger, "info">;
 }
 
 /**
@@ -43,6 +53,7 @@ export class UpdateLimiter implements Limiter {
   private readonly rate: number;
   private readonly burst: number;
   private readonly clock: Clock;
+  private readonly log: Pick<Logger, "info">;
   private tokens: number;
   private checked: number;
   private readonly lock = new Mutex();
@@ -53,12 +64,17 @@ export class UpdateLimiter implements Limiter {
     this.rate = limit / window;
     this.burst = options.burst ?? UPDATE_BURST;
     this.clock = options.clock ?? monotonicClock;
+    this.log = options.logger ?? logger;
     this.tokens = this.burst;
     this.checked = this.clock.time();
   }
 
-  /** Waits until a token is available, then spends it. A signal that aborts gives the place up. */
+  /**
+   * Waits until a token is available, then spends it. A signal that aborts gives the place up.
+   * A wait of `UPDATE_WAIT_LOGGED_SECONDS` or more, the line of callers ahead included, is logged.
+   */
   async acquire(signal?: AbortSignal): Promise<void> {
+    const asked = this.clock.time();
     const release = await this.lock.acquire(signal);
     try {
       for (;;) {
@@ -67,6 +83,10 @@ export class UpdateLimiter implements Limiter {
         this.checked = now;
         if (this.tokens >= 1) {
           this.tokens -= 1;
+          const waited = now - asked;
+          if (waited >= UPDATE_WAIT_LOGGED_SECONDS) {
+            this.log.info(`a write waited ${waited.toFixed(1)} s for the shared budget of updates`);
+          }
           return;
         }
         await this.clock.sleep((1 - this.tokens) / this.rate, signal);
