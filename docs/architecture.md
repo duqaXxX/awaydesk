@@ -270,6 +270,50 @@ shaped on the two test modules, so a first real one may need a seam change. With
 the behaviour was compared by the existing suite and the golden files; on 2026-10-11 the daemon had
 not been run against a real Slack workspace with the modules in place.
 
+### What an agent must do that the types do not say
+
+The types of `src/agent/seam.ts` give the members. These are the rules the core relies on beside
+them. A rule the conformance suite checks names the check; one it does not check is marked, and a
+module that breaks it fails only in use.
+
+| Subject | Rule | Checked by `test/conformance/agent.ts` |
+|---|---|---|
+| A command | The owner types `!name args`. When `name` is the `name` of an entry of `AgentInfo.commands`, the agent receives the prompt `/name args` (the message flow, `messages.messages`); an alias does not match, and any other `!text` arrives as typed. A name in `AgentWords.newSession` is refused inside a thread and the names in `AgentWords.login` and `AgentWords.logout` are answered by the core: none of the three reaches the agent | `a command's output arrives whole, once, and uses no model`; nothing checks the text that arrives as typed |
+| The effort | `effort_observed` comes before the `turn_ended` of its turn: `ThreadSession.finish` builds the footer when the turn ends, from what it has by then. Null is the agent's default | Not checked: only that a level is one of `Capabilities.effortLevels` |
+| Who started a turn | `turn_ended.startedBy` is `owner` for a prompt's turn and `agent` for one the agent starts by itself to report a task. `report_started` names the task before such a turn's words, and needs `backgroundTasks` | `startedBy` is checked for a prompt's turn only |
+| A prompt taken | An agent that declares `promptDuringTurn` emits `prompt_taken` with the `Prompt.id` of each prompt it accepts, before that turn's words, whether it took the prompt into the running turn or as the next one | `a prompt taken is named by its id, before the turn's words` |
+| `interrupt` | The running turn ends with `turn_ended` whose `ending` is `interrupted`, and the session stays usable. With no turn running it resolves and ends nothing. The core has no timer for a turn that never ends after it | `interrupt ends the turn as interrupted, and the session goes on` |
+| `stopTask` | The task's line closes only when the agent then sends `task_ended`, or `task_updated` with `terminal` and a status. Until then the reply that holds the line stays open | Not checked |
+| `setEffort(null)`, `setModel(null)` | Null is the agent's default. The core calls `setEffort` only with `liveEffort` and `setModel` only with `models`, and never `setModel(null)` | `setEffort takes a declared level or null, and refuses another`, `setModel takes a listed model or null` |
+| `setPermissionMode` | A mode the agent refuses rejects. The core then changes nothing of its own: the bypass it stores is written only after the call resolves | `a permission mode the back end names is taken, another is refused` |
+| `session_started` | Emitted only once a start that resumes that id would succeed: the core stores the id when the event arrives, and the setup's Start may resume it before any prompt | `an id that session_started names can be resumed at once` |
+| A request | `RequestHandler.permission` and `RequestHandler.question` each resolve once. The agent passes a signal and aborts it when it no longer waits: the core takes the request back from the owner and resolves it as refused | `a request the agent gives up aborts the signal it passed, and the turn goes on to its end` |
+| A start that fails | `ResumeRefused`, the one error class of the seam, when the session a start names cannot be resumed: the core forgets the thread. Any other rejection is shown to the owner by its name and the next message tries again. Neither leaves a process running | `a resume the agent refuses rejects with ResumeRefused and leaves no process` |
+
+Some members are required by the type and serve a capability the module may not declare. The core
+never calls them then, and the plain agent shows what to give back: `folderTrusted` answers true
+and `trustedRepository` null without `folderTrust`, `setEffort` and `stopTask` throw without
+`liveEffort` and `backgroundTasks`, and `AgentInfo.models` is an empty list without `models`.
+`AgentBackend.usageLimits` is the one member left out when its capability is not declared.
+
+### What a chat must do that the types do not say
+
+| Subject | Rule | Checked by `test/conformance/chat.ts` |
+|---|---|---|
+| The owner check | Every inbound path checks that the owner acted before it calls `ChatInbound`, and the core never checks. What "the owner" means is the provider's: the Slack provider requires the configured user and the workspace it started in (`guards.isOwner`) | Three checks send a message, a click and a pick from somebody else. Nothing checks a second workspace |
+| Start and stop | `ChatProvider.start`, `stop` and `close` are called once each, in that order. Before `start` the daemon already calls `thread`, `endReply`, `withdraw`, `showStatus`, `channelState`, `openedAt` and the index's `refresh`, for the crash repair and the cleanup. `ChatEntry.build` must not read the core | `nothing arrives before start`, `nothing arrives after stop` |
+| A reply | `text` and `task` come while the turn runs. `finish` ends the body and may come more than once for one reply, since a report turn writes into the reply that started its task. `closeOut` ends the reply once, with the footer, and answers whether the end landed. `waitLanded` is asked only after a `closeOut` that answered false. `settle` brings the reply to its true form now, at a close. A signal given to any of the four releases the caller only: the write goes on | `carries text, a task line and a footer to its end`, `reports an end that did not land` |
+| A task line | `task` with an id already sent updates that line | The same id is sent twice; nothing checks that one line results |
+| A line of the daemon's | `text` with `notice` is a line of the daemon's own, and with `ending` the line that says how a reply was cut short | Not checked |
+| Markup | The core writes a notice (`tell`, `rewrite`, `ChannelChat.notice`) and a reference (`say`) and names which one (`Markup`). Its texts use backticks and Markdown emphasis. `ChatProvider.escape` makes a name safe for one markup, `ThreadChat.link` writes a link to a thread or answers null, and `ChatProvider.channelName` writes a channel | `leaves a plain word alone when it escapes it`, `link is a string or nothing` |
+| Ids | `MessageId` and `ThreadRef` are strings the core stores in `state.json` and hands back after a restart: the crash repair ends a reply and withdraws a request by the ids a previous process stored | Not checked across a restart |
+| A request | `ThreadChat.ask` resolves with the id of the message that shows the request, or rejects with `ChatError`; the core then refuses the request. `withdraw` answers true for a request that is already gone. A click on a withdrawn request may still reach `ChatInbound.answer`, which answers false after telling the owner | `ask rejects with ChatError when it could not show the request` |
+| A status | The core hands `showStatus` one of four words and stores the same word. What the word looks like is the provider's | Skipped for a chat without `reactions` |
+
+Not settled by the seam, by the core or by a check: who drops an event the chat delivers twice
+(neither the Slack provider nor the core does), and what a provider does with a click on a
+request it already withdrew.
+
 ## Startup
 
 `main.run` starts the daemon in this order. It is the one module that wires all three layers, and
