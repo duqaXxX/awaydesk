@@ -2416,7 +2416,9 @@ export class ThreadSession {
     const names: string[] = [];
     for (const [taskId, renderer] of this.taskReplies) {
       if (!renderer.runningTasks.includes(taskId)) continue;
-      const name = (this.tasks.get(taskId)?.[1] ?? "").split("\n", 1)[0]?.trim() ?? "";
+      // The first line, whatever ends it: a status is one line.
+      const name =
+        (this.tasks.get(taskId)?.[1] ?? "").split(/[\n\r\u2028\u2029]/, 1)[0]?.trim() ?? "";
       if (name === "") return null;
       names.push(name);
     }
