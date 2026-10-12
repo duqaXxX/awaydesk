@@ -678,6 +678,27 @@ export function chatConformance(
         assert.equal(showing(), false);
       });
 
+      check("gives up its footer when asked, without a new message", async (s) => {
+        const reply = s.provider.thread(s.ref).openReply(() => {});
+        await reply.text("The build is finished");
+        await reply.finish([]);
+        await reply.closeOut(FOOTER);
+        await reply.settle();
+        await s.rig.settle();
+        const footer = () => s.rig.read(s.ref).some((m) => m.text.includes("model-a"));
+        const messages = s.rig.read(s.ref).length;
+        assert.equal(footer(), true);
+        reply.withdrawFooter();
+        await reply.settle();
+        await s.rig.settle();
+        assert.equal(footer(), false, "the footer is gone");
+        assert.ok(
+          s.rig.read(s.ref).some((m) => m.text.includes("The build is finished")),
+          "the reply keeps what it said",
+        );
+        assert.equal(s.rig.read(s.ref).length, messages, "no message was added");
+      });
+
       check("reports an end that did not land", async (s) => {
         const reply = s.provider.thread(s.ref).openReply(() => {});
         await reply.text("This one is refused");

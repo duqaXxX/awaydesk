@@ -57,7 +57,7 @@ What crosses the chat seam, in both directions:
 
 | Crossing | Direction | What |
 |---|---|---|
-| a reply | core to provider | `ReplySink`: `text`, `task`, `finish`, `closeOut`, `waitLanded`, `settle`. A session holds it as a `Reply`, which adds `setRunning`, `setLatest` and `footerShown`. A tool's line crosses as a `TaskUpdate` and the footer as `FooterFields`, which the provider formats |
+| a reply | core to provider | `ReplySink`: `text`, `task`, `finish`, `closeOut`, `waitLanded`, `settle`. A session holds it as a `Reply`, which adds `setRunning`, `setLatest`, `withdrawFooter` and `footerShown`. A tool's line crosses as a `TaskUpdate` and the footer as `FooterFields`, which the provider formats |
 | a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, `activityRefused`, `written`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
 | a channel | core to provider | `ChannelChat`, from `ChatProvider.channel`: `notice`, `say`, `rewrite`, and the lists a word posts (`offer`, `withdraw`) |
 | the provider | core to provider | `ChatProvider`: `name`, `capabilities`, `escape` and `channelName` (what a core text relies on to write a name and a channel for the chat's markup, beside `ThreadChat.link`), `openedAt`, `channelState`, `threadState`, `index` and `openFile` where declared, and `start`, `stop` and `close` |

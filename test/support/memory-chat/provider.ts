@@ -148,6 +148,12 @@ class MemoryReply implements Reply {
     if (this.#closed) this.#write();
   }
 
+  withdrawFooter(): void {
+    if (!this.#closed || this.#footer === null) return;
+    this.#footer = null;
+    this.#write();
+  }
+
   #render(): string {
     const lines = this.#segments.flatMap((segment) => {
       if (segment.kind === "text") return [segment.text.trim()];

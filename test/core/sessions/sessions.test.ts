@@ -1056,6 +1056,101 @@ test("a report whose target already closed out gets its own reply", async (t) =>
   assert.ok(h.bodies().slice(1).some(isReport)); // the report got a reply of its own
 });
 
+/** Whether each message of the thread, in the order they were made, shows a footer now. */
+function footers(h: Harness): boolean[] {
+  return h.slack.createdTs.map(
+    (ts) => h.slack.messages.get(ts)?.blocks.some((block) => block.type === "divider") ?? false,
+  );
+}
+
+test("a report in a reply of its own takes the footer from the reply above it", async (t) => {
+  // The reply that started the task has ended, with its footer, when the report comes: the
+  // report's reply ends with a footer too, right under it. The thread says how it stands once.
+  const [first, notice, injected] = splitBackground();
+  const ended = notice.filter(notNotification);
+  const notification = notice.filter((item) => !notNotification(item));
+  const h = harnessFor(t)({ turns: [first] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  const a = inside(session).taskReplies.get("bny2rux7d");
+  assert.ok(a !== undefined);
+  h.clients[0]?.inject(ended);
+  await h.idle();
+  await h.clock.advance(INJECTED_TURN_WAIT);
+  await h.until(() => a.closedOut, 1.0);
+  await h.idle();
+  assert.deepEqual(footers(h), [true]); // the first reply ended with its footer
+  const pushes = h.slack.pushes();
+  h.clients[0]?.inject([...notification, ...injected]);
+  await h.until(() => h.replies().some(isReport));
+  await h.until(() => !session.busy);
+  await h.idle();
+  await h.sleep(3); // the edit waits its debounce, as every change to an ended reply does
+  assert.deepEqual(footers(h), [false, true]);
+  // The report's own end rang once; taking the footer back above it is an edit, which does not.
+  assert.equal(h.slack.pushes(), pushes + 1);
+});
+
+test("a report takes the footer from the reply right above it, whichever turn that was", async (t) => {
+  // Decided by the owner on 2026-10-12: two replies of the daemon's in a row show one footer,
+  // the last. The reply above the report is here an owner's turn that did not start the task.
+  const [first, notice, injected] = splitBackground();
+  const ended = notice.filter(notNotification);
+  const notification = notice.filter((item) => !notNotification(item));
+  const h = harnessFor(t)({ turns: [first, sdkMessages("tools")] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  const a = inside(session).taskReplies.get("bny2rux7d");
+  assert.ok(a !== undefined);
+  h.clients[0]?.inject(ended);
+  await h.idle();
+  await h.clock.advance(INJECTED_TURN_WAIT);
+  await h.until(() => a.closedOut, 1.0);
+  await (await session.submit("something else")).done.wait();
+  await h.idle();
+  await h.sleep(3);
+  assert.deepEqual(footers(h), [true, true]);
+  h.clients[0]?.inject([...notification, ...injected]);
+  await h.until(() => h.replies().some(isReport));
+  await h.until(() => !session.busy);
+  await h.idle();
+  await h.sleep(3);
+  // The task's own reply is not right above the report: it keeps its footer.
+  assert.deepEqual(footers(h), [true, false, true]);
+});
+
+test("a close writes the edit that takes a footer back, when it still waited", async (t) => {
+  const [first, notice, injected] = splitBackground();
+  const ended = notice.filter(notNotification);
+  const notification = notice.filter((item) => !notNotification(item));
+  const h = harnessFor(t)({ turns: [first] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  const a = inside(session).taskReplies.get("bny2rux7d");
+  assert.ok(a !== undefined);
+  h.clients[0]?.inject(ended);
+  await h.idle();
+  await h.clock.advance(INJECTED_TURN_WAIT);
+  await h.until(() => a.closedOut, 1.0);
+  h.clients[0]?.inject([...notification, ...injected]);
+  await h.until(() => h.replies().some(isReport));
+  await h.until(() => !session.busy);
+  await h.idle();
+  assert.deepEqual(footers(h), [true, true]); // the edit still waits its debounce
+  await session.close();
+  assert.deepEqual(footers(h), [false, true]);
+});
+
+test("an owner's next prompt leaves the footer of the reply above it", async (t) => {
+  const tools = sdkMessages("tools");
+  const h = harnessFor(t)({ turns: [tools, tools] });
+  const session = h.session();
+  await (await session.submit("first")).done.wait();
+  await (await session.submit("second")).done.wait();
+  await h.idle();
+  assert.deepEqual(footers(h), [true, true]);
+});
+
 test("the unreported expiry timer does not outlive close", async (t) => {
   // `expireUnreported`'s own task lives in a set of its own, which `close` must cancel along
   // with everything else, or it would try to post through a session that is already gone once

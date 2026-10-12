@@ -152,6 +152,12 @@ export interface Reply extends ReplySink {
   /** Whether this is the thread's latest reply: an older one drops the counts, keeps its footer. */
   setLatest(latest: boolean): void;
   /**
+   * Give up this reply's footer: a report of a background task follows it in a reply of its own
+   * that has ended with one, and the thread says how it stands once, at its end. An ended reply
+   * is written again without notifying; one whose footer cannot be taken back keeps it.
+   */
+  withdrawFooter(): void;
+  /**
    * Whether the reply's end has landed in the chat: its footer is then what says the running
    * counts, and the thread's activity line does not repeat them.
    */
