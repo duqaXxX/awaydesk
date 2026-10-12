@@ -14,6 +14,8 @@ import type { PromptContent } from "../../../src/agent/seam.ts";
 import type { ThreadSession } from "../../../src/core/sessions/session.ts";
 import { type Turn, takenNote } from "../../../src/core/sessions/turn.ts";
 import * as texts from "../../../src/core/texts.ts";
+import { AsyncEvent } from "../../support/fake-clock.ts";
+import { CHANNEL, THREAD } from "../../support/fake-slack.ts";
 import { NAMES } from "../../support/names.ts";
 import {
   END_OF_STREAM,
@@ -358,9 +360,90 @@ test("a prompt taken into a turn whose end a close cut is said to be taken, not 
   await session.close();
   footerRead();
   assert.ok(prompt.done.isSet);
-  assert.ok(said(h).includes(texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)));
+  assert.equal(count(said(h), texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)), 1);
   assert.ok(!said(h).includes("was not sent"));
   assert.ok(!said(h).includes(texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN })));
+});
+
+// Issue #263, from the review of its first commit: what else a close can cut in that window.
+
+/** Hold the footer's first read, so the reader stays inside `finish`. */
+function holdFooter(h: Harness): { reading: () => boolean; release: () => void } {
+  const client = h.clients[0];
+  assert.ok(client !== undefined);
+  let reading = false;
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const original = client.contextUsage.bind(client);
+  client.contextUsage = async () => {
+    reading = true;
+    await held;
+    return original();
+  };
+  return { reading: () => reading, release };
+}
+
+test("a close that cuts a turn's end while an earlier reply's command still runs keeps the status of a cut", async (t) => {
+  const { c, h, session } = crossed(t);
+  await firstTurn(h, session, c);
+  assert.equal(session.runningKinds, "1 shell"); // the first turn left its command running
+  const prompt = await send(h, session, PROMPT);
+  const hold = holdFooter(h);
+  play(h, c.own);
+  await h.until(() => hold.reading());
+  // The command belongs to the earlier reply, not to the turn being ended.
+  assert.equal(inside(session).active?.renderer.runningTasks.length, 0);
+  await session.close();
+  hold.release();
+  assert.ok(prompt.done.isSet);
+  assert.equal(h.state.thread(CHANNEL, THREAD)?.ended, "error");
+});
+
+test("a prompt whose turn a report's result ended is said not to be sent when a close cuts that end", async (t) => {
+  const { c, h, session } = crossed(t);
+  await firstTurn(h, session, c);
+  const prompt = await send(h, session, PROMPT);
+  const hold = holdFooter(h);
+  // The report turn with no notification before it: the turn's start takes the owner's prompt.
+  h.clients[0]?.inject(c.report);
+  await h.until(() => hold.reading());
+  const active = inside(session).active;
+  assert.ok(active !== null && active.turn === prompt);
+  assert.equal(active.taken.length, 0);
+  await session.close();
+  hold.release();
+  assert.ok(prompt.done.isSet);
+  // The reply holds the report, not the prompt's answer: the note names the prompt, once.
+  assert.equal(count(said(h), "was not sent"), 1);
+  assert.equal(count(said(h), "PINEAPPLE"), 1);
+  assert.equal(h.state.thread(CHANNEL, THREAD)?.ended, "error");
+});
+
+test("a close that lands in the reply's last write says once that the prompt was taken", async (t) => {
+  const r = scene("during-tool");
+  const h = harnessFor(t)({});
+  const session = h.session();
+  const prompt = await promptDuringTheReportTurn(h, session, r);
+  play(h, r.rest.slice(0, -1)); // up to the replay, before the result
+  await h.until(() => (inside(session).active?.taken.length ?? 0) > 0);
+  await h.sleep(0.3);
+  h.slack.gate = new AsyncEvent();
+  h.slack.gateMethod = "chat.startStream";
+  // The result: the footer is read at once, `finish` writes the note, and the reply's last write
+  // is held at the gate.
+  const result = r.rest.at(-1);
+  assert.ok(result !== undefined);
+  h.clients[0]?.inject([result]);
+  await h.slack.gated.wait();
+  const closing = session.close();
+  await h.until(() => session.closed);
+  h.slack.gate.set();
+  await closing;
+  assert.ok(prompt.done.isSet);
+  assert.ok(!said(h).includes("was not sent"));
+  assert.equal(count(said(h), texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)), 1);
 });
 
 test("the note counts the prompts taken in", () => {

@@ -2805,6 +2805,38 @@ test("a close that cancels the sweep after a turn ended normally finds no turn t
   assert.equal(activeAtAbandon, null);
 });
 
+// Issue #263, from the review: a restart's drain dropped a queued prompt, and its error stands.
+test("a close that cuts a turn's end keeps the error a dropped prompt left on the root", async (t) => {
+  const messages = sdkMessages("tools");
+  const h = harnessFor(t)({ turns: [messages.slice(0, -1)] });
+  const session = h.session();
+  const turn = await session.submit("first");
+  await h.until(() => h.clients.length > 0 && h.clients[0]?.queries.join() === "first");
+  const client = at(h.clients, 0);
+  const footerRead = new AsyncEvent();
+  let reading = false;
+  const original = client.contextUsage.bind(client);
+  client.contextUsage = async () => {
+    reading = true;
+    await footerRead.wait();
+    return original();
+  };
+  await h.until(() => h.slack.streamTs.length > 0);
+  // Queued, and dropped before the worker takes it, as the drain of a restart does.
+  const queuing = session.submit("next");
+  const dropping = session.dropQueued({ error: true });
+  const second = await queuing;
+  await dropping;
+  client.inject([at(messages, -1)]);
+  await h.until(() => reading); // the reader is inside `finish`, waiting for the footer
+  await session.close();
+  footerRead.set();
+  await h.idle();
+  assert.ok(turn.done.isSet && second.done.isSet);
+  assert.ok(h.replies().some((reply) => reply.includes("was not sent")));
+  assert.equal(thread(h).ended, "error");
+});
+
 test("a close after the turn's reply was closed leaves that reply as it ended", async (t) => {
   const messages = sdkMessages("tools");
   const h = harnessFor(t)({ turns: [messages.slice(0, -1)] });

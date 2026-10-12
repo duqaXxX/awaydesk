@@ -2239,7 +2239,15 @@ export class ThreadSession {
     // (sync) The turn is the active one before its first write: every `await` below yields, and
     // a turn already out of `sent` and not yet active would read as idle to a drain, a `!stop`
     // or a timer.
-    const active: ActiveTurn = { turn, renderer, taken: [], cut: false, released: [] };
+    const active: ActiveTurn = {
+      turn,
+      renderer,
+      taken: [],
+      cut: false,
+      released: [],
+      takenNoted: false,
+      unanswered: null,
+    };
     this.active = active;
     if (opening !== null) await renderer.feedNotice(opening);
     if (this.notice !== null) {
@@ -2522,6 +2530,7 @@ export class ThreadSession {
     signal?: AbortSignal,
   ): Promise<boolean> {
     let stopped = false;
+    let takenNoted = false;
     const injected = result.startedBy === "agent";
     // The agent ends a turn it took prompts into with one result of its own for all of them.
     const released = injected ? active.taken : [];
@@ -2572,7 +2581,10 @@ export class ThreadSession {
         // under the answer.
         this.handLatestTo(this.reply(active.renderer));
       }
-      if (released.length > 0) this.endNotes.push(takenNote(released.length, this.names));
+      if (released.length > 0) {
+        this.endNotes.push(takenNote(released.length, this.names));
+        takenNoted = true;
+      }
       // What a restart dropped meanwhile is said where the running turn ends.
       await this.feedEndNotes(active.renderer);
       // `!stop` cut this turn short, the owner's own or a report's: its reply ends like any
@@ -2581,7 +2593,13 @@ export class ThreadSession {
       await this.closeReply(active.renderer, footer, { force: stopped, signal });
     } catch (error) {
       active.cut = this.cutBeforeClose(active, error);
-      if (active.cut) active.released = released;
+      if (active.cut) {
+        active.released = released;
+        active.takenNoted = takenNoted;
+        // `settle` sends such a prompt back to wait for its own turn, which will not come.
+        const unanswered = injected && active.turn !== null && !released.includes(active.turn);
+        active.unanswered = unanswered ? active.turn : null;
+      }
       throw error;
     } finally {
       // Not settled when the cancel came before the reply closed: the turn stays active and
@@ -2682,12 +2700,26 @@ export class ThreadSession {
     const ended = active?.cut ? active : null;
     const whole = ended !== null;
     const released = ended?.released ?? [];
-    if (released.length > 0) this.endNotes.push(takenNote(released.length, this.names));
-    const dropped = [...this.sent.filter((turn) => !released.includes(turn)), ...more];
+    if (ended !== null && released.length > 0 && !ended.takenNoted) {
+      this.endNotes.push(takenNote(released.length, this.names));
+    }
+    const unanswered = ended?.unanswered ?? null;
+    const dropped = [
+      ...(unanswered === null ? [] : [unanswered]),
+      ...this.sent.filter((turn) => !released.includes(turn) && turn !== unanswered),
+      ...more,
+    ];
     this.sent = [];
     const waiting = [...(active?.turn ? [active.turn] : []), ...released, ...dropped];
+    // What `reactDoneIfIdle` reads at a normal end, before anything below changes it: an error
+    // that stands (a restart dropped prompts) and a task of any reply's that still runs keep the
+    // root from the status of a turn that ended.
     const endedWell =
-      ended !== null && dropped.length === 0 && ended.renderer.runningTasks.length === 0;
+      ended !== null &&
+      dropped.length === 0 &&
+      !this.errorStanding &&
+      ended.renderer.runningTasks.length === 0 &&
+      !this.runningKindsOf();
     this.injectedExpected = false;
     this.announced = null;
     this.reportDue = false;

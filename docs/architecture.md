@@ -1209,10 +1209,12 @@ closed when the start returns (`ThreadSession.connect`).
   closed. A close that does not drain (`SIGINT`, a second signal, the drain's limit) cancels the
   reader: when that comes before the reply was closed out, `ThreadSession.finish` leaves the turn
   active and unsettled (`ThreadSession.cutBeforeClose`), so that `ThreadSession.abandon` ends the
-  reply. The turn's result had arrived, so its answer is whole: the reply's stream stops with no
-  footer and without the line of a reply cut short, the prompts that result released get the note
-  of a normal end (`turn.takenNote`), and the root's status is the one of a turn that ended when
-  nothing else was dropped and no task of the turn's still ran.
+  reply. The turn's result had arrived, so its answer is whole: the reply's stream stops without
+  the line of a reply cut short, and with no footer when the cut came while the footer was read.
+  The prompts that result released get the note of a normal end, once (`turn.takenNote`); an
+  owner's prompt whose turn a report's result ended is named among the prompts not sent. The root's
+  status is the one of a turn that ended when no prompt was dropped, no error already stood and no
+  task of any reply still ran.
 - A background task that finishes between turns sends its notification while the session is idle,
   then Claude Code starts a turn of its own to report it. That turn renders into the reply that
   started the task (the held-open reply: `ThreadSession.openingTarget`, keyed by the task id through
