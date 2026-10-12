@@ -408,6 +408,31 @@ test("a thread slack gave no answer about is kept, and the log names the error",
   assert.ok(text.includes(`could not read thread ${GONE_ROOT} of ${CHANNEL}: no answer`));
 });
 
+test("after a thread the chat gave no answer about, its channel is asked no more", async () => {
+  // What stops one answer (a rate limit, a history the bot may not read) stops the others.
+  state.openThread(CHANNEL, GONE_ROOT, SECOND_SESSION);
+  const asked: ThreadRef[] = [];
+  const lookup = threadsInSlack(
+    { [THREAD]: "internal_error", [GONE_ROOT]: "internal_error" },
+    asked,
+  );
+  await forgetGoneThreads(lookup, state, found, nothingLive, "Slack", log);
+  assert.equal(asked.length, 1);
+  assert.equal(log.lines.filter((line) => line.includes("could not read thread")).length, 1);
+});
+
+test("a stop that has begun asks about no further thread", async () => {
+  state.openThread(CHANNEL, GONE_ROOT, SECOND_SESSION);
+  const asked: ThreadRef[] = [];
+  const lookup = threadsInSlack(
+    { [THREAD]: "thread_not_found", [GONE_ROOT]: "thread_not_found" },
+    asked,
+  );
+  const stopping = (): boolean => asked.length >= 1;
+  await forgetGoneThreads(lookup, state, found, nothingLive, "Slack", log, stopping);
+  assert.equal(asked.length, 1);
+});
+
 test("only the threads of the channels found are asked about", async () => {
   const asked: ThreadRef[] = [];
   const lookup = threadsInSlack({}, asked);

@@ -54,6 +54,8 @@ export type Alive = (
 
 export interface CleanOptions {
   readonly threadLookup: ThreadLookup;
+  /** True once a stop has begun: the threads not yet asked about wait for the next start. */
+  readonly stopping?: () => boolean;
   readonly alive: Alive;
   readonly live: Live;
   /** The chat's name (`ChatProvider.name`), for the log lines that say whose answer it was. */
@@ -125,7 +127,9 @@ export async function forgetGoneChannels(
 /**
  * Remove from `state` each thread, among those of the `channels` the chat found, whose first
  * message the chat answers `gone` about, and return them. A thread with a live session (read
- * when it is removed, after the chat was asked) is left for the next pass.
+ * when it is removed, after the chat was asked) is left for the next pass, as are the threads of
+ * a channel after the first one the chat gave no answer about, and every thread not yet asked
+ * about once `stopping` says a stop has begun.
  */
 export async function forgetGoneThreads(
   lookup: ThreadLookup,
@@ -134,22 +138,29 @@ export async function forgetGoneThreads(
   live: Live,
   chat: string,
   log: Log = logger,
+  stopping: () => boolean = () => false,
 ): Promise<ThreadRef[]> {
   const asked = new Set(channels);
   const gone: ThreadRef[] = [];
   for (const [channel, thread] of state.threads()) {
+    // One call to the chat per thread: a stop that begins meanwhile waits for one, not for all.
+    if (stopping()) break;
     if (!asked.has(channel)) continue;
     const ref = { channel, thread };
-    let answer: Presence;
+    let answer: Presence | string;
     try {
       answer = await lookup(ref);
     } catch (error) {
-      log.warning(`could not read thread ${thread} of ${channel}: ${errorName(error)}`);
-      continue;
+      answer = errorName(error);
     }
-    if (answer === "gone") gone.push(ref);
-    else if (answer === "no answer")
+    if (answer === "gone") {
+      gone.push(ref);
+    } else if (answer !== "there") {
+      // What kept the chat from answering (a rate limit, a history it may not read) holds for
+      // the channel's other threads too: they wait for the next pass, with one line here.
       log.warning(`could not read thread ${thread} of ${channel}: ${answer}`);
+      asked.delete(channel);
+    }
   }
   const busy = new Set([...live()].map((ref) => `${ref.channel}\u0000${ref.thread}`));
   const forgotten: ThreadRef[] = [];
@@ -190,7 +201,15 @@ export async function clean(
     log.warning(`could not check the bound channels: ${errorName(error)}`);
   }
   try {
-    await forgetGoneThreads(options.threadLookup, state, found, live, options.chat, log);
+    await forgetGoneThreads(
+      options.threadLookup,
+      state,
+      found,
+      live,
+      options.chat,
+      log,
+      options.stopping,
+    );
   } catch (error) {
     log.warning(`could not check the threads: ${errorName(error)}`);
   }

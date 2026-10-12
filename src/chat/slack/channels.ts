@@ -3,10 +3,10 @@
 import type { WebClient } from "@slack/web-api";
 import type { ChannelLookup, ThreadLookup } from "../../core/port.ts";
 import { ChatError } from "../seam.ts";
+import { THREAD_NOT_FOUND } from "./delete.ts";
 import { describe } from "./reply/errors.ts";
 
 const CHANNEL_NOT_FOUND = "channel_not_found";
-const THREAD_NOT_FOUND = "thread_not_found";
 
 /**
  * What the cleanup asks about a bound channel: `conversations.info`. Only `channel_not_found` is

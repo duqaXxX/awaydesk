@@ -12,8 +12,13 @@ All notable changes to this project are documented here. The format follows
   `ChatProvider.threadState`; for Slack, `thread_not_found` from `conversations.replies` on the
   thread's root is the only answer that removes a thread. Threads are asked about only in a
   channel that answered `there` in the same pass, and a thread with a live session is kept. Its
-  session shows in `!resume` again, since no thread holds it. The chat seam's `ChannelState`
-  type is named `Presence`, and `cleanup.ChannelAnswer` is gone in its favour.
+  session shows in `!resume` again, since no thread holds it. After the first thread Slack gives
+  no answer about, the other threads of that channel wait for the next pass, and no further
+  thread is asked about once a stop has begun. The chat seam's `ChannelState` type is named
+  `Presence`, and `cleanup.ChannelAnswer` is gone in its favour. A root deleted while replies
+  remain under it is still a thread to Slack: on 2026-10-12, after the owner deleted the first
+  message of a thread with two replies, the session index listed it with its two replies, read
+  with the same `conversations.replies` call. Not measured: a root the free plan hides.
 - The shared budget of updates logs a write that waited 5 seconds or more for its turn
   (`limiter.UPDATE_WAIT_LOGGED_SECONDS`), with the time it waited: `UpdateLimiter.acquire` slept
   without a line, so the log could not say whether the budget ever delayed the end of a reply
