@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Status } from "../../../src/chat/slack/reply/status.ts";
 import { APPROVE } from "../../../src/core/requests.ts";
-import { CHANNEL, THREAD } from "../../support/fake-slack.ts";
+import { AsyncEvent, CHANNEL, THREAD } from "../../support/fake-slack.ts";
 import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
 import {
   type Harness,
@@ -37,6 +37,11 @@ interface Ask {
   readonly input: JsonObject;
   readonly callId: string;
   readonly abort: AbortController;
+}
+
+/** The recorded turn from the reply's first message on: what follows `openedTurn`. */
+function restOfTurn() {
+  return sdkMessages("tools").slice(openedTurn().length);
 }
 
 /** The recorded turn up to the reply's first message, then the requests, each with its signal. */
@@ -174,4 +179,27 @@ test("a signal already aborted when the request arrives posts nothing", async (t
   assert.deepEqual(h.state.thread(CHANNEL, THREAD)?.requests, []);
   assert.equal(h.slack.callsTo("chat.delete").length, 0);
   assert.ok(!h.reactions().includes(Status.WAITING));
+});
+
+test("a turn that ends while a given-up request is being withdrawn leaves the root done", async (t) => {
+  const abort = new AbortController();
+  const h = harnessFor(t)({ turns: [askingTurn([bash("toolu_a", abort)])] });
+  const session = await posted(h, 1);
+  const gate = new AsyncEvent();
+  h.slack.gate = gate;
+  h.slack.gateMethod = "chat.delete";
+  h.slack.gated.clear();
+
+  abort.abort();
+  await h.slack.gated.wait(); // the withdraw is in flight
+  h.clients[0]?.inject(restOfTurn());
+  await h.until(() => session.idle);
+  gate.set();
+  await h.idle();
+
+  assert.equal(session.idle, true);
+  assert.equal(h.reactions().at(-1), Status.DONE);
+  const stored = h.state.thread(CHANNEL, THREAD);
+  assert.equal(stored?.status, null);
+  assert.deepEqual(stored?.requests, []);
 });

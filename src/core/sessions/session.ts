@@ -2808,7 +2808,6 @@ export class ThreadSession {
         await this.deleteRequest(messageTs); // decided while it was posted
       }
       decision = await pending.decision;
-      if (givenUp && !withdrawn) await this.deleteRequest(messageTs);
     } finally {
       signal.removeEventListener("abort", giveUp);
       this.deps.approvals.discard(approvalId);
@@ -2816,6 +2815,9 @@ export class ThreadSession {
       this.idleTimerCheck(); // may (re)start the idle-close timer
       if (!this.interrupting) this.reactWaitingOrWorking();
     }
+    // After the bookkeeping above, so a turn that ends during the chat round trip finds the
+    // request gone and the root free to settle on done.
+    if (givenUp && !withdrawn) await this.deleteRequest(messageTs);
     if (questions !== null && "answered" in decision && decision.answered) {
       await this.keepAnswers(request.callId, messageTs, questions, decision.answers);
     }
