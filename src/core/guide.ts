@@ -59,10 +59,17 @@ export function guideText(names: Names, offered: GuideOffer): string {
     (offered.sessionListing ? ` ${texts.GUIDE_SESSIONS_RESUME}` : "") +
     ` ${texts.GUIDE_SESSIONS_TERMINAL}`;
 
+  const [first, ...others] = names.newSession.map((name) => `\`!${name}\``);
+  const newSession =
+    first === undefined
+      ? ""
+      : ` ${fill(texts.GUIDE_NEW_SESSION, { names: others.length > 0 ? `${first} (${others.join(", ")})` : first })}`;
+  const commands = say(texts.GUIDE_COMMANDS) + newSession;
+
   const sections = [
     say(texts.GUIDE_INTRO),
     start.join("\n"),
-    ...(offered.commands ? [say(texts.GUIDE_COMMANDS)] : []),
+    ...(offered.commands ? [commands] : []),
     `${offered.questions ? texts.GUIDE_APPROVALS_AND_QUESTIONS : texts.GUIDE_APPROVALS}\n${approvals.join(" ")}`,
     sessions,
     ...(offered.fileUpload ? [say(texts.GUIDE_FILES)] : []),

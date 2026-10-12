@@ -26,12 +26,18 @@ export interface Names {
   readonly chat: string;
   /** Two of the agent's commands as the owner types them (`AgentWords.examples`). */
   readonly examples: string;
+  /** The agent's commands that start a new session (`AgentWords.newSession`). */
+  readonly newSession: readonly string[];
+  /** The agent's command that logs in on the host (`AgentWords.login`); null when none. */
+  readonly login: string | null;
+  /** The agent's command that logs out on the host (`AgentWords.logout`); null when none. */
+  readonly logout: string | null;
 }
 
 /**
  * A template that names the agent or the chat, with the fields `{agent}`, `{author}`, `{cli}`,
- * `{chat}` and `{examples}`. It is no string, and it throws where one is made of it: nothing can show it
- * before `named` filled the names in.
+ * `{chat}`, `{examples}`, `{login}` and `{logout}`. It is no string, and it throws where one is
+ * made of it: nothing can show it before `named` filled the names in.
  */
 export class Named {
   readonly template: string;
@@ -50,11 +56,18 @@ function naming(template: string): Named {
   return new Named(template);
 }
 
-/** `text` with the names filled in; its other `{name}` fields are left for `fill`. */
+/**
+ * `text` with the names filled in; its other `{name}` fields are left for `fill`. A text that
+ * takes `{login}` or `{logout}` is never shown for an agent that has no such command: it throws.
+ */
 export function named(text: Named, names: Names): string {
   return text.template.replace(
-    /\{(agent|author|cli|chat|examples)\}/g,
-    (_field, name: keyof Names) => names[name],
+    /\{(agent|author|cli|chat|examples|login|logout)\}/g,
+    (_field, name: "agent" | "author" | "cli" | "chat" | "examples" | "login" | "logout") => {
+      const value = names[name];
+      if (value === null) throw new Error(`no name for the field {${name}}`);
+      return value;
+    },
   );
 }
 
@@ -69,6 +82,9 @@ export function namesOf(
     cli: agent.words.command,
     chat: chat.name,
     examples: agent.words.examples,
+    newSession: agent.words.newSession,
+    login: agent.words.login,
+    logout: agent.words.logout,
   };
 }
 
@@ -83,15 +99,20 @@ export const UNBOUND_ANY =
   "under `{root}`, or `!bind <folder>` with the folder's path relative to `{root}`, for " +
   "example `!bind my-project`. `!guide` explains how awaydesk works.";
 export const AUTH_FAILED = naming(
-  "{agent} is not logged in on the host. On that machine, run `{cli}`, then `/login`. " +
+  "{agent} is not logged in on the host. On that machine, run `{cli}`, then `/{login}`. " +
+    "The login is never done from {chat}.",
+);
+// The same for an agent with no command of its own that logs in.
+export const AUTH_FAILED_NO_LOGIN = naming(
+  "{agent} is not logged in on the host. Log in on that machine. " +
     "The login is never done from {chat}.",
 );
 export const LOGIN_ON_HOST = naming(
-  "Log in on the host: on that machine, run `{cli}`, then `/login`. " +
+  "Log in on the host: on that machine, run `{cli}`, then `/{login}`. " +
     "The login is never done from {chat}.",
 );
 export const LOGOUT_ON_HOST = naming(
-  "Log out on the host: on that machine, run `{cli}`, then `/logout`. " +
+  "Log out on the host: on that machine, run `{cli}`, then `/{logout}`. " +
     "It is never done from {chat}.",
 );
 export const DIRECTORY_MISSING =
@@ -412,10 +433,12 @@ export const GUIDE_COMMANDS = naming(
   "**Commands**\n" +
     "{agent}'s commands start with `!` instead of `/`: {examples}. They run inside " +
     "a session's thread, where `!help` lists every command that session offers, and `!help <text>` " +
-    "filters the list; typed in the channel, `!help` lists awaydesk's own words instead. " +
-    "`!clear` (`!reset`, `!new`) is refused inside a thread (one thread is one session): start a " +
-    "fresh session with a new top-level message instead.",
+    "filters the list; typed in the channel, `!help` lists awaydesk's own words instead.",
 );
+// Joined to the guide's commands section, with `{names}` the agent's new-session commands.
+export const GUIDE_NEW_SESSION =
+  "{names} is refused inside a thread (one thread is one session): start a " +
+  "fresh session with a new top-level message instead.";
 export const GUIDE_APPROVALS = "**Approvals**";
 export const GUIDE_APPROVALS_AND_QUESTIONS = "**Approvals and questions**";
 export const GUIDE_PERMISSION = naming(

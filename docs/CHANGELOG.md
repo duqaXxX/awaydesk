@@ -318,6 +318,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `AgentWords` declares the names of the commands the core used to know by heart: `newSession`
+  (the commands that start a new session, refused inside a thread), `login` and `logout` (answered
+  with where they are done on the host; `null` when the agent has none).
+  `commands.NEW_SESSION_NAMES` and `commands.HOST_ONLY` are gone, `refusedInThread`, `hostOnly`
+  and `helpText` take the names, and `texts.Names` carries them. `texts.AUTH_FAILED_NO_LOGIN` is
+  the login failure for an agent with no login command, and the guide leaves out its sentence on
+  new-session commands when there are none. What Claude Code and Slack show is unchanged (#266).
 - The architecture reference is two pages, cut along the module boundary. `docs/architecture.md`
   keeps the overview, the modules, the core's parts and the measured platform behaviour;
   `docs/slack-provider.md` holds the four sections that describe the Slack provider alone

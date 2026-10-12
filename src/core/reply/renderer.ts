@@ -388,7 +388,8 @@ export class TurnRenderer<Footer = FooterFields> {
     }
     if (event.kind === "authentication") {
       this.authFailed = true;
-      await this.#text(texts.named(texts.AUTH_FAILED, this.#names), { notice: true });
+      const failed = this.#names.login === null ? texts.AUTH_FAILED_NO_LOGIN : texts.AUTH_FAILED;
+      await this.#text(texts.named(failed, this.#names), { notice: true });
       return;
     }
     // The agent wrote this message itself: its words name the failure and what to do next, as

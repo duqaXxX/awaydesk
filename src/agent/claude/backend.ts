@@ -28,6 +28,12 @@ export const WORDS: AgentWords = Object.freeze({
   author: "Claude",
   command: "claude",
   examples: "`!compact`, `!model opus`",
+  // `/clear` starts a new session under any of its names (aliases `/reset` and `/new`: commands
+  // reference, code.claude.com/docs/en/commands, read 2026-10-02, and the list SDK 0.2.163
+  // reports); `/login` and `/logout` act on the host's own login.
+  newSession: ["clear", "reset", "new"],
+  login: "login",
+  logout: "logout",
   terminal: "cd {directory} && claude --resume {session} --fork-session",
 });
 

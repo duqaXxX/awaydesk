@@ -79,21 +79,6 @@ export const WORD = {
 
 export const DESCRIPTION_LIMIT = 100;
 
-// Claude Code's `/clear` starts a new session under any of its names (aliases `/reset` and `/new`:
-// commands reference, code.claude.com/docs/en/commands, read 2026-10-02, and the list SDK 0.2.163
-// reports), and one thread is one session: the daemon refuses each of them inside a thread, which
-// is also the only place a session's commands are listed. Named here because a session rebuilt
-// after a restart lists no command until it connects (`refusedInThread`).
-export const NEW_SESSION_NAMES: ReadonlySet<string> = new Set(["clear", "reset", "new"]);
-
-// Claude Code's `/login` and `/logout` act on the host's own login, which the daemon and every
-// session run on: neither is ever sent to Claude Code, from the channel or from a thread, and
-// each is answered with where it is done instead (`hostOnly`).
-export const HOST_ONLY: ReadonlyMap<string, texts.Named> = new Map([
-  ["login", texts.LOGIN_ON_HOST],
-  ["logout", texts.LOGOUT_ON_HOST],
-]);
-
 // Python's whitespace, which `strip` and `split` follow, is not JavaScript's `\s` (`text.ts`).
 const TRAILING = new RegExp(`[${PY_SPACE}]+$`);
 const STARTS_WITH_SPACE = new RegExp(`^[${PY_SPACE}]`);
@@ -173,7 +158,7 @@ export function helpText(
     .map((word) => texts.named(word, names))
     .filter(served)
     .filter(keep);
-  const refused = refusedInThread(commands, agentCommands);
+  const refused = refusedInThread(commands, names.newSession, agentCommands);
   const offered = (commands ?? []).filter((c) => !refused.has(c.name.toLowerCase()));
   const session = offered
     .toSorted((a, b) => compareCodePoints(a.name, b.name))
@@ -194,9 +179,11 @@ export function helpText(
 }
 
 /**
- * The answer to a command that is only ever run on the host (`HOST_ONLY`), or null for any other,
- * and for every one when the agent has no commands of its own (`agentCommands` false): the caller
- * sends that answer and nothing to Claude Code.
+ * The answer to a command that is only ever run on the host (the agent's `login` and `logout`
+ * names, in `names`), or null for any other, for a name the agent does not have, and for every one
+ * when the agent has no commands of its own (`agentCommands` false): the caller sends that answer
+ * and nothing to the agent. These commands act on the host's own login, which the daemon and
+ * every session run on.
  */
 export function hostOnly(
   command: Passthrough,
@@ -204,24 +191,34 @@ export function hostOnly(
   agentCommands = true,
 ): string | null {
   if (!agentCommands) return null; // no command is the agent's, so none is run on the host
-  const answer = HOST_ONLY.get((command.text.split(" ", 1)[0] as string).toLowerCase());
-  return answer === undefined ? null : texts.named(answer, names);
+  const word = (command.text.split(" ", 1)[0] as string).toLowerCase();
+  if (names.login !== null && word === names.login.toLowerCase()) {
+    return texts.named(texts.LOGIN_ON_HOST, names);
+  }
+  if (names.logout !== null && word === names.logout.toLowerCase()) {
+    return texts.named(texts.LOGOUT_ON_HOST, names);
+  }
+  return null;
 }
 
 /**
- * The command names a thread refuses, lowercase: `NEW_SESSION_NAMES`, with every alias the
- * session's own list (`commands`, null or empty before it connects) gives one of them. None
- * for an agent with no commands of its own (`agentCommands` false).
+ * The command names a thread refuses, lowercase: the agent's `newSession` names (one thread is
+ * one session, and a thread is also the only place a session's commands are listed; they are
+ * known before a session rebuilt after a restart connects), with every alias the session's own
+ * list (`commands`, null or empty before it connects) gives one of them. None for an agent with
+ * no commands of its own (`agentCommands` false).
  */
 export function refusedInThread(
   commands: readonly CommandInfo[] | null,
+  newSession: readonly string[],
   agentCommands = true,
 ): ReadonlySet<string> {
   if (!agentCommands) return new Set(); // an agent with no commands of its own has none to refuse
+  const own = new Set(newSession.map((name) => name.toLowerCase()));
   const aliases = (commands ?? [])
-    .filter((command) => NEW_SESSION_NAMES.has(command.name.toLowerCase()))
+    .filter((command) => own.has(command.name.toLowerCase()))
     .flatMap((command) => command.aliases.map((alias) => alias.toLowerCase()));
-  return new Set([...NEW_SESSION_NAMES, ...aliases]);
+  return new Set([...own, ...aliases]);
 }
 
 /**

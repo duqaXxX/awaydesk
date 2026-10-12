@@ -35,16 +35,17 @@ function firstWord(command: Passthrough): string {
 }
 
 /**
- * Whether a passthrough is `!clear` under any of its names (`refusedInThread`, given the
- * session's `commands`): refused inside a thread (one thread is one session), left as an
- * ordinary passthrough everywhere else.
+ * Whether a passthrough starts a new session under any of the agent's names (`refusedInThread`,
+ * given its `newSession` names and the session's `commands`): refused inside a thread (one thread
+ * is one session), left as an ordinary passthrough everywhere else.
  */
 export function isClear(
   command: Passthrough,
   commands: readonly CommandInfo[] | null,
+  newSession: readonly string[],
   agentCommands = true,
 ): boolean {
-  return refusedInThread(commands, agentCommands).has(firstWord(command).toLowerCase());
+  return refusedInThread(commands, newSession, agentCommands).has(firstWord(command).toLowerCase());
 }
 
 export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): MessagesFlow {
@@ -111,7 +112,7 @@ export function messages(deps: FlowDeps, talk: Talk, others: OtherFlows): Messag
     if (
       inThread &&
       command !== null &&
-      isClear(command, opened.commands, agent.capabilities.commands)
+      isClear(command, opened.commands, agent.words.newSession, agent.capabilities.commands)
     ) {
       await talk.tell(ref, texts.CLEAR_IN_THREAD);
       return;

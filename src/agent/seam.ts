@@ -80,6 +80,18 @@ export interface AgentWords {
   /** Two of its commands as the owner types them in the chat, for the guide. */
   readonly examples: string;
   /**
+   * The agent's command names, without the slash, that start a new session; empty when it has
+   * none. One thread is one session, so the daemon refuses each of them inside a thread.
+   */
+  readonly newSession: readonly string[];
+  /**
+   * The name of the agent's own command that logs in on the host, without the slash; null when
+   * it has none. The daemon answers it with where it is done and never sends it.
+   */
+  readonly login: string | null;
+  /** The same for the command that logs out. */
+  readonly logout: string | null;
+  /**
    * The shell line that continues a session in a terminal; `{directory}` and `{session}` are
    * filled in, each quoted for a shell.
    */

@@ -35,6 +35,9 @@ const PLAIN_NAMES = {
   cli: "plain",
   chat: "Memory chat",
   examples: "`!echo hello`, `!count one two`",
+  login: "signin",
+  logout: "signout",
+  newSession: ["restart"],
 };
 
 /** A second thread with its session, working in the folder: the one a hold names. */

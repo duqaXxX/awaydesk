@@ -55,6 +55,9 @@ export const PLAIN_WORDS: AgentWords = Object.freeze({
   author: "Plain",
   command: "plain",
   examples: "`!echo hello`, `!count one two`",
+  newSession: ["restart"],
+  login: "signin",
+  logout: "signout",
   terminal: "cd {directory} && plain --resume {session}",
 });
 

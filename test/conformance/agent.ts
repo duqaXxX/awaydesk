@@ -349,6 +349,13 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       assert.ok(backend.words.examples.trim() !== "");
       assert.ok(backend.words.terminal.includes("{directory}"));
       assert.ok(backend.words.terminal.includes("{session}"));
+      // A command name is written after `!` in the chat and `/` in the agent: no slash, no space.
+      const { newSession, login, logout } = backend.words;
+      assert.ok(Array.isArray(newSession), "newSession is a list, empty when there is none");
+      for (const name of [...newSession, ...[login, logout].filter((one) => one !== null)]) {
+        assert.ok(/^[^\s/]+$/.test(name), `a command name carries no slash and no space: ${name}`);
+      }
+      for (const one of [login, logout]) assert.ok(one === null || typeof one === "string");
       assert.deepEqual(backend.capabilities, caps);
       const { effortLevels, permissionModes } = backend.capabilities;
       assert.ok(effortLevels.length > 0 && effortLevels.every((level) => level.trim() !== ""));

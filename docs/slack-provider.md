@@ -609,11 +609,11 @@ lists the channel's live sessions at the top level and one session's own values 
 `!stop` stops every session of the channel at the top level and one session inside its thread.
 `!clear` is not a word of its own: it is an ordinary `Passthrough` that `messages.isClear` catches
 only inside a thread, refused there (`texts.CLEAR_IN_THREAD`, one thread is one session), under each
-of its names: `clear`, `reset` and `new` (`commands.NEW_SESSION_NAMES`, known before a rebuilt
-session has started), and any other alias the session's own command list gives `clear` (the
+of the agent's new-session names (`AgentWords.newSession`: for Claude Code `clear`, `reset` and
+`new`, known before a rebuilt session has started), and any other alias the session's own command list gives `clear` (the
 initialization result carries each command's aliases; measured: "Initialization result"). At the top
 level it opens a new session like any other message, and reaches Claude Code as `/clear` if the
-freshly started session offers that command. `!login` and `!logout` are `Passthrough`s the daemon
+freshly started session offers that command. `!login` and `!logout` (`AgentWords.login` and `AgentWords.logout`) are `Passthrough`s the daemon
 never sends (`commands.hostOnly`): they act on the host's own login, which the daemon and every
 session run on, so `messages.messages` answers with `texts.LOGIN_ON_HOST` or
 `texts.LOGOUT_ON_HOST` before any session is opened, in the channel or, inside a session's thread,

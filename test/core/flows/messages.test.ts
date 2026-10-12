@@ -112,10 +112,10 @@ test("a command the agent does not offer is sent as typed", async (t) => {
 test("a command that is only run on the host is answered, not sent", async (t) => {
   const world = await MessagesWorld.make(t);
   const ref = await world.opened();
-  await world.says("!login", ref.thread);
+  await world.says("!signin", ref.thread);
   assert.equal(world.shown(ref).at(-1), named(texts.LOGIN_ON_HOST, PLAIN_NAMES));
   assert.deepEqual(await world.prompts(), ["first"]);
-  await world.says("!logout");
+  await world.says("!signout");
   assert.equal(world.inChannel().at(-1), named(texts.LOGOUT_ON_HOST, PLAIN_NAMES));
   assert.deepEqual(await world.prompts(), ["first"], "no session started either");
 });
@@ -132,9 +132,20 @@ test("an agent with no commands of its own gets every !text as text", async (t) 
 test("a command that starts a new session is refused inside a thread", async (t) => {
   const world = await MessagesWorld.make(t);
   const ref = await world.opened();
-  for (const word of ["!clear", "!reset", "!new"]) await world.says(word, ref.thread);
-  assert.deepEqual(world.shown(ref).filter((line) => line === texts.CLEAR_IN_THREAD).length, 3);
+  for (const word of ["!restart", "!RESTART now"]) await world.says(word, ref.thread);
+  assert.deepEqual(world.shown(ref).filter((line) => line === texts.CLEAR_IN_THREAD).length, 2);
   assert.deepEqual(await world.prompts(), ["first"]);
+});
+
+test("another agent's login and new-session names reach the plain agent as any other text", async (t) => {
+  const world = await MessagesWorld.make(t);
+  const ref = await world.opened();
+  await world.says("!clear", ref.thread);
+  await world.says("!login", ref.thread);
+  await world.says("!logout", ref.thread);
+  assert.deepEqual(await world.prompts(), ["first", "!clear", "!login", "!logout"]);
+  assert.ok(!world.shown(ref).includes(texts.CLEAR_IN_THREAD));
+  assert.ok(!world.shown(ref).includes(named(texts.LOGIN_ON_HOST, PLAIN_NAMES)));
 });
 
 // --- A thread whose folder is no longer the channel's
