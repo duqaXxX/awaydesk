@@ -23,6 +23,8 @@ export interface WaitingClip {
   readonly event: Payload;
   /** Gives the wait up after `voice.WAIT_SECONDS`. */
   expiry: Task<void> | null;
+  /** The line that says the clip waits, taken back when the wait ends; null when none stands. */
+  notice: string | null;
 }
 
 export class Clips {
@@ -67,22 +69,37 @@ export class Clips {
       await this.parts.inbound.unbound(channel);
       return;
     }
-    const waiting: WaitingClip = { channel, threadTs, ts, event, expiry: null };
+    const waiting: WaitingClip = { channel, threadTs, ts, event, expiry: null, notice: null };
     if (voice.ready(file)) {
       await this.sendClip(waiting, file);
       return;
     }
     const fileId = str(file.id);
-    // the same file sent again: one wait, the later one
-    this.clips.get(fileId)?.expiry?.cancel();
+    // the same file sent again: one wait, the later one, and one line that says so
+    const earlier = this.clips.get(fileId);
+    earlier?.expiry?.cancel();
     waiting.expiry = new Task((signal) => this.giveUp(fileId, signal));
     this.clips.set(fileId, waiting);
-    await this.answers.tellOwnerAbout(
-      channel,
-      threadTs,
-      ts,
-      named(slackTexts.CLIP_WAITING, this.parts.names),
-    );
+    if (earlier !== undefined) await this.endWait(earlier);
+    const notice = await this.say(waiting, named(slackTexts.CLIP_WAITING, this.parts.names));
+    // The wait can have ended while Slack took the line: nobody is left to take it back.
+    if (this.clips.get(fileId) === waiting) waiting.notice = notice;
+    else if (notice !== null) await this.answers.withdraw(channel, notice);
+  }
+
+  /**
+   * A line about the clip that stays: a normal post in the clip's thread, or in the channel
+   * for a clip at the top level. Returns its `ts`, null when it was not posted.
+   */
+  private say(waiting: WaitingClip, line: string): Promise<string | null> {
+    return this.answers.tellAbout(waiting.channel, waiting.threadTs, waiting.ts, line);
+  }
+
+  /** The wait is over, whichever way: the line that said the clip waits goes. */
+  private async endWait(waiting: WaitingClip): Promise<void> {
+    const notice = waiting.notice;
+    waiting.notice = null;
+    if (notice !== null) await this.answers.withdraw(waiting.channel, notice);
   }
 
   private async giveUp(fileId: string, signal: AbortSignal): Promise<void> {
@@ -95,12 +112,8 @@ export class Clips {
     // Whole minutes: 300 seconds are 5 whichever way a tie rounds (`Math.round` goes up, Python's
     // `round` to even).
     const minutes = Math.round(voice.WAIT_SECONDS / 60);
-    await this.answers.tellOwnerAbout(
-      waiting.channel,
-      waiting.threadTs,
-      waiting.ts,
-      fill(named(slackTexts.CLIP_NOT_SENT, this.parts.names), { minutes }),
-    );
+    await this.endWait(waiting);
+    await this.say(waiting, fill(named(slackTexts.CLIP_NOT_SENT, this.parts.names), { minutes }));
   }
 
   /** Send the clip's transcript as the message the owner would have typed. */
@@ -116,10 +129,8 @@ export class Clips {
         });
       } catch (error) {
         if (!(error instanceof DownloadFailed)) throw error;
-        await this.answers.tellOwnerAbout(
-          waiting.channel,
-          waiting.threadTs,
-          waiting.ts,
+        await this.say(
+          waiting,
           fill(named(slackTexts.CLIP_UNREADABLE, this.parts.names), {
             reason: mrkdwnEscape(error.message),
           }),
@@ -130,12 +141,7 @@ export class Clips {
       heard = voice.vttText(new TextDecoder("utf-8").decode(body));
     }
     if (!heard) {
-      await this.answers.tellOwnerAbout(
-        waiting.channel,
-        waiting.threadTs,
-        waiting.ts,
-        named(slackTexts.CLIP_EMPTY, this.parts.names),
-      );
+      await this.say(waiting, named(slackTexts.CLIP_EMPTY, this.parts.names));
       return;
     }
     const typed = strip(text(waiting.event.text) ?? "");
@@ -182,6 +188,7 @@ export class Clips {
     if (waiting === undefined || !voice.ready(file)) return;
     this.clips.delete(fileId);
     waiting.expiry?.cancel();
+    await this.endWait(waiting);
     const user = text(file.user);
     const team = text(file.user_team);
     if (!isOwner(identity, user, team)) {

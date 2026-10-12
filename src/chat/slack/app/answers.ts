@@ -25,7 +25,7 @@ import {
 import { getLogger } from "../../../log.ts";
 import type { ChatInbound } from "../../seam.ts";
 import type { Home } from "../home.ts";
-import { deliver } from "../notice.ts";
+import { deliver, deliverNotice } from "../notice.ts";
 import { contextBlock, noticeText } from "../reply/blocks.ts";
 import { describe } from "../reply/errors.ts";
 import type { Limiter } from "../reply/limiter.ts";
@@ -182,6 +182,48 @@ export class Answers {
   }
 
   /**
+   * A notice about the message `ts` that the daemon can take back (`withdraw`): a normal post,
+   * since Slack lets nobody delete an ephemeral message. It goes to the message's thread, or to
+   * the channel for a message at the top level, which has no thread yet. Returns the post's
+   * `ts`, null when nothing was posted. Never throws.
+   */
+  async tellAbout(
+    channel: string,
+    threadTs: string,
+    ts: string,
+    text: string,
+  ): Promise<string | null> {
+    const { slack, identity, sessions } = this.parts;
+    if (this.stopped) return null;
+    const place = { channel, threadTs: threadTs === ts ? null : threadTs };
+    try {
+      const posted = await deliverNotice(slack, identity.ownerUserId, place, text, {
+        ephemeral: false,
+      });
+      // Slack clears a thread's status line when the app replies: the session's is set again.
+      if (place.threadTs !== null) sessions.wrote(channel, place.threadTs);
+      return posted;
+    } catch (error) {
+      if (isCancelled(error)) throw error;
+      logger.warning(`could not reach the owner in ${channel}: ${describe(error)}`);
+      return null;
+    }
+  }
+
+  /** Takes back a notice `tellAbout` posted; one already gone counts as done. Never throws. */
+  async withdraw(channel: string, ts: string): Promise<void> {
+    if (this.stopped) return;
+    try {
+      await this.parts.slack.chat.delete({ channel, ts });
+    } catch (error) {
+      if (isCancelled(error)) throw error;
+      if (describe(error) !== "message_not_found") {
+        logger.warning(`could not take back a notice in ${channel}: ${describe(error)}`);
+      }
+    }
+  }
+
+  /**
    * Answer in the channel itself, as a normal post: where a word typed in the channel, or a
    * click on a list posted there, is answered.
    */
@@ -266,15 +308,24 @@ export class Answers {
     return true;
   }
 
-  /** The second check: the channel as Slack describes it now, the owner told why when refused. */
-  async channelAllowed(channel: string, threadTs: string): Promise<boolean> {
+  /**
+   * The second check: the channel as Slack describes it now, the owner told why when refused,
+   * under the message `ts` that asked or in `threadTs` when no message did (a click).
+   */
+  async channelAllowed(channel: string, threadTs: string, ts?: string): Promise<boolean> {
     const reason = await this.parts.guard.refusal(channel);
     // The check can outlast the daemon: nothing is said, not even to refuse the channel.
     if (this.stopped) return false;
     if (reason !== null) {
       // For the owner alone, even from a top-level message: a channel the guard refuses may
       // hold people who must not read the bot's words.
-      await this.tellOwner(channel, threadTs, fill(slackTexts.CHANNEL_REFUSED, { reason }));
+      // `ts` is the message that asked, when a message did: at the top level it has no thread.
+      await this.tellOwnerAbout(
+        channel,
+        threadTs,
+        ts ?? "",
+        fill(slackTexts.CHANNEL_REFUSED, { reason }),
+      );
       return false;
     }
     return true;

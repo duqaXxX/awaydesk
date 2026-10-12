@@ -277,7 +277,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
       // The daemon can have stopped while this message waited for the ones before it: calling
       // Slack then would break the contract of a listener in flight after the stop.
       if (answers.stopped) return;
-      if (!(await answers.channelAllowed(channel, threadTs))) return;
+      if (!(await answers.channelAllowed(channel, threadTs, ts))) return;
       // (sync) From the check to the call that hands the message over, nothing is awaited.
       const spoken = voice.clip(filesOf(message));
       // A failure of the prompt itself (or of the session it starts) lands in that session's

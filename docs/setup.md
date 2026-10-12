@@ -473,11 +473,12 @@ on the phone) can be the message. Send the clip, then choose **Generate transcri
 long press on the message on the phone, the transcript button beside the player on desktop. When
 Slack has written the transcript, awaydesk sends its text to Claude as if you had typed
 it, in a new thread for a clip sent in the channel and in the same session for a clip sent in a
-thread. Until then it tells you, for you alone,
+thread. Until then a line says
 ``Waiting for this clip's transcript: choose `Generate transcript` on the clip, and its text is sent to Claude.``
-A clip with no transcript after
-5 minutes is dropped, and you are told that nothing was sent; so is a clip that waits when
-awaydesk restarts, without a message. Text you type with the clip comes before the
+It is a message of the bot's, in the channel for a clip sent in the channel and in the thread for a
+clip sent in a thread, and awaydesk deletes it when the transcript arrives or the wait ends. A
+clip with no transcript after 5 minutes is dropped, and a line that stays says that nothing was
+sent; a clip that waits when awaydesk restarts is dropped without a message, and its line stays. Text you type with the clip comes before the
 transcript. What Slack heard is always the message, never a `!word`: a clip cannot turn bypass
 on or stop a session.
 
@@ -808,7 +809,7 @@ in [features.md](features.md#notifications), not restated here.
 | Symptom | Cause |
 |---|---|
 | The bot does not see a channel | The channel is public, or the bot was not invited: the manifest subscribes the app to the messages of private channels only (`message.groups`) |
-| ``awaydesk does not work in this channel: <reason>. It answers only in a private channel whose only members are you and the bot.`` | The bot checked the channel on its own and refused it; only you see the message. `<reason>` is one of `it is not a private channel`, `it is shared with another workspace`, `it has members other than you and the bot` and `the bot cannot read its details`. Remove the other members, or use a channel of your own. The first reason can come only from an event of a channel that is not private, which the manifest does not subscribe to |
+| ``awaydesk does not work in this channel: <reason>. It answers only in a private channel whose only members are you and the bot.`` | The bot checked the channel on its own and refused it; only you see the message, in the channel for a message sent there and in the thread for a reply. `<reason>` is one of `it is not a private channel`, `it is shared with another workspace`, `it has members other than you and the bot` and `the bot cannot read its details`. Remove the other members, or use a channel of your own. The first reason can come only from an event of a channel that is not private, which the manifest does not subscribe to |
 | `Claude Code is not logged in on the host` | Claude Code on the machine is logged out: run `claude`, then `/login` |
 | Some messages get no reply | A second instance is running and receiving part of the events |
 | `This thread's session no longer exists: Claude Code deleted it or cannot find it. Send a new message in the channel to start one.` | The stored session id can no longer be resumed (its transcript was deleted); send a new message in the channel to start one |

@@ -611,7 +611,11 @@ errors) are a context block, small and grey as the footer, so they read apart fr
 answers, `Answers.notice` and `Answers.tellOwner` for the Slack listeners'. A line for the owner
 alone about a top-level message that has no reply yet goes to the channel
 (`Answers.tellOwnerAbout`): Slack shows an ephemeral message in a thread only when the thread is
-already active. The same holds
+already active. That covers a refused attachment and a refused channel. The lines about an audio
+clip are normal posts instead (`Answers.tellAbout`), in the clip's thread or in the channel for a
+clip at the top level: Slack lets nobody delete or update an ephemeral message, and the line that
+says a clip waits is deleted (`Answers.withdraw`) when its transcript arrives or the wait ends. A
+clip whose file is somebody else's is still answered for the owner alone. The same holds
 for the lines of the `!bind` and `!resume` lists; their rows keep a section, since a context block
 holds no button. Their text is mrkdwn, and what comes from outside (a folder, a file name, a typed
 target) is escaped for it (`ChatProvider.escape`, which the Slack provider answers with

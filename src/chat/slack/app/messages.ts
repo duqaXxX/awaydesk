@@ -120,23 +120,25 @@ export function filesOf(event: Payload): SlackFile[] {
 }
 
 /**
- * The prompt for `sent` and its files; null, after telling the owner why, when any file cannot
- * reach the agent: the message is sent whole or not at all.
+ * The prompt for `sent` and its files; null, after telling the owner why under the message `ts`,
+ * when any file cannot reach the agent: the message is sent whole or not at all.
  */
 async function withAttachments(
   parts: AppParts,
   answers: Answers,
   channel: string,
   threadTs: string,
+  ts: string,
   sent: string,
   files: readonly SlackFile[],
 ): Promise<PromptContent | null> {
   const { fetch, uploads } = parts;
   const refuse = async (file: SlackFile, reason: string): Promise<void> => {
     const name = mrkdwnEscape(str(file.name || file.id));
-    await answers.tellOwner(
+    await answers.tellOwnerAbout(
       channel,
       threadTs,
+      ts,
       fill(named(slackTexts.UPLOAD_FAILED, parts.names), { name, reason }),
     );
   };
@@ -150,7 +152,7 @@ async function withAttachments(
   }
   const together = imagesRefusal(files, parts.names);
   if (together !== null) {
-    await answers.tellOwner(channel, threadTs, together);
+    await answers.tellOwnerAbout(channel, threadTs, ts, together);
     return null;
   }
   const fetched = await Promise.allSettled(
@@ -220,6 +222,6 @@ export function inboundMessage(
     plain: unformatted(sent, event.blocks) || sent,
     literal: files.length > 0 || (options.spoken ?? false),
     content: async () =>
-      files.length > 0 ? withAttachments(parts, answers, channel, threadTs, sent, files) : sent,
+      files.length > 0 ? withAttachments(parts, answers, channel, threadTs, ts, sent, files) : sent,
   };
 }

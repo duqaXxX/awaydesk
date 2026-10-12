@@ -253,6 +253,17 @@ test("a refused channel tells only the owner", async (t) => {
   const [refused] = refusals as [Body];
   assert.equal(refused.user, OWNER);
   assert.equal(refused.blocks[0].type, "context");
+  // A top-level message has no thread yet, and Slack shows an ephemeral message in a thread only
+  // when the thread is already active (`chat.postEphemeral` reference, read 2026-10-12).
+  assert.ok(!("thread_ts" in refused));
+});
+
+test("a refused channel answers a reply in its thread", async (t) => {
+  const world = worldOf(t);
+  world.slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
+  await world.dispatch(reply("hello", THREAD));
+  const [refused] = world.slack.callsTo("chat.postEphemeral") as [Body];
+  assert.equal(refused.thread_ts, THREAD);
 });
 
 test("an unbound channel explains how to bind", async (t) => {
@@ -1657,6 +1668,8 @@ test("a refused file sends nothing and says why", async (t) => {
     fill(namedText(slackTexts.UPLOAD_FAILED, NAMES), { name: "photo.png", reason }),
   ]);
   assert.deepEqual(world.queries(), []);
+  // The message is at the top level: under it, Slack would show the owner nothing.
+  assert.ok(!("thread_ts" in (world.slack.callsTo("chat.postEphemeral")[0] as Body)));
 });
 
 test("a failed download sends nothing and says why", async (t) => {

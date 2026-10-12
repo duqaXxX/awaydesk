@@ -965,6 +965,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The line that says a clip waits for its transcript goes when the transcript arrives, when the
+  wait ends, and when the same clip is sent again. It is a normal post of the bot's now, in the
+  channel for a clip at the top level and in the thread for a clip sent in one, since Slack
+  lets nobody delete or update an ephemeral message ("Modifying messages", read 2026-10-12).
+  The lines that say nothing was sent (no transcript in time, an empty or unreadable one) are
+  normal posts too, and stay. A clip that waits across a restart leaves its line behind: the
+  wait is kept in memory only. Not checked in Slack: whether the line pushes a notification
+  inside a session's thread.
+- A refused attachment and a refused channel are said again to a message at the top level. Both
+  were ephemeral messages under the message itself, which Slack shows only in a thread that is
+  already active; they go to the channel, still for the owner alone (`Answers.tellOwnerAbout`).
+  Seen on 2026-10-12: a zip sent in a bound channel got no word.
 - The footer and `!status` count a usage limit down to its next reset again (issue #272). Since
   the TypeScript daemon, every reset read `↻ 0m`: `UsageProbe` dated the `/usage` text on the
   clock the back end waits on, which the daemon sets to the monotonic one, so each reset was
@@ -975,10 +987,8 @@ All notable changes to this project are documented here. The format follows
   says it waits for its transcript, and the four that say nothing was sent. They were sent as
   ephemeral messages under the clip, a message with no reply yet, and Slack shows an ephemeral
   message in a thread only when the thread is already active (`chat.postEphemeral` reference,
-  read 2026-10-12): it accepted each call and showed nothing. `Answers.tellOwnerAbout` sends
-  them to the channel for a top-level clip and to the thread for a clip recorded in one. Not
-  checked in Slack: the refusals of an attachment and of a channel the guard refuses, which
-  reach a top-level message the same way.
+  read 2026-10-12): it accepted each call and showed nothing. They go to the channel for a
+  top-level clip and to the thread for a clip recorded in one.
 - A Claude Code process that ended is named for how it ended: the owner reads
   ``Claude Code reported an error: `ProcessExited` `` for an exit with a status other than 0,
   `ProcessKilled` for a signal and `ErrorResult` for an error result reported before the exit
