@@ -14,7 +14,10 @@ detail the sequence leaves out.
 
 ## Requirements
 
-- macOS, with a user account that stays logged in on the machine that runs the sessions.
+- macOS 13 or later, with a user account that stays logged in on the machine that runs the
+  sessions. The floor is Claude Code's (its system requirements, read 2026-10-12); awaydesk
+  itself has been run on macOS 27 only. The Mac has to stay awake: a sleeping machine answers
+  nothing until it wakes.
 - Claude Code installed and logged in with a claude.ai subscription: run `claude`, then `/login`.
   The 5-hour and weekly usage figures in the status footer exist only with a subscription.
 - [Node.js](https://nodejs.org/) 22.18 or later, which brings `npm`.
@@ -76,16 +79,8 @@ version found, and also with status 1: install a newer Node.
      `awaydesk`. Choose **Next**.
    - Check the summary and choose **Create**.
 
-The manifest asks for private channels only (`groups:history`, `groups:read`,
-`message.groups`), `chat:write`, `files:read` to download the files you attach to a message,
-`files:write` for `!open`, which shares a file of the session's folder into its thread, and
-`reactions:write` for the status reaction on a session's root message. It subscribes to one more
-event, `file_change`, which is how the app learns that Slack has written the transcript of an
-audio clip you sent; reading it needs `files:read` and no scope of its own. It also switches on the
-app's **Home** tab, where awaydesk keeps the list of your sessions; publishing it needs no
-scope and no event.
-The app registers no slash command: commands are typed as `!word` messages. Socket Mode is on,
-so the app needs no public URL and your machine opens no inbound port.
+What each scope and event of the manifest is for is under
+[Slack scopes and what fails without one](#slack-scopes-and-what-fails-without-one).
 
 awaydesk needs none of the app's agent features: leave **Agent experience** and the
 **Slack Model Context Protocol (MCP) Server** off in the app settings. The MCP server lets an app
@@ -269,36 +264,9 @@ approval for reaches Slack as **Approve** and **Deny** buttons, with the tool's 
    them. How trust reaches worktrees and nested repositories is under
    [How trust applies to git](#how-trust-applies-to-git).
 
-The models a new thread offers are the ones Claude Code lists, older versions included. To offer
-fewer, set Claude Code's `modelPicker` with `replaceBuiltInOptions: true` in
-`~/.claude/settings.json` (Claude Code reads it only from user or managed settings); it changes
-the terminal's `/model` picker the same way. Rows naming an alias (`opus`, `sonnet`, `haiku`)
-follow the newest version of that model.
-
-When Claude Code is logged out, a message in Slack replies with a note asking you to run `claude`
-and `/login` on the machine; the login is never done from Slack. `!login` and `!logout` typed in
-Slack get the same pointer to the machine and are never sent to Claude Code.
-
-If you turn on Claude Code's Bash sandbox, do it in your own settings, where it applies to the
-terminal and to Slack alike. Its auto-allow mode runs sandboxed Bash commands without asking,
-so they would not reach Slack for approval.
-
-The MCP servers you set up in Claude Code are available to a session started from Slack. A
-server that needs you to sign in is signed in on the machine: run `claude mcp login <name>`, or
-`/mcp` in the terminal. Computer use, and the commands Claude Code keeps for its interactive
-terminal, are not available from Slack: [limits.md](limits.md) lists what differs from the
-terminal and whose limit each is. Commands, scripts and command-line tools run from Slack as
-they do in the terminal.
-
-Claude Code's [Chrome integration](https://code.claude.com/docs/en/chrome) follows your choice in
-Claude Code. When `/chrome` shows **Enabled by default: Yes** in the terminal, a session started
-from Slack has the browser tools too, and Claude opens its tabs in the Chrome running on the
-machine, with your sign-ins. Nothing about it is set in awaydesk: turn it on or off with
-`/chrome` in the terminal, and a thread follows the change from its next start or resume. The
-permissions are Claude Code's own: when it asks before a browser action, the request reaches
-Slack as **Approve** and **Deny** buttons, and the sites Claude may act on are the ones the
-extension allows. Chrome has to be open, with the extension signed in to the account Claude Code
-uses.
+What else a session takes from your Claude Code setup (the models it offers, the Bash sandbox, MCP
+servers, the Chrome integration) is under
+[What a session takes from Claude Code](#what-a-session-takes-from-claude-code).
 
 ## Part 4: starting awaydesk on macOS
 
@@ -398,6 +366,19 @@ version goes: write it again after changing Node.
     ```bash
     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.awaydesk.plist
     ```
+
+    The command prints nothing when it works. `Bootstrap failed: 5: Input/output error` is the one
+    answer `launchctl` gives for a job that is already loaded, a plist that is missing, and a plist
+    it cannot read (measured on macOS 27.0.1, 2026-10-12). Check the file again with the `plutil`
+    line of step 11, then unload the job and load it again:
+
+    ```bash
+    launchctl bootout gui/$(id -u)/local.awaydesk
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.awaydesk.plist
+    ```
+
+    Do the same after changing the plist, or when checkpoint 3 fails: repeat step 11, then these
+    two lines.
 
 ### Checkpoint 3: the LaunchAgent runs it
 
@@ -925,6 +906,17 @@ kills the daemon and that turn with it after `ExitTimeOut`.
 
 ### Slack scopes and what fails without one
 
+The manifest asks for private channels only (`groups:history`, `groups:read`,
+`message.groups`), `chat:write`, `files:read` to download the files you attach to a message,
+`files:write` for `!open`, which shares a file of the session's folder into its thread, and
+`reactions:write` for the status reaction on a session's root message. It subscribes to one more
+event, `file_change`, which is how the app learns that Slack has written the transcript of an
+audio clip you sent; reading it needs `files:read` and no scope of its own. It also switches on the
+app's **Home** tab, where awaydesk keeps the list of your sessions; publishing it needs no
+scope and no event.
+The app registers no slash command: commands are typed as `!word` messages. Socket Mode is on,
+so the app needs no public URL and your machine opens no inbound port.
+
 If the bot token lacks `files:read`, `files:write` or `reactions:write`, add the missing bot
 scope on the app's **OAuth & Permissions** page, then reinstall the app to the workspace. Without
 `files:read`, every attached file is refused with `HTTP 302`; without `files:write`, `!open`
@@ -941,6 +933,39 @@ app that its transcript is ready.
 The line under a thread (`Working…`, `1 shell still running`) is Slack's thread status
 (`assistant.threads.setStatus`), which Slack's reference lists under `chat:write`. When Slack
 refuses it, the refusal is logged and the line is skipped.
+
+### What a session takes from Claude Code
+
+The models a new thread offers are the ones Claude Code lists, older versions included. To offer
+fewer, set Claude Code's `modelPicker` with `replaceBuiltInOptions: true` in
+`~/.claude/settings.json` (Claude Code reads it only from user or managed settings); it changes
+the terminal's `/model` picker the same way. Rows naming an alias (`opus`, `sonnet`, `haiku`)
+follow the newest version of that model.
+
+When Claude Code is logged out, a message in Slack replies with a note asking you to run `claude`
+and `/login` on the machine; the login is never done from Slack. `!login` and `!logout` typed in
+Slack get the same pointer to the machine and are never sent to Claude Code.
+
+If you turn on Claude Code's Bash sandbox, do it in your own settings, where it applies to the
+terminal and to Slack alike. Its auto-allow mode runs sandboxed Bash commands without asking,
+so they would not reach Slack for approval.
+
+The MCP servers you set up in Claude Code are available to a session started from Slack. A
+server that needs you to sign in is signed in on the machine: run `claude mcp login <name>`, or
+`/mcp` in the terminal. Computer use, and the commands Claude Code keeps for its interactive
+terminal, are not available from Slack: [limits.md](limits.md) lists what differs from the
+terminal and whose limit each is. Commands, scripts and command-line tools run from Slack as
+they do in the terminal.
+
+Claude Code's [Chrome integration](https://code.claude.com/docs/en/chrome) follows your choice in
+Claude Code. When `/chrome` shows **Enabled by default: Yes** in the terminal, a session started
+from Slack has the browser tools too, and Claude opens its tabs in the Chrome running on the
+machine, with your sign-ins. Nothing about it is set in awaydesk: turn it on or off with
+`/chrome` in the terminal, and a thread follows the change from its next start or resume. The
+permissions are Claude Code's own: when it asks before a browser action, the request reaches
+Slack as **Approve** and **Deny** buttons, and the sites Claude may act on are the ones the
+extension allows. Chrome has to be open, with the extension signed in to the account Claude Code
+uses.
 
 ### How trust applies to git
 
