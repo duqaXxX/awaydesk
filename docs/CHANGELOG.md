@@ -527,9 +527,9 @@ All notable changes to this project are documented here. The format follows
     two and tried again, and Slack always sends the header.
   - An effort chosen in a session's setup is applied to the running session in place, where the
     Python daemon started a new Claude Code client for it. The footer shows the same level.
-  - The log names the module of each line: `awaydesk.main` where the Python daemon wrote
-    `awaydesk`, so the line a start prints reads `INFO awaydesk.main: connected to Slack
-    workspace <workspace id>`. A start that fails on a token Slack refuses logs `ERROR
+  - The log names the module of each line where the Python daemon wrote `awaydesk`, so the line
+    a start prints reads `INFO awaydesk.chat.slack.thread: connected to Slack workspace
+    <workspace id>`. A start that fails on a token Slack refuses logs `ERROR
     awaydesk.main: stopped by an unexpected error: <Slack's error>` and exits with status 1, in
     place of a traceback.
   - Where a text or a log line names the error that stopped something (a failed download, a
