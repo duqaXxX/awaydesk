@@ -250,6 +250,16 @@ export const CLAIMS: readonly Claim[] = [
       "environment.` A command that answers anything else is no longer a limit: take its " +
       "row out of `docs/limits.md` and say so in the issue it names",
   ),
+  claim(
+    "P24",
+    "gesture",
+    "a session whose folder has computer use switched on lists no computer-use server, as " +
+      "`docs/limits.md` says",
+    "src/agent/claude/translate.ts#Translator.translate",
+    "in a folder where `/mcp` has computer use on, ask in a thread to open an app: Claude has no " +
+      "computer-use tool. If it does, the limit is gone: take its row out of `docs/limits.md`, " +
+      "say so in the issue it names, and see what Slack shows for a screenshot in a result",
+  ),
 ];
 
 if (new Set(CLAIMS.map((c) => c.id)).size !== CLAIMS.length) {

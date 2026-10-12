@@ -38,8 +38,12 @@ pinned SDK bundles Claude Code 2.1.296. Claude
 Code's commands reference lists 119 built-in commands; a session started through the SDK is
 offered 50 of them. Twenty-two of the others were each sent as awaydesk sends a command:
 the nineteen of the table, `/status`, `/help` and `/chrome`. Each got the answer quoted above,
-at no cost in tokens.
-Computer use was absent from the session's servers although it was switched on for the folder.
+at no cost in tokens. All twenty-two were sent again through the TypeScript SDK 0.3.296 (Claude
+Code 2.1.296) on 2026-10-12, with the same answer.
+Computer use was absent from the session's servers although it was switched on for the folder,
+on the Python SDK 0.2.164 (Claude Code 2.1.292, 2026-10-09) and again on the TypeScript SDK
+0.3.296 (Claude Code 2.1.296, 2026-10-12). The same session started with `--chrome` listed
+Claude in Chrome as connected, which is a different server.
 
 For some rows the SDK has a way of its own, which awaydesk does not use: a program can
 set a session's permission mode to `plan`, rewind the files of a session to an earlier message,

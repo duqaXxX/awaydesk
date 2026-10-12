@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Probe claim P24 sends no prompt and reads the servers of a session whose folder has computer
+  use switched on. The entry sits in a temporary home given to the Claude Code process, so the
+  owner's `~/.claude.json` is not read or changed, and a server the session declares and the
+  entry switches off must be listed as `disabled`: that shows the entry was read, and a run
+  where it is not proves nothing. A computer-use server in the list breaks the claim, and its row
+  leaves `docs/limits.md` first. `docs/limits.md` now records that the 22 commands and computer
+  use were measured again on the TypeScript SDK 0.3.296 (Claude Code 2.1.296) on 2026-10-12.
 - The release probe looks at commands (`probe/commands.py`). It compares the commands a session
   is offered on the release with the recorded `server-info.json` and prints the new and the gone
   ones, to be tried in Slack before the release is pinned; `uv run python -m probe --commands`

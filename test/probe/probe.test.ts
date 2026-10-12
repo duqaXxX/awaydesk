@@ -262,3 +262,21 @@ test("the models are listed when each has a value and a name and its effort leve
   assert.ok(!modelsListed([{ ...fine, supportedEffortLevels: [] }]).holds);
   assert.ok(!modelsListed([fine, "not a record"]).holds);
 });
+
+test("computer use is judged only when the control server shows the folder's entry was read", async () => {
+  const { judgeComputerUse } = await import("../../probe/scenes.ts");
+  const read = { name: "control", status: "disabled" };
+  // Absent beside a control that was read: the limit stands.
+  assert.deepEqual(judgeComputerUse([read]), { caused: true, holds: true, detail: "" });
+  // Listed, whatever its status: the limit is gone.
+  const listed = judgeComputerUse([read, { name: "computer-use", status: "connected" }]);
+  assert.equal(listed.caused, true);
+  assert.equal(listed.holds, false);
+  assert.match(listed.detail, /computer-use connected/);
+  // The control missing or not disabled: the entry was not read, so its absence says nothing.
+  for (const servers of [[], [{ name: "control", status: "connected" }]]) {
+    const unread = judgeComputerUse(servers);
+    assert.equal(unread.caused, false);
+    assert.equal(unread.holds, false);
+  }
+});

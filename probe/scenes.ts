@@ -102,6 +102,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   goal: ["P20"],
   compact: ["P21", "P22"],
   "commands not offered": ["P23"],
+  "computer use": ["P24"],
 };
 
 /** `text` without any path of this machine, one line, cut to `limit` characters. */
@@ -865,6 +866,68 @@ async function commandsNotOffered(s: Stage): Promise<Seen> {
   return { P23: observation(true, offered.length === 0, detail) };
 }
 
+/** The server a probe session declares and its folder's entry switches off: the scene's control. */
+const CONTROL_SERVER = "control";
+
+/** How long a session gets to register its servers before the list is read. */
+const SERVERS_SETTLE_MS = 4000;
+
+/**
+ * What a session's servers say about computer use. The control is a server the session declares
+ * and the folder's entry in `.claude.json` switches off: listed as `disabled`, it shows that entry
+ * was read, so the absence of a computer-use server beside it is about computer use and not about
+ * an entry nobody read.
+ */
+export function judgeComputerUse(
+  servers: readonly { readonly name: string; readonly status: string }[],
+): Observation {
+  const listed =
+    servers.map((server) => `${server.name} ${server.status}`).join(", ") || "no server";
+  if (servers.find((server) => server.name === CONTROL_SERVER)?.status !== "disabled") {
+    return observation(false, false, `the folder's entry was not read: ${listed}`);
+  }
+  const computer = servers.some((server) => /computer/i.test(server.name));
+  return observation(true, !computer, computer ? `listed: ${listed}` : "");
+}
+
+/**
+ * Starts a session in a folder whose entry switches computer use on, and reads the servers it
+ * lists; no prompt is sent. The entry sits in a temporary home given to the Claude Code process
+ * (`HOME`), so the owner's `~/.claude.json` is neither read nor changed. The claim is about a raw
+ * list the back end does not expose, which is why this scene reads the SDK itself.
+ */
+async function computerUse(s: Stage): Promise<Seen> {
+  const home = join(s.root, "computer-use-home");
+  const folder = join(s.root, "computer-use");
+  await mkdir(home);
+  await mkdir(folder);
+  const entry = { enabledMcpServers: ["computer-use"], disabledMcpServers: [CONTROL_SERVER] };
+  await writeFile(join(home, ".claude.json"), JSON.stringify({ projects: { [folder]: entry } }));
+  const env: Record<string, string | undefined> = { ...process.env, HOME: home };
+  // It would send Claude Code to another folder for its configuration.
+  delete env.CLAUDE_CONFIG_DIR;
+  const input = new AsyncQueue<SDKUserMessage>();
+  const raw = query({
+    prompt: input,
+    options: {
+      cwd: folder,
+      settingSources: [],
+      model: PROBE_MODEL,
+      env,
+      mcpServers: { [CONTROL_SERVER]: { command: process.execPath, args: ["-e", ""] } },
+    },
+  });
+  try {
+    await raw.initializationResult();
+    // Some servers register after the session starts: absence is read once they had time to.
+    await new Promise<void>((resolve) => setTimeout(resolve, SERVERS_SETTLE_MS));
+    return { P24: judgeComputerUse(await raw.mcpServerStatus()) };
+  } finally {
+    input.end();
+    raw.close();
+  }
+}
+
 /**
  * Removes the transcripts the probe's sessions left under Claude Code's projects folder: only
  * the folders whose name holds this run's random temporary folder. Anything else is left alone.
@@ -917,6 +980,7 @@ export async function runScenes(log: Log): Promise<Seen> {
       Object.assign(seen, await attempt("goal", s, () => goal(s)));
       Object.assign(seen, await attempt("compact", s, () => compact(s)));
       Object.assign(seen, await attempt("commands not offered", s, () => commandsNotOffered(s)));
+      Object.assign(seen, await attempt("computer use", s, () => computerUse(s)));
     } finally {
       await Promise.allSettled(s.lives.map((live) => live.session.close()));
       await forgetSessions(root, log);
