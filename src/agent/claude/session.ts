@@ -242,9 +242,9 @@ export class ClaudeSession implements AgentSession {
         try {
           const request = toRequest(toolName, input, context);
           if (request.type === "question") {
-            return questionResult(await requests.question(request), input);
+            return questionResult(await requests.question(request, context.signal), input);
           }
-          return permissionResult(await requests.permission(request), input);
+          return permissionResult(await requests.permission(request, context.signal), input);
         } catch (error) {
           logger.error(`could not ask the owner about a call: ${errorName(error)}`);
           return { behavior: "deny", message: REQUEST_UNSHOWN };

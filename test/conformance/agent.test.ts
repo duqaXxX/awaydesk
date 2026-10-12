@@ -226,6 +226,14 @@ class ClaudeWorld implements AgentWorld {
   }
 
   callTool(answer: "allow" | "deny", after: string): PlayedTool {
+    return this.#playBash(answer, after, false);
+  }
+
+  giveUpTool(after: string): PlayedTool {
+    return this.#playBash("deny", after, true);
+  }
+
+  #playBash(answer: "allow" | "deny", after: string, giveUp: boolean): PlayedTool {
     // What the CLI writes once it has the owner's answer: the tool's result or its rejection.
     const result =
       answer === "allow"
@@ -251,7 +259,13 @@ class ClaudeWorld implements AgentWorld {
       kind: "other",
       batch: [
         ...withSession([...OPENING, ...BASH_CALL], id),
-        ask({ toolName: "Bash", input: BASH_INPUT, toolUseID: BASH_ID, requestId: "request-1" }),
+        ask({
+          toolName: "Bash",
+          input: BASH_INPUT,
+          toolUseID: BASH_ID,
+          requestId: "request-1",
+          ...(giveUp && { giveUp }),
+        }),
         ...withSession(speak(rest, after), id),
       ],
     });
@@ -421,6 +435,11 @@ class PlainWorld implements AgentWorld {
 
   callTool(_answer: "allow" | "deny", after: string): PlayedTool {
     this.#turns.push([call("Shell", LS, { permission: true, output: "a.txt" }), say(after)]);
+    return { toolName: "Shell", input: LS };
+  }
+
+  giveUpTool(after: string): PlayedTool {
+    this.#turns.push([call("Shell", LS, { permission: true, giveUp: true }), say(after)]);
     return { toolName: "Shell", input: LS };
   }
 

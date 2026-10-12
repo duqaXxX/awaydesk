@@ -417,10 +417,15 @@ export type QuestionAnswer =
 /**
  * Asked by a back end while a call waits; each resolves once, for as long as it takes. A request
  * still waiting when the core closes the session resolves as refused (a denial, a skip).
+ *
+ * `signal` is the agent's: it aborts it when it no longer waits for the answer. The core then
+ * takes the request back from the owner and the promise resolves as refused, like a request
+ * still waiting when the session closes. A signal already aborted when the request arrives
+ * shows the owner nothing.
  */
 export interface RequestHandler {
-  permission(request: PermissionRequest): Promise<PermissionAnswer>;
-  question(request: QuestionRequest): Promise<QuestionAnswer>;
+  permission(request: PermissionRequest, signal: AbortSignal): Promise<PermissionAnswer>;
+  question(request: QuestionRequest, signal: AbortSignal): Promise<QuestionAnswer>;
 }
 
 /** One live session of an agent. */

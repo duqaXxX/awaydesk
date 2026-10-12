@@ -37,6 +37,10 @@ export interface AskCall {
     readonly requestId?: string;
     readonly title?: string;
     readonly description?: string;
+    /** The request's own signal: a test aborts it, as the SDK does when it gives a request up. */
+    readonly abort?: AbortController;
+    /** The fake aborts the request's signal once the callback holds it, and awaits the callback. */
+    readonly giveUp?: boolean;
   };
 }
 
@@ -208,14 +212,20 @@ export class FakeQuery implements QueryHandle {
   async #ask({ ask }: AskCall): Promise<void> {
     const canUseTool: CanUseTool | undefined = this.options.canUseTool;
     if (canUseTool === undefined) throw new Error("the session registered no permission callback");
+    const abort = ask.abort ?? new AbortController();
+    const stop = () => abort.abort();
+    this.#stop.signal.addEventListener("abort", stop, { once: true });
     const context = {
-      signal: this.#stop.signal,
+      signal: abort.signal,
       toolUseID: ask.toolUseID ?? "toolu_fake_1",
       requestId: ask.requestId ?? "request_fake_1",
       ...(ask.title !== undefined && { title: ask.title }),
       ...(ask.description !== undefined && { description: ask.description }),
     };
-    const result = await canUseTool(ask.toolName, ask.input, context);
+    const asking = canUseTool(ask.toolName, ask.input, context);
+    if (ask.giveUp === true) abort.abort();
+    const result = await asking;
+    this.#stop.signal.removeEventListener("abort", stop);
     if (result === null) throw new Error("the session answered the permission request out of band");
     this.permissionResults.push(result);
   }

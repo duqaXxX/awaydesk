@@ -73,6 +73,11 @@ export interface AgentWorld {
    * test is going to give `answer`, which a back end that replays records needs to know.
    */
   callTool(answer: "allow" | "deny", after: string): PlayedTool;
+  /**
+   * The next prompt: the agent starts a call, asks permission for it, gives the request up while
+   * the handler waits, then writes `after`.
+   */
+  giveUpTool(after: string): PlayedTool;
   /** The next prompt: the agent asks questions, then writes a word. Returns what it asks. */
   askQuestion(): readonly PlayedQuestion[];
   /** The next prompt: the agent writes `text` and then keeps working until interrupted. */
@@ -189,13 +194,18 @@ function startOptions(world: AgentWorld, override: Partial<StartOptions> = {}): 
 class Requests implements RequestHandler {
   readonly permissions: PermissionRequest[] = [];
   readonly questions: QuestionRequest[] = [];
-  readonly #permission: (request: PermissionRequest) => Promise<PermissionAnswer>;
-  readonly #question: (request: QuestionRequest) => Promise<QuestionAnswer>;
+  /** The signal each request came with, in the order of `permissions` then `questions` asked. */
+  readonly signals: AbortSignal[] = [];
+  readonly #permission: (
+    request: PermissionRequest,
+    signal: AbortSignal,
+  ) => Promise<PermissionAnswer>;
+  readonly #question: (request: QuestionRequest, signal: AbortSignal) => Promise<QuestionAnswer>;
 
   constructor(
     answers: {
-      permission?: (request: PermissionRequest) => Promise<PermissionAnswer>;
-      question?: (request: QuestionRequest) => Promise<QuestionAnswer>;
+      permission?: (request: PermissionRequest, signal: AbortSignal) => Promise<PermissionAnswer>;
+      question?: (request: QuestionRequest, signal: AbortSignal) => Promise<QuestionAnswer>;
     } = {},
   ) {
     this.#permission = answers.permission ?? (async () => ({ allow: true }));
@@ -203,14 +213,16 @@ class Requests implements RequestHandler {
       answers.question ?? (async () => ({ answered: false, message: "The owner skipped it." }));
   }
 
-  permission(request: PermissionRequest): Promise<PermissionAnswer> {
+  permission(request: PermissionRequest, signal: AbortSignal): Promise<PermissionAnswer> {
     this.permissions.push(request);
-    return this.#permission(request);
+    this.signals.push(signal);
+    return this.#permission(request, signal);
   }
 
-  question(request: QuestionRequest): Promise<QuestionAnswer> {
+  question(request: QuestionRequest, signal: AbortSignal): Promise<QuestionAnswer> {
     this.questions.push(request);
-    return this.#question(request);
+    this.signals.push(signal);
+    return this.#question(request, signal);
   }
 }
 
@@ -555,6 +567,8 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         await session.send(prompt());
         const turn = await events.turn();
         assert.equal(requests.permissions.length, 1, "the owner is asked once");
+        assert.equal(requests.signals.length, 1, "the request came with a signal");
+        assert.equal(requests.signals[0]?.aborted, false, "an answered request is not given up");
         const [request] = requests.permissions;
         assert.ok(request !== undefined);
         assert.equal(request.toolName, played.toolName);
@@ -575,6 +589,31 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         assert.deepEqual(told?.input, played.input);
         assertWellFormed(turn);
         assertDeclared(turn, caps);
+      },
+    );
+
+    check(
+      "a request the agent gives up aborts the signal it passed, and the turn goes on to its end",
+      LIMIT,
+      async (world, t) => {
+        const played = world.giveUpTool("Went on.");
+        const requests = new Requests({
+          permission: (_request, signal) =>
+            new Promise((resolve) => {
+              const refuse = () => resolve({ allow: false, message: "The agent gave it up." });
+              if (signal.aborted) refuse();
+              else signal.addEventListener("abort", refuse, { once: true });
+            }),
+        });
+        const { session, events } = await open(t, world, requests);
+        await session.send(prompt());
+        const turn = await events.turn();
+        assert.equal(requests.permissions.length, 1);
+        assert.equal(requests.permissions[0]?.toolName, played.toolName);
+        assert.equal(requests.signals[0]?.aborted, true, "the signal was aborted");
+        assert.equal(ended(turn).ending, "done");
+        assert.equal(written(turn).trim(), "Went on.");
+        assertWellFormed(turn);
       },
     );
 

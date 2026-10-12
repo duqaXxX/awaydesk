@@ -806,7 +806,12 @@ record (`ThreadChat.keepAnswers`, `requests.answeredBlocks`); if Slack refuses t
 request is deleted, so no button is left that no longer works. `!stop` denies every request still
 pending in the session's own thread and deletes its message, and a request still waiting when the
 session closes or loses its process is answered as refused (`Approvals.denyAll`): a denial for a
-permission, a skip for a question. A request Slack does not accept is denied at once, with a message telling Claude Code that
+permission, a skip for a question. The back end passes the callback's `signal` to the handler
+(`RequestHandler.permission` and `question` take it as their second parameter); when the agent
+aborts it, the session refuses that one request (`Approvals.giveUp`) and deletes its message, with
+no text for the owner, and the root's status leaves `waiting` as after an answer. A signal that
+aborts after the answer does nothing, and one already aborted when the request arrives posts
+nothing. A request Slack does not accept is denied at once, with a message telling Claude Code that
 it could not be shown (`texts.APPROVAL_UNPOSTED`), and the tool's line records the denial.
 
 ## Footer

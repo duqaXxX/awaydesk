@@ -164,6 +164,17 @@ export class Approvals {
     return entry.pending;
   }
 
+  /**
+   * Refuses the one request `approvalId` still open, for an agent that no longer waits for its
+   * answer; null when it was answered or removed already.
+   */
+  giveUp(approvalId: string): Pending | null {
+    const entry = this.entries.get(approvalId);
+    if (entry === undefined || entry.pending.decided) return null;
+    this.decide(approvalId, entry, DENY);
+    return entry.pending;
+  }
+
   /** Denies every request still open in this thread, and returns them. */
   denyAll(channelId: string, threadId: string): Pending[] {
     const denied: Pending[] = [];

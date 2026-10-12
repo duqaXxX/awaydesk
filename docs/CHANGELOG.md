@@ -318,6 +318,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A request the agent gives up is taken back from the owner. `RequestHandler.permission` and
+  `RequestHandler.question` take an `AbortSignal` as their second parameter: the agent aborts it
+  when it no longer waits for the answer, and the core refuses that one request
+  (`Approvals.giveUp`), deletes its message and removes it from `state.json`, as a close does.
+  The Claude back end passes the `signal` of the SDK's `canUseTool` callback on. A signal already
+  aborted when the request arrives posts nothing, one aborted after the answer does nothing, and
+  the owner is shown no new text (#266).
 - The port of the requests hands a provider plain values and no longer the live objects:
   `SessionManager.live` replaces `get` (it does what `get` does, so a clip is told what a message
   would be), `Approvals.questions` replaces `get` and checks the thread the request was posted
