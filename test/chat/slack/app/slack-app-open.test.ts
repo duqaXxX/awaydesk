@@ -25,12 +25,8 @@ import { type TestContext, test } from "node:test";
 import { trustedRepository } from "../../../../src/agent/claude/trust.ts";
 import type { Repository } from "../../../../src/agent/seam.ts";
 import { logger } from "../../../../src/chat/slack/app/answers.ts";
+import { startedAt } from "../../../../src/chat/slack/app/open.ts";
 import { actionKey } from "../../../../src/chat/slack/app/wire.ts";
-import {
-  type Listing,
-  Listings,
-  type RepositoryLookup,
-} from "../../../../src/chat/slack/openfile/listing.ts";
 import {
   modalView,
   OPEN_FORM,
@@ -39,8 +35,13 @@ import {
   QUERY_BLOCK,
   Target,
 } from "../../../../src/chat/slack/openfile/modal.ts";
-import { regularFiles } from "../../../../src/chat/slack/openfile/read.ts";
 import * as slackTexts from "../../../../src/chat/slack/texts.ts";
+import {
+  type Listing,
+  Listings,
+  type RepositoryLookup,
+} from "../../../../src/core/files/listing.ts";
+import { regularFiles } from "../../../../src/core/files/read.ts";
 import * as texts from "../../../../src/core/texts.ts";
 import { fill, named } from "../../../../src/core/texts.ts";
 import {
@@ -1414,3 +1415,9 @@ test("a name is looked up in a folder with no repository", async (t) => {
   assert.equal(done.files[0].title, "docs/Guide.md");
   assert.deepEqual(world.ephemerals(), []);
 });
+
+for (const ts of ["", "abc", "1790000000.x", "-5", "1790000000 +0000", "@{1}", "../x"]) {
+  test(`a thread ts that is no epoch second gives no start [${ts === "" ? "empty" : ts}]`, () => {
+    assert.equal(startedAt(ts), null);
+  });
+}

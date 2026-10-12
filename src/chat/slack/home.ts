@@ -61,12 +61,12 @@ import {
   texts,
 } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
-import type { ThreadRef } from "../seam.ts";
+import type { SessionStatus, ThreadRef } from "../seam.ts";
 import { contextBlock, plainTextObject } from "./reply/blocks.ts";
 import { take } from "./reply/chars.ts";
 import { describe, gone } from "./reply/errors.ts";
 import { mrkdwnEscape, shownAsWritten } from "./reply/escape.ts";
-import { Status } from "./reply/status.ts";
+import { REACTIONS, Status } from "./reply/status.ts";
 import { Task } from "./reply/tasks.ts";
 import { ID_SHOWN } from "./resume.ts";
 import * as slackTexts from "./texts.ts";
@@ -127,7 +127,14 @@ const WORDS: ReadonlyMap<string, string> = new Map<string, string>([
 ]);
 // A session in one of these states is not offered for deleting: its thread is in use.
 const IN_USE: ReadonlySet<string> = new Set([Status.WAITING, Status.WORKING]);
+
+/** The reaction that shows a stored status; null for none. */
+function reactionOf(status: SessionStatus | null): string | null {
+  return status === null ? null : REACTIONS[status];
+}
+
 export const LAST_48 = "48h";
+
 export const TODAY = "today";
 export const YESTERDAY = "yesterday";
 export const LAST_7 = "7";
@@ -1063,8 +1070,8 @@ export class Home {
           titles.get(sessionId) ||
           texts.fill(slackTexts.HOME_UNTITLED, { id: take(sessionId, ID_SHOWN) }),
         // ❌ over a kept ⏳ or ✋ (an answer that never reached Slack) shows ❌. A thread that
-        // ended before the daemon kept its reaction shows the root's.
-        status: thread.ended || thread.status || facts.reaction,
+        // ended before the daemon kept its status shows the root's reaction.
+        status: reactionOf(thread.ended) ?? reactionOf(thread.status) ?? facts.reaction,
         replies: facts.replies,
         lastActivity: facts.latestReply || Math.trunc(pyFloat(threadTs)),
         permalink: link,

@@ -405,6 +405,43 @@ test("a question the owner skips is a deny with what the agent is told", LIMIT, 
   ]);
 });
 
+test("the handler's signal is the SDK's, and fires when the SDK's does", LIMIT, async (t) => {
+  const signals: AbortSignal[] = [];
+  const handler: RequestHandler = {
+    permission: (_request, signal) => {
+      signals.push(signal);
+      return new Promise((resolve) => {
+        signal.addEventListener("abort", () => resolve({ allow: false, message: "gone" }), {
+          once: true,
+        });
+      });
+    },
+    question: async () => ({ answered: false, message: "" }),
+  };
+  const sdk = new AbortController();
+  const { session, query, events } = await started(
+    t,
+    {
+      turns: [
+        [
+          ...TOOLS.slice(0, 2),
+          ask({ toolName: "Bash", input: BASH, abort: sdk }),
+          ...TOOLS.slice(-1),
+        ],
+      ],
+    },
+    {},
+    handler,
+  );
+  await session.send(PROMPT);
+  while (signals.length === 0) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(signals[0]?.aborted, false);
+  sdk.abort();
+  assert.equal(signals[0]?.aborted, true);
+  await until(events, "turn_ended");
+  assert.deepEqual(query.permissionResults, [{ behavior: "deny", message: "gone" }]);
+});
+
 // The review round of 2026-10-10: a request that cannot be answered is a deny, never a rejection.
 // SDK 0.3.296 answers a callback that rejects with a `control_response` of subtype `error`
 // (`handleControlRequest`, sdk.mjs), which is not a deny.

@@ -42,6 +42,9 @@ export const PLAIN_NAMES: Names = {
   cli: "plain",
   chat: "Memory chat",
   examples: "`!echo hello`, `!count one two`",
+  login: "signin",
+  logout: "signout",
+  newSession: ["restart"],
 };
 
 /** A plain agent that offers no command of its own. */

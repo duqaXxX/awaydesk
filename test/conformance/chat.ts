@@ -283,6 +283,7 @@ class Recorder implements ChatInbound {
     readonly message: MessageId | null;
   }> = [];
   readonly picks: ListPick[] = [];
+  readonly unboundChannels: string[] = [];
 
   async message(message: InboundMessage): Promise<void> {
     this.messages.push(message);
@@ -302,8 +303,18 @@ class Recorder implements ChatInbound {
     this.picks.push(pick);
   }
 
+  async unbound(channel: string): Promise<void> {
+    this.unboundChannels.push(channel);
+  }
+
   get empty(): boolean {
-    return this.messages.length + this.answers.length + this.picks.length === 0;
+    return (
+      this.messages.length +
+        this.answers.length +
+        this.picks.length +
+        this.unboundChannels.length ===
+      0
+    );
   }
 }
 
@@ -416,6 +427,14 @@ export function chatConformance(
       check("leaves a plain word alone when it escapes it", async ({ provider }) => {
         assert.equal(provider.escape("plainword", "notice"), "plainword");
         assert.equal(provider.escape("plainword", "reference"), "plainword");
+      });
+
+      check("writes a channel for each markup, never empty and never rejecting", async (s) => {
+        for (const markup of ["notice", "reference"] as const) {
+          const written = s.provider.channelName(s.ref.channel, markup);
+          assert.equal(typeof written, "string");
+          assert.ok(written.trim() !== "", markup);
+        }
       });
 
       check("dates a thread by a number or by nothing, and by the same on every ask", async (s) => {

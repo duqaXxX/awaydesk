@@ -1770,12 +1770,16 @@ test("a bind during the downloads never moves the thread already opened", async 
   // The file's own thread keeps the folder it opened in: a bind only affects new threads.
   mkdirSync(join(world.root, "docs"));
   const body = sharedFile("snippet");
-  await downloading(world, body);
+  const { session } = await downloading(world, body);
+  const opened = join(world.root, "app");
+  assert.equal(session.directory, opened);
   await world.dispatch(message("!bind docs"));
   await world.appClock.advance(0.2);
   await world.settle();
   assert.notDeepEqual(world.queries(), []);
   assert.equal(world.state.channel(CHANNEL)?.directory, join(world.root, "docs"));
+  assert.equal(session.directory, opened);
+  assert.equal(world.state.thread(CHANNEL, String(body.event.ts))?.directory, opened);
 });
 
 test("a command after a message with files waits its turn", async (t) => {
@@ -1859,7 +1863,7 @@ test("a refusal during a stop names the thread the stop waits for", async (t) =>
       texts.RESTARTING,
       texts.RESTART_WAITS_FOR,
       fill(texts.RESTART_WAIT_ROW, {
-        channel: CHANNEL,
+        channel: `<#${CHANNEL}>`,
         link: `<${PERMALINK}|${texts.RESTART_WAIT_SESSION}>`,
         hold: texts.RESTART_HOLD_TURN,
       }),

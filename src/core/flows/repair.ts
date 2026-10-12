@@ -7,11 +7,10 @@
  * stop clears these same fields itself, so a second start finds nothing to do. What the chat
  * did not repair stays in the state, and the next start asks again (issue #264).
  */
-import type { ChatProvider } from "../../chat/seam.ts";
+import type { ChatProvider, SessionStatus } from "../../chat/seam.ts";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import type { ThreadsState } from "../port/threads.ts";
-import { STORED_STATUS } from "../sessions/constants.ts";
 import * as texts from "../texts.ts";
 
 export const logger = getLogger("awaydesk.core.flows.repair");
@@ -87,8 +86,6 @@ function safe(write: () => void): void {
  * The stored word a root left working or waiting ends on, the error one; null for a word that
  * is neither, which is cleared with nothing shown.
  */
-function endedWord(stored: string): string | null {
-  return stored === STORED_STATUS.working || stored === STORED_STATUS.waiting
-    ? STORED_STATUS.error
-    : null;
+function endedWord(stored: SessionStatus): SessionStatus | null {
+  return stored === "working" || stored === "waiting" ? "error" : null;
 }

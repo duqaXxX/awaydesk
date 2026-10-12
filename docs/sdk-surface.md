@@ -127,6 +127,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `BaseHookInput` | `effort` | field | hooks.ts: stopHookEvents | reference | none |
 | `BaseHookInput.effort` | `level` | field | hooks.ts: stopHookEvents | package | none |
 | `CanUseTool` | `description` | field | requests.ts: toRequest, CallContext | package | none |
+| `CanUseTool` | `signal` | field | session.ts: ClaudeSession.#options | package | none |
 | `CanUseTool` | `title` | field | requests.ts: toRequest, CallContext | package | none |
 | `CanUseTool` | `toolUseID` | field | requests.ts: toRequest, CallContext | reference | none |
 | `ModelInfo` | `description` | field | info.ts: modelOf | reference | none |

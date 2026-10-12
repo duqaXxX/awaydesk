@@ -117,6 +117,7 @@ const WRITES = [
   "chat.appendStream",
   "chat.stopStream",
   "chat.update",
+  "reactions.add",
 ];
 
 /** Whether a message's blocks hold a control. */
@@ -284,7 +285,14 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
   const asked = new Map<string, Pending>();
   const core: CorePort = {
     ...world.core,
-    approvals: { get: (id) => asked.get(id) ?? world.approvals.get(id) },
+    approvals: {
+      questions: (id, channel, thread) => {
+        const pending = asked.get(id);
+        if (pending === undefined) return world.approvals.questions(id, channel, thread);
+        const same = pending.channelId === channel && pending.threadId === thread;
+        return same && pending.questions?.length ? pending.questions : null;
+      },
+    },
   };
   const receiver: Receiver = {
     init: (app) => {

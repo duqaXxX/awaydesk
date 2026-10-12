@@ -4,26 +4,22 @@
  * in the `listing.ts` header.
  */
 
-import type { Repository } from "../../../agent/seam.ts";
-import { type Clock, monotonicClock } from "../../../clock.ts";
-import { GIT_TIMEOUT, runGit, Semaphore } from "../../../core/port.ts";
-import { strip } from "../../../text.ts";
-import { len } from "../reply/chars.ts";
+import type { Repository } from "../../agent/seam.ts";
+import { type Clock, monotonicClock } from "../../clock.ts";
+import { len, strip } from "../../text.ts";
+import { GIT_TIMEOUT, runGit } from "../footer.ts";
+import { Semaphore } from "../sessions/tasks.ts";
 import { GIT_CHAINS, relation, scoped, under } from "./listing.ts";
 import { TIMED_OUT, within } from "./waiting.ts";
 
-// Python's `^(\d+)(?:\.\d+)?$`: `\d` is any decimal digit there and `$` also matches before a
-// final newline.
-const EPOCH_SECONDS = /^(\p{Nd}+)(?:\.\p{Nd}+)?\n?$/u;
 const DECIMAL = /^\p{Nd}+$/u;
 
 /**
- * Where the repository's HEAD was when the thread started, which `threadTs` (the Slack ts of its
- * root, epoch seconds) says: `HEAD@{<seconds> +0000}`, read from HEAD's own reflog (a linked
- * worktree has its own). A commit, or the empty tree when the repository was made after the thread
- * began (below), so that every file counts. Null when git has no answer: no reflog (a repository
- * with `core.logAllRefUpdates` off, or a first commit not made yet), or a `threadTs` that is no
- * time.
+ * Where the repository's HEAD was when the thread started, which `startedAt` (seconds since the
+ * epoch) says: `HEAD@{<seconds> +0000}`, read from HEAD's own reflog (a linked worktree has its
+ * own). A commit, or the empty tree when the repository was made after the thread began (below),
+ * so that every file counts. Null when git has no answer: no reflog (a repository with
+ * `core.logAllRefUpdates` off, or a first commit not made yet), or a `startedAt` that is no time.
  *
  * Measured on git 2.54.0 (2026-10-05, 2026-10-06). The bare number is read as a time
  * (`HEAD@{1790000150}`) and so is the internal format with its zone, which is the one used: it
@@ -43,12 +39,11 @@ const DECIMAL = /^\p{Nd}+$/u;
  */
 export async function startCommit(
   repository: Repository,
-  threadTs: string,
+  startedAt: number,
   signal?: AbortSignal,
 ): Promise<string | null> {
-  const seconds = EPOCH_SECONDS.exec(threadTs);
-  if (seconds === null) return null;
-  const when = `${seconds[1]} +0000`;
+  if (!Number.isSafeInteger(startedAt) || startedAt < 0) return null;
+  const when = `${startedAt} +0000`;
   const found = await runGit(
     repository,
     ["rev-parse", "--verify", "--quiet", `HEAD@{${when}}`],
@@ -145,13 +140,14 @@ export interface ChangedInOptions {
 
 /**
  * The changed files of every repository of `repositories` (see `changedSince`), each from where
- * its own HEAD was when the thread `threadTs` started (`startCommit`), as paths from `folder`,
+ * its own HEAD was when the thread started, at `startedAt` seconds since the epoch
+ * (`startCommit`; null when the chat cannot tell, which counts from no start), as paths from `folder`,
  * each once. A repository whose git fails or runs over `GIT_TIMEOUT` adds none.
  */
 export async function changedIn(
   folder: string,
   repositories: readonly Repository[],
-  threadTs: string,
+  startedAt: number | null,
   options: ChangedInOptions = {},
 ): Promise<string[]> {
   const clock = options.clock ?? monotonicClock;
@@ -163,7 +159,7 @@ export async function changedIn(
   const changed = (repository: Repository): Promise<string[]> =>
     gate.run(async () => {
       const found = await within(clock, GIT_TIMEOUT / 1000, async (signal) => {
-        const from = await start(repository, threadTs, signal);
+        const from = startedAt === null ? null : await start(repository, startedAt, signal);
         return (await since(repository, folder, from, signal)) ?? [];
       });
       return found === TIMED_OUT ? [] : found;

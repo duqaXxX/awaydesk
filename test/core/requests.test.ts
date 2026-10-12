@@ -28,6 +28,30 @@ const TWO: readonly Question[] = [
   },
 ];
 
+test("questions are read by id, only from the thread the request was posted in", () => {
+  const approvals = new Approvals(NAMES);
+  const [approvalId] = approvals.open(CHANNEL, THREAD, "q", TWO);
+  assert.deepEqual(approvals.questions(approvalId, CHANNEL, THREAD), TWO);
+  assert.equal(approvals.questions(approvalId, OTHER_CHANNEL, THREAD), null);
+  assert.equal(approvals.questions(approvalId, CHANNEL, OTHER_THREAD), null);
+  assert.equal(approvals.questions("no-such-request", CHANNEL, THREAD), null);
+});
+
+test("a request with no questions, or an empty list of them, has none to read", () => {
+  const approvals = new Approvals(NAMES);
+  const [permission] = approvals.open(CHANNEL, THREAD, "Bash: ls");
+  const [empty] = approvals.open(CHANNEL, THREAD, "q", []);
+  assert.equal(approvals.questions(permission, CHANNEL, THREAD), null);
+  assert.equal(approvals.questions(empty, CHANNEL, THREAD), null);
+});
+
+test("a request that is gone has no questions to read", () => {
+  const approvals = new Approvals(NAMES);
+  const [approvalId] = approvals.open(CHANNEL, THREAD, "q", TWO);
+  approvals.discard(approvalId);
+  assert.equal(approvals.questions(approvalId, CHANNEL, THREAD), null);
+});
+
 test("resolve only in the same channel and thread and only once", async () => {
   const approvals = new Approvals(NAMES);
   const [approvalId, pending] = approvals.open(CHANNEL, THREAD, "Bash: ls");

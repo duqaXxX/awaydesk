@@ -25,23 +25,24 @@
  *   not reported: `status`, which compares the content of a file whose stat differs.
  *
  * So the committed changes come from `diff-tree` and the rest from `status`, which also lists the
- * untracked files. `test/chat/slack/openfile/changed.test.ts` repeats the measurement on every run.
+ * untracked files. `test/core/files/changed.test.ts` repeats the measurement on every run.
  */
 
 import { lstat, readdir } from "node:fs/promises";
 import { join, sep } from "node:path";
-import type { Repository } from "../../../agent/seam.ts";
-import { type Clock, monotonicClock } from "../../../clock.ts";
-import { cancellable, foldersWithin, runGit, Semaphore } from "../../../core/port.ts";
-import { getLogger } from "../../../log.ts";
-import { compareCodePoints } from "../../../text.ts";
-import { len } from "../reply/chars.ts";
-import { describe } from "../reply/errors.ts";
+import type { Repository } from "../../agent/seam.ts";
+import { type Clock, monotonicClock } from "../../clock.ts";
+import { getLogger } from "../../log.ts";
+import { compareCodePoints, len } from "../../text.ts";
+import { errorName } from "../../values.ts";
+import { foldersWithin } from "../folders.ts";
+import { runGit } from "../footer.ts";
+import { cancellable, Semaphore } from "../sessions/tasks.ts";
 import { relativeTo } from "./paths.ts";
 import { realpathLoose, regularFiles } from "./read.ts";
 import { TIMED_OUT, within } from "./waiting.ts";
 
-export const logger = getLogger("awaydesk.chat.slack.openfile");
+export const logger = getLogger("awaydesk.core.files");
 
 // A folder's listing is kept for LISTING_TTL (LISTING_PARTIAL_TTL when it is not complete), so
 // the keystrokes of one search do not walk the folder again, and a listing stops at
@@ -378,7 +379,7 @@ export interface ListingsOptions {
 
 /**
  * The files of a session's folder for the search, and the repositories found in it, kept in
- * memory: Slack asks again on every keystroke, and a folder is not walked each time. A listing is
+ * memory: the chat asks again on every keystroke, and a folder is not walked each time. A listing is
  * kept `ttl` seconds when it is complete and `partialTtl` when it ran out of time or git failed
  * for part of it, so a folder too large for the budget is not walked on each keystroke but is not
  * taken for complete either. The repositories are kept `repositoriesTtl` seconds. At most `limit`
@@ -455,7 +456,7 @@ export class Listings {
       return [{ files, complete, fresh: true }, complete ? this.#ttl : this.#partialTtl];
     } catch (error) {
       // A search that finds nothing beats a modal that never loads.
-      logger.warning(`could not list a folder's files: ${describe(error)}`);
+      logger.warning(`could not list a folder's files: ${errorName(error)}`);
       return [{ files: [], complete: false, fresh: true }, null];
     }
   }

@@ -180,6 +180,7 @@ for (const [name, value] of [
   [`@${THREAD}`, `@${THREAD}`],
   ["68da9311@1780000000", "68da9311@1780000000"],
   ["68da9311@1.2.3", "68da9311@1.2.3"],
+  ["a thread ts alone", THREAD],
 ] as const) {
   test(`a resume value of another shape is refused [${name}]`, () => {
     assert.equal(parseResumeValue(value), null);

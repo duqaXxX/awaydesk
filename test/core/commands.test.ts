@@ -15,6 +15,9 @@ import * as texts from "../../src/core/texts.ts";
 import { sdkJson } from "../support/fixtures.ts";
 import { EVERYTHING_OFFERED } from "../support/guide-offer.ts";
 import { NAMES } from "../support/names.ts";
+import { PLAIN_NAMES } from "./flows/messages-world.ts";
+
+const CLEARS = NAMES.newSession;
 
 /**
  * The chat provider's markdown escape, which the core takes as a parameter: the same characters
@@ -137,7 +140,7 @@ test("help leaves out clear which a thread refuses", () => {
 test("a thread refuses clear and its aliases before the session lists them", () => {
   // A session rebuilt after a restart has listed no command until it connects.
   for (const listed of [[], null]) {
-    const refused = refusedInThread(listed);
+    const refused = refusedInThread(listed, CLEARS);
     for (const name of ["clear", "reset", "new"]) assert.ok(refused.has(name), name);
   }
 });
@@ -147,7 +150,7 @@ test("a thread refuses an alias of clear the session adds", () => {
     command("clear", "d", { aliases: ["reset", "new", "wipe"] }),
     command("rename", "d", { aliases: ["name"] }),
   ];
-  const refused = refusedInThread(commands);
+  const refused = refusedInThread(commands, CLEARS);
   assert.ok(refused.has("wipe"));
   assert.ok(!refused.has("name") && !refused.has("rename"));
 });
@@ -259,9 +262,58 @@ test("an agent with no commands of its own has none listed, refused or run on th
       texts.named(texts.HELP_UNBOUND, NAMES),
     ),
   );
-  assert.deepEqual([...refusedInThread(null, false)], []);
+  assert.deepEqual([...refusedInThread(null, CLEARS, false)], []);
   assert.equal(hostOnly({ kind: "passthrough", text: "login" }, NAMES, false), null);
   // The same calls for an agent that has them are as before.
-  assert.ok(refusedInThread(null).has("clear"));
+  assert.ok(refusedInThread(null, CLEARS).has("clear"));
   assert.notEqual(hostOnly({ kind: "passthrough", text: "login" }, NAMES), null);
+});
+
+test("an agent's own new-session name is refused in a thread, with the aliases its list gives it", () => {
+  const own = PLAIN_NAMES.newSession;
+  assert.deepEqual([...refusedInThread(null, own)], ["restart"]);
+  const listed = [command("restart", "d", { aliases: ["Again"] })];
+  assert.deepEqual([...refusedInThread(listed, own)].sort(), ["again", "restart"]);
+  // Claude Code's names mean nothing to an agent that does not declare them.
+  assert.ok(!refusedInThread(null, own).has("clear"));
+  assert.deepEqual([...refusedInThread(null, [])], []);
+});
+
+test("an agent's own login and logout are answered on the host, and Claude Code's are not its words", () => {
+  assert.equal(
+    hostOnly({ kind: "passthrough", text: "SignIn now" }, PLAIN_NAMES),
+    texts.named(texts.LOGIN_ON_HOST, PLAIN_NAMES),
+  );
+  assert.equal(
+    hostOnly({ kind: "passthrough", text: "signout" }, PLAIN_NAMES),
+    texts.named(texts.LOGOUT_ON_HOST, PLAIN_NAMES),
+  );
+  assert.equal(hostOnly({ kind: "passthrough", text: "login" }, PLAIN_NAMES), null);
+  assert.equal(hostOnly({ kind: "passthrough", text: "logout" }, PLAIN_NAMES), null);
+});
+
+test("an agent with no login or logout gets no host-only answer for that word", () => {
+  const none = { ...PLAIN_NAMES, login: null, logout: null };
+  assert.equal(hostOnly({ kind: "passthrough", text: "signin" }, none), null);
+  assert.equal(hostOnly({ kind: "passthrough", text: "signout" }, none), null);
+});
+
+test("the host-only texts and the login failure name the agent's own commands", () => {
+  const login = texts.named(texts.LOGIN_ON_HOST, PLAIN_NAMES);
+  assert.ok(login.includes("`/signin`") && !login.includes("/login"));
+  assert.ok(texts.named(texts.LOGOUT_ON_HOST, PLAIN_NAMES).includes("`/signout`"));
+  assert.ok(texts.named(texts.AUTH_FAILED, PLAIN_NAMES).includes("`/signin`"));
+  const none = { ...PLAIN_NAMES, login: null, logout: null };
+  assert.ok(!texts.named(texts.AUTH_FAILED_NO_LOGIN, none).includes("/"));
+});
+
+test("the guide names the agent's own new-session commands, and leaves the sentence out with none", () => {
+  const guide = guideText(PLAIN_NAMES, EVERYTHING_OFFERED);
+  assert.ok(guide.includes("`!restart` is refused inside a thread"));
+  assert.ok(!guide.includes("!clear"));
+  const several = guideText({ ...PLAIN_NAMES, newSession: ["a", "b", "c"] }, EVERYTHING_OFFERED);
+  assert.ok(several.includes("`!a` (`!b`, `!c`) is refused inside a thread"));
+  const none = guideText({ ...PLAIN_NAMES, newSession: [] }, EVERYTHING_OFFERED);
+  assert.ok(!none.includes("refused inside a thread"));
+  assert.ok(none.includes("filters the list;"));
 });

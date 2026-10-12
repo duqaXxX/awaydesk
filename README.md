@@ -15,7 +15,8 @@ Powered by Claude, through the
 
 ## Before you install
 
-- It runs on macOS only, as a LaunchAgent in your login session.
+- It runs on macOS only (13 or later), as a LaunchAgent in your login session, on a Mac that
+  stays awake.
 - It needs a Slack workspace where you are the only member. The bot checks who writes, but a
   workspace admin could still read or export what Claude prints, and whoever controls your Slack
   account controls the machine.

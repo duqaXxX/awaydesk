@@ -367,6 +367,10 @@ export class MemoryProvider implements ChatProvider {
     return text;
   }
 
+  channelName(channel: string, _markup: Markup): string {
+    return `#${channel}`;
+  }
+
   openedAt(ref: ThreadRef): number | null {
     return this.#room.openedAt(ref);
   }

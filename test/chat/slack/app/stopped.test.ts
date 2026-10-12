@@ -31,6 +31,17 @@ import {
   worldOf,
 } from "../../../support/slack-app.ts";
 
+/**
+ * Counts what the provider hands the core: the core ends a flow of its own once it is stopped,
+ * so only this count shows that the provider itself stopped at the channel check.
+ */
+function crossings(t: Parameters<typeof worldOf>[0], world: World): () => number {
+  const spies = (["message", "answer", "picked"] as const).map((name) =>
+    t.mock.method(world.inbound, name),
+  );
+  return () => spies.reduce((total, spy) => total + spy.mock.callCount(), 0);
+}
+
 /** A world with `THREAD` stored and the channel check held, a body dispatched and waiting on it. */
 async function held(
   t: Parameters<typeof worldOf>[0],
@@ -43,9 +54,10 @@ async function held(
   const gate = new AsyncEvent();
   world.slack.gate = gate;
   world.slack.gateMethod = "conversations.members";
+  const crossed = crossings(t, world);
   await world.dispatch(body);
   assert.ok(world.slack.gated.isSet(), "the listener never reached the channel check");
-  return { world, gate };
+  return { world, gate, crossed };
 }
 
 /** The daemon's stop: the connection closed, the app told, the sessions closed. */
@@ -55,7 +67,7 @@ async function stop(world: World): Promise<void> {
 }
 
 /** What changed since the stop, once the held listener went on. */
-async function release(world: World, gate: AsyncEvent): Promise<string[]> {
+async function release(world: World, gate: AsyncEvent, crossed: () => number): Promise<string[]> {
   const stateFile = join(world.tmpPath, "state.json");
   const before = readFileSync(stateFile, "utf8");
   const calls = world.slack.apiCalls.length;
@@ -63,40 +75,41 @@ async function release(world: World, gate: AsyncEvent): Promise<string[]> {
   await world.idle();
   assert.equal(readFileSync(stateFile, "utf8"), before, "state.json was written after the stop");
   assert.deepEqual(world.clients, [], "an agent session was started after the stop");
+  assert.equal(crossed(), 0, "the core was handed an input after the stop");
   // The held `conversations.members` is recorded once it is let go; nothing follows it.
   return world.slack.apiCalls.slice(calls).map((call) => call.method);
 }
 
 test("a message in a thread whose channel check ends after the stop does nothing", async (t) => {
-  const { world, gate } = await held(t, reply("hello", THREAD));
+  const { world, gate, crossed } = await held(t, reply("hello", THREAD));
   await stop(world);
-  assert.deepEqual(await release(world, gate), ["conversations.members"]);
+  assert.deepEqual(await release(world, gate, crossed), ["conversations.members"]);
 });
 
 test("a message still waiting for its place in the thread when the daemon stops calls nothing", async (t) => {
-  const { world, gate } = await held(t, reply("first", THREAD));
+  const { world, gate, crossed } = await held(t, reply("first", THREAD));
   // Two more replies of the thread: each waits for the place of the one before it.
   await world.dispatch(reply("second", THREAD));
   await world.dispatch(reply("third", THREAD));
   await stop(world);
-  assert.deepEqual(await release(world, gate), ["conversations.members"]);
+  assert.deepEqual(await release(world, gate, crossed), ["conversations.members"]);
 });
 
 test("a top-level message whose channel check ends after the stop does nothing", async (t) => {
-  const { world, gate } = await held(t, message("hello", { ts: "1790000000.000044" }));
+  const { world, gate, crossed } = await held(t, message("hello", { ts: "1790000000.000044" }));
   await stop(world);
-  assert.deepEqual(await release(world, gate), ["conversations.members"]);
+  assert.deepEqual(await release(world, gate, crossed), ["conversations.members"]);
   assert.equal(world.state.thread(CHANNEL, "1790000000.000044"), null);
 });
 
 test("a channel the guard refuses is not told about once the daemon stopped", async (t) => {
-  const { world, gate } = await held(t, reply("hello", THREAD));
+  const { world, gate, crossed } = await held(t, reply("hello", THREAD));
   world.slack.responses["conversations.members"] = {
     ok: true,
     members: [OWNER, "U000BOB"],
   };
   await stop(world);
-  assert.deepEqual(await release(world, gate), ["conversations.members"]);
+  assert.deepEqual(await release(world, gate, crossed), ["conversations.members"]);
 });
 
 test("a message that arrives after the stop is not even checked", async (t) => {
@@ -171,6 +184,7 @@ for (const [name, arrange, acted] of CLICKS) {
     const gate = new AsyncEvent();
     world.slack.gate = gate;
     world.slack.gateMethod = "conversations.members";
+    const crossed = crossings(t, world);
     await world.dispatch(body);
     assert.ok(world.slack.gated.isSet(), "the listener never reached the channel check");
     await stop(world);
@@ -181,6 +195,7 @@ for (const [name, arrange, acted] of CLICKS) {
     await world.idle();
     assert.equal(readFileSync(stateFile, "utf8"), before);
     assert.equal(acted(world), false);
+    assert.equal(crossed(), 0, "the core was handed an input after the stop");
     assert.deepEqual(
       world.slack.apiCalls.slice(calls).map((call) => call.method),
       ["conversations.members"],

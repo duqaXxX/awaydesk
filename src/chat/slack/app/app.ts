@@ -45,6 +45,7 @@ import type {
   SessionsPort,
   StatePort,
 } from "../../../core/port.ts";
+import { Listings } from "../../../core/port.ts";
 import type { ChatInbound } from "../../seam.ts";
 import { download } from "../attachments.ts";
 import { BIND_ACTION } from "../bind.ts";
@@ -58,7 +59,6 @@ import {
   NEW_THREAD_ACTION,
   SHOW_ALL_ACTION,
 } from "../home.ts";
-import { Listings } from "../openfile/listing.ts";
 import { OPEN_BUTTON_ACTION, OPEN_FORM, QUERY_ACTION } from "../openfile/modal.ts";
 import { levelLogger } from "../quiet-logger.ts";
 import { REQUEST_TIMEOUT_MS } from "../reply/clients.ts";

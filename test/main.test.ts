@@ -356,7 +356,7 @@ test("run repairs a crashed thread before pruning it", async (t) => {
   const state = new StateStore(d.path);
   state.bind(CHANNEL, d.dir);
   state.openThread(CHANNEL, "1000000000.000001");
-  state.setStatusPending(CHANNEL, "1000000000.000001", "raised_hand");
+  state.setStatusPending(CHANNEL, "1000000000.000001", "waiting");
 
   d.start();
   await d.booted();
@@ -373,7 +373,7 @@ test("run publishes the session index once started and after a change", async (t
   const state = new StateStore(d.path);
   state.bind(CHANNEL, d.dir);
   state.openThread(CHANNEL, threadTs, "some-id");
-  state.setStatusPending(CHANNEL, threadTs, "hourglass_flowing_sand"); // a crash left it
+  state.setStatusPending(CHANNEL, threadTs, "working"); // a crash left it
 
   const nowSeconds = Date.now() / 1000;
   d.clock.now = nowSeconds; // inside the 48 hours the page starts on
@@ -409,7 +409,7 @@ test("run publishes the session index once started and after a change", async (t
   // Published after the repair: the root a crash left ⏳ already reads ❌.
   await d.until(() => firstLines(d.slack).join() === ":x:  *Fix the footer*");
   assert.equal(d.slack.callsTo("views.publish")[0]?.user_id, OWNER);
-  (stores[0] as StateStore).setStatusPending(CHANNEL, threadTs, "raised_hand");
+  (stores[0] as StateStore).setStatusPending(CHANNEL, threadTs, "waiting");
   await d.until(() => firstLines(d.slack).at(-1) === ":raised_hand:  *Fix the footer*");
   await d.stop();
 });
@@ -479,7 +479,7 @@ test("repair and prune run before the socket mode connection opens", async (t) =
   const state = new StateStore(d.path);
   state.bind(CHANNEL, d.dir);
   state.openThread(CHANNEL, "1000000000.000001");
-  state.setStatusPending(CHANNEL, "1000000000.000001", "raised_hand");
+  state.setStatusPending(CHANNEL, "1000000000.000001", "waiting");
   const order: string[] = [];
   d.slack.responses["reactions.add"] = () => {
     order.push("repair");
@@ -515,7 +515,7 @@ test("signal handlers are installed before a long repair runs", async (t) => {
   const state = new StateStore(d.path);
   state.bind(CHANNEL, d.dir);
   state.openThread(CHANNEL, "1000000000.000001");
-  state.setStatusPending(CHANNEL, "1000000000.000001", "raised_hand");
+  state.setStatusPending(CHANNEL, "1000000000.000001", "waiting");
   const order: string[] = [];
   d.slack.responses["reactions.add"] = () => {
     order.push("repair");
@@ -743,7 +743,7 @@ test("a signal during the repair stops the daemon once it is up", async (t) => {
   const state = new StateStore(d.path);
   state.bind(CHANNEL, d.dir);
   state.openThread(CHANNEL, "1000000000.000001");
-  state.setStatusPending(CHANNEL, "1000000000.000001", "raised_hand");
+  state.setStatusPending(CHANNEL, "1000000000.000001", "waiting");
   d.slack.responses["reactions.add"] = () => {
     d.signals.emit("SIGTERM"); // while the repair runs
     return { ok: true };

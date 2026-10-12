@@ -318,6 +318,54 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The logic of `!open` that names no chat moved from `src/chat/slack/openfile/` to the core, in
+  `src/core/files/`: which files are offered (`listing`), which of them changed since the thread
+  started (`changed`), which paths are safe to read (`read`, `paths`) and the time limit on a wait
+  (`waiting`). No logic changed. The Slack provider keeps the modal and the upload
+  (`read.uploadFile`) and reaches the rest through `core/port.ts`. Three signatures take what the
+  provider used to supply: `readOpenable` and `readOnce` take the size cap as an argument, and
+  `startCommit` and `changedIn` take the thread's start in epoch seconds, which the provider reads
+  from the thread's `thread_ts` (`open.startedAt`). The listing logs under `awaydesk.core.files`,
+  and a listing that fails names the error by its code or type, as the core's other log lines do
+  (#266).
+- `state.json` keeps a thread's `status` and `ended` as the words `working`, `waiting`, `done` and
+  `error`, and no longer as the name of a Slack reaction (`constants.STORED_STATUS` is gone): the
+  core stores what the session asks of the chat, and the Slack provider maps the word to its
+  reaction for the session index (`reply.status.REACTIONS`). The file keeps version 3. A file
+  written before is read: `hourglass_flowing_sand`, `raised_hand`, `white_check_mark` and `x` load
+  as their words and the next save writes words; any other value loads as none. A daemon older than
+  this change that reads a file this one wrote does not know the words: its session index writes
+  the word between colons where the icon goes, shows no status word, matches no status filter, and
+  does not treat a working or waiting thread as in use, until the newer daemon runs again (#266).
+- A request the agent gives up is taken back from the owner. `RequestHandler.permission` and
+  `RequestHandler.question` take an `AbortSignal` as their second parameter: the agent aborts it
+  when it no longer waits for the answer, and the core refuses that one request
+  (`Approvals.giveUp`), deletes its message and removes it from `state.json`, as a close does.
+  The Claude back end passes the `signal` of the SDK's `canUseTool` callback on. A signal already
+  aborted when the request arrives posts nothing, one aborted after the answer does nothing, and
+  the owner is shown no new text (#266).
+- The port of the requests hands a provider plain values and no longer the live objects:
+  `SessionManager.live` replaces `get` (it does what `get` does, so a clip is told what a message
+  would be), `Approvals.questions` replaces `get` and checks the thread the request was posted
+  in, and `Holds.get` leaves the port, since `Holds.atMessage` already answers only for an open,
+  undecided setup. No file under `src/chat/` can reach a `ThreadSession` or a pending request.
+  What the owner reads in Slack is unchanged (#266).
+- `ChatInbound.unbound(channel)` is how a provider says the owner wrote in a channel bound to no
+  folder before it had a message to hand over. The core answers with `Talk.unbound`, so an audio
+  clip in such a channel gets the words of an agent that keeps no record of trust where it has
+  none; `Clips.takeClip` no longer builds the notice itself. For Claude Code and Slack the text is
+  as before (#266).
+- `ChatProvider.channelName(channel, markup)` writes a channel as the chat does inside a line, and
+  `texts.RESTART_WAIT_ROW` takes it, where it held Slack's `<#channel>` syntax. No text of
+  `src/core/texts.ts` holds Slack's `<#`, `<@` or `<!` now, and a test says so. The Slack provider
+  answers `<#channel>` for both markups, so the notice reads as before (#266).
+- `AgentWords` declares the names of the commands the core used to know by heart: `newSession`
+  (the commands that start a new session, refused inside a thread), `login` and `logout` (answered
+  with where they are done on the host; `null` when the agent has none).
+  `commands.NEW_SESSION_NAMES` and `commands.HOST_ONLY` are gone, `refusedInThread`, `hostOnly`
+  and `helpText` take the names, and `texts.Names` carries them. `texts.AUTH_FAILED_NO_LOGIN` is
+  the login failure for an agent with no login command, and the guide leaves out its sentence on
+  new-session commands when there are none. What Claude Code and Slack show is unchanged (#266).
 - The architecture reference is two pages, cut along the module boundary. `docs/architecture.md`
   keeps the overview, the modules, the core's parts and the measured platform behaviour;
   `docs/slack-provider.md` holds the four sections that describe the Slack provider alone

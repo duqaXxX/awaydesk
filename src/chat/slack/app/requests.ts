@@ -106,11 +106,10 @@ export class Requests {
     if (!(await this.answers.admitted(user, team, channel, threadTs)) || channel === null) return;
     const shownAt = messageTs(body);
     const setupId = holds.atMessage(channel, threadTs, shownAt);
-    const pending = setupId === null ? null : holds.get(setupId);
-    if (setupId === null || pending === null) {
+    if (setupId === null) {
       this.logRefusedClick("setup model, no open setup", body, {
-        open_at_message: setupId !== null,
-        held: pending !== null,
+        open_at_message: false,
+        held: false,
       });
       await this.answers.tellOwner(channel, threadTs, texts.HOLD_GONE);
       return;
@@ -179,23 +178,13 @@ export class Requests {
     const threadTs = clickThread(body);
     if (!(await this.answers.admitted(user, team, channel, threadTs)) || channel === null) return;
     const approvalId = str(firstAction(body).value);
-    const pending = approvals.get(approvalId);
-    if (
-      pending === null ||
-      pending.channelId !== channel ||
-      pending.threadId !== threadTs ||
-      pending.questions === null ||
-      pending.questions.length === 0
-    ) {
+    const questions = approvals.questions(approvalId, channel, threadTs);
+    if (questions === null) {
       await this.answers.tellOwner(channel, threadTs, texts.APPROVAL_GONE);
       return;
     }
     // trigger_id lives 3 seconds: the checks above are the only work before this call.
-    const view = questionView(
-      newDraft(approvalId, channel, threadTs),
-      pending.questions,
-      this.parts.names,
-    );
+    const view = questionView(newDraft(approvalId, channel, threadTs), questions, this.parts.names);
     try {
       const trigger = text(body.trigger_id);
       if (trigger === null) throw new TypeError("the click carries no trigger_id");
@@ -229,19 +218,12 @@ export class Requests {
       logger.info("ignored an inbound event from someone other than the owner");
       return;
     }
-    const pending = approvals.get(draft.approvalId);
-    if (
-      pending === null ||
-      pending.channelId !== draft.channelId ||
-      pending.threadId !== draft.threadTs ||
-      pending.questions === null ||
-      pending.questions.length === 0
-    ) {
+    const questions = approvals.questions(draft.approvalId, draft.channelId, draft.threadTs);
+    if (questions === null) {
       await ack();
       await this.answers.tellOwner(draft.channelId, draft.threadTs, texts.APPROVAL_GONE);
       return;
     }
-    const questions = pending.questions;
     draft = absorb(draft, record(view.state).values);
     if (!isAnswered(draft, questions, draft.active)) {
       await ack({

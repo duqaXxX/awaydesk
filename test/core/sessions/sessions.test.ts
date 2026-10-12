@@ -200,6 +200,18 @@ test("clear records the new session id", async (t) => {
   assert.equal(thread(h).sessionId, recordOf(second.at(-1))?.session_id);
 });
 
+test("a thread is live exactly when get would give it a session", async (t) => {
+  const h = harnessFor(t)();
+  assert.equal(h.manager.live(CHANNEL, THREAD), false, "no entry in state.json");
+  h.session();
+  assert.equal(h.manager.live(CHANNEL, THREAD), true);
+  assert.notEqual(h.manager.get(CHANNEL, THREAD), null);
+  assert.ok(await h.manager.release(CHANNEL, THREAD));
+  assert.equal(h.manager.live(CHANNEL, THREAD), false, "a released thread is held");
+  h.manager.free(CHANNEL, THREAD);
+  assert.equal(h.manager.live(CHANNEL, THREAD), true);
+});
+
 test("a gone session is removed and says so", async (t) => {
   // A stored session id that fails to resume no longer falls back to a fresh session.
   const h = harnessFor(t)({ startError: gone() });
@@ -556,7 +568,7 @@ test("the status field tracks working then clears once done", async (t) => {
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
   const session = h.session();
   const turn = await session.submit("list the files");
-  assert.equal(thread(h).status, Status.WORKING);
+  assert.equal(thread(h).status, "working");
   await turn.done.wait();
   await h.until(() => thread(h).status === null);
 });
@@ -567,10 +579,10 @@ test("the ended field keeps the roots final reaction until work starts again", a
   const turn = await session.submit("list the files");
   assert.equal(thread(h).ended, null);
   await turn.done.wait();
-  await h.until(() => thread(h).ended === Status.DONE);
+  await h.until(() => thread(h).ended === "done");
   await session.submit("and again");
   const stored = thread(h);
-  assert.deepEqual([stored.status, stored.ended], [Status.WORKING, null]);
+  assert.deepEqual([stored.status, stored.ended], ["working", null]);
 });
 
 test("a close that cuts a turn short keeps x as the ended reaction", async (t) => {
@@ -581,7 +593,7 @@ test("a close that cuts a turn short keeps x as the ended reaction", async (t) =
   await h.until(() => pending(h.approvals).length > 0);
   await session.close();
   const stored = thread(h);
-  assert.deepEqual([stored.status, stored.ended], [null, Status.ERROR]);
+  assert.deepEqual([stored.status, stored.ended], [null, "error"]);
 });
 
 test("close leaves every repair field cleared", async (t) => {
@@ -3338,10 +3350,22 @@ test("the next message after an idle close resumes with effort", async (t) => {
 });
 
 test("sessions of leaves out a closed session", async (t) => {
-  const h = harnessFor(t)({});
+  // Closing has started but its disconnect has not ended, so the manager has not evicted it yet.
+  const gate = new AsyncEvent();
+  const h = harnessFor(t)({ closeGate: gate });
   const session = h.session();
-  await session.close();
-  assert.deepEqual(h.manager.sessionsOf(CHANNEL), []);
+  await session.ensureConnected();
+  assert.deepEqual(h.manager.sessionsOf(CHANNEL), [session]);
+  const closing = session.close();
+  try {
+    await h.sleep(0.05);
+    assert.ok(session.closed);
+    assert.equal(h.clients[0]?.connected, true); // blocked inside the gated disconnect
+    assert.deepEqual(h.manager.sessionsOf(CHANNEL), []);
+  } finally {
+    gate.set(); // a failed assertion must not leave the close hanging
+    await closing;
+  }
 });
 
 test("a gone session is left out of sessions of", async (t) => {

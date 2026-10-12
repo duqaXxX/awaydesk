@@ -80,6 +80,18 @@ export interface AgentWords {
   /** Two of its commands as the owner types them in the chat, for the guide. */
   readonly examples: string;
   /**
+   * The agent's command names, without the slash, that start a new session; empty when it has
+   * none. One thread is one session, so the daemon refuses each of them inside a thread.
+   */
+  readonly newSession: readonly string[];
+  /**
+   * The name of the agent's own command that logs in on the host, without the slash; null when
+   * it has none. The daemon answers it with where it is done and never sends it.
+   */
+  readonly login: string | null;
+  /** The same for the command that logs out. */
+  readonly logout: string | null;
+  /**
    * The shell line that continues a session in a terminal; `{directory}` and `{session}` are
    * filled in, each quoted for a shell.
    */
@@ -405,10 +417,15 @@ export type QuestionAnswer =
 /**
  * Asked by a back end while a call waits; each resolves once, for as long as it takes. A request
  * still waiting when the core closes the session resolves as refused (a denial, a skip).
+ *
+ * `signal` is the agent's: it aborts it when it no longer waits for the answer. The core then
+ * takes the request back from the owner and the promise resolves as refused, like a request
+ * still waiting when the session closes. A signal already aborted when the request arrives
+ * shows the owner nothing.
  */
 export interface RequestHandler {
-  permission(request: PermissionRequest): Promise<PermissionAnswer>;
-  question(request: QuestionRequest): Promise<QuestionAnswer>;
+  permission(request: PermissionRequest, signal: AbortSignal): Promise<PermissionAnswer>;
+  question(request: QuestionRequest, signal: AbortSignal): Promise<QuestionAnswer>;
 }
 
 /** One live session of an agent. */

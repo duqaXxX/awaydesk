@@ -65,3 +65,25 @@ export function compareCodePoints(a: string, b: string): number {
   }
   return left.length - right.length;
 }
+
+/** Whether the UTF-16 unit `code` opens a surrogate pair. */
+export function isHigh(code: number): boolean {
+  return code >= 0xd800 && code <= 0xdbff;
+}
+
+/** Whether the UTF-16 unit `code` closes a surrogate pair. */
+export function isLow(code: number): boolean {
+  return code >= 0xdc00 && code <= 0xdfff;
+}
+
+/** Python's `len(text)`: the code points of a text. */
+export function len(text: string): number {
+  let count = text.length;
+  for (let i = 0; i < text.length - 1; i += 1) {
+    if (isHigh(text.charCodeAt(i)) && isLow(text.charCodeAt(i + 1))) {
+      count -= 1;
+      i += 1;
+    }
+  }
+  return count;
+}

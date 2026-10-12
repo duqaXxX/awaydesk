@@ -46,6 +46,9 @@ export const NAMES: Names = {
   cli: "plain",
   chat: "Memory chat",
   examples: "`!echo hello`, `!count one two`",
+  login: "signin",
+  logout: "signout",
+  newSession: ["restart"],
 };
 
 /** A date, in seconds: threads the memory chat opens are dated by it. */

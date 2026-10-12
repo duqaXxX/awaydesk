@@ -77,6 +77,8 @@ export interface CanUseToolCall {
   readonly toolName: string;
   readonly input: JsonObject;
   readonly callId: string;
+  /** The request's own signal, which a test aborts as the SDK does when it gives a request up. */
+  readonly abort?: AbortController;
 }
 
 /** One step of a script. */
@@ -151,8 +153,9 @@ export function requestWhileStreaming(
   toolName: string,
   input: JsonObject,
   callId = "toolu_fake_1",
+  abort?: AbortController,
 ): Item {
-  return { request: { toolName, input, callId } };
+  return { request: { toolName, input, callId, ...(abort !== undefined && { abort }) } };
 }
 
 export function hookRun(input: JsonObject, hook: "Stop" | "PostToolUse" = "Stop"): Item {
@@ -354,12 +357,13 @@ export class FakeAgentSession implements AgentSession {
     const mapped = toRequest(call.toolName, call.input, {
       toolUseID: call.callId,
     });
+    const signal = (call.abort ?? new AbortController()).signal;
     if (mapped.type === "question") {
       const request: QuestionRequest = { ...mapped, toolName: call.toolName, title: null };
-      return this.#requests.question(request);
+      return this.#requests.question(request, signal);
     }
     const request: PermissionRequest = mapped;
-    return this.#requests.permission(request);
+    return this.#requests.permission(request, signal);
   }
 
   async setPermissionMode(mode: string): Promise<void> {

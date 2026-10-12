@@ -13,6 +13,7 @@ import {
   DirectoryUnavailable,
   fill,
   type HoldsPort,
+  type Listings,
   type Names,
   named,
   SessionClosed,
@@ -25,7 +26,6 @@ import { getLogger } from "../../../log.ts";
 import type { ChatInbound } from "../../seam.ts";
 import type { Home } from "../home.ts";
 import { deliver } from "../notice.ts";
-import type { Listings } from "../openfile/listing.ts";
 import { contextBlock, noticeText } from "../reply/blocks.ts";
 import { describe } from "../reply/errors.ts";
 import type { Limiter } from "../reply/limiter.ts";

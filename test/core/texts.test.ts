@@ -4,6 +4,16 @@ import * as slackTexts from "../../src/chat/slack/texts.ts";
 import * as texts from "../../src/core/texts.ts";
 import { NAMES } from "../support/names.ts";
 
+test("no text of the core holds a chat's own syntax for a channel, a user or a broadcast", () => {
+  const templates = Object.values(texts).flatMap((value) =>
+    typeof value === "string" ? [value] : value instanceof texts.Named ? [value.template] : [],
+  );
+  assert.ok(templates.length > 100);
+  for (const template of templates) {
+    for (const syntax of ["<#", "<@", "<!"]) assert.ok(!template.includes(syntax), template);
+  }
+});
+
 test("fill takes a number for a field", () => {
   assert.equal(
     texts.fill(texts.named(slackTexts.UPLOAD_TOO_MANY, NAMES), { count: 12, limit: 5 }),

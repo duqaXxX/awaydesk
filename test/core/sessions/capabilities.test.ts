@@ -11,7 +11,6 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import type { Capabilities, ListedSession, SessionEvent } from "../../../src/agent/seam.ts";
-import { STORED_STATUS } from "../../../src/core/sessions/constants.ts";
 import { BypassUnavailable, DirectoryUntrusted } from "../../../src/core/sessions/errors.ts";
 import { DEFAULT } from "../../../src/core/setup.ts";
 import { CHANNEL, THREAD } from "../../support/fake-slack.ts";
@@ -407,7 +406,7 @@ test("reactions off: no status is shown, cleared or settled, and the stored one 
     assert.ok(!h.chatCalls.includes(member), `${member} was called`);
   }
   assert.deepEqual(h.reactions(), []);
-  assert.equal(h.state.thread(CHANNEL, THREAD)?.ended, STORED_STATUS.done);
+  assert.equal(h.state.thread(CHANNEL, THREAD)?.ended, "done");
 });
 
 test("reactions off: a hold that is cancelled clears no status", async (t) => {

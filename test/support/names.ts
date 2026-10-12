@@ -11,4 +11,7 @@ export const NAMES: Names = {
   cli: "claude",
   chat: "Slack",
   examples: "`!compact`, `!model opus`",
+  login: "login",
+  logout: "logout",
+  newSession: ["clear", "reset", "new"],
 };

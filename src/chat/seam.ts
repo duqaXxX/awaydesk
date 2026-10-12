@@ -260,7 +260,8 @@ export interface ThreadChat {
  * The two ways the daemon writes its own words: a `notice` is a small line (`ThreadChat.tell`
  * and `rewrite`, `ChannelChat.notice` and `rewrite`), a `reference` is Markdown at full size
  * (`say`). A chat may mark each up differently, so a name that goes into either is escaped for
- * it (`ChatProvider.escape`), and a link is written for it (`ThreadChat.link`).
+ * it (`ChatProvider.escape`), a channel is written for it (`ChatProvider.channelName`) and a link
+ * is written for it (`ThreadChat.link`).
  */
 export type Markup = "notice" | "reference";
 
@@ -406,6 +407,11 @@ export interface ChatInbound {
   ): Promise<boolean>;
   /** The owner used a control of a list a word posted. */
   picked(pick: ListPick): Promise<void>;
+  /**
+   * The owner wrote in a channel the provider found bound to no folder, before it had a message
+   * to hand over; the core tells the owner how to bind.
+   */
+  unbound(channel: string): Promise<void>;
 }
 
 /** Whether a chat still has a channel; `no answer` when it could not say, with no reason to give. */
@@ -429,6 +435,11 @@ export interface ChatProvider {
   channel(channel: string): ChannelChat;
   /** `text` made safe to stand inside a line of `markup`, where it is shown as written. */
   escape(text: string, markup: Markup): string;
+  /**
+   * The channel as the chat writes it inside a line of `markup`, so that the owner can tell which
+   * one it is. Never rejects.
+   */
+  channelName(channel: string, markup: Markup): string;
   /**
    * When the thread was opened, in seconds since the epoch, as its name alone tells; null when
    * the name tells nothing.

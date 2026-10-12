@@ -80,7 +80,7 @@ import {
   taskTitle,
 } from "../reply/renderer.ts";
 import { oneLine } from "../reply/words.ts";
-import type { Decision } from "../requests.ts";
+import { DENY, type Decision, toAnswer } from "../requests.ts";
 import { type Choice, DEFAULT } from "../setup.ts";
 import * as texts from "../texts.ts";
 import {
@@ -89,7 +89,6 @@ import {
   INJECTED_TURN_WAIT,
   PROCESS_EXITED,
   STOP_TAIL_WAIT,
-  STORED_STATUS,
   SUMMARY_IS_END_LINE,
   TASK_EVENTS,
   TASK_REPLIES_KEPT,
@@ -1310,12 +1309,7 @@ export class ThreadSession {
       try {
         this.deps.state.clearRepair(this.channelId, this.threadId, { keepOpen: lost });
         if (lost) {
-          this.deps.state.setStatusPending(
-            this.channelId,
-            this.threadId,
-            STORED_STATUS.working,
-            STORED_STATUS.error,
-          );
+          this.deps.state.setStatusPending(this.channelId, this.threadId, "working", "error");
         }
       } catch (error) {
         logger.warning(
@@ -1371,8 +1365,9 @@ export class ThreadSession {
         effort: valid,
       },
       {
-        permission: (request) => this.answering(request) as Promise<PermissionAnswer>,
-        question: (request) => this.answering(request) as Promise<QuestionAnswer>,
+        permission: (request, signal) =>
+          this.answering(request, signal) as Promise<PermissionAnswer>,
+        question: (request, signal) => this.answering(request, signal) as Promise<QuestionAnswer>,
       },
     );
     try {
@@ -1409,8 +1404,11 @@ export class ThreadSession {
   }
 
   /** A request handler in flight, tracked so that a close can wait for it. */
-  private answering(request: PermissionRequest | QuestionRequest): Promise<Decision> {
-    const answer = this.askOwner(request);
+  private answering(
+    request: PermissionRequest | QuestionRequest,
+    signal: AbortSignal,
+  ): Promise<Decision> {
+    const answer = this.askOwner(request, signal);
     this.asking.add(answer);
     const forget = () => this.asking.delete(answer);
     answer.then(forget, forget);
@@ -2008,8 +2006,8 @@ export class ThreadSession {
       this.deps.state.setStatusPending(
         this.channelId,
         this.threadId,
-        pending ? STORED_STATUS[state] : null,
-        pending ? null : STORED_STATUS[state],
+        pending ? state : null,
+        pending ? null : state,
       ),
     );
   }
@@ -2038,12 +2036,7 @@ export class ThreadSession {
     const stored = this.deps.state.thread(this.channelId, this.threadId);
     if (stored !== null) {
       this.recordStatus(() =>
-        this.deps.state.setStatusPending(
-          this.channelId,
-          this.threadId,
-          stored.status,
-          STORED_STATUS.error,
-        ),
+        this.deps.state.setStatusPending(this.channelId, this.threadId, stored.status, "error"),
       );
     }
   }
@@ -2753,10 +2746,16 @@ export class ThreadSession {
   /**
    * A request of the agent's, put to the owner: a tool's permission, or its questions. Resolves
    * with what the owner chose, for as long as that takes; with a refusal when the chat could
-   * not show the request, since nobody can answer one that was never shown.
+   * not show the request, since nobody can answer one that was never shown. `signal` is the
+   * agent's: aborted, the request is refused and its message withdrawn; aborted before the
+   * request arrives, nothing is posted.
    */
-  private async askOwner(request: PermissionRequest | QuestionRequest): Promise<Decision> {
+  private async askOwner(
+    request: PermissionRequest | QuestionRequest,
+    signal: AbortSignal,
+  ): Promise<Decision> {
     const questions = request.type === "question" ? request.questions : null;
+    if (signal.aborted) return toAnswer(DENY, questions, this.names);
     const title =
       request.title ||
       (request.type === "question" ? request.toolName : taskTitle(request.toolName, request.input));
@@ -2769,6 +2768,14 @@ export class ThreadSession {
     this.waiting.add(approvalId);
     this.idleTimerCheck(); // an open approval or question holds the session
     this.react("waiting");
+    // Set only when the agent's abort settled a request still open, so an abort after the answer
+    // changes nothing.
+    let givenUp = false;
+    let withdrawn = false;
+    const giveUp = () => {
+      givenUp = this.deps.approvals.giveUp(approvalId) !== null;
+    };
+    signal.addEventListener("abort", giveUp, { once: true });
     let messageTs: MessageId;
     let decision: Decision;
     try {
@@ -2797,15 +2804,20 @@ export class ThreadSession {
           );
         }
       } else {
+        withdrawn = true;
         await this.deleteRequest(messageTs); // decided while it was posted
       }
       decision = await pending.decision;
     } finally {
+      signal.removeEventListener("abort", giveUp);
       this.deps.approvals.discard(approvalId);
       this.waiting.delete(approvalId);
       this.idleTimerCheck(); // may (re)start the idle-close timer
       if (!this.interrupting) this.reactWaitingOrWorking();
     }
+    // After the bookkeeping above, so a turn that ends during the chat round trip finds the
+    // request gone and the root free to settle on done.
+    if (givenUp && !withdrawn) await this.deleteRequest(messageTs);
     if (questions !== null && "answered" in decision && decision.answered) {
       await this.keepAnswers(request.callId, messageTs, questions, decision.answers);
     }

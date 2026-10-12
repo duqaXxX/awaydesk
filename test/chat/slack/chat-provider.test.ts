@@ -23,6 +23,7 @@ const NOBODY: ChatInbound = {
   message: async () => {},
   answer: async () => false,
   picked: async () => {},
+  unbound: async () => {},
 };
 
 test("the provider names itself and supports every part of the seam", () => {
@@ -42,6 +43,9 @@ const OTHER_AGENT = {
     author: "Other",
     command: "other",
     examples: "`!one`, `!two`",
+    newSession: ["fresh"],
+    login: "enter",
+    logout: "leave",
     terminal: "cd {directory} && other --resume {session}",
   },
 };
@@ -64,6 +68,9 @@ test("the names are the agent's and the chat's, read when first needed and once"
     cli: "other",
     chat: "Slack",
     examples: "`!one`, `!two`",
+    login: "enter",
+    logout: "leave",
+    newSession: ["fresh"],
   };
   assert.deepEqual(chat.names(), expected);
   assert.deepEqual(chat.names(), expected);

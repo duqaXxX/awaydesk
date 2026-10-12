@@ -51,7 +51,7 @@ What crosses the agent seam:
 | commands | core to back end | on `AgentBackend`: `start`, `listSessions`, `datedSessions`, `aliveSessions`, `folderTrusted`, `trustedRepository`, `usageLimits` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask`, `setPermissionMode`, `setModel`, `setEffort`, `contextUsage`, `info`, `close` |
 | events | back end to core | `SessionEvent`, read in order from `AgentSession.events`: the session's id and version, a message's start and end, text as pieces or whole, a call's start and end, a task's life, a compaction, a change of permission mode, effort or folder, a prompt the agent took, word that the coming turn reports a background task (`report_started`), usage limits gone stale, a turn's end, an error message of the agent's, a lost process. A turn has no start event, and `turn_ended` is an event like the others, never the answer to `send` |
 | requests | back end to core, which answers | `RequestHandler.permission` and `RequestHandler.question`: each resolves once, for as long as the owner takes, with a `PermissionAnswer` or a `QuestionAnswer` |
-| declarations | read by the core | `AgentBackend.name` and `AgentBackend.words`, which the texts take; `AgentBackend.capabilities`, what the back end supports (`capabilities.CAPABILITIES` for Claude), listed under "Modules" |
+| declarations | read by the core | `AgentBackend.name` and `AgentBackend.words`, which the texts take, with the names of the commands the core treats on its own (`AgentWords.newSession`, `AgentWords.login`, `AgentWords.logout`: an agent with none leaves a list empty or a name null, and the core refuses and answers nothing for it); `AgentBackend.capabilities`, what the back end supports (`capabilities.CAPABILITIES` for Claude), listed under "Modules" |
 
 What crosses the chat seam, in both directions:
 
@@ -60,9 +60,9 @@ What crosses the chat seam, in both directions:
 | a reply | core to provider | `ReplySink`: `text`, `task`, `finish`, `closeOut`, `waitLanded`, `settle`. A session holds it as a `Reply`, which adds `setRunning`, `setLatest` and `footerShown`. A tool's line crosses as a `TaskUpdate` and the footer as `FooterFields`, which the provider formats |
 | a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, `activityRefused`, `written`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
 | a channel | core to provider | `ChannelChat`, from `ChatProvider.channel`: `notice`, `say`, `rewrite`, and the lists a word posts (`offer`, `withdraw`) |
-| the provider | core to provider | `ChatProvider`: `name`, `capabilities`, `escape`, `openedAt`, `channelState`, `index` and `openFile` where declared, and `start`, `stop` and `close` |
+| the provider | core to provider | `ChatProvider`: `name`, `capabilities`, `escape` and `channelName` (what a core text relies on to write a name and a channel for the chat's markup, beside `ThreadChat.link`), `openedAt`, `channelState`, `index` and `openFile` where declared, and `start`, `stop` and `close` |
 | a request | core to provider | typed by what it asks, never by how it is drawn: `OwnerRequest` is a `PermissionRequest`, a `QuestionRequest`, a `HoldRequest` or a `SetupRequest`; a list is an `OwnerList`, of folders or of sessions |
-| an owner's act | provider to core | `ChatInbound`: `message` (an `InboundMessage`), `answer` (an `OwnerAnswer` to the request `requestId` names) and `picked` (a `ListPick` from an `OwnerList`). The provider calls them for the owner alone |
+| an owner's act | provider to core | `ChatInbound`: `message` (an `InboundMessage`), `answer` (an `OwnerAnswer` to the request `requestId` names), `picked` (a `ListPick` from an `OwnerList`) and `unbound` (the owner wrote in a channel bound to no folder: the core tells how to bind). The provider calls them for the owner alone |
 | a failure | provider to core | `ChatError`, whose name is the provider's code for the failed call |
 
 The core decides what is asked, which choices exist and what follows an answer; the provider
@@ -74,7 +74,7 @@ else of it.
 |---|---|
 | `main` | the startup order, the single-instance lock, the build of both modules from the registry, signals and the shutdown drain |
 | `registry.REGISTRY` | the agents and the chats by name, and the two names taken when `.env` selects none |
-| `flows.buildFlows`, `Inbound` | the core's side of `ChatInbound`: what a message, an answer and a pick mean and what follows each (`src/core/flows/`: `messages`, `words`, `status`, `asking`, `lists`, `resume`, `bind`, `repair`, `notices`), all answering the owner through `Talk` |
+| `flows.buildFlows`, `Inbound` | the core's side of `ChatInbound`: what a message, an answer, a pick and an unbound channel mean and what follows each (`src/core/flows/`: `messages`, `words`, `status`, `asking`, `lists`, `resume`, `bind`, `repair`, `notices`), all answering the owner through `Talk` |
 | `CorePort` | what a provider may call and read of the core: the live sessions, `state.json`, the pending requests and holds, the agent's name, words and session listing |
 | `SessionManager` | the live `ThreadSession` objects, one per open thread, and what spans them: `!bind`, `!resume`, the drain |
 | `ThreadSession` | one thread: its agent session, prompt queue, turns, requests, status and idle close |
@@ -244,7 +244,7 @@ as messages of the thread, which show the same text.
 The core reaches a provider only through `src/core/port.ts`. `CorePort` has the members
 `sessions`, `state`, `approvals`, `holds` and `agent`, each a set of `Pick` types over the class that
 answers, declared in a file of `src/core/port/` for the flow of the provider that uses it, so the
-classes themselves are the implementation. The same file exports `ChatContext`, `ChatEntry` and the
+classes themselves are the implementation. What a provider reads of a live session or a pending request is a plain value: `SessionManager.live` (whether the thread has a session), `Approvals.questions` (the questions of a request, read from the thread it was posted in) and `Holds.atMessage` (the id of the open setup a message shows). No `ThreadSession` and no `Pending` reaches a provider. The same file exports `ChatContext`, `ChatEntry` and the
 values of the core that a provider's own code works with.
 
 Two tests hold the boundary. `test/imports.test.ts` allows a chat provider to import the chat seam,
@@ -269,6 +269,50 @@ Not tested: a module other than these. No second real agent or chat ships, and t
 shaped on the two test modules, so a first real one may need a seam change. With Claude and Slack
 the behaviour was compared by the existing suite and the golden files; on 2026-10-11 the daemon had
 not been run against a real Slack workspace with the modules in place.
+
+### What an agent must do that the types do not say
+
+The types of `src/agent/seam.ts` give the members. These are the rules the core relies on beside
+them. A rule the conformance suite checks names the check; one it does not check is marked, and a
+module that breaks it fails only in use.
+
+| Subject | Rule | Checked by `test/conformance/agent.ts` |
+|---|---|---|
+| A command | The owner types `!name args`. When `name` is the `name` of an entry of `AgentInfo.commands`, the agent receives the prompt `/name args` (the message flow, `messages.messages`); an alias does not match, and any other `!text` arrives as typed. A name in `AgentWords.newSession` is refused inside a thread and the names in `AgentWords.login` and `AgentWords.logout` are answered by the core: none of the three reaches the agent | `a command's output arrives whole, once, and uses no model`; nothing checks the text that arrives as typed |
+| The effort | `effort_observed` comes before the `turn_ended` of its turn: `ThreadSession.finish` builds the footer when the turn ends, from what it has by then. Null is the agent's default | Not checked: only that a level is one of `Capabilities.effortLevels` |
+| Who started a turn | `turn_ended.startedBy` is `owner` for a prompt's turn and `agent` for one the agent starts by itself to report a task. `report_started` names the task before such a turn's words, and needs `backgroundTasks` | `startedBy` is checked for a prompt's turn only |
+| A prompt taken | An agent that declares `promptDuringTurn` emits `prompt_taken` with the `Prompt.id` of each prompt it accepts, before that turn's words, whether it took the prompt into the running turn or as the next one | `a prompt taken is named by its id, before the turn's words` |
+| `interrupt` | The running turn ends with `turn_ended` whose `ending` is `interrupted`, and the session stays usable. With no turn running it resolves and ends nothing. The core has no timer for a turn that never ends after it | `interrupt ends the turn as interrupted, and the session goes on` |
+| `stopTask` | The task's line closes only when the agent then sends `task_ended`, or `task_updated` with `terminal` and a status. Until then the reply that holds the line stays open | Not checked |
+| `setEffort(null)`, `setModel(null)` | Null is the agent's default. The core calls `setEffort` only with `liveEffort` and `setModel` only with `models`, and never `setModel(null)` | `setEffort takes a declared level or null, and refuses another`, `setModel takes a listed model or null` |
+| `setPermissionMode` | A mode the agent refuses rejects. The core then changes nothing of its own: the bypass it stores is written only after the call resolves | `a permission mode the back end names is taken, another is refused` |
+| `session_started` | Emitted only once a start that resumes that id would succeed: the core stores the id when the event arrives, and the setup's Start may resume it before any prompt | `an id that session_started names can be resumed at once` |
+| A request | `RequestHandler.permission` and `RequestHandler.question` each resolve once. The agent passes a signal and aborts it when it no longer waits: the core takes the request back from the owner and resolves it as refused | `a request the agent gives up aborts the signal it passed, and the turn goes on to its end` |
+| A start that fails | `ResumeRefused`, the one error class of the seam, when the session a start names cannot be resumed: the core forgets the thread. Any other rejection is shown to the owner by its name and the next message tries again. Neither leaves a process running | `a resume the agent refuses rejects with ResumeRefused and leaves no process` |
+
+Some members are required by the type and serve a capability the module may not declare. The core
+never calls them then, and the plain agent shows what to give back: `folderTrusted` answers true
+and `trustedRepository` null without `folderTrust`, `setEffort` and `stopTask` throw without
+`liveEffort` and `backgroundTasks`, and `AgentInfo.models` is an empty list without `models`.
+`AgentBackend.usageLimits` is the one member left out when its capability is not declared.
+
+### What a chat must do that the types do not say
+
+| Subject | Rule | Checked by `test/conformance/chat.ts` |
+|---|---|---|
+| The owner check | Every inbound path checks that the owner acted before it calls `ChatInbound`, and the core never checks. What "the owner" means is the provider's: the Slack provider requires the configured user and the workspace it started in (`guards.isOwner`) | Three checks send a message, a click and a pick from somebody else. Nothing checks a second workspace |
+| Start and stop | `ChatProvider.start`, `stop` and `close` are called once each, in that order. Before `start` the daemon already calls `thread`, `endReply`, `withdraw`, `showStatus`, `channelState`, `openedAt` and the index's `refresh`, for the crash repair and the cleanup. `ChatEntry.build` must not read the core | `nothing arrives before start`, `nothing arrives after stop` |
+| A reply | `text` and `task` come while the turn runs. `finish` ends the body and may come more than once for one reply, since a report turn writes into the reply that started its task. `closeOut` ends the reply once, with the footer, and answers whether the end landed. `waitLanded` is asked only after a `closeOut` that answered false. `settle` brings the reply to its true form now, at a close. A signal given to any of the four releases the caller only: the write goes on | `carries text, a task line and a footer to its end`, `reports an end that did not land` |
+| A task line | `task` with an id already sent updates that line | The same id is sent twice; nothing checks that one line results |
+| A line of the daemon's | `text` with `notice` is a line of the daemon's own, and with `ending` the line that says how a reply was cut short | Not checked |
+| Markup | The core writes a notice (`tell`, `rewrite`, `ChannelChat.notice`) and a reference (`say`) and names which one (`Markup`). Its texts use backticks and Markdown emphasis. `ChatProvider.escape` makes a name safe for one markup, `ThreadChat.link` writes a link to a thread or answers null, and `ChatProvider.channelName` writes a channel | `leaves a plain word alone when it escapes it`, `link is a string or nothing` |
+| Ids | `MessageId` and `ThreadRef` are strings the core stores in `state.json` and hands back after a restart: the crash repair ends a reply and withdraws a request by the ids a previous process stored | Not checked across a restart |
+| A request | `ThreadChat.ask` resolves with the id of the message that shows the request, or rejects with `ChatError`; the core then refuses the request. `withdraw` answers true for a request that is already gone. A click on a withdrawn request may still reach `ChatInbound.answer`, which answers false after telling the owner | `ask rejects with ChatError when it could not show the request` |
+| A status | The core hands `showStatus` one of four words and stores the same word. What the word looks like is the provider's | Skipped for a chat without `reactions` |
+
+Not settled by the seam, by the core or by a check: who drops an event the chat delivers twice
+(neither the Slack provider nor the core does), and what a provider does with a click on a
+request it already withdrew.
 
 ## Startup
 
@@ -445,8 +489,8 @@ fields of the `Config`, and each holds only non-enumerable properties, so a log 
 
 `StateStore` (in `state`) keeps, for each bound channel, its directory and, for each of its threads,
 the folder it was opened in, its Claude Code session id, its bypass choice (on, off, or never
-chosen), the effort level set with `/effort` and `ended`, the reaction name of its root once ✅ or ❌
-is requested (cleared when the root turns ⏳ or ✋ again; read only by the session index), in
+chosen), the effort level set with `/effort` and `ended`, the status of its root once it is done or
+in error (cleared when the root turns working or waiting again; read only by the session index), in
 `~/.config/awaydesk/state.json` (version 3: version 2 plus `agent` and `chat`, the names of the agent
 and the chat that wrote the file). `bypass` is `true` for on and `false` for not on; an
 explicit off also writes `bypass_off: true`, and a thread with `bypass` false and no `bypass_off`
@@ -473,9 +517,11 @@ Each thread also carries three fields for crash repair, ids only, never message 
   session writes it (`StateStore.replaceOpenReply`).
 - `requests`: the id of every approval, question, setup and same-folder hold message still carrying
   buttons (added on post, removed on delete or answer).
-- `status`: the root's reaction name while it is ⏳ or ✋ (cleared once ✅ or ❌ is requested). The
-  session asks the chat for a status by one of four words, and `constants.STORED_STATUS` gives the
-  reaction name the file keeps for each.
+- `status`: the root's status while it is ⏳ or ✋ (cleared once ✅ or ❌ is requested). The session
+  asks the chat for a status by one of four words (`SessionStatus`), and the file keeps that word:
+  `working`, `waiting`, `done` or `error`, whatever the chat draws it as. A file written before the
+  words were stored holds the name of the Slack reaction for each; `StateStore` reads those four
+  names as their words, keeps the file at version 3 and writes words at its next save.
 
 All three are optional: a version 2 file without them reads as "nothing open", and a reader that
 does not know them ignores them, so they did not change the version. A graceful close (`ThreadSession.close`)
@@ -806,7 +852,12 @@ record (`ThreadChat.keepAnswers`, `requests.answeredBlocks`); if Slack refuses t
 request is deleted, so no button is left that no longer works. `!stop` denies every request still
 pending in the session's own thread and deletes its message, and a request still waiting when the
 session closes or loses its process is answered as refused (`Approvals.denyAll`): a denial for a
-permission, a skip for a question. A request Slack does not accept is denied at once, with a message telling Claude Code that
+permission, a skip for a question. The back end passes the callback's `signal` to the handler
+(`RequestHandler.permission` and `question` take it as their second parameter); when the agent
+aborts it, the session refuses that one request (`Approvals.giveUp`) and deletes its message, with
+no text for the owner, and the root's status leaves `waiting` as after an answer. A signal that
+aborts after the answer does nothing, and one already aborted when the request arrives posts
+nothing. A request Slack does not accept is denied at once, with a message telling Claude Code that
 it could not be shown (`texts.APPROVAL_UNPOSTED`), and the tool's line records the denial.
 
 ## Footer
@@ -1264,6 +1315,60 @@ opens starts in its new thread with bypass never chosen (it follows the folder's
 `/effort` level set, whatever the session had before: both belong to the thread, not to the Claude
 Code session id, and `!resume` never touches or waits on any other thread.
 
+## Files offered by `!open`
+
+What `!open` offers, which of it changed since a thread started and which paths are safe to read
+are the core's, in `src/core/files/` (`listing`, `changed`, `read`, `paths`, `waiting`), written
+for any chat. A provider reaches them through `core/port.ts`; the Slack provider's picker, modal and
+upload are in [Opening a file](slack-provider.md#opening-a-file).
+
+The search reads the folder from disk, and the changed files come from git. Which repositories the
+folder has is `listing.repositoriesOf`: the one holding the folder when `SessionManager.repository`
+(the footer's own `trustedRepository` lookup) finds it usable, otherwise
+the usable ones found at most two levels below it, by `folders.foldersWithin`, the walk `!bind`
+uses, which never enters a repository; the lookups of those candidates run together.
+`Listings.repositories` keeps the answer for a folder for `listing.REPOSITORIES_TTL` seconds, so the
+listing and the changed files of one modal ask once. Where git runs in several repositories (the
+listing, `changed.changedIn`), at most `listing.GIT_CHAINS` run at once. Inside one the files come
+from git, through the footer's `footer.runGit`: `ls-files --cached --others --exclude-standard`,
+which leaves out what `.gitignore` excludes, as the terminal's `@` file picker does under
+`respectGitignore`. Everywhere else `listing.walkFiles` reads the disk: regular files, no symlinked
+folder entered, no `.git` entered, none of the usable repositories' roots (git lists those).
+`Listings` joins the two for a folder, within `listing.LISTING_BUDGET` seconds (what is found by
+then is the answer), and keeps the result for `listing.LISTING_TTL` seconds
+(`listing.LISTING_PARTIAL_TTL` when it ran out of time or a repository's git list failed or timed
+out, so an incomplete listing is not taken for a complete one) so the keystrokes of one search do
+not walk the folder again; `!open <words>` reads the same listing. A request for a folder being
+listed waits for that listing, and a request that gives up does not stop it; at most
+`listing.LISTING_KEPT` folders are kept, the expired ones removed on the next request. Paths are
+relative to the session's folder.
+
+A kept listing is never the reason for "no match": `Listings.search` lists the folder again first
+when a kept listing finds none, so a file made since is found. The listing it answers from says
+whether it is complete (`Listing.complete`); a search over one that is not carries that into its
+answer (`Found.complete`): `!open <words>` says `texts.OPEN_NO_MATCH_PARTIAL` instead of "no match",
+posts the matches with `texts.OPEN_PARTIAL` instead of opening a single match on its own, and the
+modal adds the same line under its rows. The files that match are checked on disk
+(`read.regularFiles`) only until the rows are full when a modal asks (`limit` of `modal.ROW_LIMIT`),
+so typing costs ten checks and not one for each match; past ten the count in the heading is the
+matches by name, and below ten it is exact. `!open <words>` checks all of them.
+
+The changed files are the union over the same repositories (`changed.changedIn`): `status` under
+`--no-optional-locks` with `diff-tree` from the repository's start commit to `HEAD`. No command
+writes the index, and `status` does not report a file that was only touched (the measurements are in
+the header of `src/core/files/listing.ts` and repeated by
+`test/core/files/changed.test.ts`). The start commit is `changed.startCommit`: where the
+repository's `HEAD` was when the thread started, from HEAD's reflog at the thread's start (the provider turns the `thread_ts` into epoch seconds,
+`open.startedAt`; `git rev-parse --verify --quiet HEAD@{<seconds> +0000}`, through `--git-dir`, so a linked worktree
+reads its own log). It is computed when `!open` builds the list and kept nowhere: no handler touches
+it when a prompt arrives, and a daemon restarted any number of times gives the same answer. A reflog
+that does not go back that far gives its oldest entry (git's own answer), unless that entry's old
+value is null, which means the repository was made or cloned since the thread began: then the start
+is the empty tree and every file counts (`rev-list -g --until` says whether the log begins after the
+thread, `rev-list -g --count` and `rev-parse HEAD@{<count>}` whether the oldest entry has an old
+value, `hash-object -t tree /dev/null` is the empty tree of the repository's hash algorithm). With
+no reflog, or no commit yet, there is no start and the list is the uncommitted and untracked files.
+
 ## Measured platform behaviour
 
 What the sections above state about Slack, the SDK and Claude Code that no reference documents or
@@ -1274,7 +1379,7 @@ the observation was made. A row names the client and the package it was observed
 behaviour is Claude Code's or Slack's own. A row observed through the Python SDK, which the daemon
 no longer uses, says so when it has not been measured again on the TypeScript SDK. The last two rows are documentation reads, not
 observations. Where `!open` relies on git's behaviour, its measurements are in the header of
-`src/chat/slack/openfile/listing.ts` and repeated by `test/chat/slack/openfile/changed.test.ts`.
+`src/core/files/listing.ts` and repeated by `test/core/files/changed.test.ts`.
 
 | Name | Observed | Method | Date | Version |
 |---|---|---|---|---|

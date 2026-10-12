@@ -14,25 +14,9 @@
  *   that ends that many code points, so a cut never lands inside a surrogate pair.
  */
 
-function isHigh(code: number): boolean {
-  return code >= 0xd800 && code <= 0xdbff;
-}
+import { isHigh, isLow, len } from "../../../text.ts";
 
-function isLow(code: number): boolean {
-  return code >= 0xdc00 && code <= 0xdfff;
-}
-
-/** Python's `len(text)`: the code points of a text. */
-export function len(text: string): number {
-  let count = text.length;
-  for (let i = 0; i < text.length - 1; i += 1) {
-    if (isHigh(text.charCodeAt(i)) && isLow(text.charCodeAt(i + 1))) {
-      count -= 1;
-      i += 1;
-    }
-  }
-  return count;
-}
+export { len };
 
 /** The UTF-16 index that ends the first `count` code points of `text`: where `text[:count]` cuts. */
 export function at(text: string, count: number): number {

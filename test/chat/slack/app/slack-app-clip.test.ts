@@ -38,8 +38,10 @@ import {
   ownerWasTold,
   postedBlocks,
   recorded,
+  said,
   setupClick,
   startAHold,
+  worldFor,
   worldOf,
 } from "../../../support/slack-app.ts";
 
@@ -235,6 +237,18 @@ test("text typed with a clip comes before its transcript", async (t) => {
   body.event.text = "!status";
   await world.dispatch(body);
   assert.deepEqual(world.queries(), ["!status\n\nWhat day is it today?"]);
+});
+
+test("a clip in an unbound channel explains how to bind and does not wait", async (t) => {
+  const world = worldFor(t)({ bound: false });
+  await world.dispatch(clipMessage(false));
+  assert.deepEqual(said(world), [fill(named(texts.UNBOUND, NAMES), { root: world.root })]);
+  assert.ok(
+    !("thread_ts" in (world.slack.callsTo("chat.postMessage")[0] as Record<string, unknown>)),
+  );
+  clipInfo(world);
+  await world.dispatch(recorded("event_callback-file_change"));
+  assert.deepEqual(world.queries(), []);
 });
 
 test("a clip where a message would be refused does not wait", async (t) => {

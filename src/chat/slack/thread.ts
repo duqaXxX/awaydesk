@@ -15,7 +15,14 @@ import type { Receiver } from "@slack/bolt";
 import type { KnownBlock, WebClient } from "@slack/web-api";
 import type { AgentBackend, Question } from "../../agent/seam.ts";
 import { type Clock, monotonicClock, systemClock } from "../../clock.ts";
-import { Cancelled, type CorePort, type Names, named, texts } from "../../core/port.ts";
+import {
+  Cancelled,
+  type CorePort,
+  type Listings,
+  type Names,
+  named,
+  texts,
+} from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import {
   type ChannelChat,
@@ -42,26 +49,17 @@ import { channelLookup } from "./channels.ts";
 import { holdBlocks } from "./hold.ts";
 import type { Home } from "./home.ts";
 import { crossing, deliver, deliverNotice } from "./notice.ts";
-import type { Listings } from "./openfile/listing.ts";
 import { endReply } from "./repair.ts";
 import { contextBlock, noticeText, split } from "./reply/blocks.ts";
 import { deleteRequest, describe } from "./reply/errors.ts";
 import { markdownEscape, mrkdwnEscape } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
 import { ReplySink } from "./reply/sinks.ts";
-import { Status, StatusReaction, ThreadStatus } from "./reply/status.ts";
+import { REACTIONS, StatusReaction, ThreadStatus } from "./reply/status.ts";
 import { answeredBlocks, approvalBlocks, questionBlocks } from "./requests.ts";
 import { type SetupDraw, setupBlocks } from "./setup.ts";
 
 export const logger = getLogger("awaydesk.chat.slack.thread");
-
-/** The reaction that shows each status of a session on its root message. */
-export const REACTIONS: Readonly<Record<SessionStatus, Status>> = {
-  working: Status.WORKING,
-  waiting: Status.WAITING,
-  done: Status.DONE,
-  error: Status.ERROR,
-};
 
 /** Who a reply's stream is addressed to, and whose messages are read back after a reset. */
 export interface SlackIdentity {
@@ -218,6 +216,12 @@ export class SlackChat implements ChatProvider {
 
   escape(text: string, markup: Markup): string {
     return markup === "notice" ? mrkdwnEscape(text) : markdownEscape(text);
+  }
+
+  // Slack's channel syntax in a notice. Whether a markdown block renders it was not confirmed
+  // (the block's reference names neither mentions nor angle brackets), so `reference` gets the same.
+  channelName(channel: string, _markup: Markup): string {
+    return `<#${channel}>`;
   }
 
   openedAt(ref: ThreadRef): number | null {

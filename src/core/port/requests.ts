@@ -8,9 +8,9 @@ import type { Holds } from "../hold.ts";
 import type { Approvals } from "../requests.ts";
 import type { SessionManager } from "../sessions/manager.ts";
 
-export type RequestsSessions = Pick<SessionManager, "get" | "wrote">;
+export type RequestsSessions = Pick<SessionManager, "live" | "wrote">;
 
-export type RequestsApprovals = Pick<Approvals, "get">;
+export type RequestsApprovals = Pick<Approvals, "questions">;
 
 /** A setup waits for its Start as a hold does; the model picked redraws the open one. */
-export type RequestsHolds = Pick<Holds, "get" | "atMessage">;
+export type RequestsHolds = Pick<Holds, "atMessage">;

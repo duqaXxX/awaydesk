@@ -55,6 +55,9 @@ export const PLAIN_WORDS: AgentWords = Object.freeze({
   author: "Plain",
   command: "plain",
   examples: "`!echo hello`, `!count one two`",
+  newSession: ["restart"],
+  login: "signin",
+  logout: "signout",
   terminal: "cd {directory} && plain --resume {session}",
 });
 
@@ -94,6 +97,8 @@ export interface CallOptions {
   readonly isError?: boolean;
   /** The call asks the owner first (`RequestHandler.permission`); a denial ends it as an error. */
   readonly permission?: boolean;
+  /** The agent gives the request up while the handler waits (aborts the signal it passed). */
+  readonly giveUp?: boolean;
 }
 
 export type PlainStep =
@@ -104,7 +109,7 @@ export type PlainStep =
       readonly input: Readonly<Record<string, unknown>>;
       readonly options: CallOptions;
     }
-  | { readonly question: readonly Question[] }
+  | { readonly question: readonly Question[]; readonly giveUp: boolean }
   | { readonly fail: string }
   | { readonly hold: true }
   | { readonly die: true };
@@ -132,9 +137,15 @@ export function call(
 export function question(
   text: string,
   labels: readonly string[],
-  options: { readonly header?: string; readonly multiSelect?: boolean } = {},
+  options: {
+    readonly header?: string;
+    readonly multiSelect?: boolean;
+    /** The agent gives the question up while the handler waits. */
+    readonly giveUp?: boolean;
+  } = {},
 ): PlainStep {
   return {
+    giveUp: options.giveUp ?? false,
     question: [
       {
         header: options.header ?? "",
@@ -481,7 +492,7 @@ export class PlainSession implements AgentSession {
       } else if ("call" in step) {
         await this.#call(step.call, step.input, step.options, turn, signal);
       } else if ("question" in step) {
-        await this.#ask(step.question, turn, signal);
+        await this.#ask(step.question, step.giveUp, turn, signal);
       } else if ("fail" in step) {
         this.#push({
           type: "agent_error",
@@ -541,8 +552,9 @@ export class PlainSession implements AgentSession {
         description: null,
       };
       const answer = await this.#request(
-        () => this.#context.requests.permission(request),
+        (given) => this.#context.requests.permission(request, given),
         { allow: false, message: NOT_SHOWN },
+        options.giveUp === true,
         signal,
       );
       if (answer === ABORTED) return;
@@ -562,7 +574,12 @@ export class PlainSession implements AgentSession {
     });
   }
 
-  async #ask(questions: readonly Question[], turn: Turn, signal: AbortSignal): Promise<void> {
+  async #ask(
+    questions: readonly Question[],
+    giveUp: boolean,
+    turn: Turn,
+    signal: AbortSignal,
+  ): Promise<void> {
     const callId = this.#nextId("call");
     turn.calls += 1;
     this.#push({
@@ -580,8 +597,9 @@ export class PlainSession implements AgentSession {
       questions,
     };
     const answer = await this.#request(
-      () => this.#context.requests.question(request),
+      (given) => this.#context.requests.question(request, given),
       { answered: false, message: NOT_SHOWN },
+      giveUp,
       signal,
     );
     if (answer === ABORTED) return;
@@ -596,18 +614,25 @@ export class PlainSession implements AgentSession {
     });
   }
 
-  /** Asks the handler; a handler that throws is a refusal, an interrupt or a close ends the wait. */
+  /**
+   * Asks the handler with a signal of the request's own; a handler that throws is a refusal, an
+   * interrupt or a close ends the wait. `giveUp` aborts the request's signal once the handler
+   * holds it, and the turn goes on with whatever the handler answers.
+   */
   async #request<T>(
-    ask: () => Promise<T>,
+    ask: (given: AbortSignal) => Promise<T>,
     refused: T,
+    giveUp: boolean,
     signal: AbortSignal,
   ): Promise<T | typeof ABORTED> {
+    const request = new AbortController();
     let pending: Promise<T>;
     try {
-      pending = ask();
+      pending = ask(request.signal);
     } catch {
       return refused;
     }
+    if (giveUp) request.abort();
     try {
       return await orAborted(pending, signal);
     } catch {

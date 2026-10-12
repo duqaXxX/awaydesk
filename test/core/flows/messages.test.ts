@@ -54,6 +54,14 @@ test("a message in a channel bound to no folder says where sessions start", asyn
   assert.deepEqual(world.chat.requests(), []);
 });
 
+test("the chat says the owner wrote in an unbound channel and the core tells how to bind, with no word of trust for an agent with none", async (t) => {
+  const world = await MessagesWorld.make(t);
+  const free = world.chat.openChannel("free");
+  await world.inbound.unbound(free);
+  assert.deepEqual(world.chat.texts(free), [fill(texts.UNBOUND_ANY, { root: world.folder })]);
+  assert.deepEqual(await world.prompts(), []);
+});
+
 test("a reply in a session's thread is sent at once, with no second setup", async (t) => {
   const world = await MessagesWorld.make(t);
   const ref = await world.opened("first");
@@ -112,10 +120,10 @@ test("a command the agent does not offer is sent as typed", async (t) => {
 test("a command that is only run on the host is answered, not sent", async (t) => {
   const world = await MessagesWorld.make(t);
   const ref = await world.opened();
-  await world.says("!login", ref.thread);
+  await world.says("!signin", ref.thread);
   assert.equal(world.shown(ref).at(-1), named(texts.LOGIN_ON_HOST, PLAIN_NAMES));
   assert.deepEqual(await world.prompts(), ["first"]);
-  await world.says("!logout");
+  await world.says("!signout");
   assert.equal(world.inChannel().at(-1), named(texts.LOGOUT_ON_HOST, PLAIN_NAMES));
   assert.deepEqual(await world.prompts(), ["first"], "no session started either");
 });
@@ -132,9 +140,20 @@ test("an agent with no commands of its own gets every !text as text", async (t) 
 test("a command that starts a new session is refused inside a thread", async (t) => {
   const world = await MessagesWorld.make(t);
   const ref = await world.opened();
-  for (const word of ["!clear", "!reset", "!new"]) await world.says(word, ref.thread);
-  assert.deepEqual(world.shown(ref).filter((line) => line === texts.CLEAR_IN_THREAD).length, 3);
+  for (const word of ["!restart", "!RESTART now"]) await world.says(word, ref.thread);
+  assert.deepEqual(world.shown(ref).filter((line) => line === texts.CLEAR_IN_THREAD).length, 2);
   assert.deepEqual(await world.prompts(), ["first"]);
+});
+
+test("another agent's login and new-session names reach the plain agent as any other text", async (t) => {
+  const world = await MessagesWorld.make(t);
+  const ref = await world.opened();
+  await world.says("!clear", ref.thread);
+  await world.says("!login", ref.thread);
+  await world.says("!logout", ref.thread);
+  assert.deepEqual(await world.prompts(), ["first", "!clear", "!login", "!logout"]);
+  assert.ok(!world.shown(ref).includes(texts.CLEAR_IN_THREAD));
+  assert.ok(!world.shown(ref).includes(named(texts.LOGIN_ON_HOST, PLAIN_NAMES)));
 });
 
 // --- A thread whose folder is no longer the channel's
@@ -228,7 +247,7 @@ test("a message that arrives while the daemon drains is refused and names what t
       texts.RESTARTING,
       texts.RESTART_WAITS_FOR,
       fill(texts.RESTART_WAIT_ROW, {
-        channel: world.channel,
+        channel: `#${world.channel}`, // the memory chat's form, which is not Slack's
         link,
         hold: texts.RESTART_HOLD_TURN,
       }),

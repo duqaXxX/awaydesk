@@ -397,13 +397,13 @@ test("a reply whose end failed shows no checkmark then the cross", async (t) => 
   await turn.done.wait();
   await h.sleep(0.02); // the stop failed; its retry is still waiting
   assert.ok(!h.reactions().includes(Status.DONE));
-  assert.equal(thread(h).status, Status.WORKING);
+  assert.equal(thread(h).status, "working");
   await h.until(() => h.reactions().at(-1) === Status.ERROR);
   assert.ok(!h.reactions().includes(Status.DONE));
   // kept, so a crash right now is still repaired
-  assert.equal(thread(h).status, Status.WORKING);
+  assert.equal(thread(h).status, "working");
   // and the cross the root shows is what the session index reads
-  assert.equal(thread(h).ended, Status.ERROR);
+  assert.equal(thread(h).ended, "error");
   assert.deepEqual(thread(h).openReplies, [h.slack.streamTs[0]]);
 });
 
@@ -493,8 +493,8 @@ test("a close that cannot end a reply shows the cross and keeps what repair need
   await session.close();
   assert.equal(h.reactions().at(-1), Status.ERROR);
   const stored = thread(h);
-  assert.equal(stored.status, Status.WORKING); // repair covers it
-  assert.equal(stored.ended, Status.ERROR); // what the root shows, for the session index
+  assert.equal(stored.status, "working"); // repair covers it
+  assert.equal(stored.ended, "error"); // what the root shows, for the session index
   assert.deepEqual(stored.openReplies, [h.slack.streamTs[0]]); // the stream Slack still holds open
 });
 
@@ -526,7 +526,7 @@ test("the status is persisted until the end lands", async (t) => {
   };
   const turn = await h.session().submit("list the files");
   await turn.done.wait();
-  assert.deepEqual(seen, [Status.WORKING]);
+  assert.deepEqual(seen, ["working"]);
 });
 
 test("the open reply is the stream until it ends", async (t) => {

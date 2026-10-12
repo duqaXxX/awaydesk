@@ -4160,6 +4160,30 @@ test("a change that arrives while a write waits its turn is sent with it", async
   );
 });
 
+test("the footer's limit counts down from the clock's time in milliseconds", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  clock.now = 36_000; // seconds, as every clock of the daemon reads
+  const sink = reply(slack, { clock });
+  await sink.text("Answer.");
+  await settled();
+  await sink.finish([]);
+  const fields = {
+    bypass: false,
+    model: null,
+    effort: null,
+    folder: null,
+    branch: null,
+    changes: null,
+    sessionTokens: null,
+    contextPercent: null,
+    sessionLimit: { percent: 3, resetsAt: 36_000_000 + 2 * 3_600_000 + 10 * 60_000 },
+    weekLimit: null,
+  };
+  assert.equal(await sink.closeOut(fields), true);
+  assert.equal(footerOf(firstStream(slack).blocks), "*5h* 3% ↻ 2h");
+});
+
 test("the footer's fields are formatted into the line the end writes", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();

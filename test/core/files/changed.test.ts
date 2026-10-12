@@ -13,17 +13,13 @@ import {
 import { basename, join } from "node:path";
 import { test } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
-import type { Repository } from "../../../../src/agent/seam.ts";
-import {
-  changedIn,
-  changedSince,
-  startCommit,
-} from "../../../../src/chat/slack/openfile/changed.ts";
-import { projectFiles } from "../../../../src/chat/slack/openfile/listing.ts";
-import { newestFirst } from "../../../../src/chat/slack/openfile/read.ts";
-import { FakeClock } from "../../../support/fake-slack.ts";
-import { commitAt, committed, git, gitAt, gitInit } from "../../../support/git-layouts.ts";
-import { GIT_LAYOUT } from "../../../support/platform.ts";
+import type { Repository } from "../../../src/agent/seam.ts";
+import { changedIn, changedSince, startCommit } from "../../../src/core/files/changed.ts";
+import { projectFiles } from "../../../src/core/files/listing.ts";
+import { newestFirst } from "../../../src/core/files/read.ts";
+import { FakeClock } from "../../support/fake-clock.ts";
+import { commitAt, committed, git, gitAt, gitInit } from "../../support/git-layouts.ts";
+import { GIT_LAYOUT } from "../../support/platform.ts";
 import {
   commitAll,
   commitOf,
@@ -176,17 +172,6 @@ test(
     assert.deepEqual(await changedSince(await repository(repo), repo, begunOnFeature), []);
   },
 );
-
-for (const ts of ["", "abc", "1790000000.x", "-5", "1790000000 +0000", "@{1}", "../x"]) {
-  test(
-    `a thread ts that is no epoch second gives no start [${ts === "" ? "empty" : ts}]`,
-    GIT_LAYOUT,
-    async () => {
-      const repo = dated(join(tmp.dir, "dated"));
-      assert.equal(await startCommit(await repository(repo), ts), null);
-    },
-  );
-}
 
 test("a start that git cannot read is none", GIT_LAYOUT, async () => {
   const repo = dated(join(tmp.dir, "dated"));
