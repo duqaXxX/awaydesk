@@ -5,6 +5,7 @@
  *   gave, up to 3 times. That is safe for every method: a rate limited call never ran. Once the
  *   daemon stops (`ClientOptions.stopped`) such a call is thrown as it is and the pause of one
  *   that waits ends: Slack names the length of that pause, and a stop does not wait for it.
+ *   Each rate limit is logged with its method, its `Retry-After` and the send it answered.
  * - a call that failed on the connection (a reset, a refused or unreachable host: a
  *   `WebAPIRequestError` that is not a timeout) is sent again once, after a backoff pause.
  *   `sharedClient` does so for every method, which is safe for a post that is an approval, a
@@ -47,7 +48,10 @@ import {
   type WebClientOptions,
 } from "@slack/web-api";
 import { type Clock, systemClock } from "../../../clock.ts";
+import { getLogger } from "../../../log.ts";
 import { silentLogger } from "../quiet-logger.ts";
+
+export const logger = getLogger("awaydesk.chat.slack.reply.clients");
 
 /**
  * The four calls that create or grow a message: the replies client never sends one again after a
@@ -152,6 +156,14 @@ class PolicyClient extends WebClient {
       try {
         return await super.apiCall(method, options);
       } catch (error) {
+        if (error instanceof WebAPIRateLimitedError) {
+          // The method and Slack's own number, never the call's arguments: which methods are
+          // rate limited, and for how long, is what issue #236 waits for.
+          logger.info(
+            `Slack rate limited ${method}: Retry-After ${error.retryAfter} s, ` +
+              `send ${retries + 1} of ${RATE_LIMIT_RETRIES + 1}`,
+          );
+        }
         const pause = this.#pause(method, error, retries);
         if (pause === null) throw error;
         if (error instanceof WebAPIRateLimitedError) {
