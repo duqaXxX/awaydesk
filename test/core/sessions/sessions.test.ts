@@ -200,6 +200,18 @@ test("clear records the new session id", async (t) => {
   assert.equal(thread(h).sessionId, recordOf(second.at(-1))?.session_id);
 });
 
+test("a thread is live exactly when get would give it a session", async (t) => {
+  const h = harnessFor(t)();
+  assert.equal(h.manager.live(CHANNEL, THREAD), false, "no entry in state.json");
+  h.session();
+  assert.equal(h.manager.live(CHANNEL, THREAD), true);
+  assert.notEqual(h.manager.get(CHANNEL, THREAD), null);
+  assert.ok(await h.manager.release(CHANNEL, THREAD));
+  assert.equal(h.manager.live(CHANNEL, THREAD), false, "a released thread is held");
+  h.manager.free(CHANNEL, THREAD);
+  assert.equal(h.manager.live(CHANNEL, THREAD), true);
+});
+
 test("a gone session is removed and says so", async (t) => {
   // A stored session id that fails to resume no longer falls back to a fresh session.
   const h = harnessFor(t)({ startError: gone() });

@@ -244,7 +244,7 @@ as messages of the thread, which show the same text.
 The core reaches a provider only through `src/core/port.ts`. `CorePort` has the members
 `sessions`, `state`, `approvals`, `holds` and `agent`, each a set of `Pick` types over the class that
 answers, declared in a file of `src/core/port/` for the flow of the provider that uses it, so the
-classes themselves are the implementation. The same file exports `ChatContext`, `ChatEntry` and the
+classes themselves are the implementation. What a provider reads of a live session or a pending request is a plain value: `SessionManager.live` (whether the thread has a session), `Approvals.questions` (the questions of a request, read from the thread it was posted in) and `Holds.atMessage` (the id of the open setup a message shows). No `ThreadSession` and no `Pending` reaches a provider. The same file exports `ChatContext`, `ChatEntry` and the
 values of the core that a provider's own code works with.
 
 Two tests hold the boundary. `test/imports.test.ts` allows a chat provider to import the chat seam,

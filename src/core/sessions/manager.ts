@@ -95,6 +95,14 @@ export class SessionManager {
     return this.session(channelId, threadId, thread.directory);
   }
 
+  /**
+   * Whether `get` would give the thread a session. Asking does what `get` does: it touches the
+   * session, or rebuilds one from `state.json`, so a clip is told what a message would be.
+   */
+  live(channelId: string, threadId: string): boolean {
+    return this.get(channelId, threadId) !== null;
+  }
+
   private refuseWhenClosed(): void {
     if (this.closed) throw new SessionClosed();
   }

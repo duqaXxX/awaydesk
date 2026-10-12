@@ -58,9 +58,7 @@ test("the chat says the owner wrote in an unbound channel and the core tells how
   const world = await MessagesWorld.make(t);
   const free = world.chat.openChannel("free");
   await world.inbound.unbound(free);
-  assert.deepEqual(world.chat.texts(free), [
-    fill(texts.UNBOUND_ANY, { root: world.folder }),
-  ]);
+  assert.deepEqual(world.chat.texts(free), [fill(texts.UNBOUND_ANY, { root: world.folder })]);
   assert.deepEqual(await world.prompts(), []);
 });
 

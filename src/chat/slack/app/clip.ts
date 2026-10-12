@@ -58,7 +58,7 @@ export class Clips {
       );
       return;
     }
-    if (threadTs !== ts && sessions.get(channel, threadTs) === null) {
+    if (threadTs !== ts && !sessions.live(channel, threadTs)) {
       await this.answers.tellOwner(channel, threadTs, texts.NOT_A_SESSION);
       return;
     }

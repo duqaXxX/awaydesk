@@ -126,6 +126,24 @@ export class Approvals {
     return this.entries.get(approvalId)?.pending ?? null;
   }
 
+  /**
+   * The questions of the request `approvalId`, read from the thread it was posted in; null when
+   * the request is gone, belongs to another thread or has no questions.
+   */
+  questions(approvalId: string, channelId: string, threadId: string): readonly Question[] | null {
+    const pending = this.get(approvalId);
+    if (
+      pending === null ||
+      pending.channelId !== channelId ||
+      pending.threadId !== threadId ||
+      pending.questions === null ||
+      pending.questions.length === 0
+    ) {
+      return null;
+    }
+    return pending.questions;
+  }
+
   /** Resolve once, and only from the channel and thread the request was posted in. */
   resolve(
     approvalId: string,

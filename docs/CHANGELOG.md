@@ -318,6 +318,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The port of the requests hands a provider plain values and no longer the live objects:
+  `SessionManager.live` replaces `get` (it does what `get` does, so a clip is told what a message
+  would be), `Approvals.questions` replaces `get` and checks the thread the request was posted
+  in, and `Holds.get` leaves the port, since `Holds.atMessage` already answers only for an open,
+  undecided setup. No file under `src/chat/` can reach a `ThreadSession` or a pending request.
+  What the owner reads in Slack is unchanged (#266).
 - `ChatInbound.unbound(channel)` is how a provider says the owner wrote in a channel bound to no
   folder before it had a message to hand over. The core answers with `Talk.unbound`, so an audio
   clip in such a channel gets the words of an agent that keeps no record of trust where it has
