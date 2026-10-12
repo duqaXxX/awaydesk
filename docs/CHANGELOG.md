@@ -965,6 +965,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- The footer and `!status` count a usage limit down to its next reset again (issue #272). Since
+  the TypeScript daemon, every reset read `↻ 0m`: `UsageProbe` dated the `/usage` text on the
+  clock the back end waits on, which the daemon sets to the monotonic one, so each reset was
+  placed in 1970 and the countdown was clamped to zero. The probe now reads the wall time on its
+  own (`UsageProbeOptions.now`). The tests gave one fake clock to both uses, which is why they
+  passed.
 - A Claude Code process that ended is named for how it ended: the owner reads
   ``Claude Code reported an error: `ProcessExited` `` for an exit with a status other than 0,
   `ProcessKilled` for a signal and `ErrorResult` for an error result reported before the exit

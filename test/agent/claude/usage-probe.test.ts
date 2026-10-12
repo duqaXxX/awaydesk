@@ -20,9 +20,8 @@ const FOLDER = "/srv/alice/app";
 const NOW = Date.UTC(2026, 8, 30, 22, 0);
 
 function probeOn(sdk: FakeSdk, clock = new FakeClock()): { probe: UsageProbe; clock: FakeClock } {
-  clock.now = NOW / 1000;
   const backend = new ClaudeBackend({ query: sdk.query });
-  const probe = new UsageProbe(FOLDER, backend.startBare.bind(backend), { clock });
+  const probe = new UsageProbe(FOLDER, backend.startBare.bind(backend), { clock, now: () => NOW });
   return { probe, clock };
 }
 
@@ -69,6 +68,21 @@ test("the probe asks /usage and reads the limits off the answer", LIMIT, async (
   await probe.close();
 });
 
+// The daemon paces the back end on a monotonic clock, which counts from the process's start: a
+// reset dated on it lands in 1970, and the footer counts every reset down to `0m`.
+test("the probe dates a reset on the wall clock, not on the clock it waits on", LIMIT, async () => {
+  const sdk = new FakeSdk({ turns: [sdkRecords("usage")] });
+  const clock = new FakeClock();
+  clock.now = 12; // seconds since the daemon started
+  const backend = new ClaudeBackend({ query: sdk.query });
+  const probe = new UsageProbe(FOLDER, backend.startBare.bind(backend), { clock, now: () => NOW });
+  const usage = await probe.read();
+  // "Oct 1 at 1:29am" and "Oct 4 at 5:59pm" in Europe/Berlin, two hours ahead of UTC.
+  assert.equal(usage.session?.resetsAt, Date.UTC(2026, 8, 30, 23, 29));
+  assert.equal(usage.week?.resetsAt, Date.UTC(2026, 9, 4, 15, 59));
+  await probe.close();
+});
+
 test("the probe takes no setting source of the owner's", LIMIT, async () => {
   const sdk = new FakeSdk({ turns: [sdkRecords("usage")] });
   const { probe } = probeOn(sdk);
@@ -93,10 +107,11 @@ test(
       JSON.stringify({ claudeInChromeDefaultEnabled: true }),
     );
     const sdk = new FakeSdk({ turns: [sdkRecords("usage")] });
-    const clock = new FakeClock();
-    clock.now = NOW / 1000;
     const backend = new ClaudeBackend({ query: sdk.query, home });
-    const probe = new UsageProbe(FOLDER, backend.startBare.bind(backend), { clock });
+    const probe = new UsageProbe(FOLDER, backend.startBare.bind(backend), {
+      clock: new FakeClock(),
+      now: () => NOW,
+    });
     await probe.read();
     const { options } = sdk.only;
     assert.notEqual(options.allowDangerouslySkipPermissions, true);

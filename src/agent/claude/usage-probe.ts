@@ -28,6 +28,11 @@ export interface UsageProbeOptions {
   readonly clock?: Clock;
   /** Milliseconds one `read` may take, start included. */
   readonly timeout?: number;
+  /**
+   * The wall time a reset is dated on, in milliseconds since the epoch; `Date.now` when absent.
+   * Never `clock`: the daemon gives the back end the monotonic one, which counts from its start.
+   */
+  readonly now?: () => number;
 }
 
 export class UsageProbe {
@@ -35,6 +40,7 @@ export class UsageProbe {
   readonly #start: BareStart;
   readonly #clock: Clock;
   readonly #timeout: number;
+  readonly #now: () => number;
   #session: AgentSession | null = null;
   #events: AsyncIterator<SessionEvent> | null = null;
   // Counts the closes, so a session still starting when one happens is closed as it arrives.
@@ -47,6 +53,7 @@ export class UsageProbe {
     this.#start = start;
     this.#clock = options.clock ?? systemClock;
     this.#timeout = options.timeout ?? USAGE_TIMEOUT;
+    this.#now = options.now ?? Date.now;
   }
 
   /**
@@ -113,7 +120,7 @@ export class UsageProbe {
       if (next.done) throw new Error("the usage probe's session ended");
       const event = next.value;
       if (event.type === "turn_ended") {
-        return parseUsage(event.finalText ?? "", this.#clock.time() * 1000);
+        return parseUsage(event.finalText ?? "", this.#now());
       }
       if (event.type === "process_lost") throw new Error("the usage probe lost its process");
     }
