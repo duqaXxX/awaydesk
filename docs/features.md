@@ -96,6 +96,7 @@ Facts about a feature that neither `setup.md` nor `architecture.md` states, kept
 
 - A message that Claude Code took into a report turn is released when that turn ends, and the reply says so at its end: `Claude Code took your message into this reply: send it again if it is not answered here.`
 - A message sent while a background task is about to report is answered in a reply of its own, and the report stays with the reply that started the task, whichever of the two turns Claude Code runs first. This holds for a message of plain text; for a command or a message with an image the answer can still land in the task's reply.
+- A report that comes after the reply that started its task has ended gets a reply of its own, under `Background task update`. Once it has ended with its footer, the reply above it loses its own by an edit that does not notify, so the footer shows once, at the end. Both footers stay when the reply above is a closing message that is the footer alone, and after a restart of the daemon between the two.
 - A background subagent that hands its report back to the main agent is reported in the reply that started it, while that reply is still open, whether its task's end is told before, during or after the report. The turn Claude Code then gives the task's notification, which does nothing, shows nowhere. The subagent's card counts the hand-back as one more call.
 
 ### A restart

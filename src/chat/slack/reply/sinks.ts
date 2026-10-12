@@ -643,6 +643,20 @@ export class ReplySink implements Sink {
   }
 
   /**
+   * Take the footer back from a reply that has ended: the reply under it, a report of a
+   * background task, ended with one. Written by a silent edit, as the counts are. Only where
+   * the footer shares its message with the reply's own content ("inline" on the stream's stop,
+   * "moved" under the reply's ending): a closing message that is the footer alone would be left
+   * empty, so that one keeps it.
+   */
+  withdrawFooter(): void {
+    if (!this.closedOut || this.footer === null) return;
+    if (this.endMode !== "inline" && this.endMode !== "moved") return;
+    this.footer = null;
+    this.changed();
+  }
+
+  /**
    * End the reply's body: what was written is sent now, not at the next debounce. A card still
    * in progress is a task that outlives the turn: `task` keeps updating it after this. The
    * stream stays open: it ends with `closeOut`, once the caller knows nothing more is coming (a

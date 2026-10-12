@@ -182,7 +182,9 @@ name only the reply of the first task it covers when several end together;
 `ThreadSession.sweepClosedOut`, run after every turn and after `ThreadSession.expireInjectedTurn`,
 ends every other reply left eligible. A turn Claude Code starts on its own to report a background
 task renders into the reply that started the task (`ThreadSession.openingTarget`); when that reply
-has already ended, the report gets a reply of its own.
+has already ended, the report gets a reply of its own, and the reply above it gives its footer up
+once the report has ended with one (`ThreadSession.newReportReply`). An owner's next prompt takes no
+footer away.
 
 A background subagent can hand its report back before, or without, a turn of that kind (measured
 2026-10-10 on Claude Code 2.1.294 and 2.1.296 with the owner's setting sources loaded, recorded in
@@ -225,7 +227,12 @@ dropped and the message shows less than the model: unless a later update of it p
 end counts as not landed and the root shows ❌. The update that only folds the cards of a stream sent
 all of its span is the exception, since nothing of the reply is missing. Every reply that has ended
 keeps its footer, the record of how its last turn ended; only the thread's latest reply adds the
-counts of what still runs to it (`Reply.setLatest`). A card left `in_progress` in a stopped message
+counts of what still runs to it (`Reply.setLatest`). One reply gives its footer up
+(`Reply.withdrawFooter`): the one a report of a background task follows in a reply of its own, once
+that report has ended with a footer, so that the two read as one exchange with the footer at its
+end. `ReplySink.withdrawFooter` takes it out by an edit, which does not notify, where the footer
+shares its message with the reply's content; a closing message that is the footer alone keeps it,
+since the edit would leave it empty. A card left `in_progress` in a stopped message
 is stored as an error until it is updated (measured: "Open card stored as error"), so every end
 closes its cards first.
 
