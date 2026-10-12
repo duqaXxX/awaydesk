@@ -220,6 +220,12 @@ export class SlackChat implements ChatProvider {
     return markup === "notice" ? mrkdwnEscape(text) : markdownEscape(text);
   }
 
+  // Slack's channel syntax in a notice. Whether a markdown block renders it was not confirmed
+  // (the block's reference names neither mentions nor angle brackets), so `reference` gets the same.
+  channelName(channel: string, _markup: Markup): string {
+    return `<#${channel}>`;
+  }
+
   openedAt(ref: ThreadRef): number | null {
     // A Slack ts is the post time in epoch seconds.
     const seconds = ref.thread.trim() === "" ? Number.NaN : Number(ref.thread);

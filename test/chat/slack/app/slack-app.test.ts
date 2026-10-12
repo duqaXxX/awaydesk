@@ -1863,7 +1863,7 @@ test("a refusal during a stop names the thread the stop waits for", async (t) =>
       texts.RESTARTING,
       texts.RESTART_WAITS_FOR,
       fill(texts.RESTART_WAIT_ROW, {
-        channel: CHANNEL,
+        channel: `<#${CHANNEL}>`,
         link: `<${PERMALINK}|${texts.RESTART_WAIT_SESSION}>`,
         hold: texts.RESTART_HOLD_TURN,
       }),

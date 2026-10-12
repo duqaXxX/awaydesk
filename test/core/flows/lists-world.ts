@@ -94,6 +94,10 @@ class Faulty implements ChatProvider {
     return this.#inner.escape(text, markup);
   }
 
+  channelName(channel: string, markup: Markup): string {
+    return this.#inner.channelName(channel, markup);
+  }
+
   openedAt(ref: ThreadRef): number | null {
     return this.#inner.openedAt(ref);
   }

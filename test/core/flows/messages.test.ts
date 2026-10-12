@@ -239,7 +239,7 @@ test("a message that arrives while the daemon drains is refused and names what t
       texts.RESTARTING,
       texts.RESTART_WAITS_FOR,
       fill(texts.RESTART_WAIT_ROW, {
-        channel: world.channel,
+        channel: `#${world.channel}`, // the memory chat's form, which is not Slack's
         link,
         hold: texts.RESTART_HOLD_TURN,
       }),

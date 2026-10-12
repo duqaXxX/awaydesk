@@ -260,7 +260,8 @@ export interface ThreadChat {
  * The two ways the daemon writes its own words: a `notice` is a small line (`ThreadChat.tell`
  * and `rewrite`, `ChannelChat.notice` and `rewrite`), a `reference` is Markdown at full size
  * (`say`). A chat may mark each up differently, so a name that goes into either is escaped for
- * it (`ChatProvider.escape`), and a link is written for it (`ThreadChat.link`).
+ * it (`ChatProvider.escape`), a channel is written for it (`ChatProvider.channelName`) and a link
+ * is written for it (`ThreadChat.link`).
  */
 export type Markup = "notice" | "reference";
 
@@ -429,6 +430,11 @@ export interface ChatProvider {
   channel(channel: string): ChannelChat;
   /** `text` made safe to stand inside a line of `markup`, where it is shown as written. */
   escape(text: string, markup: Markup): string;
+  /**
+   * The channel as the chat writes it inside a line of `markup`, so that the owner can tell which
+   * one it is. Never rejects.
+   */
+  channelName(channel: string, markup: Markup): string;
   /**
    * When the thread was opened, in seconds since the epoch, as its name alone tells; null when
    * the name tells nothing.

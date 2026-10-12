@@ -318,6 +318,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `ChatProvider.channelName(channel, markup)` writes a channel as the chat does inside a line, and
+  `texts.RESTART_WAIT_ROW` takes it, where it held Slack's `<#channel>` syntax. No text of
+  `src/core/texts.ts` holds Slack's `<#`, `<@` or `<!` now, and a test says so. The Slack provider
+  answers `<#channel>` for both markups, so the notice reads as before (#266).
 - `AgentWords` declares the names of the commands the core used to know by heart: `newSession`
   (the commands that start a new session, refused inside a thread), `login` and `logout` (answered
   with where they are done on the host; `null` when the agent has none).

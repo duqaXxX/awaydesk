@@ -418,6 +418,14 @@ export function chatConformance(
         assert.equal(provider.escape("plainword", "reference"), "plainword");
       });
 
+      check("writes a channel for each markup, never empty and never rejecting", async (s) => {
+        for (const markup of ["notice", "reference"] as const) {
+          const written = s.provider.channelName(s.ref.channel, markup);
+          assert.equal(typeof written, "string");
+          assert.ok(written.trim() !== "", markup);
+        }
+      });
+
       check("dates a thread by a number or by nothing, and by the same on every ask", async (s) => {
         const first = s.provider.openedAt(s.ref);
         assert.ok(first === null || (typeof first === "number" && Number.isFinite(first)));

@@ -179,10 +179,10 @@ export const ENDED_RESTARTING = "awaydesk is restarting; send your message again
 export const ENDED_IDLE = "awaydesk closed this idle session";
 export const RESTARTING = "awaydesk is restarting; send this again in a moment.";
 // Under RESTARTING, and after a channel's `!status`, while a stop waits: one row per thread that
-// holds it (issue #119). mrkdwn.
+// holds it (issue #119).
 export const RESTART_WAITS_FOR = "It is waiting for:";
 export const RESTART_WAITS_HEADER = `awaydesk is restarting. ${RESTART_WAITS_FOR}`;
-export const RESTART_WAIT_ROW = "• <#{channel}>, {link}: {hold}";
+export const RESTART_WAIT_ROW = "• {channel}, {link}: {hold}";
 export const RESTART_WAIT_SESSION = "Session"; // the link's label for a session with no title yet
 export const RESTART_WAIT_STOP = "`!stop` in a thread ends the wait there.";
 export const RESTART_WAITS_MORE = "…and {count} more.";

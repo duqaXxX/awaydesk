@@ -224,7 +224,11 @@ export class Talk {
         { channel: session.channelId, thread: session.threadId },
         label,
       );
-      return fill(texts.RESTART_WAIT_ROW, { channel: session.channelId, link, hold });
+      return fill(texts.RESTART_WAIT_ROW, {
+        channel: chat.channelName(session.channelId, "notice"),
+        link,
+        hold,
+      });
     };
 
     const lines = await Promise.all(shown.map(([session, hold]) => row(session, hold)));
