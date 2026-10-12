@@ -223,6 +223,44 @@ test("a rate limited call is given up after 3 more sends, and thrown as a rate l
   }
 });
 
+// Issue #236: which methods Slack rate limits, and the pauses it asks for, were never recorded.
+test("each rate limit is logged with its method, its Retry-After and the send it answered", async () => {
+  for (const make of [replies, shared]) {
+    const lines: string[] = [];
+    const restore = setWriter((line) => lines.push(line));
+    try {
+      await make(network([], "429"))
+        .apiCall("chat.delete", { channel: "C000CHAN", ts: "1.000001" })
+        .catch(() => {});
+    } finally {
+      setWriter(restore);
+    }
+    assert.deepEqual(
+      lines.map((line) => line.replace(/^\S+ \S+ /, "")),
+      [1, 2, 3, 4].map(
+        (send) =>
+          "INFO awaydesk.chat.slack.reply.clients: " +
+          `Slack rate limited chat.delete: Retry-After 30 s, send ${send} of 4`,
+      ),
+    );
+  }
+});
+
+test("a call that is not rate limited logs nothing", async () => {
+  const lines: string[] = [];
+  const restore = setWriter((line) => lines.push(line));
+  try {
+    await replies(network([], "reset", "ok")).apiCall("chat.update", {});
+    await shared(network([], "500", "ok")).apiCall("chat.update", {});
+    await shared(refusing([]))
+      .apiCall("chat.update", {})
+      .catch(() => {});
+  } finally {
+    setWriter(restore);
+  }
+  assert.deepEqual(lines, []);
+});
+
 // Issue #236: nothing is in flight during the pause Slack asks for, so a daemon that stops can
 // leave it. The call was answered `ratelimited`: Slack did not apply it, and it is thrown as that.
 
