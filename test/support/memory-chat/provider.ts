@@ -11,7 +11,6 @@
 import type { Question } from "../../../src/agent/seam.ts";
 import {
   type ChannelChat,
-  type ChannelState,
   type ChatCapabilities,
   ChatError,
   type ChatInbound,
@@ -22,6 +21,7 @@ import {
   type OpenMessageChange,
   type OwnerList,
   type OwnerRequest,
+  type Presence,
   type Reply,
   type SessionStatus,
   type TaskUpdate,
@@ -375,9 +375,14 @@ export class MemoryProvider implements ChatProvider {
     return this.#room.openedAt(ref);
   }
 
-  async channelState(channel: string): Promise<ChannelState> {
+  async channelState(channel: string): Promise<Presence> {
     if (this.#room.lookupFails()) return "no answer";
     return this.#room.knows(channel) ? "there" : "gone";
+  }
+
+  async threadState(ref: ThreadRef): Promise<Presence> {
+    if (this.#room.lookupFails()) return "no answer";
+    return this.#room.knowsThread(ref) ? "there" : "gone";
   }
 
   async start(inbound: ChatInbound): Promise<void> {

@@ -26,7 +26,6 @@ import {
 import { getLogger } from "../../log.ts";
 import {
   type ChannelChat,
-  type ChannelState,
   type ChatCapabilities,
   ChatError,
   type ChatInbound,
@@ -35,6 +34,7 @@ import {
   type MessageId,
   type OpenMessageChange,
   type OwnerRequest,
+  type Presence,
   type Reply,
   type SessionIndex,
   type SessionStatus,
@@ -45,7 +45,7 @@ import type { AppConfig, Fetch } from "./app/answers.ts";
 import { type BuiltApp, buildApp } from "./app/app.ts";
 import type { ChannelGuard } from "./app/guards.ts";
 import { SlackChannel } from "./channel.ts";
-import { channelLookup } from "./channels.ts";
+import { channelLookup, threadLookup } from "./channels.ts";
 import { holdBlocks } from "./hold.ts";
 import type { Home } from "./home.ts";
 import { crossing, deliver, deliverNotice } from "./notice.ts";
@@ -230,8 +230,12 @@ export class SlackChat implements ChatProvider {
     return Number.isNaN(seconds) ? null : seconds;
   }
 
-  channelState(channel: string): Promise<ChannelState> {
+  channelState(channel: string): Promise<Presence> {
     return channelLookup(this.options.slack)(channel);
+  }
+
+  threadState(ref: ThreadRef): Promise<Presence> {
+    return threadLookup(this.options.slack)(ref);
   }
 
   async openFile(ref: ThreadRef, folder: string, target: string): Promise<void> {

@@ -71,7 +71,7 @@ export interface ChatEntry {
 
 // ---- the core's values a provider's own code works with
 
-export type { ChannelLookup } from "./cleanup.ts";
+export type { ChannelLookup, ThreadLookup } from "./cleanup.ts";
 export { ConfigError } from "./config.ts";
 export { changedIn } from "./files/changed.ts";
 export type { Found } from "./files/listing.ts";

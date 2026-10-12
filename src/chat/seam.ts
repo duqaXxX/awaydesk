@@ -414,8 +414,11 @@ export interface ChatInbound {
   unbound(channel: string): Promise<void>;
 }
 
-/** Whether a chat still has a channel; `no answer` when it could not say, with no reason to give. */
-export type ChannelState = "gone" | "there" | "no answer";
+/**
+ * Whether a chat still has a channel or a thread; `no answer` when it could not say, with no
+ * reason to give.
+ */
+export type Presence = "gone" | "there" | "no answer";
 
 /** The list of every session the chat shows on a page of its own. */
 export interface SessionIndex {
@@ -449,7 +452,12 @@ export interface ChatProvider {
    * Whether the chat still has `channel`. A chat that could not say answers `no answer`, or
    * rejects with a `ChatError` whose name is the reason: the core logs it and forgets nothing.
    */
-  channelState(channel: string): Promise<ChannelState>;
+  channelState(channel: string): Promise<Presence>;
+  /**
+   * Whether the chat still has the thread's first message. Answers like `channelState`; `gone`
+   * only when the chat is certain.
+   */
+  threadState(ref: ThreadRef): Promise<Presence>;
   /** The chat's index of the sessions. A chat with none leaves it out, and nothing asks for one. */
   readonly index?: SessionIndex;
   /**

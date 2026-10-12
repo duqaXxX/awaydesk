@@ -858,8 +858,9 @@ file names, awaydesk does not start and the message names both pairs: select the
 names again, or delete the file and bind the channels again.
 
 awaydesk keeps `state.json` clean on its own, when it starts and then every 6 hours. It
-forgets a channel Slack answers `channel_not_found` about, with its threads, a thread whose
-Claude Code session no longer exists, and a thread that has no session and was opened more than a
+forgets a channel Slack answers `channel_not_found` about, with its threads, a thread whose first
+message Slack answers `thread_not_found` about (asked only in channels Slack found in the same
+pass), a thread whose Claude Code session no longer exists, and a thread that has no session and was opened more than a
 day ago. Anything it cannot tell for certain stays: a rate limit, a
 server error or an unreadable folder removes nothing, and neither does a thread or a channel
 with a session open at that moment. When Slack finds none of the bound channels it forgets none

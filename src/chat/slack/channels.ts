@@ -1,11 +1,12 @@
-/** What the daemon asks Slack about the channels it is bound to. */
+/** What the daemon asks Slack about the channels it is bound to, and the threads in them. */
 
 import type { WebClient } from "@slack/web-api";
-import type { ChannelLookup } from "../../core/port.ts";
+import type { ChannelLookup, ThreadLookup } from "../../core/port.ts";
 import { ChatError } from "../seam.ts";
 import { describe } from "./reply/errors.ts";
 
 const CHANNEL_NOT_FOUND = "channel_not_found";
+const THREAD_NOT_FOUND = "thread_not_found";
 
 /**
  * What the cleanup asks about a bound channel: `conversations.info`. Only `channel_not_found` is
@@ -20,6 +21,24 @@ export function channelLookup(slack: WebClient): ChannelLookup {
     } catch (error) {
       const code = describe(error);
       if (code === CHANNEL_NOT_FOUND) return "gone";
+      throw new ChatError(code, { cause: error });
+    }
+  };
+}
+
+/**
+ * What the cleanup asks about a thread: `conversations.replies` on its root with `limit=1`, which
+ * a deleted root answers with `thread_not_found` (measured 2026-10-01, see `home.ts`). Only that
+ * code says the thread is gone; any other failure crosses as a `ChatError` named by Slack's code.
+ */
+export function threadLookup(slack: WebClient): ThreadLookup {
+  return async (ref) => {
+    try {
+      await slack.conversations.replies({ channel: ref.channel, ts: ref.thread, limit: 1 });
+      return "there";
+    } catch (error) {
+      const code = describe(error);
+      if (code === THREAD_NOT_FOUND) return "gone";
       throw new ChatError(code, { cause: error });
     }
   };

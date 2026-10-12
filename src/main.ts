@@ -329,6 +329,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
 
     const cleanOnce = (): Promise<void> =>
       clean((channel) => chat.channelState(channel), state, {
+        threadLookup: (ref) => chat.threadState(ref),
         alive: async (directory) =>
           backend.capabilities.sessionListing ? backend.aliveSessions(directory) : null,
         live: () => sessions.liveThreads(),

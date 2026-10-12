@@ -159,7 +159,12 @@ export class Room {
     this.#channels.delete(channel);
   }
 
-  /** From now on the chat can not say whether a channel is there (`no answer`), or can again. */
+  /** The thread's first message is gone: the chat answers `gone` about it. */
+  removeThread(ref: ThreadRef): void {
+    this.#threads.delete(key(ref.channel, ref.thread));
+  }
+
+  /** From now on the chat can not say whether a channel or a thread is there, or can again. */
   failChannelLookups(fails = true): void {
     this.#lookupFails = fails;
   }
@@ -243,6 +248,10 @@ export class Room {
 
   knows(channel: string): boolean {
     return this.#channels.has(channel);
+  }
+
+  knowsThread(ref: ThreadRef): boolean {
+    return this.#threads.has(key(ref.channel, ref.thread));
   }
 
   lookupFails(): boolean {

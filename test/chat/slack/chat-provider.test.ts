@@ -125,6 +125,22 @@ test("a channel is gone only for channel_not_found", async () => {
   );
 });
 
+test("a thread is gone only for thread_not_found", async () => {
+  const { slack, chat } = madeChat();
+  const ref = { channel: CHANNEL, thread: THREAD };
+  assert.equal(await chat.threadState(ref), "there");
+  assert.deepEqual(slack.callsTo("conversations.replies"), [
+    { channel: CHANNEL, ts: THREAD, limit: 1 },
+  ]);
+  slack.responses["conversations.replies"] = rejected("thread_not_found");
+  assert.equal(await chat.threadState(ref), "gone");
+  slack.responses["conversations.replies"] = rejected("ratelimited");
+  await assert.rejects(
+    chat.threadState(ref),
+    (error: unknown) => error instanceof Error && error.name === "ratelimited",
+  );
+});
+
 test("a provider with no Home has no session index and nothing to start", async () => {
   const { chat } = madeChat();
   assert.equal(chat.index, undefined);
