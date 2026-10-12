@@ -91,10 +91,13 @@ it they cannot be done.
   `/agents`): what each does from Slack was not tried with the TypeScript SDK awaydesk is built
   on. The issue holds an earlier measurement
   ([#218](https://github.com/duqaXxX/awaydesk/issues/218)).
-- A reply that stops growing on a phone. Seen once, on iOS on 2026-10-08 with desktop open on the
-  same thread: the reply stopped 34 seconds into a turn of 116 and showed neither its text nor
-  its footer, while desktop showed all of it. It has not been seen again, and what causes it is
-  not known ([#200](https://github.com/duqaXxX/awaydesk/issues/200)).
+- A reply that stays on a phone as its stream drew it. Seen twice on iOS, on 2026-10-08 and on
+  2026-10-12, while desktop showed the whole reply: the first time it stopped 34 seconds into a
+  turn of 116 and showed neither its text nor its footer; the second time it had its text and
+  missed the footer and the line that folds the calls. Opening the thread again does not load
+  it, nor does restarting the app. Resetting the app's cache does (in the Slack app:
+  Preferences, then "Debug & reset cache"). What makes the app miss the end of a reply is not
+  known ([#200](https://github.com/duqaXxX/awaydesk/issues/200)).
 - A thread older than 90 days on Slack's free plan, where older messages are hidden (Slack's help
   pages, read 2026-10-08). What awaydesk does when the first message of a thread is hidden has
   not been measured ([#196](https://github.com/duqaXxX/awaydesk/issues/196)).
