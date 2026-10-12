@@ -64,7 +64,7 @@ export interface Inside {
   sweepClosedOut(signal?: AbortSignal): Promise<void>;
   stopTaskReplies(): Promise<void>;
   dropClient(): Promise<void>;
-  abandon(line: string, options?: object): Promise<void>;
+  abandon(line: string, options?: object): Promise<boolean>;
   awaitLanding(reply: Reply): Promise<void>;
   sink(): Reply | Promise<Reply>;
   idleTimerCheck(): void;

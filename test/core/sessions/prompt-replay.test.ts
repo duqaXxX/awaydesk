@@ -333,6 +333,36 @@ test("a prompt taken in when the client ends is noted as not sent", async (t) =>
   assert.ok(said(h).includes(note));
 });
 
+// Issue #263: the result that releases the prompt arrived, and a close then cut the reply's
+// close. The agent took the prompt, so the reply says so, as at a normal end.
+test("a prompt taken into a turn whose end a close cut is said to be taken, not unsent", async (t) => {
+  const r = scene("during-tool");
+  const h = harnessFor(t)({});
+  const session = h.session();
+  const prompt = await promptDuringTheReportTurn(h, session, r);
+  const client = h.clients[0];
+  assert.ok(client !== undefined);
+  let reading = false;
+  let footerRead: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    footerRead = resolve;
+  });
+  const original = client.contextUsage.bind(client);
+  client.contextUsage = async () => {
+    reading = true;
+    await held;
+    return original();
+  };
+  play(h, r.rest); // the replay, then the one result
+  await h.until(() => reading); // the reader is inside `finish`, waiting for the footer
+  await session.close();
+  footerRead();
+  assert.ok(prompt.done.isSet);
+  assert.ok(said(h).includes(texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)));
+  assert.ok(!said(h).includes("was not sent"));
+  assert.ok(!said(h).includes(texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN })));
+});
+
 test("the note counts the prompts taken in", () => {
   // The worker sends one prompt at a time, so a turn takes in one today; the note reads `taken`.
   assert.equal(takenNote(1, NAMES), texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES));

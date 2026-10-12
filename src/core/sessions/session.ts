@@ -1236,6 +1236,9 @@ export class ThreadSession {
     // task the stop does not wait for (`mayHaveOrderedRestart`) ended its turn well; the task
     // is most likely its own wait for the new process. ✅, as `!stop` would show.
     const onlySkipped = cutShort && this.draining && this.restartReady;
+    // Issue #263: the one thing this close cut was the close of a reply whose turn had ended.
+    // Its answer is whole: ✅, as that turn would have shown.
+    let endedWell = false;
     this.closedFlag = true;
     try {
       // A snapshot taken before any cancellation below, not `denyAll`'s own return list read
@@ -1260,7 +1263,7 @@ export class ThreadSession {
       this.taken = null;
       const unsent = taken === null ? [] : [taken];
       while (!this.queue.empty) unsent.push(this.queue.getNowait());
-      await this.abandon(texts.fill(texts.ENDED, { reason }), {
+      endedWell = await this.abandon(texts.fill(texts.ENDED, { reason }), {
         more: unsent,
         because: texts.BECAUSE_SHUTDOWN,
       });
@@ -1293,7 +1296,7 @@ export class ThreadSession {
           lost = true;
         }
       }
-      if (onlySkipped && !lost) {
+      if ((onlySkipped || endedWell) && !lost) {
         this.noteStatus("done");
         if (this.reacts) await this.thread.showStatus("done");
       } else if (cutShort || lost) {
@@ -2236,7 +2239,7 @@ export class ThreadSession {
     // (sync) The turn is the active one before its first write: every `await` below yields, and
     // a turn already out of `sent` and not yet active would read as idle to a drain, a `!stop`
     // or a timer.
-    const active: ActiveTurn = { turn, renderer, taken: [], cut: false };
+    const active: ActiveTurn = { turn, renderer, taken: [], cut: false, released: [] };
     this.active = active;
     if (opening !== null) await renderer.feedNotice(opening);
     if (this.notice !== null) {
@@ -2578,6 +2581,7 @@ export class ThreadSession {
       await this.closeReply(active.renderer, footer, { force: stopped, signal });
     } catch (error) {
       active.cut = this.cutBeforeClose(active, error);
+      if (active.cut) active.released = released;
       throw error;
     } finally {
       // Not settled when the cancel came before the reply closed: the turn stays active and
@@ -2651,6 +2655,12 @@ export class ThreadSession {
    * reply of their own: one note says they were not sent, `because` of what. With no turn
    * active, an `error` says `line` in each reply that still waited for a task, and says nothing
    * at all, the cross included, when nothing ran and nothing waited.
+   *
+   * A turn whose result had arrived when a close cut its reply's close (`ActiveTurn.cut`) is no
+   * turn cut short: its answer is whole. Its reply ends without `line`, and the prompts its
+   * result released get the note of a normal end, since the agent did take them (issue #263).
+   * True when that was all there was to end: nothing was dropped and no task of the turn's still
+   * ran, so the thread's status is the one of a turn that ended.
    */
   private async abandon(
     line: string,
@@ -2659,7 +2669,7 @@ export class ThreadSession {
       readonly more?: readonly Turn[];
       readonly because?: string;
     } = {},
-  ): Promise<void> {
+  ): Promise<boolean> {
     const {
       error = false,
       more = [],
@@ -2669,9 +2679,15 @@ export class ThreadSession {
     // the first write: whatever reads the session meanwhile sees it with no turn.
     const active = this.active;
     this.active = null;
-    const dropped = [...this.sent, ...more];
+    const ended = active?.cut ? active : null;
+    const whole = ended !== null;
+    const released = ended?.released ?? [];
+    if (released.length > 0) this.endNotes.push(takenNote(released.length, this.names));
+    const dropped = [...this.sent.filter((turn) => !released.includes(turn)), ...more];
     this.sent = [];
-    const waiting = [...(active?.turn ? [active.turn] : []), ...dropped];
+    const waiting = [...(active?.turn ? [active.turn] : []), ...released, ...dropped];
+    const endedWell =
+      ended !== null && dropped.length === 0 && ended.renderer.runningTasks.length === 0;
     this.injectedExpected = false;
     this.announced = null;
     this.reportDue = false;
@@ -2702,7 +2718,7 @@ export class ThreadSession {
       }
       if (active !== null) {
         try {
-          await active.renderer.feedEnding(line);
+          if (!whole) await active.renderer.feedEnding(line);
           if (dropped.length > 0) {
             this.handLatestTo(this.reply(active.renderer));
             await active.renderer.feedError(notSent(dropped, because));
@@ -2724,6 +2740,7 @@ export class ThreadSession {
       this.settled.set();
       this.stopTailEnded();
     }
+    return endedWell;
   }
 
   /** The reply's footer, or null when it would say nothing. */

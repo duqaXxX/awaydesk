@@ -2721,22 +2721,32 @@ async function closedAround(t: TestContext, ending: boolean) {
   return { h, turn };
 }
 
-for (const ending of [false, true]) {
-  test(`a close ${ending ? "while the turn's end is being written" : "while the turn runs"} stops the reply's stream and says awaydesk stopped`, async (t) => {
-    const { h, turn } = await closedAround(t, ending);
-    assert.equal(h.slack.callsTo("chat.stopStream").length, 1);
-    assert.equal(
-      h
-        .replies()
-        .filter((reply) =>
-          reply.includes(texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN })),
-        ).length,
-      1,
-    );
-    assert.deepEqual(thread(h).openReplies, []);
-    assert.ok(turn.done.isSet);
-  });
-}
+test("a close while the turn runs stops the reply's stream and says awaydesk stopped", async (t) => {
+  const { h, turn } = await closedAround(t, false);
+  assert.equal(h.slack.callsTo("chat.stopStream").length, 1);
+  assert.equal(
+    h
+      .replies()
+      .filter((reply) => reply.includes(texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN })))
+      .length,
+    1,
+  );
+  assert.deepEqual(thread(h).openReplies, []);
+  assert.equal(thread(h).ended, "error");
+  assert.ok(turn.done.isSet);
+});
+
+// Issue #263: the turn had ended, so its answer is whole. The reply does not say it ended before
+// an answer, and the root does not get the status of a turn cut short.
+test("a close while the turn's end is being written stops the reply's stream and leaves the answer as it is", async (t) => {
+  const { h, turn } = await closedAround(t, true);
+  assert.equal(h.slack.callsTo("chat.stopStream").length, 1);
+  const ended = texts.fill(texts.ENDED, { reason: texts.ENDED_SHUTDOWN });
+  assert.ok(!h.replies().some((reply) => reply.includes(ended)));
+  assert.deepEqual(thread(h).openReplies, []);
+  assert.equal(thread(h).ended, "done");
+  assert.ok(turn.done.isSet);
+});
 
 test("a reader cancelled while the session is not closing settles the turn it was ending", async (t) => {
   // `dropClient` cancels the reader too (a reconnect): only a close hands the turn to `abandon`.
