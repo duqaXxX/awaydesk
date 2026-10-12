@@ -614,6 +614,26 @@ test("close leaves every repair field cleared", async (t) => {
   assert.deepEqual(deleted, [requestTs]);
 });
 
+// Issue #240: the agent takes the denial of the request a close settles and can ask again at
+// once, while the close still waits on the first handler. Nobody is left to answer that one.
+test("a request that comes while the session closes is refused and never shown", async (t) => {
+  const first = canUseToolCall("Bash", { command: "rm -rf build" });
+  const second = canUseToolCall("Bash", { command: "rm -rf dist" });
+  const h = harnessFor(t)({ turns: [[first, second, ...sdkMessages("tools")]] });
+  const session = h.session();
+  await session.submit("clean");
+  await h.until(() => pending(h.approvals).length > 0);
+  await session.close();
+  // Both requests reached the session and were answered: the second was not simply never sent.
+  assert.equal(h.clients[0]?.permissionResults.length, 2);
+  assert.deepEqual(pending(h.approvals), []);
+  const shown = h.slack
+    .callsTo("chat.postMessage")
+    .filter((args) => JSON.stringify(args.blocks ?? []).includes('"actions"'));
+  assert.equal(shown.length, 1);
+  assert.equal(h.slack.callsTo("chat.delete").length, 1);
+});
+
 test("waiting for owner reflects an open approval", async (t) => {
   const ask = canUseToolCall("Bash", { command: "ls" });
   const h = harnessFor(t)({ turns: [[ask, ...sdkMessages("tools")]] });

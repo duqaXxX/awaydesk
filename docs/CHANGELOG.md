@@ -965,6 +965,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A request the agent makes while its session closes is denied at once and never shown (issue
+  #240). A close denies the open requests and waits for their handlers, and the agent could ask
+  again on that denial: the new request was posted with live buttons in a thread whose session
+  was going away, and stayed pending for good. Reproduced with the fake agent; not tried with
+  Claude Code. The other path of that issue, a start the worker gave up, is unchanged.
 - The line that says a clip waits for its transcript goes when the transcript arrives, when the
   wait ends, and when the same clip is sent again. It is a normal post of the bot's now, in the
   channel for a clip at the top level and in the thread for a clip sent in one, since Slack

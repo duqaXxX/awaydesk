@@ -2748,7 +2748,8 @@ export class ThreadSession {
    * with what the owner chose, for as long as that takes; with a refusal when the chat could
    * not show the request, since nobody can answer one that was never shown. `signal` is the
    * agent's: aborted, the request is refused and its message withdrawn; aborted before the
-   * request arrives, nothing is posted.
+   * request arrives, nothing is posted. Nothing is posted either for a request that arrives once
+   * the session is closing: it is refused at once.
    */
   private async askOwner(
     request: PermissionRequest | QuestionRequest,
@@ -2756,6 +2757,11 @@ export class ThreadSession {
   ): Promise<Decision> {
     const questions = request.type === "question" ? request.questions : null;
     if (signal.aborted) return toAnswer(DENY, questions, this.names);
+    // A session that is closing has denied its open requests (`close`), and the agent can ask
+    // again on that denial while the close still waits for the first handler: this one would be
+    // shown in a thread whose session is going away, and nothing would ever settle it. It gets
+    // the answer the others got.
+    if (this.closedFlag) return toAnswer(DENY, questions, this.names);
     const title =
       request.title ||
       (request.type === "question" ? request.toolName : taskTitle(request.toolName, request.input));
