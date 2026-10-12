@@ -60,7 +60,7 @@ What crosses the chat seam, in both directions:
 | a reply | core to provider | `ReplySink`: `text`, `task`, `finish`, `closeOut`, `waitLanded`, `settle`. A session holds it as a `Reply`, which adds `setRunning`, `setLatest` and `footerShown`. A tool's line crosses as a `TaskUpdate` and the footer as `FooterFields`, which the provider formats |
 | a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, `activityRefused`, `written`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
 | a channel | core to provider | `ChannelChat`, from `ChatProvider.channel`: `notice`, `say`, `rewrite`, and the lists a word posts (`offer`, `withdraw`) |
-| the provider | core to provider | `ChatProvider`: `name`, `capabilities`, `escape` and `channelName` (what a core text relies on to write a name and a channel for the chat's markup, beside `ThreadChat.link`), `openedAt`, `channelState`, `index` and `openFile` where declared, and `start`, `stop` and `close` |
+| the provider | core to provider | `ChatProvider`: `name`, `capabilities`, `escape` and `channelName` (what a core text relies on to write a name and a channel for the chat's markup, beside `ThreadChat.link`), `openedAt`, `channelState`, `threadState`, `index` and `openFile` where declared, and `start`, `stop` and `close` |
 | a request | core to provider | typed by what it asks, never by how it is drawn: `OwnerRequest` is a `PermissionRequest`, a `QuestionRequest`, a `HoldRequest` or a `SetupRequest`; a list is an `OwnerList`, of folders or of sessions |
 | an owner's act | provider to core | `ChatInbound`: `message` (an `InboundMessage`), `answer` (an `OwnerAnswer` to the request `requestId` names), `picked` (a `ListPick` from an `OwnerList`) and `unbound` (the owner wrote in a channel bound to no folder: the core tells how to bind). The provider calls them for the owner alone |
 | a failure | provider to core | `ChatError`, whose name is the provider's code for the failed call |
@@ -301,7 +301,7 @@ and `trustedRepository` null without `folderTrust`, `setEffort` and `stopTask` t
 | Subject | Rule | Checked by `test/conformance/chat.ts` |
 |---|---|---|
 | The owner check | Every inbound path checks that the owner acted before it calls `ChatInbound`, and the core never checks. What "the owner" means is the provider's: the Slack provider requires the configured user and the workspace it started in (`guards.isOwner`) | Three checks send a message, a click and a pick from somebody else. Nothing checks a second workspace |
-| Start and stop | `ChatProvider.start`, `stop` and `close` are called once each, in that order. Before `start` the daemon already calls `thread`, `endReply`, `withdraw`, `showStatus`, `channelState`, `openedAt` and the index's `refresh`, for the crash repair and the cleanup. `ChatEntry.build` must not read the core | `nothing arrives before start`, `nothing arrives after stop` |
+| Start and stop | `ChatProvider.start`, `stop` and `close` are called once each, in that order. Before `start` the daemon already calls `thread`, `endReply`, `withdraw`, `showStatus`, `channelState`, `threadState`, `openedAt` and the index's `refresh`, for the crash repair and the cleanup. `ChatEntry.build` must not read the core | `nothing arrives before start`, `nothing arrives after stop` |
 | A reply | `text` and `task` come while the turn runs. `finish` ends the body and may come more than once for one reply, since a report turn writes into the reply that started its task. `closeOut` ends the reply once, with the footer, and answers whether the end landed. `waitLanded` is asked only after a `closeOut` that answered false. `settle` brings the reply to its true form now, at a close. A signal given to any of the four releases the caller only: the write goes on | `carries text, a task line and a footer to its end`, `reports an end that did not land` |
 | A task line | `task` with an id already sent updates that line | The same id is sent twice; nothing checks that one line results |
 | A line of the daemon's | `text` with `notice` is a line of the daemon's own, and with `ending` the line that says how a reply was cut short | Not checked |
@@ -588,7 +588,7 @@ removes only what an answer makes certain:
 
 - `cleanup.forgetGoneChannels` asks about each bound channel through the lookup it is given
   (`ChatProvider.channelState`), which answers `gone`, `there` or `no answer`
-  (`cleanup.ChannelAnswer`; a lookup that rejects counts as `no answer`, and the log names the
+  (`seam.Presence`; a lookup that rejects counts as `no answer`, and the log names the
   reason), and removes, with `StateStore.removeChannel`, each one that is `gone`, threads included.
   The lookup for Slack is `channels.channelLookup`: `gone` is `channel_not_found` from
   `conversations.info`, and any other failure is no answer and removes nothing. A private channel the bot was removed from gives the
@@ -596,6 +596,13 @@ removes only what an answer makes certain:
   channels (a channel it gave no answer about is not one it found), nothing is removed and a warning
   says so:
   that is what the token of another workspace looks like.
+- `cleanup.forgetGoneThreads` then asks about each thread of the channels `forgetGoneChannels`
+  found in the same pass (`ChatProvider.threadState`, answering as `channelState` does) and
+  removes, with `StateStore.removeThread`, each one that is `gone`: its first message no longer
+  exists, and its session shows in `!resume` again because no thread holds it. A channel that gave
+  no answer or was just forgotten has none of its threads asked about, and a thread with a live
+  session is kept. The lookup for Slack is `channels.threadLookup`: `gone` is `thread_not_found`
+  from `conversations.replies` on the root with `limit=1`, and any other failure is no answer.
 - `StateStore.prune` then drops a thread whose session id is no longer among its folder's sessions
   (`AgentBackend.aliveSessions`, which for Claude is `listing.aliveSessions`: the sessions the SDK
   lists, with every transcript file in the folder's transcript directory) and a no-session thread

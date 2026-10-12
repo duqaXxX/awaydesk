@@ -11,12 +11,12 @@ import type { TestContext } from "node:test";
 import type { ListedSession } from "../../../src/agent/seam.ts";
 import type {
   ChannelChat,
-  ChannelState,
   ChatCapabilities,
   ChatInbound,
   ChatProvider,
   ListPick,
   Markup,
+  Presence,
   ThreadChat,
   ThreadRef,
 } from "../../../src/chat/seam.ts";
@@ -102,8 +102,12 @@ class Faulty implements ChatProvider {
     return this.#inner.openedAt(ref);
   }
 
-  channelState(channel: string): Promise<ChannelState> {
+  channelState(channel: string): Promise<Presence> {
     return this.#inner.channelState(channel);
+  }
+
+  threadState(ref: ThreadRef): Promise<Presence> {
+    return this.#inner.threadState(ref);
   }
 
   start(inbound: ChatInbound): Promise<void> {

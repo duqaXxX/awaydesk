@@ -151,7 +151,8 @@ export interface MainOptions extends RunOptions {
 /**
  * The scheduled cleanup of `state.json`: a pass every `seconds`, none once a stop has begun (the
  * sessions are closing, and the next start cleans anyway). Ends when `signal` aborts; a pass in
- * flight is finished first, since a call to Slack cannot be cut short.
+ * flight is finished first, since a call to Slack cannot be cut short, though it asks about no
+ * further thread once the stop has begun (`CleanOptions.stopping`).
  */
 export async function cleanEvery(options: {
   readonly seconds: number;
@@ -329,6 +330,8 @@ export async function run(options: RunOptions = {}): Promise<number> {
 
     const cleanOnce = (): Promise<void> =>
       clean((channel) => chat.channelState(channel), state, {
+        threadLookup: (ref) => chat.threadState(ref),
+        stopping: () => sessions.draining || (stop?.received.length ?? 0) > 0,
         alive: async (directory) =>
           backend.capabilities.sessionListing ? backend.aliveSessions(directory) : null,
         live: () => sessions.liveThreads(),

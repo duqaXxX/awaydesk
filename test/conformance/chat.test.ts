@@ -103,6 +103,7 @@ async function memoryRig(): Promise<ChatRig> {
     settle: async () => {},
     refuseWrites: () => chat.removeChannel(channel),
     removeChannel: (gone) => chat.removeChannel(gone),
+    removeThread: (gone) => chat.removeThread(gone),
     failLookups: () => chat.failChannelLookups(),
   };
 }
@@ -335,8 +336,12 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
     },
     refuseWrites: () => refuse(...WRITES),
     removeChannel: () => refuse("conversations.info"),
+    removeThread: () => {
+      world.slack.responses["conversations.replies"] = rejected("thread_not_found");
+    },
     failLookups: () => {
       world.slack.responses["conversations.info"] = rejected("ratelimited");
+      world.slack.responses["conversations.replies"] = rejected("ratelimited");
     },
   };
 }

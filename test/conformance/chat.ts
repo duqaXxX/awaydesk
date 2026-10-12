@@ -105,7 +105,9 @@ export interface ChatRig {
   refuseWrites(): void;
   /** `channel` is no longer there for the chat. */
   removeChannel(channel: string): void;
-  /** From now on the chat can not say whether a channel is there. */
+  /** `thread` is no longer there for the chat: its first message is gone. */
+  removeThread(thread: ThreadRef): void;
+  /** From now on the chat can not say whether a channel or a thread is there. */
   failLookups(): void;
 }
 
@@ -458,6 +460,27 @@ export function chatConformance(
         async ({ rig, provider }) => {
           rig.failLookups();
           const answer = await provider.channelState(rig.channel).catch((error: unknown) => error);
+          if (answer instanceof ChatError) assert.notEqual(answer.name, "");
+          else assert.equal(answer, "no answer");
+        },
+      );
+    });
+
+    describe("a thread: whether the chat still has it", () => {
+      check("says a thread it has is there", async ({ provider, ref }) => {
+        assert.equal(await provider.threadState(ref), "there");
+      });
+
+      check("says a thread whose first message went is gone", async ({ rig, provider, ref }) => {
+        rig.removeThread(ref);
+        assert.equal(await provider.threadState(ref), "gone");
+      });
+
+      check(
+        "says `no answer`, or rejects with a named ChatError, when it can not say",
+        async ({ rig, provider, ref }) => {
+          rig.failLookups();
+          const answer = await provider.threadState(ref).catch((error: unknown) => error);
           if (answer instanceof ChatError) assert.notEqual(answer.name, "");
           else assert.equal(answer, "no answer");
         },
