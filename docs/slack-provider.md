@@ -608,7 +608,10 @@ The daemon's notices (the answer to `!bind`, `!bypass` and `!stop`, a word used 
 a resume that did not happen or is refused, a refused attachment, a restart, and the ephemeral
 errors) are a context block, small and grey as the footer, so they read apart from Claude's replies:
 `ThreadChat.notice` for the session's own, `ThreadChat.tell` and `ChannelChat.notice` for the flows'
-answers, `Answers.notice` and `Answers.tellOwner` for the Slack listeners'. The same holds
+answers, `Answers.notice` and `Answers.tellOwner` for the Slack listeners'. A line for the owner
+alone about a top-level message that has no reply yet goes to the channel
+(`Answers.tellOwnerAbout`): Slack shows an ephemeral message in a thread only when the thread is
+already active. The same holds
 for the lines of the `!bind` and `!resume` lists; their rows keep a section, since a context block
 holds no button. Their text is mrkdwn, and what comes from outside (a folder, a file name, a typed
 target) is escaped for it (`ChatProvider.escape`, which the Slack provider answers with

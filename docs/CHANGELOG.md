@@ -971,6 +971,14 @@ All notable changes to this project are documented here. The format follows
   placed in 1970 and the countdown was clamped to zero. The probe now reads the wall time on its
   own (`UsageProbeOptions.now`). The tests gave one fake clock to both uses, which is why they
   passed.
+- A clip recorded at the top level of a channel gets its lines again (issue #235): the one that
+  says it waits for its transcript, and the four that say nothing was sent. They were sent as
+  ephemeral messages under the clip, a message with no reply yet, and Slack shows an ephemeral
+  message in a thread only when the thread is already active (`chat.postEphemeral` reference,
+  read 2026-10-12): it accepted each call and showed nothing. `Answers.tellOwnerAbout` sends
+  them to the channel for a top-level clip and to the thread for a clip recorded in one. Not
+  checked in Slack: the refusals of an attachment and of a channel the guard refuses, which
+  reach a top-level message the same way.
 - A Claude Code process that ended is named for how it ended: the owner reads
   ``Claude Code reported an error: `ProcessExited` `` for an exit with a status other than 0,
   `ProcessKilled` for a signal and `ErrorResult` for an error result reported before the exit
