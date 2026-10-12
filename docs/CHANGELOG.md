@@ -328,6 +328,20 @@ All notable changes to this project are documented here. The format follows
   no description or the names pass 80 characters (`texts.STILL_RUNNING_NAMES_LIMIT`), a limit of
   the project's own: Slack's reference states none for a status, and what a client draws of a long
   one was not measured. The footer's count (`⏳ 1 agent`) and the line a stop shows are unchanged.
+- A stop of the daemon no longer stalls on the pause Slack asks for after a rate limit (issue
+  #236). A rate limited call was sent again after `Retry-After`, up to three times, and nothing
+  could end that pause. With a long one on a call made while the sessions close, the shutdown
+  completed no step for `main.SHUTDOWN_LIMIT_SECONDS` (30) and the process ended with status 1,
+  the remaining sessions not closed and the session index not published. Once the chat has
+  stopped (`ClientOptions.stopped`) a rate limited call is thrown as rate limited and the pause
+  of one that waits ends; nothing is in flight during that pause, so the stop completes. What it
+  costs: under a rate limit, the end of a reply that is cut by the stop is not written by the
+  stop, even when `Retry-After` is a few seconds. Its message stays in `open_replies`, the repair
+  of the next start closes it with its line, and the note about prompts that were not sent is
+  lost; the session index's last publication and a root's reaction fail the same way. Unchanged:
+  `!stop` in a thread still waits for the pause, as do the retries while turns finish before the
+  stop, and the pause after a failed connection. Not measured: which `Retry-After` values Slack
+  answers with in practice.
 - The logic of `!open` that names no chat moved from `src/chat/slack/openfile/` to the core, in
   `src/core/files/`: which files are offered (`listing`), which of them changed since the thread
   started (`changed`), which paths are safe to read (`read`, `paths`) and the time limit on a wait

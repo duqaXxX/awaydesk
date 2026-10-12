@@ -25,7 +25,10 @@
  *    abort a call in flight (the only signal `WebClient.makeRequest` gives `fetch` is the client's
  *    own timeout), and a call given up after Slack took it loses a message's ts or posts an
  *    ending twice. For that reason no wait inside a pass (the lock, the limiter, a Slack call, a
- *    read-back) takes a signal.
+ *    read-back) takes a signal. One pause inside a Slack call does end early, at the daemon's
+ *    stop: the one the client makes after Slack rate limited the call (`ClientOptions.stopped`
+ *    in `clients.ts`). Nothing is in flight then, and Slack did not apply the call it answered
+ *    `ratelimited`: the pass gets that failure, as it does when the retries run out.
  * 2. What can be cancelled is a wait outside a pass, and it is cancelled with an `AbortSignal`:
  *    the debounce before a write, the pause before the end's one retry, the stream's 280 seconds
  *    (each a `Task` with its own signal, aborted by `Task.cancel`), and a caller's own wait for a

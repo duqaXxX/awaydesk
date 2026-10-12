@@ -223,6 +223,96 @@ test("a rate limited call is given up after 3 more sends, and thrown as a rate l
   }
 });
 
+// Issue #236: nothing is in flight during the pause Slack asks for, so a daemon that stops can
+// leave it. The call was answered `ratelimited`: Slack did not apply it, and it is thrown as that.
+
+/** A clock whose pause ends only when its signal aborts, as a long Retry-After does at a stop. */
+class Held implements Clock {
+  readonly slept: number[] = [];
+  /** Resolves when the first pause begins. */
+  readonly paused: Promise<void>;
+  #begun: () => void = () => {};
+
+  constructor() {
+    this.paused = new Promise((resolve) => {
+      this.#begun = resolve;
+    });
+  }
+
+  sleep(seconds: number, signal?: AbortSignal): Promise<void> {
+    this.slept.push(seconds);
+    this.#begun();
+    return new Promise((_, reject) => {
+      if (signal?.aborted) reject(signal.reason);
+      signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+  }
+
+  time(): number {
+    return 0;
+  }
+}
+
+test("a stop ends the pause of a rate limited call, which is not sent again", async () => {
+  for (const make of [repliesClient, sharedClient]) {
+    const requests: string[] = [];
+    const clock = new Held();
+    const stopping = new AbortController();
+    const client = make(undefined, {
+      ...QUIET,
+      ...STEADY,
+      clock,
+      fetch: network(requests, "429", "ok"),
+      stopped: stopping.signal,
+    });
+    const call = client.apiCall("chat.update", {}).catch((error: unknown) => error);
+    // The call's own end is raced too: a client that threw before any pause fails the test here
+    // in place of leaving it waiting.
+    assert.equal(await Promise.race([clock.paused.then(() => "paused"), call]), "paused");
+    stopping.abort();
+    const failure = await call;
+    assert.ok(failure instanceof WebAPIRateLimitedError);
+    assert.equal(unknownOutcome(failure), false);
+    assert.deepEqual(requests, ["chat.update"]);
+  }
+});
+
+test("once the daemon is stopping a rate limited call is thrown with no pause", async () => {
+  const requests: string[] = [];
+  const clock = new Pauses();
+  const stopping = new AbortController();
+  stopping.abort();
+  const client = repliesClient(undefined, {
+    ...QUIET,
+    ...STEADY,
+    clock,
+    fetch: network(requests, "429", "ok"),
+    stopped: stopping.signal,
+  });
+  const failure = await client.apiCall("chat.update", {}).catch((error: unknown) => error);
+  assert.ok(failure instanceof WebAPIRateLimitedError);
+  assert.deepEqual(requests, ["chat.update"]);
+  assert.deepEqual(clock.slept, []);
+});
+
+test("a stop does not end the pause after a failed connection", async () => {
+  // That pause is a second and a half at most, and the call may be the one that ends a reply.
+  const requests: string[] = [];
+  const clock = new Pauses();
+  const stopping = new AbortController();
+  stopping.abort();
+  const client = sharedClient(undefined, {
+    ...QUIET,
+    ...STEADY,
+    clock,
+    fetch: network(requests, "reset", "ok"),
+    stopped: stopping.signal,
+  });
+  const result = await client.apiCall("chat.update", {});
+  assert.equal(result.ok, true);
+  assert.equal(requests.length, 2);
+});
+
 test("the pause before a send again carries the jitter", async () => {
   const clock = new Pauses();
   const client = repliesClient(undefined, {

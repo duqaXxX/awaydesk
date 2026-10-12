@@ -31,8 +31,11 @@ export type SlackClient = ReturnType<typeof sharedClient>;
 
 /** The Slack clients of the daemon, one constructor for each way it calls. */
 export interface Clients {
-  /** The shared client and the one replies are written with, on the bot token. */
-  bot(token: string): readonly [shared: SlackClient, replies: SlackClient];
+  /**
+   * The shared client and the one replies are written with, on the bot token. `stopped` aborts
+   * when the daemon stops (`ClientOptions.stopped`).
+   */
+  bot(token: string, stopped?: AbortSignal): readonly [shared: SlackClient, replies: SlackClient];
   /** The owner's own client, on the user token. */
   owner(token: string): SlackClient;
 }
@@ -49,7 +52,7 @@ export function makeClients(
 }
 
 export const CLIENTS: Clients = {
-  bot: (token) => makeClients(token),
+  bot: (token, stopped) => makeClients(token, stopped === undefined ? {} : { stopped }),
   owner: (token) => sharedClient(token),
 };
 
@@ -154,7 +157,9 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
   const botToken = variable(context, "SLACK_BOT_TOKEN");
   const appToken = variable(context, "SLACK_APP_TOKEN");
   const clients = options.clients ?? CLIENTS;
-  const [slack, replySlack] = clients.bot(botToken);
+  // The clients are built before the chat that stops them: its stop is passed on below.
+  const stopping = new AbortController();
+  const [slack, replySlack] = clients.bot(botToken, stopping.signal);
   const auth = await slack.auth.test();
   const identity: Identity = {
     ownerUserId: variable(context, "SLACK_OWNER_USER_ID"),
@@ -221,5 +226,6 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
       ...(options.now !== undefined && { now: options.now }),
     },
   });
+  chat.stopped.addEventListener("abort", () => stopping.abort(), { once: true });
   return chat;
 }

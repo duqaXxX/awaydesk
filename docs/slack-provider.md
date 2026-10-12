@@ -30,7 +30,7 @@ client's `apiCall`:
 
 | Failure | What is sent again |
 |---|---|
-| Slack rate limited the call (HTTP 429) | every method, after the `Retry-After` Slack gave, up to `clients.RATE_LIMIT_RETRIES` (3) times: a rate limited call never ran. A 429 with no valid `Retry-After` is not sent again |
+| Slack rate limited the call (HTTP 429) | every method, after the `Retry-After` Slack gave, up to `clients.RATE_LIMIT_RETRIES` (3) times: a rate limited call never ran. A 429 with no valid `Retry-After` is not sent again. Once the daemon stops, a rate limited call is not sent again either, and the pause of one that waits ends (`ClientOptions.stopped`): the call is thrown as rate limited |
 | the connection failed before an answer (a reset, a refused or unreachable host), or Slack answered with HTTP 500 or 503 (`clients.SERVER_ERROR_STATUSES`) | once, after a backoff pause, while no retry of the call was made yet. `clients.sharedClient` does so for every method. `clients.repliesClient`, the one replies are written with, does so for every method but the four of `clients.CREATING_METHODS`, `chat.postMessage` and the three stream calls: they are not idempotent, and a reset can come after Slack applied the call; whether a 500 or a 503 can was not measured, and they are left out for those too |
 | anything else | never: an error Slack answered with, any other HTTP status, and the client's own timeout (`clients.REQUEST_TIMEOUT_MS`, 30 seconds), since a timed out call may have run |
 
@@ -247,7 +247,8 @@ that is not posted yet, a continuation or the reply's ending (`invalid_blocks`, 
 the like, `errors.REFUSED_CONTENT`, not a rate limit), that message is posted once more as plain
 text (`ReplySink.writePlain`), and the reply goes on to the next messages. A message that already
 shows something is never replaced by a plainer one. An end that fails for any other reason (the
-network, or a rate limit the client has already retried) is tried once more after
+network, or a rate limit the client has already retried, or stopped retrying at the daemon's
+stop) is tried once more after
 `sinks.FINAL_RETRY_SECONDS`; until it lands, `ThreadSession` shows no ✅
 (`ThreadSession.trackLanding`), shows ❌ if the retry fails too, and keeps the persisted status so
 the next start's repair still finds the reply.
