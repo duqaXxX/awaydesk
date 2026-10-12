@@ -164,6 +164,24 @@ export class Answers {
   }
 
   /**
+   * `tellOwner` about the message `ts`. At the top level (`threadTs` is `ts`) the line goes to
+   * the channel: the message has no reply yet, and Slack shows an ephemeral message in a thread
+   * only when the thread is already active (`chat.postEphemeral` reference), accepting the call
+   * and showing nothing. Never throws.
+   */
+  async tellOwnerAbout(channel: string, threadTs: string, ts: string, text: string): Promise<void> {
+    if (threadTs !== ts) {
+      await this.tellOwner(channel, threadTs, text);
+      return;
+    }
+    try {
+      await this.notice(channel, null, text, { ephemeral: true });
+    } catch (error) {
+      logger.warning(`could not reach the owner in ${channel}: ${describe(error)}`);
+    }
+  }
+
+  /**
    * Answer in the channel itself, as a normal post: where a word typed in the channel, or a
    * click on a list posted there, is answered.
    */

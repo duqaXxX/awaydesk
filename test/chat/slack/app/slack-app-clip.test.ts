@@ -189,6 +189,37 @@ test("a clip waits for its transcript and is sent when slack has it", async (t) 
   assert.deepEqual(world.queries(), ["What day is it today?"]); // once
 });
 
+// Slack accepts an ephemeral message under a message that has no reply and shows nothing: "Ephemeral
+// messages in threads are only shown if there is already an active thread" (`chat.postEphemeral`
+// reference, read 2026-10-12). The fake records the call either way, so the place is asserted.
+test("a clip at the top level is answered in the channel, where the owner sees it", async (t) => {
+  const world = worldOf(t);
+  await world.dispatch(clipMessage(false));
+  const [told] = world.slack.callsTo("chat.postEphemeral") as Record<string, unknown>[];
+  assert.equal(told?.text, named(slackTexts.CLIP_WAITING, NAMES));
+  assert.equal(told?.channel, CHANNEL);
+  assert.ok(!("thread_ts" in (told ?? {})));
+});
+
+test("a clip in a thread is answered in that thread", async (t) => {
+  const world = worldOf(t);
+  const body = clipMessage(false);
+  body.event.thread_ts = THREAD; // a thread that holds no session
+  await world.dispatch(body);
+  const [told] = world.slack.callsTo("chat.postEphemeral") as Record<string, unknown>[];
+  assert.equal(told?.text, texts.NOT_A_SESSION);
+  assert.equal(told?.thread_ts, THREAD);
+});
+
+test("a top-level clip given up after its wait is answered in the channel", async (t) => {
+  const world = worldOf(t);
+  await world.dispatch(clipMessage(false));
+  await world.appClock.advance(voice.WAIT_SECONDS);
+  const calls = world.slack.callsTo("chat.postEphemeral") as Record<string, unknown>[];
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every((call) => !("thread_ts" in call)));
+});
+
 test("a change to a file nobody waits for does nothing", async (t) => {
   const world = worldOf(t);
   clipInfo(world);

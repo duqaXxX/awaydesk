@@ -51,9 +51,10 @@ export class Clips {
   ): Promise<void> {
     const { identity, sessions, state } = this.parts;
     if (!isOwner(identity, text(file.user), text(file.user_team))) {
-      await this.answers.tellOwner(
+      await this.answers.tellOwnerAbout(
         channel,
         threadTs,
+        ts,
         named(slackTexts.CLIP_NOT_YOURS, this.parts.names),
       );
       return;
@@ -76,9 +77,10 @@ export class Clips {
     this.clips.get(fileId)?.expiry?.cancel();
     waiting.expiry = new Task((signal) => this.giveUp(fileId, signal));
     this.clips.set(fileId, waiting);
-    await this.answers.tellOwner(
+    await this.answers.tellOwnerAbout(
       channel,
       threadTs,
+      ts,
       named(slackTexts.CLIP_WAITING, this.parts.names),
     );
   }
@@ -93,9 +95,10 @@ export class Clips {
     // Whole minutes: 300 seconds are 5 whichever way a tie rounds (`Math.round` goes up, Python's
     // `round` to even).
     const minutes = Math.round(voice.WAIT_SECONDS / 60);
-    await this.answers.tellOwner(
+    await this.answers.tellOwnerAbout(
       waiting.channel,
       waiting.threadTs,
+      waiting.ts,
       fill(named(slackTexts.CLIP_NOT_SENT, this.parts.names), { minutes }),
     );
   }
@@ -113,9 +116,10 @@ export class Clips {
         });
       } catch (error) {
         if (!(error instanceof DownloadFailed)) throw error;
-        await this.answers.tellOwner(
+        await this.answers.tellOwnerAbout(
           waiting.channel,
           waiting.threadTs,
+          waiting.ts,
           fill(named(slackTexts.CLIP_UNREADABLE, this.parts.names), {
             reason: mrkdwnEscape(error.message),
           }),
@@ -126,9 +130,10 @@ export class Clips {
       heard = voice.vttText(new TextDecoder("utf-8").decode(body));
     }
     if (!heard) {
-      await this.answers.tellOwner(
+      await this.answers.tellOwnerAbout(
         waiting.channel,
         waiting.threadTs,
+        waiting.ts,
         named(slackTexts.CLIP_EMPTY, this.parts.names),
       );
       return;
@@ -180,9 +185,10 @@ export class Clips {
     const user = text(file.user);
     const team = text(file.user_team);
     if (!isOwner(identity, user, team)) {
-      await this.answers.tellOwner(
+      await this.answers.tellOwnerAbout(
         waiting.channel,
         waiting.threadTs,
+        waiting.ts,
         named(slackTexts.CLIP_NOT_YOURS, this.parts.names),
       );
       return;
