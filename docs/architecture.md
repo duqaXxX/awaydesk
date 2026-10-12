@@ -1160,11 +1160,9 @@ closed when the start returns (`ThreadSession.connect`).
   opens a compaction with a `status` system record that says `compacting`, repeats it while it
   lasts, and ends it with the `status` record that carries `compact_result`, and the back end says
   each once. The first event also starts the turn it belongs to, when one is due. Once no turn runs
-  and the thread's latest reply is still open, what the session left running, each task by the
-  first line of its description (`Still running: Run the test suite`, `texts.STILL_RUNNING_NAMES`),
-  or `1 shell still running`, the words the terminal ends such a turn with, when a task has no
-  description or the names pass `texts.STILL_RUNNING_NAMES_LIMIT`, a limit of the project's own:
-  what runs changes, is a state of the thread and stays out of a reply whose stream only grows. Once the latest reply has
+  and the thread's latest reply is still open, what the session left running,
+  `1 shell still running`, the words the terminal ends such a turn with: a count that changes is a
+  state of the thread and stays out of a reply whose stream only grows. Once the latest reply has
   ended its footer says it, and the status line says nothing (`Reply.footerShown`: the reply's end
   has landed on Slack, so a footer that could not be written never silences the line). During a stop
   that only background tasks hold, the line says `texts.RESTART_WAITS` whatever the footer shows.
@@ -1176,7 +1174,7 @@ closed when the start returns (`ThreadSession.connect`).
   instance makes the calls in order, so two quick changes end on the last one and a turn that ends
   at once sets nothing. The line is sent as the one loading message, which is what a client shows,
   with a `status` that says the same after the app's name (`is working…`,
-  `is still running: Run the test suite`, `has 1 shell still running`) for a client that draws that instead (with `status` alone, iOS showed
+  `has 1 shell still running`) for a client that draws that instead (with `status` alone, iOS showed
   nothing: measured: "Thread status on iOS"). Slack removes a status two minutes after it was set
   and clears it when the app replies (documented: "Status removal after two minutes"), so it is set
   again every `status.THREAD_STATUS_REFRESH_SECONDS` and within
@@ -1247,8 +1245,7 @@ closed when the start returns (`ThreadSession.connect`).
   the last line of the thread. When the thread's latest reply has ended, the counts close its footer
   (`⏳ 1 shell · 1 agent`); a new reply takes them over and the previous one drops them, keeping its
   footer. When the latest reply is still open for its own task, and so has no footer yet, the
-  thread's status line names what runs, or says the counts when it cannot
-  (`1 shell · 1 agent still running`). The two never show together,
+  thread's status line says them (`1 shell · 1 agent still running`). The two never show together,
   and both disappear when nothing runs.
 - When the Claude Code process goes away (shutdown, an idle close, a process that exits), its tasks
   go with it: their lines close with `Stopped` and the list empties. The map lives in memory only.

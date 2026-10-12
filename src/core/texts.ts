@@ -307,13 +307,6 @@ export const THREAD_COMPACTING_STATUS = "is compacting the conversation…";
 export const STILL_RUNNING = "{counts} still running";
 export const THREAD_WORKING_STATUS = "is working…";
 export const STILL_RUNNING_STATUS = "has {counts} still running";
-// The same line with what runs named by its description (issue #269), so that the owner can tell
-// two agents apart; `STILL_RUNNING` when a task has none or the names pass
-// `STILL_RUNNING_NAMES_LIMIT`. The limit is the project's own choice: the method's reference
-// states none for a status, and what a client draws of a long one was not measured.
-export const STILL_RUNNING_NAMES = "Still running: {names}";
-export const STILL_RUNNING_NAMES_STATUS = "is still running: {names}";
-export const STILL_RUNNING_NAMES_LIMIT = 80;
 export const ACTIVITY_BUSY = "running a turn, {queued} queued";
 // `!status` sent to the channel (top-level, or a thread that holds no session): the channel's
 // folder, then one line per live session, each with a link to its thread.

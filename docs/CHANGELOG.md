@@ -339,12 +339,6 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- The thread's status line names what still runs once a turn has ended (issue #269):
-  `Still running: Review the diff · Run the test suite`, each task by the first line of its
-  description, in place of `2 agents still running`. It says the counts as before when a task has
-  no description or the names pass 80 characters (`texts.STILL_RUNNING_NAMES_LIMIT`), a limit of
-  the project's own: Slack's reference states none for a status, and what a client draws of a long
-  one was not measured. The footer's count (`⏳ 1 agent`) and the line a stop shows are unchanged.
 - A stop of the daemon no longer stalls on the pause Slack asks for after a rate limit (issue
   #236). A rate limited call was sent again after `Retry-After`, up to three times, and nothing
   could end that pause. With a long one on a call made while the sessions close, the shutdown
