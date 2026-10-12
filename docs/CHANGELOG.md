@@ -322,6 +322,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The thread's status line names what still runs once a turn has ended (issue #269):
+  `Still running: Review the diff · Run the test suite`, each task by the first line of its
+  description, in place of `2 agents still running`. It says the counts as before when a task has
+  no description or the names pass 80 characters (`texts.STILL_RUNNING_NAMES_LIMIT`), a limit of
+  the project's own: Slack's reference states none for a status, and what a client draws of a long
+  one was not measured. The footer's count (`⏳ 1 agent`) and the line a stop shows are unchanged.
 - The logic of `!open` that names no chat moved from `src/chat/slack/openfile/` to the core, in
   `src/core/files/`: which files are offered (`listing`), which of them changed since the thread
   started (`changed`), which paths are safe to read (`read`, `paths`) and the time limit on a wait

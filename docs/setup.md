@@ -743,7 +743,9 @@ as `✓ Agent "review" finished · 3m 59s`. While tasks run, the footer counts t
 
 From the moment you send a message until its turn ends, Slack shows `Working…` under the
 thread's last message. When the turn has ended and a command or an agent it started still
-runs, the same line reads `1 shell still running` and follows the count; the reply gets its
+runs, the same line names it by its description, `Still running: Run the test suite`, with a
+` · ` between two; when a task has no description or the names pass 80 characters it reads
+`1 shell still running` and follows the count. The reply gets its
 footer once that task and its report have ended. If you sent another message meanwhile and its
 reply has ended, that reply's footer says it instead (`⏳ 1 shell`), until the command ends.
 The line goes while an approval or a question waits for you. Slack's clients draw it, and the
@@ -935,7 +937,7 @@ earlier manifest lacks it: add `file_change` under **Event Subscriptions**, **Su
 events**, and save. Without it a clip waits 5 minutes and is dropped, since nothing tells the
 app that its transcript is ready.
 
-The line under a thread (`Working…`, `1 shell still running`) is Slack's thread status
+The line under a thread (`Working…`, `Still running: Run the test suite`) is Slack's thread status
 (`assistant.threads.setStatus`), which Slack's reference lists under `chat:write`. When Slack
 refuses it, the refusal is logged and the line is skipped.
 

@@ -24,6 +24,7 @@ import {
   type HarnessOptions,
   harnessFor,
   type Item,
+  isRecord,
   type Script,
   sdkMessages,
   splitTurns,
@@ -673,16 +674,22 @@ test("the thread status goes while an approval waits and comes back after it", a
   assert.ok(statuses(h).slice(waiting).includes(texts.THREAD_WORKING_STATUS));
 });
 
-test("a task that outlives its turn is counted by the thread status", async (t) => {
+// The recorded task's description (`background.jsonl`, its `task_started` record).
+const RUNNING_NAME = "Sleep for 5 seconds then print done";
+
+test("a task that outlives its turn is named by the thread status", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harness(t, [{ turns: [first] }]);
   const session = h.session();
   await (await session.submit("start it")).done.wait();
-  const still = `${session.runningKinds} still running`;
+  const still = texts.fill(texts.STILL_RUNNING_NAMES, { names: RUNNING_NAME });
   await h.until(() => lines(h).at(-1) === still); // the turn ended: the prompt is back
-  assert.equal(statuses(h).at(-1), `has ${session.runningKinds} still running`);
+  assert.equal(
+    statuses(h).at(-1),
+    texts.fill(texts.STILL_RUNNING_NAMES_STATUS, { names: RUNNING_NAME }),
+  );
   assert.ok(lines(h)[0] === texts.THREAD_WORKING && session.runningKinds !== "");
-  // The count is a state of the thread, never a line of the reply: a stream only grows.
+  // What runs is a state of the thread, never a line of the reply: a stream only grows.
   const told = h.slack.apiCalls.flatMap((call) => (call.args.chunks ?? []) as JsonObject[]);
   assert.ok(!JSON.stringify(told).includes("still running"));
   // the reply is open
@@ -695,6 +702,29 @@ test("a task that outlives its turn is counted by the thread status", async (t) 
   assert.ok(lines(h).slice(lines(h).indexOf(still)).includes(texts.THREAD_WORKING));
   assert.equal(h.slack.pushes(), 1);
 });
+
+// The names are the owner's way to tell two agents apart; when they cannot be shown whole the
+// line says how many run, as before (issue #269).
+for (const [why, description] of [
+  ["has no description", ""],
+  ["has a description past the limit", "x".repeat(texts.STILL_RUNNING_NAMES_LIMIT + 1)],
+] as const) {
+  test(`a task that ${why} is counted by the thread status`, async (t) => {
+    const [first] = splitBackground();
+    const renamed = first.map((item) =>
+      isRecord(item, "system", "task_started") && "record" in item
+        ? { ...item, record: { ...item.record, description } }
+        : item,
+    );
+    const h = harness(t, [{ turns: [renamed] }]);
+    const session = h.session();
+    await (await session.submit("start it")).done.wait();
+    const still = `${session.runningKinds} still running`;
+    await h.until(() => lines(h).at(-1) === still);
+    assert.equal(statuses(h).at(-1), `has ${session.runningKinds} still running`);
+    assert.ok(session.runningKinds !== "");
+  });
+}
 
 test("stop clears the thread status", async (t) => {
   const h = harness(t, [{}]); // a turn that never answers: nothing waits on the owner
@@ -711,7 +741,7 @@ test("a later reply that ended counts the task in its footer not in the status",
   const h = harness(t, [{ turns: [first, sdkMessages("tools")] }]);
   const session = h.session();
   await (await session.submit("start it")).done.wait();
-  const still = `${session.runningKinds} still running`;
+  const still = texts.fill(texts.STILL_RUNNING_NAMES, { names: RUNNING_NAME });
   await h.until(() => lines(h).at(-1) === still); // the only reply is open: no footer yet
   await (await session.submit("list the files")).done.wait();
   await h.until(() => h.slack.callsTo("chat.stopStream").length === 1);
