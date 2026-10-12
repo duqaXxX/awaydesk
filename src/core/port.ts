@@ -73,9 +73,20 @@ export interface ChatEntry {
 
 export type { ChannelLookup } from "./cleanup.ts";
 export { ConfigError } from "./config.ts";
-export { FOLDER_ROWS, foldersWithin } from "./folders.ts";
+export { changedIn } from "./files/changed.ts";
+export type { Found } from "./files/listing.ts";
+export { Listings } from "./files/listing.ts";
+export {
+  NotAFile,
+  newestFirst,
+  readOpenable,
+  regularFiles,
+  TooLarge,
+  titleOf,
+} from "./files/read.ts";
+export { FOLDER_ROWS } from "./folders.ts";
 export type { FooterKey } from "./footer.ts";
-export { footerFields, GIT_TIMEOUT, runGit } from "./footer.ts";
+export { footerFields } from "./footer.ts";
 export { Fold, shownPreview } from "./reply/fold.ts";
 export { oneLine, STOPPED, TITLE_LIMIT } from "./reply/words.ts";
 export { answerOf } from "./requests.ts";

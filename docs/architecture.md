@@ -1271,6 +1271,60 @@ opens starts in its new thread with bypass never chosen (it follows the folder's
 `/effort` level set, whatever the session had before: both belong to the thread, not to the Claude
 Code session id, and `!resume` never touches or waits on any other thread.
 
+## Files offered by `!open`
+
+What `!open` offers, which of it changed since a thread started and which paths are safe to read
+are the core's, in `src/core/files/` (`listing`, `changed`, `read`, `paths`, `waiting`), written
+for any chat. A provider reaches them through `core/port.ts`; the Slack provider's picker, modal and
+upload are in [Opening a file](slack-provider.md#opening-a-file).
+
+The search reads the folder from disk, and the changed files come from git. Which repositories the
+folder has is `listing.repositoriesOf`: the one holding the folder when `SessionManager.repository`
+(the footer's own `trustedRepository` lookup) finds it usable, otherwise
+the usable ones found at most two levels below it, by `folders.foldersWithin`, the walk `!bind`
+uses, which never enters a repository; the lookups of those candidates run together.
+`Listings.repositories` keeps the answer for a folder for `listing.REPOSITORIES_TTL` seconds, so the
+listing and the changed files of one modal ask once. Where git runs in several repositories (the
+listing, `changed.changedIn`), at most `listing.GIT_CHAINS` run at once. Inside one the files come
+from git, through the footer's `footer.runGit`: `ls-files --cached --others --exclude-standard`,
+which leaves out what `.gitignore` excludes, as the terminal's `@` file picker does under
+`respectGitignore`. Everywhere else `listing.walkFiles` reads the disk: regular files, no symlinked
+folder entered, no `.git` entered, none of the usable repositories' roots (git lists those).
+`Listings` joins the two for a folder, within `listing.LISTING_BUDGET` seconds (what is found by
+then is the answer), and keeps the result for `listing.LISTING_TTL` seconds
+(`listing.LISTING_PARTIAL_TTL` when it ran out of time or a repository's git list failed or timed
+out, so an incomplete listing is not taken for a complete one) so the keystrokes of one search do
+not walk the folder again; `!open <words>` reads the same listing. A request for a folder being
+listed waits for that listing, and a request that gives up does not stop it; at most
+`listing.LISTING_KEPT` folders are kept, the expired ones removed on the next request. Paths are
+relative to the session's folder.
+
+A kept listing is never the reason for "no match": `Listings.search` lists the folder again first
+when a kept listing finds none, so a file made since is found. The listing it answers from says
+whether it is complete (`Listing.complete`); a search over one that is not carries that into its
+answer (`Found.complete`): `!open <words>` says `texts.OPEN_NO_MATCH_PARTIAL` instead of "no match",
+posts the matches with `texts.OPEN_PARTIAL` instead of opening a single match on its own, and the
+modal adds the same line under its rows. The files that match are checked on disk
+(`read.regularFiles`) only until the rows are full when a modal asks (`limit` of `modal.ROW_LIMIT`),
+so typing costs ten checks and not one for each match; past ten the count in the heading is the
+matches by name, and below ten it is exact. `!open <words>` checks all of them.
+
+The changed files are the union over the same repositories (`changed.changedIn`): `status` under
+`--no-optional-locks` with `diff-tree` from the repository's start commit to `HEAD`. No command
+writes the index, and `status` does not report a file that was only touched (the measurements are in
+the header of `src/core/files/listing.ts` and repeated by
+`test/core/files/changed.test.ts`). The start commit is `changed.startCommit`: where the
+repository's `HEAD` was when the thread started, from HEAD's reflog at the thread's start (the provider turns the `thread_ts` into epoch seconds,
+`open.startedAt`; `git rev-parse --verify --quiet HEAD@{<seconds> +0000}`, through `--git-dir`, so a linked worktree
+reads its own log). It is computed when `!open` builds the list and kept nowhere: no handler touches
+it when a prompt arrives, and a daemon restarted any number of times gives the same answer. A reflog
+that does not go back that far gives its oldest entry (git's own answer), unless that entry's old
+value is null, which means the repository was made or cloned since the thread began: then the start
+is the empty tree and every file counts (`rev-list -g --until` says whether the log begins after the
+thread, `rev-list -g --count` and `rev-parse HEAD@{<count>}` whether the oldest entry has an old
+value, `hash-object -t tree /dev/null` is the empty tree of the repository's hash algorithm). With
+no reflog, or no commit yet, there is no start and the list is the uncommitted and untracked files.
+
 ## Measured platform behaviour
 
 What the sections above state about Slack, the SDK and Claude Code that no reference documents or
@@ -1281,7 +1335,7 @@ the observation was made. A row names the client and the package it was observed
 behaviour is Claude Code's or Slack's own. A row observed through the Python SDK, which the daemon
 no longer uses, says so when it has not been measured again on the TypeScript SDK. The last two rows are documentation reads, not
 observations. Where `!open` relies on git's behaviour, its measurements are in the header of
-`src/chat/slack/openfile/listing.ts` and repeated by `test/chat/slack/openfile/changed.test.ts`.
+`src/core/files/listing.ts` and repeated by `test/core/files/changed.test.ts`.
 
 | Name | Observed | Method | Date | Version |
 |---|---|---|---|---|

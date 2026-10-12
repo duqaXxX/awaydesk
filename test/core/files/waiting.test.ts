@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { TIMED_OUT, within } from "../../../../src/chat/slack/openfile/waiting.ts";
-import { AsyncEvent, FakeClock } from "../../../support/fake-slack.ts";
+import { TIMED_OUT, within } from "../../../src/core/files/waiting.ts";
+import { AsyncEvent, FakeClock } from "../../support/fake-clock.ts";
 
 test("a time limit ends the work's wait when the clock passes it", async () => {
   const clock = new FakeClock();

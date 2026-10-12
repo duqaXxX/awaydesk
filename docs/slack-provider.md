@@ -255,58 +255,17 @@ the next start's repair still finds the reply.
 `!open` shares a file of a session's folder into its thread, where Slack shows it in its own file
 viewer. The word reaches the provider as `ChatProvider.openFile`, which `words.wordFlow` calls with
 the session's folder and the words typed after `!open`; a chat that declares no `fileUpload`
-answers `texts.OPEN_UNAVAILABLE` instead. `src/chat/slack/openfile/` holds the logic (`listing`, `changed`, `modal`, `read`) and the
-class `Open` the handlers (`Open.openWord`, `Open.openFile`, `Open.openModal`, `Open.updateModal`,
-`Open.onOpenChoose`, `Open.onOpenQuery`, `Open.onOpenSubmit`). The file goes up with the Slack
-client's `files.uploadV2` (`files:write`, in `read.uploadFile`): the file itself, its basename as
-the name and its path from the folder as the title, and nothing posted on success.
-
-The search reads the folder from disk, and the changed files come from git. Which repositories the
-folder has is `listing.repositoriesOf`: the one holding the folder when `SessionManager.repository`
-(the footer's own `trustedRepository` lookup) finds it usable, otherwise
-the usable ones found at most two levels below it, by `folders.foldersWithin`, the walk `!bind`
-uses, which never enters a repository; the lookups of those candidates run together.
-`Listings.repositories` keeps the answer for a folder for `listing.REPOSITORIES_TTL` seconds, so the
-listing and the changed files of one modal ask once. Where git runs in several repositories (the
-listing, `changed.changedIn`), at most `listing.GIT_CHAINS` run at once. Inside one the files come
-from git, through the footer's `footer.runGit`: `ls-files --cached --others --exclude-standard`,
-which leaves out what `.gitignore` excludes, as the terminal's `@` file picker does under
-`respectGitignore`. Everywhere else `listing.walkFiles` reads the disk: regular files, no symlinked
-folder entered, no `.git` entered, none of the usable repositories' roots (git lists those).
-`Listings` joins the two for a folder, within `listing.LISTING_BUDGET` seconds (what is found by
-then is the answer), and keeps the result for `listing.LISTING_TTL` seconds
-(`listing.LISTING_PARTIAL_TTL` when it ran out of time or a repository's git list failed or timed
-out, so an incomplete listing is not taken for a complete one) so the keystrokes of one search do
-not walk the folder again; `!open <words>` reads the same listing. A request for a folder being
-listed waits for that listing, and a request that gives up does not stop it; at most
-`listing.LISTING_KEPT` folders are kept, the expired ones removed on the next request. Paths are
-relative to the session's folder.
-
-A kept listing is never the reason for "no match": `Listings.search` lists the folder again first
-when a kept listing finds none, so a file made since is found. The listing it answers from says
-whether it is complete (`Listing.complete`); a search over one that is not carries that into its
-answer (`Found.complete`): `!open <words>` says `texts.OPEN_NO_MATCH_PARTIAL` instead of "no match",
-posts the matches with `texts.OPEN_PARTIAL` instead of opening a single match on its own, and the
-modal adds the same line under its rows. The files that match are checked on disk
-(`read.regularFiles`) only until the rows are full when a modal asks (`limit` of `modal.ROW_LIMIT`),
-so typing costs ten checks and not one for each match; past ten the count in the heading is the
-matches by name, and below ten it is exact. `!open <words>` checks all of them.
-
-The changed files are the union over the same repositories (`changed.changedIn`): `status` under
-`--no-optional-locks` with `diff-tree` from the repository's start commit to `HEAD`. No command
-writes the index, and `status` does not report a file that was only touched (the measurements are in
-the header of `src/chat/slack/openfile/listing.ts` and repeated by
-`test/chat/slack/openfile/changed.test.ts`). The start commit is `changed.startCommit`: where the
-repository's `HEAD` was when the thread started, from HEAD's reflog at the thread's `thread_ts`
-(`git rev-parse --verify --quiet HEAD@{<seconds> +0000}`, through `--git-dir`, so a linked worktree
-reads its own log). It is computed when `!open` builds the list and kept nowhere: no handler touches
-it when a prompt arrives, and a daemon restarted any number of times gives the same answer. A reflog
-that does not go back that far gives its oldest entry (git's own answer), unless that entry's old
-value is null, which means the repository was made or cloned since the thread began: then the start
-is the empty tree and every file counts (`rev-list -g --until` says whether the log begins after the
-thread, `rev-list -g --count` and `rev-parse HEAD@{<count>}` whether the oldest entry has an old
-value, `hash-object -t tree /dev/null` is the empty tree of the repository's hash algorithm). With
-no reflog, or no commit yet, there is no start and the list is the uncommitted and untracked files.
+answers `texts.OPEN_UNAVAILABLE` instead. The core decides what is offered, which files changed
+since the thread started and which paths are safe to read (`src/core/files/`, described in
+[Files offered by `!open`](architecture.md#files-offered-by-open)); the provider draws the picker and
+the modal and uploads the file. `src/chat/slack/openfile/` holds `modal` and `read.uploadFile`, and
+the class `Open` the handlers (`Open.openWord`, `Open.openFile`, `Open.openModal`,
+`Open.updateModal`, `Open.onOpenChoose`, `Open.onOpenQuery`, `Open.onOpenSubmit`). The file goes up
+with the Slack client's `files.uploadV2` (`files:write`, in `read.uploadFile`): the file itself, its
+basename as the name and its path from the folder as the title, and nothing posted on success. The
+size cap is Slack's limit for a snippet, `read.SNIPPET_LIMIT`, which `Open.openFile` hands to the
+core's `readOpenable`; `Open.foundFiles` turns the thread's `thread_ts` into epoch seconds
+(`open.startedAt`) for `changedIn`.
 
 `!open` alone posts a message with one button (`modal.pickerBlocks`, action
 `modal.OPEN_BUTTON_ACTION`); `!open <words>` with several matches posts the count and the same

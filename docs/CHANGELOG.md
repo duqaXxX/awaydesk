@@ -318,6 +318,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The logic of `!open` that names no chat moved from `src/chat/slack/openfile/` to the core, in
+  `src/core/files/`: which files are offered (`listing`), which of them changed since the thread
+  started (`changed`), which paths are safe to read (`read`, `paths`) and the time limit on a wait
+  (`waiting`). No logic changed. The Slack provider keeps the modal and the upload
+  (`read.uploadFile`) and reaches the rest through `core/port.ts`. Three signatures take what the
+  provider used to supply: `readOpenable` and `readOnce` take the size cap as an argument, and
+  `startCommit` and `changedIn` take the thread's start in epoch seconds, which the provider reads
+  from the thread's `thread_ts` (`open.startedAt`). The listing logs under `awaydesk.core.files`,
+  and a listing that fails names the error by its code or type, as the core's other log lines do
+  (#266).
 - `state.json` keeps a thread's `status` and `ended` as the words `working`, `waiting`, `done` and
   `error`, and no longer as the name of a Slack reaction (`constants.STORED_STATUS` is gone): the
   core stores what the session asks of the chat, and the Slack provider maps the word to its

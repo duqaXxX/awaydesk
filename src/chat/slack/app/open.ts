@@ -1,16 +1,26 @@
 /**
  * `!open`: a file of a session's folder shared into its thread, by name or through the picker's
- * modal. The logic is `openfile/`; these are its handlers.
+ * modal. The logic is the core's (`core/files/`) and `openfile/`; these are its handlers.
  *
  * The listing a click starts is a promise that began with the click, and a signal that gives it
  * up when the click is done: a walk or a git call in flight is never cut, the signal only stops
  * what would follow it.
  */
-import { Cancelled, fill, named, texts } from "../../../core/port.ts";
+import {
+  Cancelled,
+  changedIn,
+  type Found,
+  fill,
+  NotAFile,
+  named,
+  newestFirst,
+  readOpenable,
+  regularFiles,
+  TooLarge,
+  texts,
+} from "../../../core/port.ts";
 import { strip } from "../../../text.ts";
 import { errorCode } from "../../../values.ts";
-import { changedIn } from "../openfile/changed.ts";
-import type { Found } from "../openfile/listing.ts";
 import {
   BadTarget,
   choiceBlock,
@@ -26,14 +36,7 @@ import {
   Target,
   typedIn,
 } from "../openfile/modal.ts";
-import {
-  NotAFile,
-  newestFirst,
-  readOpenable,
-  regularFiles,
-  TooLarge,
-  uploadFile,
-} from "../openfile/read.ts";
+import { SNIPPET_LIMIT, uploadFile } from "../openfile/read.ts";
 import { take } from "../reply/chars.ts";
 import { describe } from "../reply/errors.ts";
 import { shownAsWritten } from "../reply/escape.ts";
@@ -53,6 +56,17 @@ import {
 /** The words of a search: what was typed, stripped (`text.ts`), cut at `QUERY_LIMIT` characters. */
 function searched(typed: string): string {
   return take(strip(typed), QUERY_LIMIT);
+}
+
+// A thread's ts is its root's post time: `<epoch seconds>.<sequence>`.
+const EPOCH_SECONDS = /^(\d+)(?:\.\d+)?\n?$/;
+
+/** The epoch second a thread's ts names, or null when the ts is no time. */
+export function startedAt(threadTs: string): number | null {
+  const seconds = EPOCH_SECONDS.exec(threadTs);
+  if (seconds === null) return null;
+  const when = Number(seconds[1]);
+  return Number.isSafeInteger(when) ? when : null;
 }
 
 /** A listing a click started: its answer once it has one. */
@@ -138,7 +152,7 @@ export class Open {
       if (!words) {
         const repositories = await listings.repositories(folder, { ...(signal && { signal }) });
         signal?.throwIfAborted();
-        const names = await changedIn(folder, repositories, threadTs);
+        const names = await changedIn(folder, repositories, startedAt(threadTs));
         signal?.throwIfAborted();
         const paths = await newestFirst(folder, names);
         return { paths, count: paths.length, complete: true };
@@ -168,7 +182,7 @@ export class Open {
     const shown = shownAsWritten(relative);
     let content: Buffer;
     try {
-      content = await readOpenable(folder, relative);
+      content = await readOpenable(folder, relative, SNIPPET_LIMIT);
     } catch (error) {
       if (error instanceof NotAFile) {
         // The owner reads one sentence whatever the cause; the log says whether the daemon could

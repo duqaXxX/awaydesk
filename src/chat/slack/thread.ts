@@ -15,7 +15,14 @@ import type { Receiver } from "@slack/bolt";
 import type { KnownBlock, WebClient } from "@slack/web-api";
 import type { AgentBackend, Question } from "../../agent/seam.ts";
 import { type Clock, monotonicClock, systemClock } from "../../clock.ts";
-import { Cancelled, type CorePort, type Names, named, texts } from "../../core/port.ts";
+import {
+  Cancelled,
+  type CorePort,
+  type Listings,
+  type Names,
+  named,
+  texts,
+} from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
 import {
   type ChannelChat,
@@ -42,7 +49,6 @@ import { channelLookup } from "./channels.ts";
 import { holdBlocks } from "./hold.ts";
 import type { Home } from "./home.ts";
 import { crossing, deliver, deliverNotice } from "./notice.ts";
-import type { Listings } from "./openfile/listing.ts";
 import { endReply } from "./repair.ts";
 import { contextBlock, noticeText, split } from "./reply/blocks.ts";
 import { deleteRequest, describe } from "./reply/errors.ts";

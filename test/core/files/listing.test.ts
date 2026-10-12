@@ -3,8 +3,8 @@ import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { test } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
-import { trustedRepository } from "../../../../src/agent/claude/trust.ts";
-import type { Repository } from "../../../../src/agent/seam.ts";
+import { trustedRepository } from "../../../src/agent/claude/trust.ts";
+import type { Repository } from "../../../src/agent/seam.ts";
 import {
   folderFiles,
   Listings,
@@ -15,11 +15,11 @@ import {
   repositoriesOf,
   usable,
   walkFiles,
-} from "../../../../src/chat/slack/openfile/listing.ts";
-import { regularFiles } from "../../../../src/chat/slack/openfile/read.ts";
-import { AsyncEvent, FakeClock } from "../../../support/fake-slack.ts";
-import { committed, gitInit, trust } from "../../../support/git-layouts.ts";
-import { GIT_LAYOUT } from "../../../support/platform.ts";
+} from "../../../src/core/files/listing.ts";
+import { regularFiles } from "../../../src/core/files/read.ts";
+import { AsyncEvent, FakeClock } from "../../support/fake-clock.ts";
+import { committed, gitInit, trust } from "../../support/git-layouts.ts";
+import { GIT_LAYOUT } from "../../support/platform.ts";
 import {
   anyRepository,
   commitAll,

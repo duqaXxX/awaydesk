@@ -10,6 +10,7 @@ import {
   type ChatContext,
   type ChatEntry,
   ConfigError,
+  type Listings,
   type Names,
   type SessionsPort,
 } from "../../core/port.ts";
@@ -20,7 +21,6 @@ import { ChannelGuard, type Identity } from "./app/guards.ts";
 import { prepareUploads, uploadsDir } from "./attachments.ts";
 import { type DeleterState, ThreadDeleter } from "./delete.ts";
 import { Home } from "./home.ts";
-import type { Listings } from "./openfile/listing.ts";
 import { type ClientOptions, repliesClient, sharedClient } from "./reply/clients.ts";
 import { describe } from "./reply/errors.ts";
 import { UpdateLimiter } from "./reply/limiter.ts";

@@ -1,0 +1,212 @@
+/**
+ * What `!open` may share: a path under the session's folder that is a regular file, read once and
+ * handed to the chat as bytes. The path is untrusted (an option's value comes back from the chat),
+ * so it is resolved with its links, held to the folder, and opened by a descriptor that refuses a
+ * link.
+ */
+import { type BigIntStats, constants, type Stats } from "node:fs";
+import { open, readlink, realpath, stat } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, posix, sep } from "node:path";
+import { compareCodePoints } from "../../text.ts";
+import { relativeTo } from "./paths.ts";
+
+// Windows has neither flag; the descriptor check below still holds there.
+const OPEN_FLAGS = constants.O_RDONLY | (constants.O_NONBLOCK ?? 0) | (constants.O_NOFOLLOW ?? 0);
+
+/** The path is not a regular file inside the folder, once its links are resolved. */
+export class NotAFile extends Error {
+  constructor(options?: ErrorOptions) {
+    super("not a regular file inside the folder", options);
+    this.name = "NotAFile";
+  }
+}
+
+/** The file is over the cap the caller gave. */
+export class TooLarge extends Error {
+  constructor() {
+    super("over the snippet limit");
+    this.name = "TooLarge";
+  }
+}
+
+/**
+ * The part of an open file `readOnce` uses, which `FileHandle` has: `fstat` and `read` go
+ * through the descriptor that was opened, and a test can wrap it.
+ */
+export interface Opened {
+  stat(): Promise<Stats>;
+  read(
+    buffer: Buffer,
+    offset: number,
+    length: number,
+    position: null,
+  ): Promise<{ bytesRead: number }>;
+  close(): Promise<void>;
+}
+
+// The kernel's own bound on the links one path may cross (Linux `MAXSYMLINKS`).
+const LINK_LIMIT = 40;
+
+/**
+ * Python's non-strict `os.path.realpath`: the links of what exists are resolved, the rest kept; a
+ * link whose target is missing leads to that target. A loop of links is left where the bound ends.
+ */
+export async function realpathLoose(path: string, links = 0): Promise<string> {
+  // Made absolute as text and never normalized: `resolve` would fold `link/..` before the link
+  // is followed, and name another folder than the one the kernel reaches.
+  const absolute = isAbsolute(path) ? path : `${process.cwd()}/${path}`;
+  try {
+    return await realpath(absolute);
+  } catch {
+    const parent = dirname(absolute);
+    if (parent === absolute) return absolute;
+    const leaf = join(await realpathLoose(parent, links), basename(absolute));
+    // `realpath` failed on a link: it dangles, or it is part of a loop.
+    const led = await readlink(leaf).catch(() => null);
+    if (led === null || links >= LINK_LIMIT) return leaf;
+    return realpathLoose(isAbsolute(led) ? led : `${dirname(leaf)}${sep}${led}`, links + 1);
+  }
+}
+
+/**
+ * The regular file `relative` names under `real` (a resolved folder), with its stat. Throws
+ * `NotAFile` for anything else: a path that leaves the folder by `..`, an absolute path or a link,
+ * a directory, a missing file. `relative` is untrusted.
+ *
+ * `realpath` of `fs/promises` is libuv's `realpath(3)`, which follows a `..` after the link
+ * before it, as Python's `os.path.realpath` does; the path is joined as text, never normalized
+ * first, since `path.join` would drop `link/..` lexically.
+ */
+async function locate(
+  real: string,
+  relative: string,
+): Promise<{ target: string; found: BigIntStats }> {
+  if (!relative || relative.includes("\0")) throw new NotAFile();
+  let target: string;
+  let found: BigIntStats;
+  try {
+    // `real / relative`: an absolute `relative` replaces `real`.
+    target = await realpath(isAbsolute(relative) ? relative : `${real}${sep}${relative}`);
+    if (relativeTo(real, target) === null) throw new NotAFile();
+    found = await stat(target, { bigint: true });
+  } catch (error) {
+    throw error instanceof NotAFile ? error : new NotAFile({ cause: error });
+  }
+  if (!found.isFile()) throw new NotAFile();
+  return { target, found };
+}
+
+/** The path as the shared file is titled: `./docs/../docs/a.md` as `docs/a.md`. */
+export function titleOf(relative: string): string {
+  // Python's `posixpath.normpath`: no trailing slash, and exactly two leading slashes are kept.
+  let normal = posix.normalize(relative);
+  if (normal.length > 1 && normal.endsWith("/")) normal = normal.slice(0, -1);
+  if (relative.startsWith("//") && !relative.startsWith("///") && !normal.startsWith("//")) {
+    normal = `/${normal}`;
+  }
+  return normal;
+}
+
+/**
+ * The content of the already resolved file `target`, opened once; everything after is read from
+ * that descriptor, so what was checked is what is read. Throws `NotAFile`, or `TooLarge` when the
+ * file is over `limit` bytes.
+ *
+ * It is opened with `fs.promises.open` and numeric flags from `fs.constants` (`O_RDONLY |
+ * O_NONBLOCK | O_NOFOLLOW`: a file that became a link in between is refused, a FIFO is never
+ * waited on). The handle's `stat` says it is a regular file under the limit, its `read` takes the
+ * bytes at the current position, up to `limit` + 1, and its `close` ends it.
+ */
+export async function readOnce(
+  target: string,
+  limit: number,
+  opener: (path: string) => Promise<Opened> = (path) => open(path, OPEN_FLAGS),
+): Promise<Buffer> {
+  let handle: Opened;
+  try {
+    handle = await opener(target);
+  } catch (error) {
+    throw new NotAFile({ cause: error });
+  }
+  let total = 0;
+  const content = Buffer.allocUnsafe(limit + 1);
+  try {
+    const found = await handle.stat();
+    if (!found.isFile()) throw new NotAFile();
+    if (found.size > limit) throw new TooLarge();
+    while (total <= limit) {
+      const { bytesRead } = await handle.read(content, total, limit + 1 - total, null);
+      if (bytesRead === 0) break;
+      total += bytesRead;
+    }
+  } catch (error) {
+    if (error instanceof NotAFile || error instanceof TooLarge) throw error;
+    throw new NotAFile({ cause: error });
+  } finally {
+    await handle.close().catch(() => {});
+  }
+  if (total > limit) throw new TooLarge();
+  return Buffer.from(content.subarray(0, total));
+}
+
+/**
+ * The content of the file `relative` names under `folder`, at most `limit` bytes. Throws
+ * `NotAFile` or `TooLarge`. The chat gets these bytes: a library handed a path would open it
+ * again, following links and with no size limit.
+ */
+export async function readOpenable(
+  folder: string,
+  relative: string,
+  limit: number,
+): Promise<Buffer> {
+  const { target } = await locate(await realpathLoose(folder), relative);
+  return readOnce(target, limit);
+}
+
+/**
+ * The paths of `relatives` that are regular files inside `folder`, in order, at most `limit`. The
+ * iterable is read only as far as the checks need.
+ */
+export async function regularFiles(
+  folder: string,
+  relatives: Iterable<string>,
+  limit?: number,
+): Promise<string[]> {
+  const real = await realpathLoose(folder);
+  const found: string[] = [];
+  if (limit !== undefined && limit <= 0) return found;
+  for (const relative of relatives) {
+    try {
+      await locate(real, relative);
+    } catch (error) {
+      if (error instanceof NotAFile) continue;
+      throw error;
+    }
+    found.push(relative);
+    // Checked here, not before the next path is taken: the iterable is not read past the limit.
+    if (limit !== undefined && found.length >= limit) break;
+  }
+  return found;
+}
+
+/**
+ * The paths of `relatives` that are regular files inside `folder`, each once, the most recently
+ * modified first (ties by path).
+ */
+export async function newestFirst(folder: string, relatives: Iterable<string>): Promise<string[]> {
+  const real = await realpathLoose(folder);
+  const dated: Array<[bigint, string]> = [];
+  for (const relative of new Set(relatives)) {
+    try {
+      const { found } = await locate(real, relative);
+      dated.push([found.mtimeNs, relative]);
+    } catch (error) {
+      if (error instanceof NotAFile) continue;
+      throw error;
+    }
+  }
+  dated.sort(([leftTime, left], [rightTime, right]) =>
+    leftTime === rightTime ? compareCodePoints(left, right) : leftTime > rightTime ? -1 : 1,
+  );
+  return dated.map(([, relative]) => relative);
+}

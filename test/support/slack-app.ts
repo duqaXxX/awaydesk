@@ -42,7 +42,6 @@ import { type BuiltApp, buildApp } from "../../src/chat/slack/app/app.ts";
 import { ChannelGuard, type Identity } from "../../src/chat/slack/app/guards.ts";
 import { HOLD_CONTINUE } from "../../src/chat/slack/hold.ts";
 import { Home } from "../../src/chat/slack/home.ts";
-import type { Listings } from "../../src/chat/slack/openfile/listing.ts";
 import {
   CHOICE_ACTION,
   CHOICE_BLOCK,
@@ -64,6 +63,7 @@ import {
   SETUP_START,
 } from "../../src/chat/slack/setup.ts";
 import { SlackChat } from "../../src/chat/slack/thread.ts";
+import type { Listings } from "../../src/core/files/listing.ts";
 import { buildFlows } from "../../src/core/flows/flows.ts";
 import { UsageCache } from "../../src/core/footer.ts";
 import { Holds } from "../../src/core/hold.ts";

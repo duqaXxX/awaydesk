@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
-import { relativeTo } from "../../../../src/chat/slack/openfile/paths.ts";
+import { relativeTo } from "../../../src/core/files/paths.ts";
 
 test("a path is relative to a root when it lies under it, the root itself included", () => {
   // Built with the system's separator: the answer is a path of this system.

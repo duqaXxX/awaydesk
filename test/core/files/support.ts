@@ -3,9 +3,9 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach } from "node:test";
-import { locate, Unkeyed } from "../../../../src/agent/claude/trust.ts";
-import type { Repository } from "../../../../src/agent/seam.ts";
-import { commitAt, git, gitInit } from "../../../support/git-layouts.ts";
+import { locate, Unkeyed } from "../../../src/agent/claude/trust.ts";
+import type { Repository } from "../../../src/agent/seam.ts";
+import { commitAt, git, gitInit } from "../../support/git-layouts.ts";
 
 /** Symbolic links and FIFOs are a POSIX matter; Windows is not a supported host yet. */
 export const POSIX = {
@@ -61,9 +61,9 @@ export async function anyRepository(directory: string): Promise<Repository | nul
 // whatever day the tests run.
 export const T0 = 1_790_000_000;
 
-/** A thread's `thread_ts` for a thread that started at the epoch second `when`. */
-export function started(when: number): string {
-  return `${when}.000100`;
+/** The start of a thread that began at the epoch second `when`, as the core takes it. */
+export function started(when: number): number {
+  return when;
 }
 
 /** The empty tree of the repository's own hash algorithm, as git computes it. */
