@@ -666,6 +666,19 @@ for (const word of ["!bypass on", "!bypass off"]) {
   });
 }
 
+// The folder's own bypass makes the session run in bypass before any Start: the word is refused
+// all the same, since the box is what sets it.
+for (const word of ["!bypass on", "!bypass off"]) {
+  test(`bypass typed while the setup waits in a native bypass folder is refused [${word}]`, async (t) => {
+    const manual = manualWorld(t);
+    nativeBypassFolder(manual);
+    await manual.dispatch(message("hello", { ts: THREAD }));
+    await manual.dispatch(reply(word, THREAD));
+    assert.deepEqual(manual.ephemerals(), [texts.BYPASS_BEFORE_START]);
+    assert.equal(manual.state.thread(CHANNEL, THREAD)?.bypass, null);
+  });
+}
+
 test("a failing forget setup does not hide the original error", async (t) => {
   const manual = manualWorld(t);
   t.mock.method(FakeAgentSession.prototype, "setModel", async () => {

@@ -3338,10 +3338,22 @@ test("the next message after an idle close resumes with effort", async (t) => {
 });
 
 test("sessions of leaves out a closed session", async (t) => {
-  const h = harnessFor(t)({});
+  // Closing has started but its disconnect has not ended, so the manager has not evicted it yet.
+  const gate = new AsyncEvent();
+  const h = harnessFor(t)({ closeGate: gate });
   const session = h.session();
-  await session.close();
-  assert.deepEqual(h.manager.sessionsOf(CHANNEL), []);
+  await session.ensureConnected();
+  assert.deepEqual(h.manager.sessionsOf(CHANNEL), [session]);
+  const closing = session.close();
+  try {
+    await h.sleep(0.05);
+    assert.ok(session.closed);
+    assert.equal(h.clients[0]?.connected, true); // blocked inside the gated disconnect
+    assert.deepEqual(h.manager.sessionsOf(CHANNEL), []);
+  } finally {
+    gate.set(); // a failed assertion must not leave the close hanging
+    await closing;
+  }
 });
 
 test("a gone session is left out of sessions of", async (t) => {

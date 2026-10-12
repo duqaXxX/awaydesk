@@ -117,6 +117,7 @@ const WRITES = [
   "chat.appendStream",
   "chat.stopStream",
   "chat.update",
+  "reactions.add",
 ];
 
 /** Whether a message's blocks hold a control. */
