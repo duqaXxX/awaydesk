@@ -227,7 +227,7 @@ awaydesk
 Within a few seconds the terminal prints a line that ends with:
 
 ```
-2026-10-10 09:05:03,042 INFO awaydesk.main: connected to Slack workspace <workspace id>
+2026-10-10 09:05:03,042 INFO awaydesk.chat.slack.thread: connected to Slack workspace <workspace id>
 ```
 
 Each line of the log starts with the local date and time, then the level and the name of the part
@@ -389,7 +389,7 @@ tail -n 5 ~/Library/Logs/awaydesk/awaydesk.log
 After a few seconds the log ends with the line of checkpoint 2:
 
 ```
-2026-10-10 09:05:03,042 INFO awaydesk.main: connected to Slack workspace <workspace id>
+2026-10-10 09:05:03,042 INFO awaydesk.chat.slack.thread: connected to Slack workspace <workspace id>
 ```
 
 A start that fails logs `ERROR awaydesk.main:` and what to fix; launchd starts the daemon again
@@ -404,6 +404,10 @@ launchctl kill TERM gui/$(id -u)/local.awaydesk
 launchctl bootout gui/$(id -u)/local.awaydesk
 launchctl print gui/$(id -u)/local.awaydesk
 ```
+
+For a service that runs, `launchctl print` shows `state = running` and a `pid`; after a restart
+with `kill TERM` it also shows `last exit code = 0` (seen on macOS 27.0.1 on 2026-10-12). What it
+shows for a daemon that fails at start was not looked at: the log is where that is said.
 
 What a restart waits for, and what each way of stopping does, is under
 [Restarts and shutdown](#restarts-and-shutdown).
