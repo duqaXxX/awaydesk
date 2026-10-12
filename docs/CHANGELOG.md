@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The shared budget of updates logs a write that waited 5 seconds or more for its turn
+  (`limiter.UPDATE_WAIT_LOGGED_SECONDS`), with the time it waited: `UpdateLimiter.acquire` slept
+  without a line, so the log could not say whether the budget ever delayed the end of a reply
+  (issue #203). Nothing else changes in how a reply ends.
 - Probe claim P24 sends no prompt and reads the servers of a session whose folder has computer
   use switched on. The entry sits in a temporary home given to the Claude Code process, so the
   owner's `~/.claude.json` is not read or changed, and a server the session declares and the
