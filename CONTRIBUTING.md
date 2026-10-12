@@ -36,7 +36,11 @@ may find a seam that needs a change: open an issue before writing one.
 1. Implement the seam: `AgentBackend` and `AgentSession` of `src/agent/seam.ts`, or `ChatProvider`,
    `ThreadChat` and `ChannelChat` of `src/chat/seam.ts`. A chat provider checks that it was the
    owner on every inbound path before it calls `ChatInbound`, and reaches the core through
-   `src/core/port.ts` alone.
+   `src/core/port.ts` alone. An agent also gives its words (`AgentWords`): what it is called,
+   and the names of its own commands that start a new session, log in and log out, which the core
+   answers itself. The rules the core relies on beside the types, and which of them a conformance
+   check holds, are in [docs/architecture.md](docs/architecture.md), under "What an agent must do
+   that the types do not say" and "What a chat must do that the types do not say".
 2. Declare the capabilities truthfully (`Capabilities`, `ChatCapabilities`). A capability left
    false means the feature is not offered; the conformance suite checks the declarations it can
    against what the module does (a member present exactly when it is declared, a list that matches
