@@ -97,10 +97,17 @@ export interface ReplySink {
     options?: { readonly notice?: boolean; readonly ending?: boolean },
   ): Promise<void>;
   task(update: TaskUpdate): Promise<void>;
-  /** The reply's body has ended; `closing` are the lines still open, closed. */
-  finish(closing: readonly TaskUpdate[], signal?: AbortSignal): Promise<void>;
-  /** Ends the reply, with its footer when the turn has one. False when the end did not land. */
-  closeOut(footer: FooterFields | null, signal?: AbortSignal): Promise<boolean>;
+  /**
+   * The turn's own part has ended; `closing` are the lines still open, closed; `footer` is what
+   * the thread says under its last reply from now on, null when the turn has none.
+   */
+  finish(
+    closing: readonly TaskUpdate[],
+    footer: FooterFields | null,
+    signal?: AbortSignal,
+  ): Promise<void>;
+  /** Ends the reply. False when the end did not land. */
+  closeOut(signal?: AbortSignal): Promise<boolean>;
   waitLanded(signal?: AbortSignal): Promise<boolean>;
   settle(signal?: AbortSignal): Promise<boolean>;
 }
@@ -144,6 +151,12 @@ export type SessionStatus = "working" | "waiting" | "done" | "error";
  * thread's latest reply says what still runs, at its end.
  */
 export interface Reply extends ReplySink {
+  /**
+   * The reply waits for work its turn started: from now on it changes by rewriting its message,
+   * so that what the thread shows under its last reply can be drawn there. Takes effect with the
+   * next write.
+   */
+  rest(): void;
   /**
    * What still runs in the thread (`⏳ 1 shell · 1 agent`), shown after the footer; empty
    * removes it. Takes effect at once and is written with the reply's next write.

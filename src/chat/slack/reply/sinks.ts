@@ -464,6 +464,8 @@ export class ReplySink implements Sink {
   private ending: Task<boolean> | null = null;
   private readonly lock = new Mutex();
   private finished = false;
+  /** `rest` was called: the reply's messages are no longer streams. */
+  private restRequested = false;
   private footer: string | null = null;
   /**
    * What the thread's places last handed this reply to show under its last message. Read once
@@ -696,9 +698,17 @@ export class ReplySink implements Sink {
     if (this.closedOut) this.changed();
   }
 
-  /** Its end has landed on Slack: it is an entry of the thread's tails. */
+  /**
+   * Its turn's part has ended and its last message is no stream: the message can be rewritten,
+   * and the footer shows under it. An end that landed counts, whatever `finish` did.
+   */
   get resting(): boolean {
-    return this.ended;
+    if (this.ended) return true;
+    const last = this.messages.at(-1);
+    // A stream not yet started is a stream: the first write opens it.
+    return (
+      this.finished && !(last?.streaming === true || (last?.ts === null && last.mode === "stream"))
+    );
   }
 
   /** The footer its turn left, formatted; null when that turn had none. */
@@ -708,8 +718,8 @@ export class ReplySink implements Sink {
 
   /**
    * What this reply shows under its last message from now on, as the thread's places worked it
-   * out. A change is written unless the last message is a stream, which the reply's end stops.
-   * The running list of the tail is not drawn yet.
+   * out. A change is written unless the last message is a stream, which a stop ends (the reply's
+   * rest or its end). The running list of the tail is not drawn yet.
    */
   assign(tail: Tail<string>): void {
     const moved = tail.footer !== this.assigned.footer;
@@ -718,16 +728,35 @@ export class ReplySink implements Sink {
   }
 
   /**
-   * End the reply's body: what was written is sent now, not at the next debounce. A card still
-   * in progress is a task that outlives the turn: `task` keeps updating it after this. The
-   * stream stays open: it ends with `closeOut`, once the caller knows nothing more is coming (a
-   * task can still outlive this very turn).
+   * End the turn's part of the reply: what was written is sent now, not at the next debounce.
+   * A card still in progress is a task that outlives the turn: `task` keeps updating it after
+   * this. `footer` is what the thread says under its last reply from now on, shown once the reply
+   * rests (`rest`) or ends. The stream stays open: it ends with `closeOut`, once the caller knows
+   * nothing more is coming, or stops with `rest`. A report that renders into the reply later is
+   * followed by another `finish`.
    */
-  async finish(closing: readonly TaskUpdate[], signal?: AbortSignal): Promise<void> {
+  finish(
+    closing: readonly TaskUpdate[],
+    footer: FooterFields | null,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const line = footer === null ? null : formatFooter(footer, this.clock.time() * 1000) || null;
+    return this.finishFormatted(closing, line, signal);
+  }
+
+  /** `finish` with the footer already formatted as one line of mrkdwn. */
+  async finishFormatted(
+    closing: readonly TaskUpdate[],
+    footer: string | null,
+    signal?: AbortSignal,
+  ): Promise<void> {
     for (const update of closing) await this.task(update);
+    this.finished = true;
+    this.footer = footer;
+    // Before the pending write is cancelled: the flush below carries the change it schedules.
+    this.places.place();
     this.pending?.cancel();
     this.pending = null;
-    this.finished = true;
     // What a card of a run of calls shows changes here, to its folded line: its message is
     // rendered again even when nothing else in it changed.
     for (const tool of this.tools.values()) {
@@ -736,18 +765,29 @@ export class ReplySink implements Sink {
     await cancellable(this.flush(), signal);
   }
 
-  /** `closeOutFormatted`, with the footer's fields formatted as one line of mrkdwn. */
-  closeOut(footer: FooterFields | null, signal?: AbortSignal): Promise<boolean> {
-    const line = footer === null ? null : formatFooter(footer, this.clock.time() * 1000) || null;
-    return this.closeOutFormatted(line, signal);
+  /**
+   * The reply waits for work its turn started (see `Reply.rest`). The next pass stops a stream
+   * with the footer at its bottom, then rewrites the message: one push, the stop's. Idempotent.
+   */
+  rest(): void {
+    const first = !this.restRequested;
+    this.restRequested = true;
+    // Called again while the stream is still open, the stop is tried again: it failed before.
+    if (first || this.messages.at(-1)?.streaming === true) this.changed();
+  }
+
+  /** `closeOutFormatted` with the footer `finish` was given. */
+  closeOut(signal?: AbortSignal): Promise<boolean> {
+    return this.closeOutFormatted(this.footer, signal);
   }
 
   /**
    * End the reply, once: stop its stream with the footer at the bottom (one push), or, when the
-   * stream already stopped at STREAM_SECONDS, post its ending and the footer as a new message
-   * (the second push). `footer` is the line as mrkdwn. True when the reply ended on Slack (or
-   * nothing was owed); false when a write failed and one retry is scheduled: `waitLanded` then
-   * says how it ended. A second call is a no-op: the reply has already ended.
+   * stream already stopped (at STREAM_SECONDS, or by `rest`), post its ending and the footer as a
+   * new message (the second push). `footer` is the line as mrkdwn, and replaces the one `finish`
+   * was given. True when the reply ended on Slack (or nothing was owed); false when a write failed
+   * and one retry is scheduled: `waitLanded` then says how it ended. A second call is a no-op: the
+   * reply has already ended.
    */
   async closeOutFormatted(footer: string | null, signal?: AbortSignal): Promise<boolean> {
     if (this.closedOut) return this.landedValue === true;
@@ -930,12 +970,17 @@ export class ReplySink implements Sink {
 
   /**
    * The footer a message shows: only the reply's last, when the footer rode on its stream's
-   * stop or when it is the reply's ending, in a message of its own (`end`).
+   * stop or when it is the reply's ending, in a message of its own (`end`), or while the reply
+   * rests before its end (`rest`). A reply that only finished shows none: its end follows at
+   * once, and a footer drawn for that moment would be moved a second later.
    */
   private footerOf(message: Message): Block[] {
     if (
       message === this.messages.at(-1) &&
-      (this.endMode === "inline" || this.endMode === "moved" || this.closingGone)
+      (this.endMode === "inline" ||
+        this.endMode === "moved" ||
+        this.closingGone ||
+        (this.endMode === null && this.restRequested && this.resting))
     ) {
       return this.closingBlocks();
     }
@@ -944,7 +989,16 @@ export class ReplySink implements Sink {
 
   /** What the reply shows under its last message: assigned once it rests, else what it would be. */
   private tail(): Tail<string> {
-    return this.ended ? this.assigned : this.places.tailIf(this);
+    return this.resting ? this.assigned : this.places.tailIf(this);
+  }
+
+  /**
+   * The last message's stream stopped after the turn's part ended: the reply rests, with the
+   * tail it would be handed, which the stop already carried.
+   */
+  private restOn(): void {
+    this.assigned = this.places.tailIf(this);
+    this.places.place();
   }
 
   /**
@@ -1883,6 +1937,7 @@ export class ReplySink implements Sink {
     message.stopUnknown = null;
     message.exact = this.streamShows(message, end);
     message.footer = result === "stopped" ? [...(footer ?? [])] : [];
+    if (end === null && this.finished) this.restOn();
     return result;
   }
 
@@ -1947,7 +2002,7 @@ export class ReplySink implements Sink {
   private async syncMessages(): Promise<boolean> {
     if (this.messages.length === 0) {
       if (!this.hasContent()) return this.closedOut ? this.end() : true;
-      this.messages.push(new Message([0, 0], "stream"));
+      this.messages.push(new Message([0, 0], this.restRequested ? "post" : "stream"));
     }
     for (let i = 0; i + 1 < this.messages.length; i += 1) {
       const message = this.messages[i];
@@ -1967,14 +2022,14 @@ export class ReplySink implements Sink {
     for (;;) {
       const message = this.messages.at(-1);
       if (message === undefined) return false;
-      if (message.streaming && message.blind) {
-        // Told nothing more: stopped now (with the footer, if the reply has ended), and the
-        // update below writes the whole message from the model.
-        const footer = this.closedOut ? this.closingBlocks() : null;
+      if (message.streaming && (message.blind || this.restRequested)) {
+        // Told nothing more, or the reply rests: stopped now (with the footer, if the reply has
+        // ended or rests), and the update below writes the whole message from the model.
+        const footer = this.closedOut || this.restRequested ? this.closingBlocks() : null;
         const result = await this.stop(message, footer, null);
         if (result === "failed") return false;
         if (this.closedOut && result === "stopped") this.endMode = "inline";
-        message.exact = false;
+        if (message.blind) message.exact = false;
       }
       let step: Step;
       if (message.ts === null) {
@@ -2128,7 +2183,9 @@ export class ReplySink implements Sink {
     }
     this.endMode = "post";
     this.bodyLanded = true; // every message is written: only the closing message is owed
-    return this.writeClosing(free);
+    if (!(await this.writeClosing(free))) return false;
+    // A message that rested showed the footer: the closing message holds it now.
+    return message.footer.length === 0 || (await this.updateStep(message, null))[0];
   }
 
   /**

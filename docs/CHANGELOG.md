@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A reply whose turn ends with background work still running rests: its stream is stopped at the
+  end of the turn, with the footer under it (the stop is a push, and replaces the one the 280
+  second stop made), and its message then changes by edit. A report that renders into it grows it
+  by edit, and its end posts the ending with the footer and cuts it out of the first message. The
+  chat seam's `ReplySink.finish` takes the footer, `closeOut` takes none, and `Reply.rest` is new;
+  the Slack provider and the memory chat show the footer under a reply from `rest` on (#295).
+
 - The Slack provider places the reply footer by position: in each stretch of a thread between two
   messages of the owner, one footer, under the lowest reply whose end has landed. A reply that
   gives its footer up takes it off by a silent edit, and a closing message that held the footer

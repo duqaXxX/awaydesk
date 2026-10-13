@@ -664,10 +664,11 @@ test("no reply ever carries a channel mention", async (t) => {
   }
 });
 
-test("a turn with a task an approval and a question is one stream and two posts", async (t) => {
+test("a turn with a task an approval and a question is one stream, two requests and the ending", async (t) => {
   // A turn that starts a background task, asks for an approval and a question, then the report
   // turn for that task, writes exactly the approval request, the question request, and one
-  // stream for the reply, which stops once, when the task's report is in. Nothing else.
+  // stream for the reply, which stops once, when the turn ends with the task still running, and
+  // the report's ending, posted when the task's report is in. Nothing else.
   const [first, notice, injected] = splitBackground();
   const recorded = recordedQuestion();
   const ask = canUseToolCall("Bash", { command: "ls" });
@@ -681,17 +682,18 @@ test("a turn with a task an approval and a question is one stream and two posts"
   await h.until(() => pending(h.approvals).some((id) => id !== approvalId));
   resolve(h, { kind: "answer", answers: firstOptions(recorded.questions) });
   await turn.done.wait();
-  h.clients[0]?.inject([...notice, ...injected]);
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
+  h.clients[0]?.inject([...notice, ...injected]);
+  await h.until(() => h.slack.callsTo("chat.postMessage").length === 3);
   await h.sleep(0.05);
   const posts = h.slack.callsTo("chat.postMessage");
   // Exactly these, in this order, nothing else.
   assert.deepEqual(
-    posts.map((post) => post.text),
+    posts.slice(0, 2).map((post) => post.text),
     ["Bash: ls", "AskUserQuestion"],
   );
   assert.ok(h.slack.streamTs.length === 1 && h.slack.callsTo("chat.stopStream").length === 1);
-  assert.equal(h.slack.pushes(), 3);
+  assert.equal(h.slack.pushes(), 4);
 });
 
 test("asked cuts a long prompt and names an image only prompt", () => {
@@ -1291,7 +1293,7 @@ test("a report turn keeps the reply it renders into open while the expiry sweeps
   h.clients[0]?.inject(injected.slice(3));
   await h.until(() => target.closedOut, 3.0);
   await h.until(() => ![...h.slack.messages.values()].some((message) => message.streaming), 2.0);
-  const shown = at(h.slack.messageBlocks(), 1);
+  const shown = at(h.slack.messageBlocks(), -1); // the ending the report turn posted
   // the report turn's footer, not the first's
   assert.ok(String(at(at(shown, -1).elements as JsonObject[], 0).text).includes("49.2k"));
 });
@@ -3180,8 +3182,8 @@ test("a stop of a background task ends the reply like any other end", async (t) 
 });
 
 test("a stopped report turn ends like any other end", async (t) => {
-  // A report turn `!stop` cuts short ends like a stopped owner turn does: its reply's stream
-  // stops with the footer, once.
+  // A report turn `!stop` cuts short ends like a stopped owner turn does: its reply, at rest
+  // since the first turn ended, ends with the footer under its ending, once.
   const [first, notice, injected] = splitBackground();
   const partial = injected.filter((item) => !isResult(item));
   const result = recordOf(injected.find(isResult));
@@ -3196,8 +3198,9 @@ test("a stopped report turn ends like any other end", async (t) => {
   await h.until(() => inside(session).active !== null);
   assert.equal(await session.stop(), true);
   h.clients[0]?.inject([interrupted]);
-  await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
-  assert.ok(h.slack.postedTs.length === 0 && h.slack.pushes() === 1);
+  await h.until(() => h.slack.postedTs.length > 0);
+  // The stream stopped when the first turn ended; the report turn's end posts its ending.
+  assert.ok(h.slack.postedTs.length === 1 && h.slack.pushes() === 2);
   assert.ok(noStreamOpen(h));
 });
 
@@ -3476,7 +3479,7 @@ test("the idle close waits for an expected report turn", async (t) => {
   await h.clock.advance(INJECTED_TURN_WAIT - 1);
   assert.ok(!session.closed && h.clients[0]?.connected === true);
   h.clients[0]?.inject(injected);
-  await h.until(() => isReport(h.bodies().at(-1) ?? ""));
+  await h.until(() => isReport(h.bodies()[0] ?? ""));
   await idleDelayPasses(h, session);
   await h.until(() => session.closed, 1);
 });
@@ -4287,11 +4290,11 @@ test("a subagent s commands have no card and no end line in the report", async (
   await h.until(() => session.idle && h.reactions().at(-1) === Status.DONE, 3.0);
   assert.equal(waits.entered, 1); // the agent's own notification
   const bodies = h.bodies(); // The report renders into the reply that started the agent
-  assert.equal(bodies.length, 1);
+  assert.equal(bodies.length, 2); // and its ending is posted as the reply's last message
   const body = at(bodies, 0);
   assert.ok(body.split("✓ ").length - 1 === 1 && body.includes('✓ Agent "'));
   const cards = h.slack.messageCards(); // the two commands show on the agent's card
-  assert.equal(cards.length, 1);
+  assert.equal(cards.length, 2);
   assert.equal(at(cards, 0).length, 1);
   const card = at(at(cards, 0), 0);
   assert.ok(String(card.title).endsWith("· 2 calls") && card.status === "complete");
@@ -4360,12 +4363,12 @@ test("a background subagent s api error shows on its card and not in the text", 
   } finally {
     log.stop();
   }
-  const texts_ = h.slack.streamTexts();
-  assert.equal(texts_.length, 1);
+  const texts_ = h.slack.messageTexts();
+  assert.equal(texts_.length, 2); // the reply, and its ending posted when the report came
   const text = String(texts_[0]);
   assert.ok(!text.includes("API Error")); // not at the top level, as no other text of a subagent is
   assert.ok(text.split("\n").includes('✗ Agent "Synthetic subtask" failed'));
-  const card = at(taskCards(h), -1);
+  const card = at(at(h.slack.messageCards(), 0), -1); // the report rewrote the card by edit
   assert.ok(card.status === "error" && String(card.output).startsWith(reason));
   assert.ok(!h.reactions().includes(Status.ERROR)); // the main turn and its report both succeeded
   assert.deepEqual(

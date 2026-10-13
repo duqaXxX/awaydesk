@@ -103,13 +103,25 @@ SDK.
 
 ### The stream and the 280 seconds
 
-The stream stays open until the reply ends, or until `sinks.STREAM_SECONDS` (280 seconds) after it
-started, whichever comes first. Slack closes a stream 5 minutes after `chat.startStream` (measured:
-"Stream lifetime"), and the daemon stops it a little earlier itself.
+The stream stays open until the reply ends, or the reply rests, or until `sinks.STREAM_SECONDS`
+(280 seconds) after it started, whichever comes first. Slack closes a stream 5 minutes after
+`chat.startStream` (measured: "Stream lifetime"), and the daemon stops it a little earlier itself.
 
 - **The reply ends first.** `ReplySink.closeOut` stops the stream with `chat.stopStream`, passing
-  the footer, a divider and a context block, as `blocks` at the message's bottom (Slack renders them
-  below the stream, buttons included). The stop is the one notification.
+  the footer `ReplySink.finish` was given, a divider and a context block, as `blocks` at the
+  message's bottom (Slack renders them below the stream, buttons included). The stop is the one
+  notification.
+- **The reply rests first.** A turn that ends with a background task still running or still to be
+  reported leaves its reply waiting. `ThreadSession.closeReply` then calls `Reply.rest`: the next
+  pass stops the stream with the same footer blocks at its bottom (the stop is the one
+  notification, and creates no message, so it takes no lock of the thread's places), and the
+  message goes on by `chat.update`, silently, as after the 280 seconds. A running card is rewritten
+  in the same pass. The reply is `resting` from then on (`finish` ran and its last message is no
+  stream), so the thread's footer shows under it before it ends. The report grows the message by
+  edit, `finish` runs again with the footer of the report turn, and the reply rests again or ends
+  as below: the ending is posted with the footer and cut out of the message it grew in. A stop that
+  fails leaves the stream open and the next pass tries again. A reply that only finished, with no
+  `rest`, shows no footer on a message that is not a stream: its end follows at once.
 - **280 seconds pass first.** `ReplySink.expire` stops the stream (Slack pushes on the stop, the
   first notification) and the same message keeps growing with `chat.update`, which never notifies
   (measured: "Update after stop is silent"). Each update writes the whole message from the
@@ -211,7 +223,7 @@ message, or is cut with the preview note when the span is fixed.
 The reply ends once its turn has ended and none of its tasks still runs or still waits on a turn
 Claude Code starts to report it (the held-open reply): a task the turn started keeps its card open
 and updating in place, `ReplySink.finish` ends only the body, and `ThreadSession.stillOwed` decides
-when `ReplySink.closeOut` runs (the CLI can suppress the report's notification, so past
+whether `Reply.rest` (still owed) or `ReplySink.closeOut` runs (the CLI can suppress the report's notification, so past
 `constants.INJECTED_TURN_WAIT` `ThreadSession.expireUnreported` gives up on it). A report turn renders
 into one reply only when several tasks end together; `ThreadSession.sweepClosedOut`, run after
 every turn and after `ThreadSession.expireInjectedTurn`, ends every other reply left eligible. A

@@ -140,21 +140,38 @@ test("a tool first turn and its cards read as the recorded turn", async (t) => {
   assert.deepEqual(h.slack.messageCards(), [[]]);
 });
 
-test("a reply waits for its background task before it stops", async (t) => {
+test("a reply whose turn left a task running rests with its footer, and its report grows it", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harness(t, [{ turns: [first] }]);
   await (await h.session().submit("start it")).done.wait();
-  await h.sleep(0.05);
-  assert.equal(h.slack.streamTs.length, 1);
-  assert.deepEqual(openStreams(h), h.slack.streamTs); // still open
-  assert.deepEqual(h.slack.callsTo("chat.stopStream"), []);
-  assert.equal(h.slack.pushes(), 0);
-  h.clients[0]?.inject([...notice, ...injected]);
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
-  const summary = systemRecord(notice, "task_notification").summary;
-  assert.ok(h.slack.streamTexts()[0]?.includes(`✓ ${summary}`)); // the report joins the same stream
-  assert.ok(h.slack.streamTs.length === 1 && h.slack.pushes() === 1);
+  // The stream stopped at the end of the turn, with the footer under it: one push.
+  assert.equal(h.slack.streamTs.length, 1);
+  assert.deepEqual(openStreams(h), []);
   assert.ok(h.slack.messageBlocks()[0]?.some((block) => block.type === "divider"));
+  assert.equal(h.slack.pushes(), 1);
+  h.clients[0]?.inject([...notice, ...injected]);
+  await h.until(() => h.slack.callsTo("chat.postMessage").length > 0);
+  await h.until(() => h.reactions().at(-1) === Status.DONE);
+  const summary = systemRecord(notice, "task_notification").summary;
+  const writes = h.slack.apiCalls.filter((call) =>
+    ["chat.update", "chat.postMessage"].includes(call.method),
+  );
+  const dividers = (call: (typeof writes)[number]) =>
+    (call.args.blocks as Array<{ type?: string }>).some((block) => block.type === "divider");
+  // The report grew the first message by edit, the footer still under it ...
+  const grown = writes.findIndex((call) =>
+    JSON.stringify(call.args.blocks).includes(JSON.stringify(summary).slice(1, -1)),
+  );
+  assert.equal(writes[grown]?.method, "chat.update");
+  assert.ok(dividers(writes[grown] as (typeof writes)[number]));
+  // ... then the ending is posted with the footer and cut out of the first message.
+  const posted = writes.findIndex((call) => call.method === "chat.postMessage");
+  assert.ok(posted > grown && dividers(writes[posted] as (typeof writes)[number]));
+  const cut = writes.at(-1);
+  assert.ok(cut?.method === "chat.update" && !dividers(cut));
+  assert.equal(h.slack.streamTs.length, 1);
+  assert.equal(h.slack.pushes(), 2);
 });
 
 test("a process lost while a task runs says so in the reply that waits for it", async (t) => {
@@ -164,14 +181,14 @@ test("a process lost while a task runs says so in the reply that waits for it", 
   const [first] = splitBackground();
   const h = harness(t, [{ turns: [first] }]);
   await (await h.session().submit("start it")).done.wait();
-  await h.sleep(0.05);
-  assert.deepEqual(openStreams(h), h.slack.streamTs); // the reply waits for its task
-  h.clients[0]?.inject([END_OF_STREAM]);
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
+  assert.deepEqual(openStreams(h), []); // the reply rests, waiting for its task
+  h.clients[0]?.inject([END_OF_STREAM]);
   await h.until(() => h.reactions().at(-1) === Status.ERROR);
-  const said = h.slack.streamTexts()[0]?.split("Claude Code reported an error").length;
+  const said = h.slack.messageTexts().join("\n").split("Claude Code reported an error").length;
   assert.equal(said, 2);
-  assert.ok(h.slack.streamTs.length === 1 && h.slack.pushes() === 1);
+  // the stop at the end of the turn, and the ending that says how the reply ended
+  assert.ok(h.slack.streamTs.length === 1 && h.slack.pushes() === 2);
 });
 
 test("a process lost after its task was reported changes nothing in the thread", async (t) => {
@@ -408,27 +425,26 @@ test("a reply whose end failed shows no checkmark then the cross", async (t) => 
   assert.deepEqual(thread(h).openReplies, [h.slack.streamTs[0]]);
 });
 
-test("a reply whose appends slack refuses ends whole with the checkmark", async (t) => {
+test("a reply that rests ends whole with the checkmark when its report arrives", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harness(t, [{ turns: [first] }], { finalRetrySeconds: 0.05 });
   await (await h.session().submit("start it")).done.wait();
-  await h.sleep(0.05);
-  assert.deepEqual(openStreams(h), h.slack.streamTs); // open: the report is owed to this stream
-  h.slack.responses["chat.appendStream"] = { ok: false, error: "msg_too_long" };
+  await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
+  assert.deepEqual(openStreams(h), []); // stopped at the end of its turn: the report grows it by edit
   h.clients[0]?.inject([...notice, ...injected]);
-  await h.until(() => h.slack.callsTo("chat.appendStream").length > 0); // the refusal did happen
   // The report turn ends on a footer, which runs git in real time: on a slow machine the fake
   // clock's 0.2 seconds pass before it does, so the end is waited for and the 0.2 come after.
   await h.until(() => h.reactions().at(-1) === Status.DONE);
   await h.sleep(0.2); // past where a failed end's retry would have shown the cross
   assert.equal(h.reactions().at(-1), Status.DONE);
   assert.ok(!h.reactions().includes(Status.ERROR));
+  assert.deepEqual(h.slack.callsTo("chat.appendStream"), []);
   const summary = systemRecord(notice, "task_notification").summary;
-  assert.ok(h.slack.streamTexts()[0]?.includes(`✓ ${summary}`)); // the report reached the reply
+  assert.ok(h.slack.messageTexts().join("\n").includes(`✓ ${summary}`)); // the report reached the reply
   assert.deepEqual(openStreams(h), []);
   assert.equal(thread(h).status, null);
   assert.deepEqual(thread(h).openReplies, []);
-  // the footer is in the closing message, as for a reply past STREAM_SECONDS
+  // the footer is in the ending, posted for the report
   assert.equal(blocksOf(h.slack.callsTo("chat.postMessage").at(-1)).at(-1)?.type, "context");
 });
 
@@ -687,18 +703,19 @@ test("a task that outlives its turn is counted by the thread status", async (t) 
   await h.until(() => lines(h).at(-1) === still); // the turn ended: the prompt is back
   assert.equal(statuses(h).at(-1), `has ${session.runningKinds} still running`);
   assert.ok(lines(h)[0] === texts.THREAD_WORKING && session.runningKinds !== "");
-  // The count is a state of the thread, never a line of the reply: a stream only grows.
+  // The count is a state of the thread, never a line of the reply's stream.
   const told = h.slack.apiCalls.flatMap((call) => (call.args.chunks ?? []) as JsonObject[]);
   assert.ok(!JSON.stringify(told).includes("still running"));
-  // the reply is open
-  assert.deepEqual(openStreams(h), h.slack.streamTs);
-  assert.equal(h.slack.pushes(), 0);
-  h.clients[0]?.inject([...notice, ...injected]);
+  // the reply rests: its stream stopped at the end of the turn, which was a push
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
+  assert.deepEqual(openStreams(h), []);
+  assert.equal(h.slack.pushes(), 1);
+  h.clients[0]?.inject([...notice, ...injected]);
+  await h.until(() => h.slack.callsTo("chat.postMessage").length > 0);
   // The report turn says `Working…` again, and the end of everything clears the status.
   await h.until(() => lines(h).at(-1) === "");
   assert.ok(lines(h).slice(lines(h).indexOf(still)).includes(texts.THREAD_WORKING));
-  assert.equal(h.slack.pushes(), 1);
+  assert.equal(h.slack.pushes(), 2); // the stop at the end of the turn, and the ending
 });
 
 test("stop clears the thread status", async (t) => {

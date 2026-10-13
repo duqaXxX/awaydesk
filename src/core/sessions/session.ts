@@ -2310,6 +2310,9 @@ export class ThreadSession {
     // `force` is a stop, an error or a restart, which never waits for one.
     if (options.force || !this.stillOwed(renderer)) {
       this.trackLanding(await renderer.closeOut(options.signal), this.reply(renderer));
+    } else {
+      // Still owed a report: the reply rests, its stream stopped, so that the footer shows.
+      this.reply(renderer).rest();
     }
   }
 
@@ -2963,8 +2966,8 @@ export class ThreadSession {
   ): Promise<void> {
     try {
       await turn.sink.text(text, { notice: true });
-      await turn.sink.finish([]);
-      this.trackLanding(await turn.sink.closeOut(null), turn.sink);
+      await turn.sink.finish([], null);
+      this.trackLanding(await turn.sink.closeOut(), turn.sink);
       if (options.error) this.reactError();
     } finally {
       turn.done.set();

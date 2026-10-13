@@ -75,7 +75,7 @@ async function settle(h: Harness): Promise<void> {
   for (let passes = 0; passes < 10; passes += 1) await h.sleep(0.5);
 }
 
-function noExtraMessage(h: Harness): void {
+function noExtraMessage(h: Harness, messages = 1): void {
   const all = h.replies().join("\n");
   assert.equal(
     all.includes(texts.named(texts.NO_OUTPUT, NAMES)),
@@ -83,7 +83,11 @@ function noExtraMessage(h: Harness): void {
     "the turn that did nothing wrote a reply",
   );
   assert.equal(all.includes(texts.BACKGROUND_NOTICE), false, "a report opened under the notice");
-  assert.equal(h.bodies().length, 1, "everything belongs to the reply that started the tasks");
+  assert.equal(
+    h.bodies().length,
+    messages,
+    "everything belongs to the reply that started the tasks",
+  );
 }
 
 test("the recording is the one the cut expects", () => {
@@ -109,10 +113,11 @@ test("a hand-back is reported in the reply that started the subagent, and the tu
   const body = h.bodies()[0] ?? "";
   assert.ok(body.indexOf(AGENT_ENDED) < body.indexOf(HANDED_BACK) && body.includes(AGENT_ENDED));
   h.clients[0]?.inject(shell);
-  await h.until(() => (h.bodies()[0] ?? "").includes(SHELL_REPORTED));
+  await h.until(() => h.bodies().join("\n").includes(SHELL_REPORTED));
   await settle(h);
-  noExtraMessage(h);
-  const whole = h.bodies()[0] ?? "";
+  // The reply ended: its last report is posted as its ending, and cut out of the first message.
+  noExtraMessage(h, 2);
+  const whole = h.bodies().join("\n");
   assert.ok(whole.indexOf(HANDED_BACK) < whole.indexOf(SHELL_ENDED));
   assert.ok(whole.indexOf(SHELL_ENDED) < whole.indexOf(SHELL_REPORTED));
   assert.equal(h.reactions().at(-1), "white_check_mark");
@@ -130,9 +135,9 @@ test("a hand-back after a subagent that ended inside its turn is reported in the
   await settle(h);
   noExtraMessage(h);
   h.clients[0]?.inject(shell);
-  await h.until(() => (h.bodies()[0] ?? "").includes(SHELL_REPORTED));
+  await h.until(() => h.bodies().join("\n").includes(SHELL_REPORTED));
   await settle(h);
-  noExtraMessage(h);
+  noExtraMessage(h, 2);
 });
 
 // The hand-back's turn can also begin before the task's own end is told.

@@ -141,7 +141,7 @@ test("a reply is written in the thread to the owner and names its open message",
   const changes: Array<[string | null, string | null]> = [];
   const reply = thread.openReply((old, fresh) => changes.push([old, fresh]));
   await reply.text("hello");
-  await reply.finish([]);
+  await reply.finish([], null);
   const [start] = replies.callsTo("chat.startStream");
   assert.equal(start?.channel, CHANNEL);
   assert.equal(start?.thread_ts, THREAD);
@@ -149,7 +149,7 @@ test("a reply is written in the thread to the owner and names its open message",
   assert.equal(start?.recipient_user_id, OWNER);
   assert.deepEqual(changes, [[null, replies.streamTs[0]]]); // what a crash would leave unfinished
   assert.equal(reply.footerShown, false);
-  assert.equal(await reply.closeOut(null), true);
+  assert.equal(await reply.closeOut(), true);
   assert.deepEqual(changes.at(-1), [replies.streamTs[0], null]);
   assert.equal(reply.footerShown, true);
   assert.deepEqual(slack.streamTs, []); // the client made for replies wrote it, and no other
@@ -162,7 +162,7 @@ test("a write of a reply sets the thread status again", async () => {
   assert.equal(slack.callsTo("assistant.threads.setStatus").length, 1);
   const reply = thread.openReply(() => {});
   await reply.text("hello");
-  await reply.finish([]); // Slack clears a thread's status when the app replies
+  await reply.finish([], null); // Slack clears a thread's status when the app replies
   await clock.advance(THREAD_STATUS_AFTER_WRITE_SECONDS);
   const [, again, ...more] = slack.callsTo("assistant.threads.setStatus");
   assert.equal(more.length, 0);
@@ -368,8 +368,8 @@ test("a reply let go of by the owner's message still sees the next reply of its 
   const thread = chat.thread({ channel: CHANNEL, thread: THREAD });
   const first = thread.openReply(() => {});
   await first.text("one");
-  await first.finish([]);
-  assert.equal(await first.closeOut(null), true);
+  await first.finish([], null);
+  assert.equal(await first.closeOut(), true);
   chat.ownerPosted(CHANNEL, THREAD, "1790000000.900000"); // lets the first go
   assert.equal(trackedThreads(chat), 1, "a release by the owner's message keeps the places");
   const second = thread.openReply(() => {});
@@ -388,8 +388,8 @@ test("a reply whose end never lands is let go of when its thread closes", async 
   const thread = chat.thread({ channel: CHANNEL, thread: THREAD });
   const reply = thread.openReply(() => {});
   await reply.text("never written");
-  await reply.finish([]);
-  assert.equal(await reply.closeOut(null), false, "the end did not land");
+  await reply.finish([], null);
+  assert.equal(await reply.closeOut(), false, "the end did not land");
   assert.equal(trackedThreads(chat), 1);
   await thread.close();
   assert.equal(trackedThreads(chat), 0, "the places and the reply are forgotten");
@@ -409,8 +409,8 @@ test("a thread that ended its reply and closed leaves nothing in the chat", asyn
     });
     const reply = thread.openReply(() => {});
     await reply.text(`answer ${i}`);
-    await reply.finish([]);
-    assert.equal(await reply.closeOut(null), true);
+    await reply.finish([], null);
+    assert.equal(await reply.closeOut(), true);
     await thread.close();
   }
   assert.equal(trackedThreads(chat), 0);
@@ -421,8 +421,8 @@ test("a detached thread object closing does not let go of a live session's repli
   const ref = { channel: CHANNEL, thread: THREAD };
   const live = chat.thread(ref).openReply(() => {});
   await live.text("one");
-  await live.finish([]);
-  assert.equal(await live.closeOut(null), true);
+  await live.finish([], null);
+  assert.equal(await live.closeOut(), true);
   await chat.thread(ref).close(); // a handler's object, which opened nothing
   assert.equal(trackedThreads(chat), 1);
 });
@@ -432,8 +432,8 @@ test("a reply opened and silent keeps the thread's places when another is let go
   const ref = { channel: CHANNEL, thread: THREAD };
   const ended = chat.thread(ref).openReply(() => {});
   await ended.text("one");
-  await ended.finish([]);
-  assert.equal(await ended.closeOut(null), true);
+  await ended.finish([], null);
+  assert.equal(await ended.closeOut(), true);
   const silent = chat.thread(ref).openReply(() => {});
   chat.ownerPosted(CHANNEL, THREAD, "1790000000.900000"); // lets the ended one go
   const newest = chat.thread(ref).openReply(() => {});
@@ -452,8 +452,8 @@ test("a thread keeps no reply the places let go of", async () => {
   for (const [i, ts] of ["1790000000.900001", "1790000000.900002"].entries()) {
     const reply = thread.openReply(() => {});
     await reply.text(`answer ${i}`);
-    await reply.finish([]);
-    assert.equal(await reply.closeOut(null), true);
+    await reply.finish([], null);
+    assert.equal(await reply.closeOut(), true);
     chat.ownerPosted(CHANNEL, THREAD, ts); // seals it
   }
   assert.equal(opened(), 1, "the first was dropped when the second opened");

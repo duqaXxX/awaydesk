@@ -71,8 +71,7 @@ test("a reply is one message: text and task lines in order, the footer, then wha
   assert.deepEqual(chat.texts(channel, ref.thread).slice(1), [
     "First words\n[complete] Read a.txt (again)\nMore words\n[complete] Read b.txt\n[complete] Read c.txt",
   ]);
-  await reply.finish([]);
-  await reply.closeOut({
+  await reply.finish([], {
     bypass: true,
     model: "model-a",
     effort: null,
@@ -84,6 +83,7 @@ test("a reply is one message: text and task lines in order, the footer, then wha
     sessionLimit: null,
     weekLimit: null,
   });
+  await reply.closeOut();
   reply.setRunning("1 shell");
   assert.deepEqual(chat.texts(channel, ref.thread).slice(1), [
     "First words\n[complete] Read a.txt (again)\nMore words\nRead 1 file\nbypass · model-a · /work · +3 -1 · 12% context\n1 shell",

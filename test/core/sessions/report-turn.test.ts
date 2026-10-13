@@ -172,11 +172,14 @@ test("a report turn after a restart renders into the one reply that is the last 
   // the report went to the bottom it opened a reply of its own in the middle of the thread.
   const [h] = await playTheContinuedAgent(t, { restarted: true });
   const texts = h.replies();
-  assert.equal(texts.length, 2, texts.join("\n---\n"));
-  const [continued, answered] = texts as [string, string];
-  assert.ok(continued.startsWith("SENT") && continued.includes("REPORTED"), continued);
+  assert.equal(texts.length, 3, texts.join("\n---\n"));
+  const [continued, report, answered] = texts as [string, string, string];
+  // The reply rested while the agent worked: the report that ended it is posted as its ending,
+  // and cut out of the message it grew in.
+  assert.ok(continued.startsWith("SENT") && !continued.includes("REPORTED"), continued);
+  assert.ok(report.includes("REPORTED"), report);
   assert.equal(answered, "KIWI");
-  assert.equal(h.slack.callsTo("chat.postMessage").length, 0);
+  assert.equal(h.slack.callsTo("chat.postMessage").length, 1);
 });
 
 test("a report turn in the daemon that saw the first call opens its own reply below the waiting one", async (t) => {
@@ -184,12 +187,19 @@ test("a report turn in the daemon that saw the first call opens its own reply be
   // below it and the report turn comes after, so the thread reads in the order things happened.
   const [h] = await playTheContinuedAgent(t, { restarted: false });
   const texts = h.replies();
-  assert.equal(texts.length, 4, texts.join("\n---\n"));
-  const [started, continued, report, answered] = texts as [string, string, string, string];
+  assert.equal(texts.length, 5, texts.join("\n---\n"));
+  const [started, noted, continued, report, answered] = texts as [
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
   assert.ok(started.startsWith("STARTED"), started);
+  assert.equal(noted, "NOTED"); // the waiting reply's ending, posted when it ended
   assert.equal(continued, "SENT");
   assert.ok(report.includes("REPORTED") && !report.includes("SENT"), report);
   assert.equal(answered, "KIWI");
-  // The waiting reply ended in place: nothing was posted for any ending.
-  assert.equal(h.slack.callsTo("chat.postMessage").length, 0);
+  // Only the waiting reply's ending was posted; the others ended in place.
+  assert.equal(h.slack.callsTo("chat.postMessage").length, 1);
 });
