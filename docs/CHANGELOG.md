@@ -393,6 +393,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `docs/limits.md` has a section for the Claude agent that lists every difference found between
+  a session started from Slack and an interactive one: the instructions Claude works under,
+  where a subagent runs, the time limit of a background command, the search refill, and the
+  tools the terminal alone offers. Measured on the first request of both (issue #300).
 - A stop of the daemon no longer stalls on the pause Slack asks for after a rate limit (issue
   #236). A rate limited call was sent again after `Retry-After`, up to three times, and nothing
   could end that pause. With a long one on a call made while the sessions close, the shutdown
