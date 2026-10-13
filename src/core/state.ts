@@ -285,12 +285,19 @@ export interface StateStoreOptions {
    * the names of one that has.
    */
   modules?: StateModules;
+  /**
+   * Flushes a written file, then its directory, to the disk: `fs.fsyncSync` when absent. The
+   * disk serves one flush at a time for the whole machine, so a store whose file no restart
+   * will read (a test's) passes one that does nothing.
+   */
+  sync?: (fd: number) => void;
 }
 
 /** In-memory copy of state.json, written atomically on every change. */
 export class StateStore {
   private readonly path: string;
   private readonly warn: (message: string) => void;
+  private readonly sync: (fd: number) => void;
   private channelsById: Map<string, ChannelRecord>;
   private modules: StateModules | null;
   // Called after a write that changed which channels are bound, which threads exist, the
@@ -302,6 +309,7 @@ export class StateStore {
     this.path = path;
     this.warn = options.warn ?? ((message) => logger.warning(message));
     this.modules = options.modules ?? null;
+    this.sync = options.sync ?? fs.fsyncSync;
     this.channelsById = this.load();
   }
 
@@ -736,7 +744,7 @@ export class StateStore {
     try {
       try {
         fs.writeFileSync(fd, dumpJson(data));
-        fs.fsyncSync(fd);
+        this.sync(fd);
       } finally {
         fs.closeSync(fd);
       }
@@ -757,7 +765,7 @@ export class StateStore {
     if (process.platform !== "win32") {
       const dirFd = fs.openSync(dirname(this.path), "r");
       try {
-        fs.fsyncSync(dirFd);
+        this.sync(dirFd);
       } finally {
         fs.closeSync(dirFd);
       }

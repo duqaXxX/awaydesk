@@ -424,6 +424,32 @@ test("a failed write keeps the previous file", (t) => {
   assert.deepEqual(readdirSync(dir).sort(), ["state.json"]);
 });
 
+test("a write syncs the file before the rename and the directory after it", POSIX_ONLY, (t) => {
+  const dir = scratch();
+  const steps: string[] = [];
+  const rename = fs.renameSync;
+  t.mock.method(fs, "renameSync", (from: string, to: string) => {
+    steps.push("rename");
+    rename(from, to);
+  });
+  const store = new StateStore(join(dir, "state.json"), {
+    sync: (fd) => {
+      steps.push(fs.fstatSync(fd).isDirectory() ? "directory" : "file");
+      fs.fsyncSync(fd);
+    },
+  });
+  store.bind(CHANNEL, join(dir, "a"));
+  assert.deepEqual(steps, ["file", "rename", "directory"]);
+});
+
+test("a store given no sync flushes with the system's own", POSIX_ONLY, (t) => {
+  const dir = scratch();
+  const flush = t.mock.method(fs, "fsyncSync");
+  const store = new StateStore(join(dir, "state.json"));
+  store.bind(CHANNEL, join(dir, "a"));
+  assert.equal(flush.mock.callCount(), 2);
+});
+
 // TestPrune: `prune` calls `alive` once per distinct folder and reports how many entries it removed.
 
 test("removes a thread whose session is gone", () => {

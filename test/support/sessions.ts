@@ -71,6 +71,7 @@ import {
 } from "./fake-slack.ts";
 import { type JsonObject, sdkJson, sdkRecords } from "./fixtures.ts";
 import { NAMES } from "./names.ts";
+import { NO_SYNC } from "./no-sync.ts";
 
 /** A point in a scripted turn where the CLI would ask the host for a permission decision. */
 export interface CanUseToolCall {
@@ -646,7 +647,7 @@ export class Harness {
     // Room between two messages of the app for the owner's own.
     slack.tsStep = 1_000;
     this.tmpPath = tmpPath;
-    this.state = new StateStore(join(tmpPath, "state.json"));
+    this.state = new StateStore(join(tmpPath, "state.json"), { sync: NO_SYNC });
     this.state.bind(CHANNEL, tmpPath);
     this.backend = new FakeAgentBackend(scripts);
     this.chat = new SlackChat({

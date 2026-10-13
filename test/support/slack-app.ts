@@ -88,6 +88,7 @@ import {
 import { type JsonObject, sdkJson, slackPayload, slackPayloads } from "./fixtures.ts";
 import { commitAt, gitInit } from "./git-layouts.ts";
 import { NAMES } from "./names.ts";
+import { NO_SYNC } from "./no-sync.ts";
 import {
   FakeAgentBackend,
   FakeAgentSession,
@@ -263,7 +264,7 @@ export class World {
     this.tmpPath = tmpPath;
     this.root = join(tmpPath, "root");
     mkdirSync(join(this.root, "app"), { recursive: true });
-    this.state = new StateStore(join(tmpPath, "state.json"));
+    this.state = new StateStore(join(tmpPath, "state.json"), { sync: NO_SYNC });
     if (options.bound ?? true) this.state.bind(CHANNEL, join(this.root, "app"));
     this.uploads = join(tmpPath, "uploads");
     this.backend.script = () => {

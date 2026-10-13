@@ -33,6 +33,7 @@ import {
   OWNER,
   type ShownMessage,
 } from "../../support/memory-chat.ts";
+import { NO_SYNC } from "../../support/no-sync.ts";
 import { PlainAgent } from "../../support/plain-agent.ts";
 import { settledTurn } from "../../support/sessions.ts";
 
@@ -106,7 +107,7 @@ export class AskingWorld {
     this.chat = chat;
     this.agent = agent;
     this.channel = chat.openChannel("work");
-    this.state = new StateStore(join(folder, "state.json"));
+    this.state = new StateStore(join(folder, "state.json"), { sync: NO_SYNC });
     this.state.bind(this.channel, folder);
     const names = namesOf(agent, provider);
     this.approvals = new Approvals(names);

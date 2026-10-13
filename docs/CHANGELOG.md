@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `StateStore` takes the flush of a write as an option, `sync`, which is `fs.fsyncSync` when
+  absent, so the daemon writes `state.json` as before. The test worlds pass one that does
+  nothing: the disk serves one flush at a time for the whole machine, and the suite's processes
+  queued on it. Measured on 2026-10-14 (macOS, ten cores, Node 26.5.1): `npm test` took 64 s
+  before and 22 s after. Two tests now hold the order of a write (file synced, rename,
+  directory synced) and the default flush, which no test checked.
 - An agent's launch line and the end line of an agent that ends during a turn are written with
   no break after them: the break showed as empty lines above a card that followed. Text that
   follows such a line is set a paragraph apart.

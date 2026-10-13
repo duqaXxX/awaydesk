@@ -36,6 +36,7 @@ import {
   OWNER,
   type ShownMessage,
 } from "../../support/memory-chat.ts";
+import { NO_SYNC } from "../../support/no-sync.ts";
 import { hold, PlainAgent, say } from "../../support/plain-agent.ts";
 
 /** The chat of a test, which a test may make fail where it wants to. */
@@ -191,7 +192,7 @@ export class ListsWorld {
       },
     });
     const faulty = new Faulty(provider);
-    const state = new StateStore(join(root, "state.json"));
+    const state = new StateStore(join(root, "state.json"), { sync: NO_SYNC });
     const names = namesOf(agent, faulty);
     const approvals = new Approvals(names);
     const holds = new Holds();
