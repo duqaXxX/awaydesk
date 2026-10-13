@@ -4585,6 +4585,11 @@ test("a subagent s command and the agent s second end close the reply as before"
   // left running, has none.
   assert.deepEqual(h.cards(), []);
   assert.equal(h.slack.streamTs.length, 1); // every report rendered into the reply that began it
+  // The command's end is told to the subagent, which reports it: the terminal prints no line
+  // for it in the conversation (captured 2026-10-14), only the agent's own ends.
+  const body = h.bodies().join("\n");
+  assert.ok(!body.includes("Background command"), body);
+  assert.equal(body.split("✓ Agent ").length - 1, 2);
 });
 
 test("a posted and a removed request are logged by id and age only", async (t) => {

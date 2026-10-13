@@ -17,8 +17,10 @@ All notable changes to this project are documented here. The format follows
 
 - A command left running in the background has no card, as the terminal draws none (issue #299,
   captured on Claude Code 2.1.296): its call is counted in its run, and the command shows in the
-  list of what still runs and by its end line. The same holds for a command a subagent leaves
-  running.
+  list of what still runs and by its end line. A command a subagent leaves running has no end
+  line either: its end is told to the subagent, which reports it, and the terminal prints the
+  agent's own end alone. Two subagents running one command each wrote two identical
+  `Background command` lines before (#276).
 - The subagents one message starts in the background share one launch line,
   `2 background agents launched`, with what each does under it.
 - A report opens with the end lines of the tasks that had ended when Claude Code began that

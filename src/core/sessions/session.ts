@@ -204,6 +204,10 @@ export class ThreadSession {
   // What the running turn's reply says when it ends: how many queued messages a restart
   // dropped, since they get no reply of their own.
   private endNotes: string[] = [];
+  // Tasks a subagent started and left running (a command in the background). Their end is told
+  // to the subagent, which reports it: the terminal prints no line for it in the conversation
+  // (captured 2026-10-14, Claude Code 2.1.296), and neither does a reply.
+  private readonly ownedBySubagent = new Set<string>();
   /** End lines of agents with no card that ended while a message waited for its turn. */
   private endedAhead: string[] = [];
   // Each task's type and description, for the list of what still runs and the task's end line.
@@ -1682,16 +1686,18 @@ export class ThreadSession {
     }
     if (event.type === "task_started") this.recordTask(event);
     const stopped = task !== null && this.stopped.has(task.taskId);
+    const owned = task !== null && this.ownedBySubagent.has(task.taskId);
     if (
       event.type === "task_ended" &&
       this.active === null &&
       this.sent.length === 0 &&
       !stopped &&
+      !owned &&
       this.background
     ) {
       this.ended.push([event.taskId, this.endedLine(event)]);
     }
-    if (event.type === "task_ended" && !stopped) {
+    if (event.type === "task_ended" && !stopped && !owned) {
       // An agent in the background that ends while a turn runs: with no card to complete, its
       // end is said where the conversation is, as the terminal prints `Agent "..." finished`
       // among the turn's calls (captured 2026-10-13 on Claude Code 2.1.296). One that ends
@@ -1723,6 +1729,7 @@ export class ThreadSession {
       if (this.active === null && !stopped && this.background) this.notificationWaits = true;
       this.unreported.delete(event.taskId);
       this.stopped.delete(event.taskId);
+      this.ownedBySubagent.delete(event.taskId);
       // Read above for the end line, which comes after the terminal task_updated (recorded
       // order); a task whose notification never comes goes with the process.
       this.tasks.delete(event.taskId);
@@ -1872,6 +1879,7 @@ export class ThreadSession {
     for (const started of promoted) {
       this.recordTask(started);
       this.taskReplies.set(started.taskId, renderer);
+      this.ownedBySubagent.add(started.taskId);
     }
     if (promoted.length > 0) this.showRunning();
   }
@@ -2415,6 +2423,7 @@ export class ThreadSession {
     this.ended = [];
     this.opening = null;
     this.endedAhead = [];
+    this.ownedBySubagent.clear();
     this.unreported.clear();
     this.notificationWaits = false;
     this.stopped.clear();
