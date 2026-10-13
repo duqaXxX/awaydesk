@@ -4975,3 +4975,19 @@ test("a rest told again while the stream is still open tries the stop again", as
   assert.equal(slack.callsTo("chat.stopStream").length, 2);
   assert.equal(slack.pushes(), 1);
 });
+
+test("a rest stop that landed with its answer lost keeps the footer when text is pending", async () => {
+  const slack = new ResetAfterApply();
+  const sink = reply(slack);
+  await sink.text("Started it.");
+  await settled();
+  await sink.finishFormatted([], "footer");
+  await sink.text(" More.");
+  slack.resetNext = "chat.stopStream"; // the stop lands with the footer, its answer is lost
+  sink.rest();
+  await settled();
+  assert.deepEqual(footerTexts(slack), ["footer"]);
+  await sink.text(" Later.");
+  await settled();
+  assert.deepEqual(footerTexts(slack), ["footer"]);
+});

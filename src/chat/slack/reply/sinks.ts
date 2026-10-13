@@ -1874,6 +1874,8 @@ export class ReplySink implements Sink {
       if (code === NOT_STREAMING) {
         // Slack ended the stream first: the message goes on by update.
         this.gone(message);
+        // A rest stop that landed with its answer lost: the reply is at rest from here on.
+        if (this.restRequested) this.restOn();
         return this.updateStep(message, null, true);
       }
       if (unknownOutcome(error)) {

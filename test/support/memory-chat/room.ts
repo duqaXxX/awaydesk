@@ -133,7 +133,7 @@ function shown(message: StoredMessage): ShownMessage {
 export interface Placed {
   /** The message it writes into; null while it has none. */
   readonly message: StoredMessage | null;
-  /** Its turn's part has ended: its message shows the footer. */
+  /** It rests (`rest` was called after `finish`) or its end has landed: it can hold the footer. */
   readonly resting: boolean;
   /** The footer its turn left, formatted; null when that turn had none. */
   readonly ownFooter: string | null;
