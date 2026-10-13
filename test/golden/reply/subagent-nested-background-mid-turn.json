@@ -42,13 +42,13 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent\n\n",
+     "markdown": "\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent",
      "notice": true
     },
     {
      "call": "text",
      "ending": false,
-     "markdown": "Launc",
+     "markdown": "\n\nLaunc",
      "notice": false
     },
     {
@@ -144,7 +144,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: python3 -c \"import time; time.sleep(40)\""
+      "title": "Run 40-second sleep in Python"
      }
     },
     {
@@ -189,7 +189,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: python3 -c \"import time; time.sleep(40)\""
+      "title": "Run 40-second sleep in Python"
      }
     },
     {
@@ -204,7 +204,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: python3 -c \"import time; time.sleep(40)\""
+      "title": "Run 40-second sleep in Python"
      }
     },
     {
@@ -359,13 +359,13 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent\n\n",
+    "markdown": "\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent",
     "notice": true
    },
    {
     "call": "text",
     "ending": false,
-    "markdown": "Launc",
+    "markdown": "\n\nLaunc",
     "notice": false
    },
    {
@@ -461,7 +461,7 @@
      "preview": null,
      "status": "in_progress",
      "task": false,
-     "title": "Bash: python3 -c \"import time; time.sleep(40)\""
+     "title": "Run 40-second sleep in Python"
     }
    },
    {
@@ -506,7 +506,7 @@
      "preview": null,
      "status": "complete",
      "task": false,
-     "title": "Bash: python3 -c \"import time; time.sleep(40)\""
+     "title": "Run 40-second sleep in Python"
     }
    },
    {
@@ -521,7 +521,7 @@
      "preview": null,
      "status": "complete",
      "task": false,
-     "title": "Bash: python3 -c \"import time; time.sleep(40)\""
+     "title": "Run 40-second sleep in Python"
     }
    },
    {

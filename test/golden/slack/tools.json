@@ -6,7 +6,7 @@
     {
      "elements": [
       {
-       "text": "✓ Ran 1 shell command · Read 1 file",
+       "text": "Ran 1 shell command, read 1 file",
        "type": "mrkdwn"
       }
      ],
@@ -48,7 +48,7 @@
      {
       "id": "fold:toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
       "status": "in_progress",
-      "title": "Bash: ls",
+      "title": "List files in current directory",
       "type": "task_update"
      }
     ],
@@ -67,7 +67,7 @@
      {
       "id": "fold:toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
       "status": "complete",
-      "title": "Bash: ls",
+      "title": "Ran 1 shell command",
       "type": "task_update"
      }
     ],
@@ -82,12 +82,6 @@
     "chunks": [
      {
       "id": "fold:toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
-      "status": "complete",
-      "title": "Ran 1 shell command",
-      "type": "task_update"
-     },
-     {
-      "id": "now:toolu_01LnSiTbh8GtkisVrbigeaKe",
       "status": "in_progress",
       "title": "Read: /home/dev/project/notes.txt",
       "type": "task_update"
@@ -103,9 +97,9 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "now:toolu_01LnSiTbh8GtkisVrbigeaKe",
+      "id": "fold:toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
       "status": "complete",
-      "title": "Read: /home/dev/project/notes.txt",
+      "title": "Ran 1 shell command, read 1 file",
       "type": "task_update"
      }
     ],
@@ -212,7 +206,7 @@
      {
       "elements": [
        {
-        "text": "✓ Ran 1 shell command · Read 1 file",
+        "text": "Ran 1 shell command, read 1 file",
         "type": "mrkdwn"
        }
       ],

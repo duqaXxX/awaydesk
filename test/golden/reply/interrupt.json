@@ -15,7 +15,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: python3 -c 'import time; time.sleep(30)'"
+      "title": "Sleep for 30 seconds using Python"
      }
     },
     {
@@ -30,7 +30,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: python3 -c 'import time; time.sleep(30)'"
+      "title": "Sleep for 30 seconds using Python"
      }
     },
     {
@@ -60,7 +60,7 @@
      "preview": null,
      "status": "in_progress",
      "task": false,
-     "title": "Bash: python3 -c 'import time; time.sleep(30)'"
+     "title": "Sleep for 30 seconds using Python"
     }
    },
    {
@@ -75,7 +75,7 @@
      "preview": null,
      "status": "complete",
      "task": false,
-     "title": "Bash: python3 -c 'import time; time.sleep(30)'"
+     "title": "Sleep for 30 seconds using Python"
     }
    },
    {

@@ -10,7 +10,7 @@
     {
      "elements": [
       {
-       "text": "✓ Read 3 files",
+       "text": "Read 3 files",
        "type": "mrkdwn"
       }
      ],
@@ -85,7 +85,7 @@
      {
       "id": "fold:toolu_01KoLbfiRVvcd4RcMT6nxuRp",
       "status": "complete",
-      "title": "Read: /home/dev/project/notes/ledger-one.txt",
+      "title": "Read 1 file",
       "type": "task_update"
      }
     ],
@@ -100,12 +100,6 @@
     "chunks": [
      {
       "id": "fold:toolu_01KoLbfiRVvcd4RcMT6nxuRp",
-      "status": "complete",
-      "title": "Read 1 file",
-      "type": "task_update"
-     },
-     {
-      "id": "now:toolu_01V19yNn7aUr4C2ueCBYvWe5",
       "status": "in_progress",
       "title": "Read: /home/dev/project/notes/ledger-two.txt",
       "type": "task_update"
@@ -121,9 +115,9 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "now:toolu_01V19yNn7aUr4C2ueCBYvWe5",
+      "id": "fold:toolu_01KoLbfiRVvcd4RcMT6nxuRp",
       "status": "complete",
-      "title": "Read: /home/dev/project/notes/ledger-two.txt",
+      "title": "Read 2 files",
       "type": "task_update"
      }
     ],
@@ -138,12 +132,6 @@
     "chunks": [
      {
       "id": "fold:toolu_01KoLbfiRVvcd4RcMT6nxuRp",
-      "status": "complete",
-      "title": "Read 2 files",
-      "type": "task_update"
-     },
-     {
-      "id": "now:toolu_01V19yNn7aUr4C2ueCBYvWe5",
       "status": "in_progress",
       "title": "Read: /home/dev/project/notes/ledger-three.txt",
       "type": "task_update"
@@ -159,9 +147,9 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "now:toolu_01V19yNn7aUr4C2ueCBYvWe5",
+      "id": "fold:toolu_01KoLbfiRVvcd4RcMT6nxuRp",
       "status": "complete",
-      "title": "Read: /home/dev/project/notes/ledger-three.txt",
+      "title": "Read 3 files",
       "type": "task_update"
      }
     ],
@@ -216,7 +204,7 @@
      {
       "elements": [
        {
-        "text": "✓ Read 3 files",
+        "text": "Read 3 files",
         "type": "mrkdwn"
        }
       ],

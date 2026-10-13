@@ -45,7 +45,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: python3 -c 'import sys; sys.exit(1)'"
+      "title": "Run Python command that exits with error code 1"
      }
     },
     {
@@ -60,7 +60,7 @@
       "preview": null,
       "status": "error",
       "task": false,
-      "title": "Bash: python3 -c 'import sys; sys.exit(1)'"
+      "title": "Run Python command that exits with error code 1"
      }
     },
     {
@@ -174,7 +174,7 @@
      "preview": null,
      "status": "in_progress",
      "task": false,
-     "title": "Bash: python3 -c 'import sys; sys.exit(1)'"
+     "title": "Run Python command that exits with error code 1"
     }
    },
    {
@@ -189,7 +189,7 @@
      "preview": null,
      "status": "error",
      "task": false,
-     "title": "Bash: python3 -c 'import sys; sys.exit(1)'"
+     "title": "Run Python command that exits with error code 1"
     }
    },
    {

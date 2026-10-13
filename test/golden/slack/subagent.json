@@ -33,7 +33,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\n",
+      "text": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent",
       "type": "markdown_text"
      }
     ],
@@ -50,7 +50,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "I've laun",
+      "text": "\n\nI've laun",
       "type": "markdown_text"
      }
     ],

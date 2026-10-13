@@ -14,7 +14,7 @@
     {
      "elements": [
       {
-       "text": "✓ ToolSearch",
+       "text": "ToolSearch",
        "type": "mrkdwn"
       }
      ],
@@ -22,7 +22,7 @@
     },
     {
      "status": "complete",
-     "task_id": "now:toolu_01VeajTuo9DEtDtcPrarZiKB",
+     "task_id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
      "title": "SendMessage: a0d6caecc437a1298",
      "type": "task_card"
     },
@@ -33,7 +33,7 @@
     {
      "elements": [
       {
-       "text": "✓ Ran 1 shell command",
+       "text": "Ran 1 shell command",
        "type": "mrkdwn"
       }
      ],
@@ -60,7 +60,7 @@
   "message_cards": [
    [
     {
-     "id": "now:toolu_01VeajTuo9DEtDtcPrarZiKB",
+     "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
      "status": "complete",
      "title": "SendMessage: a0d6caecc437a1298"
     }
@@ -79,7 +79,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Test background agent)\n⎿ Backgrounded agent\n\n",
+      "text": "**Agent**(Test background agent)\n⎿ Backgrounded agent",
       "type": "markdown_text"
      }
     ],
@@ -96,7 +96,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "STARTED",
+      "text": "\n\nSTARTED",
       "type": "markdown_text"
      }
     ],
@@ -142,7 +142,7 @@
      {
       "id": "fold:toolu_01EN71a4pBQzXL4JEZkr5vEN",
       "status": "complete",
-      "title": "ToolSearch: select:SendMessage",
+      "title": "ToolSearch",
       "type": "task_update"
      }
     ],
@@ -157,12 +157,6 @@
     "chunks": [
      {
       "id": "fold:toolu_01EN71a4pBQzXL4JEZkr5vEN",
-      "status": "complete",
-      "title": "ToolSearch",
-      "type": "task_update"
-     },
-     {
-      "id": "now:toolu_01VeajTuo9DEtDtcPrarZiKB",
       "status": "in_progress",
       "title": "SendMessage: a0d6caecc437a1298",
       "type": "task_update"
@@ -178,8 +172,14 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "id": "fold:toolu_01EN71a4pBQzXL4JEZkr5vEN",
+      "status": "complete",
+      "title": "ToolSearch",
+      "type": "task_update"
+     },
+     {
       "details": "Running in background",
-      "id": "now:toolu_01VeajTuo9DEtDtcPrarZiKB",
+      "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
       "status": "in_progress",
       "title": "SendMessage: a0d6caecc437a1298",
       "type": "task_update"
@@ -210,7 +210,7 @@
     "chunks": [
      {
       "details": "\nRunning sleep 20",
-      "id": "now:toolu_01VeajTuo9DEtDtcPrarZiKB",
+      "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
       "status": "in_progress",
       "title": "SendMessage: a0d6caecc437a1298",
       "type": "task_update"
@@ -226,7 +226,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "now:toolu_01VeajTuo9DEtDtcPrarZiKB",
+      "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
       "status": "complete",
       "title": "SendMessage: a0d6caecc437a1298",
       "type": "task_update"
@@ -260,7 +260,7 @@
      {
       "id": "fold:toolu_01H5wwXkRKqXrGbowxTuLKMV",
       "status": "complete",
-      "title": "Bash: sleep 15",
+      "title": "Ran 1 shell command",
       "type": "task_update"
      }
     ],
@@ -347,7 +347,7 @@
      {
       "elements": [
        {
-        "text": "✓ ToolSearch",
+        "text": "ToolSearch",
         "type": "mrkdwn"
        }
       ],
@@ -355,7 +355,7 @@
      },
      {
       "status": "complete",
-      "task_id": "now:toolu_01VeajTuo9DEtDtcPrarZiKB",
+      "task_id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
       "title": "SendMessage: a0d6caecc437a1298",
       "type": "task_card"
      },
@@ -366,7 +366,7 @@
      {
       "elements": [
        {
-        "text": "✓ Ran 1 shell command",
+        "text": "Ran 1 shell command",
         "type": "mrkdwn"
        }
       ],

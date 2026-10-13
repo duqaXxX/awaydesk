@@ -15,7 +15,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: sleep 5; echo done"
+      "title": "Sleep for 5 seconds then print done"
      }
     },
     {
@@ -30,7 +30,7 @@
       "preview": null,
       "status": "in_progress",
       "task": true,
-      "title": "Bash: sleep 5; echo done"
+      "title": "Sleep for 5 seconds then print done"
      }
     },
     {
@@ -52,7 +52,7 @@
        "preview": null,
        "status": "in_progress",
        "task": true,
-       "title": "Bash: sleep 5; echo done"
+       "title": "Sleep for 5 seconds then print done"
       }
      ],
      "footer": "footer"
@@ -269,7 +269,7 @@
      "preview": null,
      "status": "in_progress",
      "task": false,
-     "title": "Bash: sleep 5; echo done"
+     "title": "Sleep for 5 seconds then print done"
     }
    },
    {
@@ -284,7 +284,7 @@
      "preview": null,
      "status": "in_progress",
      "task": true,
-     "title": "Bash: sleep 5; echo done"
+     "title": "Sleep for 5 seconds then print done"
     }
    },
    {
@@ -305,7 +305,7 @@
      "preview": null,
      "status": "complete",
      "task": true,
-     "title": "Bash: sleep 5; echo done"
+     "title": "Sleep for 5 seconds then print done"
     }
    },
    {
@@ -320,7 +320,7 @@
      "preview": null,
      "status": "complete",
      "task": true,
-     "title": "Bash: sleep 5; echo done"
+     "title": "Sleep for 5 seconds then print done"
     }
    },
    {

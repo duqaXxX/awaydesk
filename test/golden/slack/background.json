@@ -23,7 +23,7 @@
      "details": "Running in background",
      "id": "fold:toolu_01LiZwhcy5g12fYSVLgAq5TS",
      "status": "complete",
-     "title": "Bash: sleep 5; echo done"
+     "title": "Sleep for 5 seconds then print done"
     }
    ]
   ],
@@ -42,7 +42,7 @@
      {
       "id": "fold:toolu_01LiZwhcy5g12fYSVLgAq5TS",
       "status": "in_progress",
-      "title": "Bash: sleep 5; echo done",
+      "title": "Sleep for 5 seconds then print done",
       "type": "task_update"
      }
     ],
@@ -62,7 +62,7 @@
       "details": "Running in background",
       "id": "fold:toolu_01LiZwhcy5g12fYSVLgAq5TS",
       "status": "in_progress",
-      "title": "Bash: sleep 5; echo done",
+      "title": "Sleep for 5 seconds then print done",
       "type": "task_update"
      }
     ],
@@ -92,7 +92,7 @@
      {
       "id": "fold:toolu_01LiZwhcy5g12fYSVLgAq5TS",
       "status": "complete",
-      "title": "Bash: sleep 5; echo done",
+      "title": "Sleep for 5 seconds then print done",
       "type": "task_update"
      }
     ],

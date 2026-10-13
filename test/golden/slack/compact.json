@@ -10,7 +10,7 @@
     {
      "elements": [
       {
-       "text": "✓ Read 1 file",
+       "text": "Read 1 file",
        "type": "mrkdwn"
       }
      ],
@@ -93,7 +93,7 @@
      {
       "id": "fold:toolu_01VQB896fYGjEcrom4wpUzm5",
       "status": "complete",
-      "title": "Read: /home/dev/project/notes/ledger-one.txt",
+      "title": "Read 1 file",
       "type": "task_update"
      }
     ],
@@ -176,7 +176,7 @@
      {
       "elements": [
        {
-        "text": "✓ Read 1 file",
+        "text": "Read 1 file",
         "type": "mrkdwn"
        }
       ],

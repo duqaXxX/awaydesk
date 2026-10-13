@@ -1,31 +1,31 @@
 /**
- * A run of tool calls as two cards: what ended, folded into counts, and under it the call that
- * runs now. A stream can only append and a card is what Slack updates in place, so the fold the
- * channel model drew as two lines of text is drawn here as two cards whose titles change.
+ * A run of tool calls as one card: the call that runs now, then the counts of what ended. The
+ * terminal draws a run the same way (captured on Claude Code 2.1.296, 2026-10-13): one live line
+ * for the call that runs, nothing for the calls before it, and when the run has ended one grey
+ * line of counts with no mark, `Read 1 file, ran 4 shell commands`, a failed call counted with
+ * the others. A stream can only append and a card is what Slack updates in place, so the line is
+ * a card whose title changes.
  *
- * A run is the calls between two pieces of text. Its first card shows the first call; once a call
- * has ended and another is shown, that card turns into the counts (`Ran 2 shell commands · Read 1
- * file · ✗ Ran 1 shell command`) and a second card takes the call shown. The call shown is the last
- * one started that still runs, else the last one shown: it joins the counts when another takes its
- * place, as the terminal folds a call once the next one follows.
+ * A run is the calls between two pieces of text. Its card shows the last call started that
+ * still runs; with none running it shows the counts of every call that ended, which is also the
+ * line that replaces the card once the reply's body has ended.
  *
  * A call with a view of its own never folds: an Edit or a Write that ended well (its preview), a
- * subagent or a background command (its task card), a stopped call. It keeps the card that shows
- * it, or gets one, and the run takes no new call after it. An Edit or a Write reaches the fold only
- * once it has ended (the renderer holds it until then): one that failed joins the run as a call
- * that ended.
+ * subagent the call waits for or a background command (its task card), a stopped call, and a
+ * failed call of a tool the terminal was not seen to count (its card says why). It gets a card
+ * of its own, or keeps the run's when it was the run's only call, and the run takes no new call
+ * after it. An Edit or a Write reaches the fold only once it has ended (the renderer holds it
+ * until then).
  *
- * Neither card carries `details` or `output`: Slack appends both to what a card already holds
+ * The card carries no `details` or `output`: Slack appends both to what a card already holds
  * (measured 2026-10-01), so a card that is reused keeps its text in its title.
  */
 import type { Preview, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
-import { folded } from "./previews.ts";
+import { failsCounted, folded } from "./previews.ts";
 import { STOPPED } from "./words.ts";
 
 export const ENDED: readonly TaskStatus[] = ["complete", "error"];
-export const SEPARATOR = " · ";
-export const OK = "✓";
-export const FAILED = "✗";
+export const SEPARATOR = ", ";
 
 /**
  * The preview, on a call that finished well and only there: a failed, running or task card keeps
@@ -35,35 +35,28 @@ export function shownPreview(update: TaskUpdate): Preview | null {
   return update.status === "complete" && !update.task ? update.preview : null;
 }
 
-/** Whether a call is drawn in its run's two cards rather than on a card of its own. */
+/**
+ * Whether a call is drawn on its run's card rather than on a card of its own. A call that failed
+ * is counted with the others only where the terminal was seen to count it so (a command that
+ * exits with an error, `previews.failsCounted`); any other failed call keeps a card that says
+ * why.
+ */
 export function folds(update: TaskUpdate): boolean {
+  if (update.status === "error" && !failsCounted(update.name)) return false;
   return (
     update.name !== "" && !update.task && shownPreview(update) === null && update.output !== STOPPED
   );
 }
 
 /**
- * Ended calls as counts in the terminal's words, the failed ones after `✗`; `check` puts `✓`
- * before the ones that ended well (a card draws that icon itself).
+ * Ended calls as counts in the terminal's words, joined as it joins them: a comma between two
+ * counts, and a capital on the first alone. A failed call is counted with the others.
  */
-export function counts(calls: readonly TaskUpdate[], options: { check: boolean }): string {
+export function counts(calls: readonly TaskUpdate[]): string {
   // In the order each name first ended, as the terminal lists them.
-  const complete = new Map<string, number>();
-  const error = new Map<string, number>();
-  for (const call of calls) {
-    const group = call.status === "error" ? error : complete;
-    group.set(call.name, (group.get(call.name) ?? 0) + 1);
-  }
-  const parts: string[] = [];
-  for (const [icon, group] of [
-    [options.check ? `${OK} ` : "", complete],
-    [`${FAILED} `, error],
-  ] as const) {
-    if (group.size > 0) {
-      parts.push(icon + [...group].map(([name, n]) => folded(name, n)).join(SEPARATOR));
-    }
-  }
-  return parts.join(SEPARATOR);
+  const byName = new Map<string, number>();
+  for (const call of calls) byName.set(call.name, (byName.get(call.name) ?? 0) + 1);
+  return [...byName].map(([name, n], index) => folded(name, n, index === 0)).join(SEPARATOR);
 }
 
 interface Run {
@@ -71,28 +64,14 @@ interface Run {
   calls: Map<string, TaskUpdate>;
   /** In the order they ended. */
   ended: string[];
-  /** The call shown whole. */
-  shown: string | null;
-  /** The first card's id. */
-  summary: string | null;
-  /** The second card's id. */
-  now: string | null;
-  /** Whether the first card has turned into the counts. */
-  split: boolean;
+  /** The run's card id, once it has one. */
+  card: string | null;
   /** Whether a new call still joins it. */
   open: boolean;
 }
 
 function newRun(): Run {
-  return {
-    calls: new Map(),
-    ended: [],
-    shown: null,
-    summary: null,
-    now: null,
-    split: false,
-    open: true,
-  };
+  return { calls: new Map(), ended: [], card: null, open: true };
 }
 
 function samePreview(a: Preview | null, b: Preview | null): boolean {
@@ -139,19 +118,6 @@ export class Fold {
   private readonly own = new Map<string, string>();
   private current: Run | null = null;
   private readonly sent = new Map<string, TaskUpdate>();
-  /** Every card id given out: none is used twice. */
-  private readonly cards = new Set<string>();
-
-  /**
-   * A new card's id, named after the call it first shows. A card a call took for its own keeps
-   * its id, so a second card named after the same call gets a longer one.
-   */
-  private card(kind: string, call: string): string {
-    let card = `${kind}:${call}`;
-    while (this.cards.has(card)) card += "+";
-    this.cards.add(card);
-    return card;
-  }
 
   /** Text was written: the calls after it are a new run. */
   text(): void {
@@ -179,15 +145,13 @@ export class Fold {
       remove(run.ended, update.id);
     } else if (!run.ended.includes(update.id)) {
       run.ended.push(update.id);
-      // The call that just ended is the one shown, unless another still runs.
-      run.shown = update.id;
     }
     return this.changed(this.draw(run));
   }
 
   /**
-   * A call that no longer folds: it keeps the card that shows it, which is its own from now on,
-   * or gets one. Its run takes no new call.
+   * A call that no longer folds gets a card of its own. The run's only call keeps the run's
+   * card, which showed it. The run takes no new call.
    */
   private leave(run: Run, update: TaskUpdate): TaskUpdate {
     run.calls.delete(update.id);
@@ -195,52 +159,30 @@ export class Fold {
     remove(run.ended, update.id);
     run.open = false;
     let card = update.id;
-    if (run.shown === update.id) {
-      run.shown = null;
-      if (run.split && run.now !== null) {
-        card = run.now;
-        run.now = null;
-      } else if (!run.split && run.summary !== null) {
-        card = run.summary;
-        run.summary = null;
-      }
+    if (run.calls.size === 0 && run.card !== null) {
+      card = run.card;
+      run.card = null;
     }
     this.own.set(update.id, card);
     return { ...update, id: card };
   }
 
-  /** The run's cards as they stand: the counts of what ended, then the call shown. */
+  /** The run's card as it stands: the call that runs now, else the counts of what ended. */
   private draw(run: Run): TaskUpdate[] {
-    const running = [...run.calls.values()]
-      .filter((call) => !ENDED.includes(call.status))
-      .map((call) => call.id);
-    const last = running.at(-1);
-    if (last !== undefined) run.shown = last;
-    const shown = run.shown === null ? undefined : run.calls.get(run.shown);
+    const first = run.calls.values().next().value;
+    if (first === undefined) return [];
+    // Named after the run's first call: a call that takes a card of its own is named by its id.
+    run.card ??= `fold:${first.id}`;
+    const running = [...run.calls.values()].filter((call) => !ENDED.includes(call.status));
+    const now = running.at(-1);
+    // A call still running when the reply's body ends has no count yet and stays a card.
+    if (now !== undefined) return [card(run.card, now.title, now.status, now.name, null)];
     const ended = run.ended.flatMap((id) => run.calls.get(id) ?? []);
-    const counted = ended.filter((call) => call.id !== run.shown);
-    // What replaces the run's cards once the reply's body has ended: every call that ended.
-    const line = counts(ended, { check: true });
-    const cards: TaskUpdate[] = [];
-    const first = counted[0];
-    if (first !== undefined) {
-      run.split = true;
-      run.summary = run.summary || this.card("fold", first.id);
-      const status: TaskStatus = counted.some((call) => call.status === "complete")
-        ? "complete"
-        : "error";
-      cards.push(card(run.summary, counts(counted, { check: false }), status, "", line));
-    } else if (shown !== undefined && (run.summary !== null || !run.split)) {
-      // Nothing to count: the first card shows the call whole. Before the run has two calls,
-      // and when a call the card counted alone stopped folding.
-      run.summary = run.summary || this.card("fold", shown.id);
-      cards.push(whole(run.summary, shown, line));
-    }
-    if (shown !== undefined && run.split) {
-      run.now = run.now || this.card("now", shown.id);
-      cards.push(whole(run.now, shown, ""));
-    }
-    return cards;
+    const line = counts(ended);
+    const status: TaskStatus = ended.some((call) => call.status === "complete")
+      ? "complete"
+      : "error";
+    return [card(run.card, line, status, "", line)];
   }
 
   private changed(cards: TaskUpdate[]): TaskUpdate[] {
@@ -250,7 +192,7 @@ export class Fold {
   }
 }
 
-/** A card of a run: a title and a state, and what it folds to. */
+/** A run's card: a title and a state, and the line that replaces it at the reply's end. */
 function card(
   id: string,
   title: string,
@@ -270,15 +212,4 @@ function card(
     preview: null,
     folded: line,
   };
-}
-
-/**
- * A call shown whole on a card of its run: its words, and why it failed. `line` is what replaces
- * the card once the reply's body has ended; a call still running then has no count yet and stays
- * a card.
- */
-function whole(id: string, call: TaskUpdate, line: string): TaskUpdate {
-  let title = call.title;
-  if (call.status === "error" && call.output) title += SEPARATOR + call.output;
-  return card(id, title, call.status, call.name, ENDED.includes(call.status) ? line : null);
 }

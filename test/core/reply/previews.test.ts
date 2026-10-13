@@ -10,7 +10,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fileChange } from "../../../src/agent/claude/translate.ts";
 import type { FileChange } from "../../../src/agent/seam.ts";
-import { answered, folded, preview } from "../../../src/core/reply/previews.ts";
+import {
+  answered,
+  described,
+  failsCounted,
+  folded,
+  preview,
+} from "../../../src/core/reply/previews.ts";
 import { NAMES } from "../../support/names.ts";
 import { recordedEvents } from "../../support/replay.ts";
 
@@ -258,4 +264,32 @@ test("a path is named from the session's folder only when it is inside it", () =
   assert.equal(title("/home/dev/project/b.txt", null), "Update(/home/dev/project/b.txt)");
   assert.equal(title("/home/dev/project/b.txt", ""), "Update(/home/dev/project/b.txt)");
   assert.equal(title("b.txt", CWD), "Update(b.txt)");
+});
+
+// The terminal's live line and its line of counts (issue #299, captured on Claude Code 2.1.296).
+
+test("a count takes its capital only when it opens the line", () => {
+  assert.equal(folded("Bash", 2), "Ran 2 shell commands");
+  assert.equal(folded("Bash", 2, false), "ran 2 shell commands");
+  assert.equal(folded("Read", 1, false), "read 1 file");
+  // A tool the terminal has no words for keeps its name as written.
+  assert.equal(folded("WebFetch", 2, false), "WebFetch ×2");
+});
+
+test("a command is titled by its description, when it has one that says something", () => {
+  assert.equal(
+    described("Bash", { command: "ls", description: "List the files" }),
+    "List the files",
+  );
+  assert.equal(described("Bash", { command: "ls", description: "  " }), null);
+  assert.equal(described("Bash", { command: "ls", description: 3 }), null);
+  assert.equal(described("Bash", { command: "ls" }), null);
+  assert.equal(described("Read", { file_path: "a", description: "Read it" }), null);
+  const long = described("Bash", { description: "x".repeat(200) });
+  assert.ok(long !== null && Array.from(long).length === 80 && long.endsWith("…"));
+});
+
+test("only a failed command is counted with the calls that ended well", () => {
+  assert.ok(failsCounted("Bash"));
+  assert.ok(!failsCounted("Read") && !failsCounted("WebFetch"));
 });

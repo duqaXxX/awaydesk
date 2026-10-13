@@ -15,7 +15,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: ls"
+      "title": "List files in current directory"
      }
     },
     {
@@ -30,7 +30,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: ls"
+      "title": "List files in current directory"
      }
     },
     {
@@ -120,7 +120,7 @@
      "preview": null,
      "status": "in_progress",
      "task": false,
-     "title": "Bash: ls"
+     "title": "List files in current directory"
     }
    },
    {
@@ -135,7 +135,7 @@
      "preview": null,
      "status": "complete",
      "task": false,
-     "title": "Bash: ls"
+     "title": "List files in current directory"
     }
    },
    {

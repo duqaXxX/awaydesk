@@ -6,13 +6,13 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent\n\n",
+     "markdown": "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent",
      "notice": true
     },
     {
      "call": "text",
      "ending": false,
-     "markdown": "started",
+     "markdown": "\n\nstarted",
      "notice": false
     },
     {
@@ -43,7 +43,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: sleep 20; echo done"
+      "title": "Sleep for 20 seconds then echo done"
      }
     },
     {
@@ -58,7 +58,7 @@
       "preview": null,
       "status": "in_progress",
       "task": true,
-      "title": "Bash: sleep 20; echo done"
+      "title": "Sleep for 20 seconds then echo done"
      }
     },
     {
@@ -128,7 +128,7 @@
        "preview": null,
        "status": "in_progress",
        "task": true,
-       "title": "Bash: sleep 20; echo done"
+       "title": "Sleep for 20 seconds then echo done"
       }
      ],
      "footer": "footer"
@@ -240,13 +240,13 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent\n\n",
+    "markdown": "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent",
     "notice": true
    },
    {
     "call": "text",
     "ending": false,
-    "markdown": "started",
+    "markdown": "\n\nstarted",
     "notice": false
    },
    {

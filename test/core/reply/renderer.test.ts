@@ -122,6 +122,27 @@ test("tools turn streams text and one line per tool", async () => {
   assert.ok(renderer.result !== null);
 });
 
+test("a running command is titled by its description, any other call by its first argument", async () => {
+  // The terminal's live line for a command reads its description (captured on Claude Code
+  // 2.1.296: `Sleeping 20 seconds then printing marker`), with the command under it.
+  const events = recordedEvents("tools");
+  const calls = eventsOf(events, "call_started");
+  const command = calls.find(
+    (event) => event.toolName === "Bash" && typeof event.input.description === "string",
+  );
+  assert.ok(command !== undefined);
+  const [sink] = await render(events);
+  assert.equal(sink.tasks.find((t) => t.id === command.callId)?.title, command.input.description);
+  // A command with no description, and a call of another tool, keep the generic title.
+  const bare: SessionEvent = { ...command, callId: "toolu_bare", input: { command: "ls -la" } };
+  const other: SessionEvent = { ...command, callId: "toolu_other", toolName: "WebFetch" };
+  const [plain] = await render([bare, other]);
+  assert.deepEqual(
+    plain.tasks.map((t) => t.title),
+    ["Bash: ls -la", taskTitle("WebFetch", command.input)],
+  );
+});
+
 test("a failed tool is an error line", async () => {
   const [sink] = await render(recordedEvents("tool-error"));
   assert.ok(sink.tasks.some((t) => t.status === "error"));
@@ -166,9 +187,7 @@ test("a subagent in the background is the terminal's line, with no card", async 
   const [call] = topLevelToolIds(first);
   assert.ok(call !== undefined);
   const [sink, renderer] = await render(first);
-  assert.deepEqual(sink.notices, [
-    "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\n",
-  ]);
+  assert.deepEqual(sink.notices, ["**Agent**(Run ls and report contents)\n⎿ Backgrounded agent"]);
   assert.deepEqual(sink.tasks, []);
   // Still this reply's task, which the list of what still runs reads, and still its call.
   assert.equal(renderer.runningTasks.length, 1);
@@ -188,7 +207,7 @@ test("the launch line names the agent's type, and none for the plain one", async
   );
   const [sink] = await render(events);
   assert.deepEqual(sink.notices, [
-    "**mechanical**(Run ls and report contents)\n⎿ Backgrounded agent\n\n",
+    "**mechanical**(Run ls and report contents)\n⎿ Backgrounded agent",
   ]);
   const unnamed = recordedEvents("subagent").map((event) =>
     event.type === "task_started" ? { ...event, agentType: null } : event,
@@ -261,10 +280,29 @@ test("agents started one after the other have no empty line between their launch
   ]);
   assert.equal(
     sink.notices.join(""),
-    "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\n" +
-      "**Agent**(Second one)\n⎿ Backgrounded agent\n\n",
+    "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent" +
+      "\n\n**Agent**(Second one)\n⎿ Backgrounded agent",
   );
   assert.deepEqual(sink.tasks, []);
+});
+
+test("a launch line ends with no break: a card after it sits right under, text a paragraph apart", async () => {
+  // Seen in a real session on iOS (2026-10-13): the break the line ended with drew as empty
+  // lines above the card that followed it.
+  const events = recordedEvents("subagent");
+  const started = events.findIndex((event) => event.type === "task_started");
+  const call = events.findLast((event, index) => index < started && event.type === "call_started");
+  assert.ok(call?.type === "call_started");
+  const [carded] = await render([
+    ...events.slice(0, started + 1),
+    { ...call, callId: "toolu_read", toolName: "Read", input: { file_path: "a" } },
+  ]);
+  assert.ok(carded.texts.join("").endsWith("Backgrounded agent"));
+  const [worded] = await render([
+    ...events.slice(0, started + 1),
+    { type: "text", text: "Started." },
+  ]);
+  assert.ok(worded.texts.join("").endsWith("Backgrounded agent\n\nStarted."));
 });
 
 test("a call that starts no agent shows as any other call", async () => {

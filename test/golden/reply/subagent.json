@@ -6,13 +6,13 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\n",
+     "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent",
      "notice": true
     },
     {
      "call": "text",
      "ending": false,
-     "markdown": "I've laun",
+     "markdown": "\n\nI've laun",
      "notice": false
     },
     {
@@ -163,7 +163,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: ls -la"
+      "title": "List files and directories in current working directory"
      }
     },
     {
@@ -178,7 +178,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: ls -la"
+      "title": "List files and directories in current working directory"
      }
     },
     {
@@ -307,13 +307,13 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\n",
+    "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent",
     "notice": true
    },
    {
     "call": "text",
     "ending": false,
-    "markdown": "I've laun",
+    "markdown": "\n\nI've laun",
     "notice": false
    },
    {

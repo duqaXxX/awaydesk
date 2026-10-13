@@ -136,7 +136,7 @@ test("a tool first turn and its cards read as the recorded turn", async (t) => {
   const [blocks, ...more] = h.slack.messageBlocks();
   assert.equal(more.length, 0);
   const elements = blocks?.[0]?.elements as JsonObject[];
-  assert.equal(elements[0]?.text, "✓ Ran 1 shell command · Read 1 file");
+  assert.equal(elements[0]?.text, "Ran 1 shell command, read 1 file");
   assert.deepEqual(h.slack.messageCards(), [[]]);
 });
 
@@ -361,7 +361,7 @@ test("an error that cuts a turn ends the stream with the cross", async (t) => {
   const lines = (blocks ?? [])
     .filter((block) => block.type === "context")
     .map((block) => (block.elements as JsonObject[])[0]?.text);
-  assert.equal(lines[0], "✓ Ran 1 shell command");
+  assert.equal(lines[0], "Ran 1 shell command");
   assert.equal(h.slack.pushes(), 1);
 });
 

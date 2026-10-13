@@ -729,15 +729,18 @@ download, stops the whole message, and the reply says which file and why.
 
 A reply is one message in the session's thread, and a native Slack stream. It appears when Claude
 has something to show: its first words, or the card of the first tool it uses. Text then grows in
-the order it is written. The tool calls between two pieces of text show as two cards: the first
-counts what ended, in the terminal's words (`Ran 2 shell commands · Read 1 file`), and the second
-names the call that runs now. A subagent Claude Code starts in the background is two
+the order it is written. The tool calls between two pieces of text show as one card, as the terminal
+draws one line for them: it names the call that runs now, a command by its description, and once
+the calls have ended it counts them in the terminal's words (`Ran 2 shell commands, read 1 file`).
+A command that failed is counted with the others, as in the terminal; a failed call of another
+tool keeps a card that says why. A command left running in the background has a card of its own,
+titled by its description too. A subagent Claude Code starts in the background is two
 lines of text, as in the terminal, with its type in bold: `mechanical(review)`, then
 `⎿ Backgrounded agent`. It has no card, and what it does shows nowhere in the reply. A background
 command keeps its card open until it ends. An Edit or a Write shows once it has ended, as
 one collapsed block titled with the call (`Update(notes.txt)`) that opens on its diff or on the
 new file's first lines. When the reply ends, a divider and the footer close the same message, and
-each pair of cards gives way to one line (`✓ Ran 2 shell commands · Read 1 file`). A reply still
+each of those cards gives way to its line of counts, in grey (`Ran 2 shell commands, read 1 file`). A reply still
 running 280 seconds after it started stops being a stream (Slack closes streams at 5 minutes) and
 goes on in the same message, updated instead of streamed; what Claude wrote after its last call
 then arrives in a new message, with the footer under it. A turn that ends with a background command

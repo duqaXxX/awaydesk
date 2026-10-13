@@ -23,13 +23,13 @@
      "details": "Running in background",
      "id": "fold:toolu_01GmqDn7crcrCohffpzUfMVm",
      "status": "complete",
-     "title": "Bash: sleep 20"
+     "title": "Sleep for 20 seconds in background"
     },
     {
      "id": "fold:toolu_01Qh2cMVNiKoB1HDHms6ridr",
      "output": "Stopped",
      "status": "complete",
-     "title": "Bash: sleep 15"
+     "title": "Sleep for 15 seconds in foreground"
     }
    ]
   ],
@@ -48,7 +48,7 @@
      {
       "id": "fold:toolu_01GmqDn7crcrCohffpzUfMVm",
       "status": "in_progress",
-      "title": "Bash: sleep 20",
+      "title": "Sleep for 20 seconds in background",
       "type": "task_update"
      }
     ],
@@ -68,7 +68,7 @@
       "details": "Running in background",
       "id": "fold:toolu_01GmqDn7crcrCohffpzUfMVm",
       "status": "in_progress",
-      "title": "Bash: sleep 20",
+      "title": "Sleep for 20 seconds in background",
       "type": "task_update"
      }
     ],
@@ -98,7 +98,7 @@
      {
       "id": "fold:toolu_01GmqDn7crcrCohffpzUfMVm",
       "status": "complete",
-      "title": "Bash: sleep 20",
+      "title": "Sleep for 20 seconds in background",
       "type": "task_update"
      }
     ],
@@ -114,7 +114,7 @@
      {
       "id": "fold:toolu_01Qh2cMVNiKoB1HDHms6ridr",
       "status": "in_progress",
-      "title": "Bash: sleep 15",
+      "title": "Sleep for 15 seconds in foreground",
       "type": "task_update"
      }
     ],
@@ -131,7 +131,7 @@
       "id": "fold:toolu_01Qh2cMVNiKoB1HDHms6ridr",
       "output": "Stopped",
       "status": "complete",
-      "title": "Bash: sleep 15",
+      "title": "Sleep for 15 seconds in foreground",
       "type": "task_update"
      }
     ],

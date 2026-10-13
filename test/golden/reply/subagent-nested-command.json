@@ -6,13 +6,13 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent\n\n",
+     "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent",
      "notice": true
     },
     {
      "call": "text",
      "ending": false,
-     "markdown": "started",
+     "markdown": "\n\nstarted",
      "notice": false
     },
     {
@@ -43,7 +43,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: python3 -c 'import time; time.sleep(12)'"
+      "title": "Sleep for 12 seconds"
      }
     },
     {
@@ -58,7 +58,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: python3 -c 'import time; time.sleep(12)'"
+      "title": "Sleep for 12 seconds"
      }
     },
     {
@@ -73,7 +73,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: python3 -c 'import time; time.sleep(12)'"
+      "title": "Sleep for 12 seconds"
      }
     },
     {
@@ -88,7 +88,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: python3 -c 'import time; time.sleep(12)'"
+      "title": "Sleep for 12 seconds"
      }
     },
     {
@@ -103,7 +103,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: python3 -c 'import time; time.sleep(12)'"
+      "title": "Sleep for 12 seconds"
      }
     },
     {
@@ -118,7 +118,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: python3 -c 'import time; time.sleep(12)'"
+      "title": "Sleep for 12 seconds"
      }
     },
     {
@@ -211,13 +211,13 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent\n\n",
+    "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent",
     "notice": true
    },
    {
     "call": "text",
     "ending": false,
-    "markdown": "started",
+    "markdown": "\n\nstarted",
     "notice": false
    },
    {

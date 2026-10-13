@@ -33,7 +33,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent\n\n",
+      "text": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent",
       "type": "markdown_text"
      }
     ],
@@ -50,7 +50,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "started",
+      "text": "\n\nstarted",
       "type": "markdown_text"
      }
     ],

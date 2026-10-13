@@ -6,13 +6,13 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent\n\n",
+     "markdown": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent",
      "notice": true
     },
     {
      "call": "text",
      "ending": false,
-     "markdown": "Synthetic answer.",
+     "markdown": "\n\nSynthetic answer.",
      "notice": false
     },
     {
@@ -85,13 +85,13 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent\n\n",
+    "markdown": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent",
     "notice": true
    },
    {
     "call": "text",
     "ending": false,
-    "markdown": "Synthetic answer.",
+    "markdown": "\n\nSynthetic answer.",
     "notice": false
    },
    {

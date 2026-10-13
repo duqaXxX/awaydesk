@@ -4,9 +4,29 @@
   "message_blocks": [
    [
     {
+     "output": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "File does not exist. Note: your current working directory is /home/dev/project.",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "error",
+     "task_id": "fold:toolu_01YYyHT3cAveY6vGoBUSEazb",
+     "title": "Read: /home/dev/project/missing.txt",
+     "type": "task_card"
+    },
+    {
      "elements": [
       {
-       "text": "✗ Read 1 file · Ran 1 shell command",
+       "text": "Ran 1 shell command",
        "type": "mrkdwn"
       }
      ],
@@ -31,7 +51,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "id": "fold:toolu_01YYyHT3cAveY6vGoBUSEazb",
+     "output": "File does not exist. Note: your current working directory is /home/dev/project.",
+     "status": "error",
+     "title": "Read: /home/dev/project/missing.txt"
+    }
+   ]
   ],
   "message_texts": [
    "The file missing.txt doesn't exist, and the Python command exited with error code 1 as expected."
@@ -66,8 +93,9 @@
     "chunks": [
      {
       "id": "fold:toolu_01YYyHT3cAveY6vGoBUSEazb",
+      "output": "File does not exist. Note: your current working directory is /home/dev/project.",
       "status": "error",
-      "title": "Read: /home/dev/project/missing.txt · File does not exist. Note: your current working directory is /home/dev/project.",
+      "title": "Read: /home/dev/project/missing.txt",
       "type": "task_update"
      }
     ],
@@ -81,15 +109,9 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01YYyHT3cAveY6vGoBUSEazb",
-      "status": "error",
-      "title": "✗ Read 1 file",
-      "type": "task_update"
-     },
-     {
-      "id": "now:toolu_01Q8BHFdBEFU1YJffhnsR7fb",
+      "id": "fold:toolu_01Q8BHFdBEFU1YJffhnsR7fb",
       "status": "in_progress",
-      "title": "Bash: python3 -c 'import sys; sys.exit(1)'",
+      "title": "Run Python command that exits with error code 1",
       "type": "task_update"
      }
     ],
@@ -103,9 +125,9 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "now:toolu_01Q8BHFdBEFU1YJffhnsR7fb",
+      "id": "fold:toolu_01Q8BHFdBEFU1YJffhnsR7fb",
       "status": "error",
-      "title": "Bash: python3 -c 'import sys; sys.exit(1)' · Exit code 1",
+      "title": "Ran 1 shell command",
       "type": "task_update"
      }
     ],
@@ -266,9 +288,29 @@
    "args": {
     "blocks": [
      {
+      "output": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "File does not exist. Note: your current working directory is /home/dev/project.",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "error",
+      "task_id": "fold:toolu_01YYyHT3cAveY6vGoBUSEazb",
+      "title": "Read: /home/dev/project/missing.txt",
+      "type": "task_card"
+     },
+     {
       "elements": [
        {
-        "text": "✗ Read 1 file · Ran 1 shell command",
+        "text": "Ran 1 shell command",
         "type": "mrkdwn"
        }
       ],

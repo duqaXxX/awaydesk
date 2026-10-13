@@ -6,7 +6,7 @@
     {
      "elements": [
       {
-       "text": "✓ AskUserQuestion",
+       "text": "AskUserQuestion",
        "type": "mrkdwn"
       }
      ],
@@ -188,7 +188,7 @@
      {
       "elements": [
        {
-        "text": "✓ AskUserQuestion",
+        "text": "AskUserQuestion",
         "type": "mrkdwn"
        }
       ],

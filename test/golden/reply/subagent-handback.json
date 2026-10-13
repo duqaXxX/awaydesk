@@ -15,13 +15,13 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: sleep 15"
+      "title": "Wait 15 seconds"
      }
     },
     {
      "call": "text",
      "ending": false,
-     "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent\n\n",
+     "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
      "notice": true
     },
     {
@@ -36,7 +36,7 @@
       "preview": null,
       "status": "in_progress",
       "task": true,
-      "title": "Bash: sleep 15"
+      "title": "Wait 15 seconds"
      }
     },
     {
@@ -220,7 +220,7 @@
        "preview": null,
        "status": "in_progress",
        "task": true,
-       "title": "Bash: sleep 15"
+       "title": "Wait 15 seconds"
       }
      ],
      "footer": "footer"
@@ -532,13 +532,13 @@
      "preview": null,
      "status": "in_progress",
      "task": false,
-     "title": "Bash: sleep 15"
+     "title": "Wait 15 seconds"
     }
    },
    {
     "call": "text",
     "ending": false,
-    "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent\n\n",
+    "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
     "notice": true
    },
    {
@@ -553,7 +553,7 @@
      "preview": null,
      "status": "in_progress",
      "task": true,
-     "title": "Bash: sleep 15"
+     "title": "Wait 15 seconds"
     }
    },
    {
@@ -826,7 +826,7 @@
      "preview": null,
      "status": "complete",
      "task": true,
-     "title": "Bash: sleep 15"
+     "title": "Wait 15 seconds"
     }
    },
    {
@@ -841,7 +841,7 @@
      "preview": null,
      "status": "complete",
      "task": true,
-     "title": "Bash: sleep 15"
+     "title": "Wait 15 seconds"
     }
    },
    {

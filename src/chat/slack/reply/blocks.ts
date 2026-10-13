@@ -144,7 +144,12 @@ export interface CardFields {
 }
 
 /** The details and the output Slack holds for a card. */
-export type CardHeld = { details?: string; output?: string };
+/**
+ * What Slack keeps of a card: the details and the output, which it appends, and the length of
+ * the longest title the card was charged for (a title is replaced, and a shorter one frees
+ * nothing that was counted).
+ */
+export type CardHeld = { details?: string; output?: string; title?: number };
 
 export function contextBlock(text: string): ContextBlock {
   return { type: "context", elements: [{ type: "mrkdwn", text }] };
@@ -392,11 +397,13 @@ export function cardAddition(
     title: chunk.title,
     status: chunk.status,
   };
+  // A title that alternates between long and short (a run's card: the call that runs, then the
+  // counts) is charged once for its longest, not again each time it grows back.
   const after: CardHeld = { ...held };
+  const longest = held.title ?? (sent === undefined ? 0 : len(sent.title));
   let cost =
-    sent === undefined
-      ? CARD_COST + len(chunk.title)
-      : Math.max(0, len(chunk.title) - len(sent.title));
+    sent === undefined ? CARD_COST + len(chunk.title) : Math.max(0, len(chunk.title) - longest);
+  after.title = Math.max(longest, len(chunk.title));
   for (const key of CARD_APPENDED) {
     const wanted = chunk[key];
     if (wanted === undefined) continue; // nothing to say: the card keeps what it holds

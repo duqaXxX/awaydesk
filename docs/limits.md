@@ -39,6 +39,10 @@ The first rows are about how a session runs, the others about commands.
 | Several subagents started in one message | One line, `2 background agents launched`, and under it what each one does | One launch line for each subagent | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | A subagent that is continued | `Resuming agent <id>` under the line of its first end | The card of the call that continues it, which stays until the subagent ends again | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | A subagent that is stopped | `Agent "<description>" was stopped by Claude`, or `by user`, with a mark of a third colour | `✓ Agent "<description>" stopped` when Claude stops it; no line when you stop the thread with `!stop` | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
+| A command while it runs | Its description, and under it the command and its seconds: `$ sleep 20 (8s)` | Its description alone, as the title of the run's card | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
+| A run of calls that has ended, while the reply goes on | A grey line of counts | A card titled with the counts, which becomes the grey line when the reply ends | [#100](https://github.com/duqaXxX/awaydesk/issues/100) |
+| The counts of a run | A command is counted by what it does: `Listed 1 directory`, `Searched for 2 patterns` | Every command is `Ran 1 shell command` | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
+| The calls of a run, one by one | `ctrl+o` opens each call with its output | Not shown | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | What a subagent was asked | `ctrl+o` shows its prompt under the launch line | Not shown | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | How Claude is told who it is | `You are Claude Code, Anthropic's official CLI for Claude.` | `You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK.` | none |
 | Sending feedback to Anthropic, ending a conversation | The `SendFeedback` and `EndConversation` tools | Not offered | none |

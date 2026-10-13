@@ -49,13 +49,37 @@ export function launched(agentType: string | null, description: string): string 
   return fill(AGENT_LAUNCHED, { type, description: oneLine(description, TITLE_LIMIT) });
 }
 
-/** How `n` finished calls of `name` read in a folded line. */
-export function folded(name: string, n: number): string {
+// The tools whose failed call the terminal counts with the others and says nothing more of: a
+// command that exits with an error was seen counted in `ran 4 shell commands` (captured on
+// Claude Code 2.1.296, 2026-10-13). No other tool's failure was captured.
+const FAILS_COUNTED: ReadonlySet<string> = new Set(["Bash"]);
+
+/** Whether a failed call of that tool is counted in its run with the calls that ended well. */
+export function failsCounted(name: string): boolean {
+  return FAILS_COUNTED.has(name);
+}
+
+// The input the terminal titles a running call by: a command's line reads its description
+// (`Sleeping 20 seconds then printing marker`), with the command itself under it.
+const DESCRIBED: Readonly<Record<string, string>> = { Bash: "description" };
+
+/** The terminal's title for a call that runs, where it has one of its own; null for any other. */
+export function described(name: string, input: Readonly<Record<string, unknown>>): string | null {
+  const said = Object.hasOwn(DESCRIBED, name) ? input[DESCRIBED[name] as string] : undefined;
+  return typeof said === "string" && said.trim() !== "" ? oneLine(said, TITLE_LIMIT) : null;
+}
+
+/**
+ * How `n` finished calls of `name` read in a folded line. The terminal's words take a capital
+ * only when they open the line (`Read 1 file, ran 4 shell commands`); a tool's name is its own.
+ */
+export function folded(name: string, n: number, first = true): string {
   const words = Object.hasOwn(WORDS, name) ? WORDS[name] : undefined;
   if (words === undefined) {
     return n === 1 ? name : `${name} ×${n}`;
   }
-  return fill(n === 1 ? words[0] : words[1], { n });
+  const said = fill(n === 1 ? words[0] : words[1], { n });
+  return first ? said : said.charAt(0).toLowerCase() + said.slice(1);
 }
 
 function counted(n: number, noun = "line"): string {
