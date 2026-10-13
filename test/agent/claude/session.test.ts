@@ -173,9 +173,12 @@ test("a session starts with the defaults of an interactive one", LIMIT, async (t
   const env = query.options.env ?? {};
   assert.equal(env.CLAUDE_CODE_FORK_SUBAGENT, "1");
   assert.equal(env.CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR, "100");
-  // `env` replaces the inherited environment: without the daemon's own, no PATH and no HOME.
-  assert.equal(env.PATH, process.env.PATH);
-  assert.equal(env.HOME, process.env.HOME);
+  // `env` replaces the inherited environment: without the daemon's own, no path and no home.
+  // Read name by name as the copy holds them: on Windows the path is `Path`, which only
+  // `process.env` itself answers under another case.
+  const own = Object.entries(process.env);
+  assert.ok(own.length > 0);
+  for (const [name, value] of own) assert.equal(env[name], value, name);
 });
 
 test("a variable the daemon's environment sets wins over a default", LIMIT, async (t) => {
