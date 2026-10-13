@@ -4664,3 +4664,139 @@ test("an ending that goes by an edit of unknown outcome is not reported landed b
   assert.equal(await soon(sink.waitLanded()), true);
   assert.equal(footerTexts(slack)[0], "upper footer");
 });
+
+test("three replies of a stretch end in every order, with an owner message at every point: one footer, on the lowest ended", async () => {
+  // Generated: 6 orders of the ends x 4 patterns of which reply has no footer of its own x 5
+  // arrivals of the owner's message (before the first end, after the first, the second, the
+  // third, or never) = 120 cases.
+  const orders = [
+    [0, 1, 2],
+    [0, 2, 1],
+    [1, 0, 2],
+    [1, 2, 0],
+    [2, 0, 1],
+    [2, 1, 0],
+  ];
+  const missing = [null, 0, 1, 2];
+  const arrivals = [0, 1, 2, 3, null];
+  let cases = 0;
+  const failures: string[] = [];
+  for (const order of orders) {
+    for (const lacks of missing) {
+      for (const arrival of arrivals) {
+        cases += 1;
+        clocks = []; // `settled` moves every clock of the test: keep it to this case's
+        const name = `order ${order.join("")} lacks ${lacks} mark after ${arrival} ends`;
+        const slack = new FakeSlack();
+        slack.tsStep = 10;
+        const places = new ThreadPlaces();
+        const sinks = [0, 1, 2].map(() => reply(slack, { places }));
+        for (const [i, sink] of sinks.entries()) {
+          await sink.text(`Reply ${i}.`);
+          await settled();
+        }
+        const own = (i: number) => (i === lacks ? null : `footer ${i}`);
+        const ownerTs = slack.ownerTs();
+        const done: number[] = [];
+        if (arrival === 0) places.ownerPosted(ownerTs);
+        for (const i of order) {
+          await ended(sinks[i] as ReplySink, "", own(i));
+          done.push(i);
+          if (arrival === done.length) places.ownerPosted(ownerTs);
+          await settled();
+          const lowest = Math.max(...done);
+          const source = [...done].sort((a, b) => a - b).findLast((j) => own(j) !== null);
+          const expected = [0, 1, 2].map((j) =>
+            j === lowest && source !== undefined ? own(source) : null,
+          );
+          if (!isDeepStrictEqual(footerTexts(slack), expected)) {
+            failures.push(`${name}, after end of ${i}: ${JSON.stringify(footerTexts(slack))}`);
+          }
+        }
+      }
+    }
+  }
+  assert.equal(cases, 120);
+  assert.deepEqual(failures, []);
+});
+
+test("a footer edit in flight while the lower reply's end lands is taken off once it lands", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const upper = await longReply(slack, { places });
+  const lower = reply(slack, { places });
+  await lower.text("Lower.");
+  await settled();
+  const gate = new AsyncEvent();
+  slack.gate = gate;
+  slack.gateMethod = "chat.update";
+  slack.gated.clear();
+  const closing = upper.closeOutFormatted("upper footer"); // overtaken: ends by an edit, held in flight
+  await slack.gated.wait();
+  slack.gate = null;
+  await ended(lower, "", "lower footer"); // lands while the edit is still on the way
+  gate.set();
+  assert.equal(await soon(closing), true);
+  await settled();
+  await passed(30);
+  assert.deepEqual(footerTexts(slack).slice(-2), [null, "lower footer"]);
+});
+
+test("a deleted closing message does not move its reply back above an owner message", async () => {
+  const slack = new FakeSlack();
+  slack.tsStep = 10;
+  const places = new ThreadPlaces();
+  const a = reply(slack, { places });
+  await ended(a, "A.", "a footer");
+  const clock = new FakeClock();
+  const b = reply(slack, { places, clock });
+  await b.text("Only words.");
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  await b.finish([]);
+  places.ownerPosted(slack.ownerTs()); // the owner writes: B's closing message lands below it
+  assert.equal(await soon(b.closeOutFormatted("b footer")), true);
+  await settled();
+  await ended(reply(slack, { places }), "C.", "c footer");
+  assert.equal(slack.callsTo("chat.delete").length, 1, "B's closing message went");
+  const shown = footerTexts(slack);
+  assert.equal(shown.filter((footer) => footer !== null).length, 2, shown.join(" | "));
+  assert.equal(shown[0], "a footer");
+  assert.equal(shown.at(-1), "c footer");
+});
+
+test("a retry of a write after the end that fails too is logged once, naming the footer", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const logger = new Recorded();
+  await closingReply(slack, places, "upper footer", { logger, finalRetrySeconds: 0.02 });
+  slack.responses["chat.delete"] = rejected("internal_error");
+  await ended(reply(slack, { places }), "Lower.", "lower footer");
+  await passed(0.02);
+  await settled();
+  assert.equal(slack.callsTo("chat.delete").length, 2, "tried, then once more");
+  const twice = logger.lines.filter((line) => line.message.includes("tried twice"));
+  assert.equal(twice.length, 1);
+  assert.match(twice[0]?.message ?? "", /footer/);
+  // The next change of the reply writes it.
+  slack.responses["chat.delete"] = { ok: true };
+  const upper = places as unknown as { replies: Set<ReplySink> };
+  const [sink] = [...upper.replies];
+  await sink?.text(" More.");
+  await settled();
+  assert.equal(slack.callsTo("chat.delete").length, 3);
+});
+
+test("a retry that a settling flush starts does not outlive the close", async () => {
+  const slack = new FakeSlack();
+  const sink = await closingReply(slack, new HandPlaced(), "upper footer", {
+    finalRetrySeconds: 0.02,
+  });
+  slack.responses["chat.delete"] = rejected("internal_error");
+  sink.assign({ footer: null, running: false }); // schedules the delete, which fails
+  await sink.settle();
+  const deletes = slack.callsTo("chat.delete").length;
+  await passed(1);
+  await settled();
+  assert.equal(slack.callsTo("chat.delete").length, deletes, "no retry after the close");
+});

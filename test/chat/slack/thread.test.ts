@@ -382,6 +382,19 @@ test("a reply let go of by the owner's message still sees the next reply of its 
   await thread.close();
 });
 
+test("a reply whose end never lands is let go of when its thread closes", async () => {
+  const { chat, slack } = made();
+  slack.responses["chat.startStream"] = rejected("internal_error");
+  const thread = chat.thread({ channel: CHANNEL, thread: THREAD });
+  const reply = thread.openReply(() => {});
+  await reply.text("never written");
+  await reply.finish([]);
+  assert.equal(await reply.closeOut(null), false, "the end did not land");
+  assert.equal(trackedThreads(chat), 1);
+  await thread.close();
+  assert.equal(trackedThreads(chat), 0, "the places and the reply are forgotten");
+});
+
 // The map of a chat's threads' places, which no member of the provider exposes.
 function trackedThreads(chat: SlackChat): number {
   return (chat as unknown as { places: Map<string, unknown> }).places.size;

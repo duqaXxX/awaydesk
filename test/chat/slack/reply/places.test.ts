@@ -130,14 +130,12 @@ describe("ThreadPlaces", () => {
     assert.equal(places.last(second), true);
   });
 
-  test("a reply is let go of when its opening thread closed and its end landed, in either order", () => {
+  test("a reply is let go of when its opening thread closes, its end landed or not", () => {
     const left: number[] = [];
     const places = new ThreadPlaces(() => left.push(1));
     const first = joined(places, "1760000001.000001");
     places.closed(first);
-    assert.equal(places.held, true, "not ended yet");
-    places.ended(first);
-    assert.equal(places.held, false);
+    assert.equal(places.held, false, "its end never landed, and its session is gone");
     const second = joined(places, "1760000002.000001");
     places.ended(second);
     assert.equal(places.held, true, "its thread is open");

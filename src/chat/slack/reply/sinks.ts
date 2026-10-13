@@ -491,6 +491,10 @@ export class ReplySink implements Sink {
   private closingGone = false;
   /** One more try of a write after the end, when a pass failed (the final write's retry). */
   private tailRetry: Task<void> | null = null;
+  /** `settle` ran: the reply is being closed down, and no retry may outlive it. */
+  private settling = false;
+  /** The retry of a write after the end is running its pass. */
+  private retrying = false;
   /** The cut of an overtaken reply was logged: once is enough. */
   private cutWarned = false;
   // Resolves once the reply is known to have ended on Slack (true) or its one retry failed too
@@ -592,6 +596,9 @@ export class ReplySink implements Sink {
       // What the end wrote is what it shows now: the places only hand over a change of it.
       this.assigned = this.places.tailIf(this);
       this.ended = true;
+      // A reply that landed after a lower one took the footer may have drawn it before that: one
+      // pass sets the message right, and makes no call when it is.
+      this.changed();
     }
     this.places.ended(this);
     this.retrack();
@@ -664,8 +671,8 @@ export class ReplySink implements Sink {
 
   /** The position of the reply's last message in its thread, null while it has none. */
   get lastAt(): number | null {
-    const closing = this.closingGone ? null : this.closing;
-    const ts = closing ?? this.messages.findLast((message) => message.ts !== null)?.ts ?? null;
+    // A closing message that was deleted still marks where the reply sat: a reply never moves up.
+    const ts = this.closing ?? this.messages.findLast((message) => message.ts !== null)?.ts ?? null;
     return ts === null ? null : positionOf(ts);
   }
 
@@ -819,6 +826,7 @@ export class ReplySink implements Sink {
     }
     this.retry?.cancel();
     this.tailRetry?.cancel();
+    this.settling = true; // the flush below may fail a write that would start a retry
     const ok = await cancellable(this.flush(), signal);
     if (this.closedOut && this.landedValue === null) this.resolve(ok);
     return ok || this.landedValue === true;
@@ -2140,7 +2148,8 @@ export class ReplySink implements Sink {
     } catch (error) {
       if (describe(error) !== MESSAGE_NOT_FOUND) {
         this.logger.warning(`could not delete a reply's closing message: ${describe(error)}`);
-        this.retryLater();
+        if (this.retrying) this.warnGaveUp();
+        else this.retryLater();
         return true;
       }
     }
@@ -2155,17 +2164,27 @@ export class ReplySink implements Sink {
    * no next rewrite to fix it. A try in flight is not followed by another.
    */
   private retryLater(): void {
-    if (this.tailRetry !== null) return;
+    if (this.tailRetry !== null || this.settling) return;
     const task = new Task<void>(async (signal) => {
       try {
         await this.clock.sleep(this.finalRetrySeconds, signal);
         // Shielded like the final write: a pass given up after Slack took it would lose its result.
-        await this.flush();
+        this.retrying = true;
+        if (!(await this.flush())) this.warnGaveUp();
       } finally {
+        this.retrying = false;
         if (this.tailRetry === task) this.tailRetry = null;
       }
     });
     this.tailRetry = task;
+  }
+
+  /** The retry of a write after the end failed too: the next change of the reply writes it. */
+  private warnGaveUp(): void {
+    this.logger.warning(
+      "could not bring a reply's footer to the thread after its end, tried twice: " +
+        "the next change of the reply writes it",
+    );
   }
 
   /** Logs once that an overtaken reply shows less than it said. */

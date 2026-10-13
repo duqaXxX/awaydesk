@@ -135,7 +135,7 @@ export class ThreadPlaces {
     return tails(entries, this.marks);
   }
 
-  /** The thread object that opened the reply closed: the reply is let go of once its end landed. */
+  /** The thread object that opened the reply closed: the reply is let go of, its end landed or not. */
   closed(reply: Placed): void {
     if (!this.replies.has(reply)) return;
     this.shut.add(reply);
@@ -166,7 +166,10 @@ export class ThreadPlaces {
   private release(): void {
     const top = this.marks.length === 0 ? null : Math.max(...this.marks);
     let gone = false;
-    for (const reply of [...this.done]) {
+    for (const reply of [...this.replies]) {
+      // A closed thread lets go of its replies whether or not their end landed: the session is
+      // gone, and nothing else would drop a reply whose end never lands.
+      if (!this.shut.has(reply) && !this.done.has(reply)) continue;
       if (!this.sealed(reply, top)) continue;
       const at = reply.lastAt;
       if (at !== null) this.floor = Math.max(this.floor ?? at, at);
@@ -179,18 +182,21 @@ export class ThreadPlaces {
   }
 
   /**
-   * Whether an ended reply is let go of: its thread closed, or an owner message sits below it
-   * and no reply of its stretch (one with a message above that owner message, or without a
-   * message yet) is still to end, since that one takes the stretch's footer from it.
+   * Whether an ended reply is let go of: its thread closed, or an owner message sits below it and
+   * no reply of its stretch, above it or below, is still to end. A stretch is let go of as a
+   * whole: the reply still to end takes the stretch's footer from its holder, or gives it back,
+   * and a holder already gone is invisible to `tails`. A reply with no message yet counts in no
+   * stretch.
    */
   private sealed(reply: Placed, top: number | null): boolean {
     const at = reply.lastAt;
     if (this.shut.has(reply) || at === null) return true;
     if (top === null || top <= at) return false;
+    const prev = Math.max(Number.NEGATIVE_INFINITY, ...this.marks.filter((mark) => mark < at));
     const next = Math.min(...this.marks.filter((mark) => mark > at));
     for (const other of this.replies) {
       if (other === reply || this.done.has(other) || other.lastAt === null) continue;
-      if (other.lastAt > at && other.lastAt < next) return false;
+      if (other.lastAt > prev && other.lastAt < next) return false;
     }
     return true;
   }

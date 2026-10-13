@@ -160,8 +160,8 @@ started, whichever comes first. Slack closes a stream 5 minutes after `chat.star
   tells it where its last message moved; the listener tells it the `ts` of every message the owner
   wrote in the thread (`SlackChat.ownerPosted`), also one the prompt filter drops. A reply is let
   go of once its end has landed and an owner message sits below it with no reply of its stretch
-  still to end (that reply may take the stretch's footer), or the `SlackThread` that
-  opened it closed; the highest position of a reply let go of stays in the places, so the answers
+  still to end, above it or below (that reply may take the stretch's footer, so a stretch is let
+  go of as a whole), or the `SlackThread` that opened it closed, its end landed or not; the highest position of a reply let go of stays in the places, so the answers
   do not change when it goes. A `SlackThread` lets go only of the replies it opened. The places
   hold a lock for the creation of a message of any reply of the thread (a stream's start, a
   continuation, an ending, a closing message) and for the end's decision to create one, so that

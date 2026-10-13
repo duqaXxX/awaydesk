@@ -756,6 +756,8 @@ function footersOf(h: Harness): Array<string | null> {
 test("a thread with an owner prompt between its replies shows one footer per stretch, under the last reply of each", async (t) => {
   // The recorded background run, with a prompt answered while the command runs: the report goes
   // to the bottom, in the stretch of the prompt's reply.
+  // The scheduled write itself is pinned by the sink tests: here the core's own calls cause
+  // other passes that would draw the tail too.
   const [first, notice, injected] = splitBackground();
   const h = harness(t, [{ turns: [first, sdkMessages("foreground")] }]);
   const session = h.session();
@@ -798,9 +800,5 @@ test("a report that starts while the owner's prompt has no message yet leaves on
     footers.map((footer) => footer !== null),
     [true, false, true],
     "one footer for the first stretch and one under the prompt's reply",
-  );
-  assert.ok(
-    footers.every((footer) => !footer?.includes("⏳")),
-    "no count of running tasks in the middle of the thread",
   );
 });
