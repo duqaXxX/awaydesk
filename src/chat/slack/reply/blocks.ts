@@ -82,6 +82,7 @@ export interface MarkdownBlock {
 export interface ContextBlock {
   type: "context";
   elements: { type: "mrkdwn"; text: string }[];
+  block_id?: string;
 }
 
 export interface DividerBlock {
@@ -153,6 +154,15 @@ export type CardHeld = { details?: string; output?: string; title?: number };
 
 export function contextBlock(text: string): ContextBlock {
   return { type: "context", elements: [{ type: "mrkdwn", text }] };
+}
+
+// The `block_id` of a line about the work, with the place of its text in the reply: a context
+// block as the count of a run of calls is, told apart from one and from the footer by its id.
+export const ASIDE_ID = "aside-";
+
+/** A line about the work (a task's end), small and grey. `at` is unique within the message. */
+export function asideBlock(text: string, at: number): ContextBlock {
+  return { ...contextBlock(text), block_id: `${ASIDE_ID}${at}` };
 }
 
 /**

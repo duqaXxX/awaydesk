@@ -143,6 +143,8 @@ export class TurnRenderer<Footer = FooterFields> {
   // every held call of it to say how its agent runs; anything else the reply writes comes
   // after them.
   #launches: Launch[] = [];
+  /** Tasks whose call has not ended: in the foreground, as far as the reply knows. */
+  readonly #waited = new Set<string>();
   /** A message of the agent's is being written, at the top level. */
   #messageOpen = false;
   /** A line of the daemon's was written into the reply. */
@@ -272,6 +274,15 @@ export class TurnRenderer<Footer = FooterFields> {
   /** Ids of the tasks that outlive the turn; a later task event fed here updates them. */
   get runningTasks(): string[] {
     return [...this.#running.keys()];
+  }
+
+  /**
+   * The running tasks that are in the background: every one but a task whose call still waits
+   * for it (a long command in the foreground, a subagent the call waits for), which the reply
+   * shows on that call's line.
+   */
+  get backgroundTasks(): string[] {
+    return this.runningTasks.filter((taskId) => !this.#waited.has(taskId));
   }
 
   /** The line title of a task this reply shows, running or ended. */
@@ -416,13 +427,13 @@ export class TurnRenderer<Footer = FooterFields> {
    * report turn feeds one into an already-written reply instead (the one that started the task
    * it reports): a blank line still separates it from what is there, as a paragraph break would.
    */
-  async feedNotice(text: string): Promise<void> {
+  async feedNotice(text: string, aside = false): Promise<void> {
     await this.#writeLaunches();
     const prefix = this.#wroteText || this.#lines.size > 0 || this.#breakOwed ? "\n\n" : "";
     this.#afterText = false;
     this.#breakOwed = false;
     await this.#handOver();
-    await this.#sink.text(`${prefix}${text}\n\n`, { notice: true, ending: false });
+    await this.#sink.text(`${prefix}${text}\n\n`, { notice: true, ending: false, aside });
   }
 
   /**
@@ -430,8 +441,8 @@ export class TurnRenderer<Footer = FooterFields> {
    * note as `feedNotice` writes one, and the reply's content: a turn that then says nothing has
    * said this, and gets no line about an answer with no text.
    */
-  async feedOpening(text: string): Promise<void> {
-    await this.feedNotice(text);
+  async feedOpening(text: string, aside = false): Promise<void> {
+    await this.feedNotice(text, aside);
     this.#wroteLine = true;
   }
 
@@ -441,14 +452,19 @@ export class TurnRenderer<Footer = FooterFields> {
    */
   async feedLine(text: string): Promise<void> {
     await this.#writeLaunches();
-    await this.#line(text);
+    await this.#line(text, true);
   }
 
-  async #line(text: string): Promise<void> {
+  /** `aside`: a line about the work, which a chat may draw smaller (a task's end). */
+  async #line(text: string, aside = false): Promise<void> {
     const apart = this.#breakOwed || this.#wroteText || this.#lines.size > 0 || this.#wroteLine;
     this.#afterText = false;
     await this.#handOver();
-    await this.#sink.text(`${apart ? "\n\n" : ""}${text}`, { notice: true, ending: false });
+    await this.#sink.text(`${apart ? "\n\n" : ""}${text}`, {
+      notice: true,
+      ending: false,
+      aside,
+    });
     this.#breakOwed = true;
     this.#wroteLine = true;
   }
@@ -548,6 +564,9 @@ export class TurnRenderer<Footer = FooterFields> {
       return;
     }
     this.#undecided.delete(event.callId); // no task came: the call shows as any other
+    // The call waits for no task any more: one still running is in the background from here.
+    for (const [taskId, lineId] of this.#running)
+      if (lineId === entry.id) this.#waited.delete(taskId);
     let outliving = this.#carded()
       .filter(([, lineId]) => lineId === entry.id)
       .map(([taskId]) => taskId);
@@ -622,6 +641,7 @@ export class TurnRenderer<Footer = FooterFields> {
       // (recorded: `interrupt.jsonl`, CLI 2.1.283). The line stays the call's until the call's
       // result arrives with the task still running (`#callEnded`).
       this.#bind(event.taskId, call);
+      this.#waited.add(event.taskId);
       return;
     }
     const command = [...this.#running.values()].reverse().find((id) => this.#commands.has(id));
@@ -710,6 +730,7 @@ export class TurnRenderer<Footer = FooterFields> {
       return;
     }
     this.#running.delete(taskId);
+    this.#waited.delete(taskId);
     const lineId = this.#lineOfTask.get(taskId) ?? `task-${taskId}`;
     // No card: its end is the session's end line.
     if (this.#launched.has(lineId) || this.#quiet.has(taskId)) return;

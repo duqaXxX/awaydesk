@@ -73,6 +73,11 @@ of the reply (`TurnRenderer`, `previews.launched`). A call that
 turns into one of these keeps the run's card when it was the run's only call. An `Edit` or a `Write` that
 ended well also ends the run, and has no card: its preview is all that shows it.
 
+A line about the work, which the core marks `aside` (a task's end line), is a `context` block too,
+with the `block_id` `aside-` and the place of its text (`blocks.asideBlock`): text in the
+stream, grey from the update that follows the stream's stop or from any update of a message no
+longer a stream.
+
 Once the reply's body has ended, each run reads as one line of counts in a `context` block
 (`Ran 3 shell commands, read 1 file`), as the terminal folds a run that
 ended (`TaskUpdate.folded`, `ReplySink.cardBlocks`). A stream cannot replace what it showed, so the

@@ -1827,6 +1827,9 @@ export class ThreadSession {
     }
     await active.renderer.feed(event);
     this.adoptPromoted(active.renderer);
+    // A call's end can leave its task running in the background, which the list then counts.
+    if (event.type === "call_ended" && active.renderer.backgroundTasks.length > 0)
+      this.showRunning();
     if (event.type === "turn_ended") {
       // The turn stays active until its reply is closed: the footer is read first, and a
       // drain that saw this thread idle meanwhile would exit before the reply's end, leaving
@@ -1907,7 +1910,11 @@ export class ThreadSession {
    * ended and will not notify again or one the owner has scrolled past. The text is null for a
    * report the agent named the task of (`report_started`) that renders in that task's reply with no end line to open it.
    */
-  private openingTarget(): readonly [text: string | null, target: TurnRenderer | null] {
+  private openingTarget(): readonly [
+    text: string | null,
+    target: TurnRenderer | null,
+    aside: boolean,
+  ] {
     // The lines set aside when this turn began, when it began with any; a task that ended
     // since waits for the turn that reports it.
     const lines = this.opening ?? this.ended;
@@ -1936,7 +1943,8 @@ export class ThreadSession {
     // In the reply that started the task the report needs no line to say what it is about:
     // the task's card or launch line is there. Anywhere else the notice says it, as it always has.
     const named = lines.length === 0 && reported !== null && target !== null;
-    return [named ? null : ends || texts.BACKGROUND_NOTICE, target];
+    // End lines are lines about the work; the notice that stands in for them is the daemon's.
+    return [named ? null : ends || texts.BACKGROUND_NOTICE, target, ends !== ""];
   }
 
   /**
@@ -2022,11 +2030,11 @@ export class ThreadSession {
     const [first] = pending;
     const holder =
       first === undefined ? null : (this.taskReplies.get(first[0]) ?? this.showing(first[0]));
-    const [text, target] = this.openingTarget();
+    const [text, target, aside] = this.openingTarget();
     try {
       if (held.length > 0) {
         const renderer = target ?? this.newRenderer(this.newReply());
-        await this.standalone(held, text, renderer, signal);
+        await this.standalone(held, text, aside, renderer, signal);
       } else if (said && target !== null && text !== null) {
         // Into the reply that started the task, which the sweep below then ends. A reply that
         // is no longer the last thing in the thread gets no line: none is posted for it.
@@ -2303,14 +2311,16 @@ export class ThreadSession {
     this.expiry?.cancel();
     let renderer: TurnRenderer;
     let opening: string | null = null;
+    let openingAside = false;
     if (turn === null) {
       this.notificationWaits = false;
       // A report turn renders into the reply that started a task it reports, so no new message
       // follows for it, but only a reply that is still tracked, not ended and the last thing in
       // the thread (`openingTarget`); otherwise it gets a reply of its own at the bottom.
-      const [text, target] = this.openingTarget();
+      const [text, target, aside] = this.openingTarget();
       renderer = target ?? this.newRenderer(this.newReply());
       opening = text;
+      openingAside = aside;
     } else {
       this.reportOf = null; // the prompt's own turn: what was named is not the next turn
       renderer = this.newRenderer(turn.sink);
@@ -2334,7 +2344,7 @@ export class ThreadSession {
       unanswered: null,
     };
     this.active = active;
-    if (opening !== null) await renderer.feedOpening(opening);
+    if (opening !== null) await renderer.feedOpening(opening, openingAside);
     const ahead = this.endedAhead;
     this.endedAhead = [];
     if (ahead.length > 0) await renderer.feedLine(ahead.join("\n"));
@@ -2356,10 +2366,11 @@ export class ThreadSession {
   private async standalone(
     events: readonly TaskEvent[],
     text: string | null,
+    aside: boolean,
     renderer: TurnRenderer,
     signal?: AbortSignal,
   ): Promise<void> {
-    if (text !== null) await renderer.feedOpening(text);
+    if (text !== null) await renderer.feedOpening(text, aside);
     for (const event of events) await renderer.feed(event);
     await this.closeReply(renderer, null, { signal });
   }
@@ -2533,9 +2544,11 @@ export class ThreadSession {
   /** The tasks still running: those that outlived their turn, and the running turn's. */
   private runningTaskIds(): string[] {
     const outlived = [...this.taskReplies]
-      .filter(([taskId, reply]) => reply.runningTasks.includes(taskId))
+      .filter(([taskId, reply]) => reply.backgroundTasks.includes(taskId))
       .map(([taskId]) => taskId);
-    const current = this.active?.renderer.runningTasks ?? [];
+    // What runs in the background, as the terminal counts it: a command the turn is still
+    // waiting for shows on its own line and is no shell left running.
+    const current = this.active?.renderer.backgroundTasks ?? [];
     return [...new Set([...outlived, ...current])];
   }
 
@@ -2547,7 +2560,7 @@ export class ThreadSession {
     const counts = new Map<string, number>();
     for (const [taskId, renderer] of this.taskReplies) {
       if (options.awaitedOnly && this.afterRestart.has(taskId)) continue;
-      if (renderer.runningTasks.includes(taskId)) {
+      if (renderer.backgroundTasks.includes(taskId)) {
         const counted = TASK_WORDS[this.tasks.get(taskId)?.[0] ?? "other"][0];
         counts.set(counted, (counts.get(counted) ?? 0) + 1);
       }
@@ -2573,7 +2586,7 @@ export class ThreadSession {
       return at === -1 ? Number.POSITIVE_INFINITY : at;
     };
     const lines = [...this.taskReplies]
-      .filter(([taskId, renderer]) => renderer.runningTasks.includes(taskId))
+      .filter(([taskId, renderer]) => renderer.backgroundTasks.includes(taskId))
       .sort(([a], [b]) => rank(a) - rank(b))
       .map(([taskId, renderer]) => {
         const [kind, description, agentType] = this.tasks.get(taskId) ?? ["other", "", null];

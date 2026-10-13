@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A task's end line is drawn small and grey, as the count of a run of calls is (the owner's
+  choice, 2026-10-14; the terminal writes it as text behind a coloured dot). The chat seam's
+  `ReplySink.text` takes `aside` for such a line; the Slack provider draws it as a `context`
+  block once the message is written by an update, and as text while it is a stream.
+- The list of what still runs counts what is in the background alone
+  (`TurnRenderer.backgroundTasks`). A long command the turn still waits for was counted as
+  `1 shell still running` beside its own card.
+
 - A command left running in the background has no card, as the terminal draws none (issue #299,
   captured on Claude Code 2.1.296): its call is counted in its run, and the command shows in the
   list of what still runs and by its end line. The same holds for a command a subagent leaves

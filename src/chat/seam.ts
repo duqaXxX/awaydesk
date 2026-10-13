@@ -92,9 +92,13 @@ export interface FooterFields {
  * a `signal` only releases the caller, who stops waiting for it.
  */
 export interface ReplySink {
+  /**
+   * `aside` marks a line about the work and not of the answer (a task's end): a chat may draw
+   * it smaller, as it draws the count of a run of calls.
+   */
   text(
     markdown: string,
-    options?: { readonly notice?: boolean; readonly ending?: boolean },
+    options?: { readonly notice?: boolean; readonly ending?: boolean; readonly aside?: boolean },
   ): Promise<void>;
   task(update: TaskUpdate): Promise<void>;
   /**

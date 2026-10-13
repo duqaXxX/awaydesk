@@ -4530,7 +4530,9 @@ test("the reply is not ended while its turn is still active", async (t) => {
   h.clients[0]?.inject(tail);
   await turn.done.wait();
   await h.until(() => h.reactions().at(-1) === Status.DONE);
-  assert.deepEqual(footerWrites(h), ["chat.stopStream"]); // ended once, by its own turn, with the footer
+  // Ended once, by its own turn, with the footer. The update that follows the stop is the
+  // silent one that draws the command's end line small and grey, which a stream cannot.
+  assert.deepEqual(footerWrites(h), ["chat.stopStream", "chat.update"]);
 });
 
 test("a recorded turn that outlives its subagent s command ends once with its footer", async (t) => {

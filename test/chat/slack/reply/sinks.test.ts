@@ -5558,3 +5558,28 @@ test("a card whose title grows back is charged once for its longest title", () =
     cardAddition({ ...(sent as CardChunk), title: long }, undefined, {}, null)[2],
   );
 });
+
+test("a line about the work is text in the stream and a grey line once the body has ended", async () => {
+  // A task's end line (issue #299): a stream takes only text and cards, so the line is grey
+  // from the silent update that follows the stream's stop, as a run's count is.
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await sink.text("Started.");
+  await sink.text('\n\n✓ Agent "Review" finished · 5s', { notice: true, aside: true });
+  await sink.text("\n\nIt found <nothing>.");
+  await settled();
+  assert.deepEqual(slack.messageTexts(), [
+    'Started.\n\n✓ Agent "Review" finished · 5s\n\nIt found <nothing>.',
+  ]);
+  await sink.finish([], null);
+  assert.equal(await sink.closeOutFormatted("main · ctx 6%"), true);
+  assert.deepEqual(methods(slack).slice(-2), ["chat.stopStream", "chat.update"]);
+  assert.deepEqual(only(slack.callsTo("chat.update")).blocks, [
+    { type: "markdown", text: "Started." },
+    { ...context('✓ Agent "Review" finished · 5s'), block_id: "aside-1" },
+    { type: "markdown", text: "It found <nothing>." },
+    { type: "divider" },
+    context("main · ctx 6%"),
+  ]);
+  assert.equal(slack.pushes(), 1); // the stop pushed; the update that greys the line never does
+});

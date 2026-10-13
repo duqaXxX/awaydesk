@@ -1260,6 +1260,10 @@ closed when the start returns (`ThreadSession.connect`).
   (`ThreadSession.whoseTurn`). Where no replay settles it, `turn_ended` tells who started the turn,
   and the queue is put back in order (`ThreadSession.settle`, which logs it); that one reply can
   then carry the other's label.
+- An end line is written `aside` (`ReplySink.text`): a line about the work, which a chat may draw
+  smaller, as it draws the count of a run of calls. The list of what still runs counts the tasks in
+  the background alone (`TurnRenderer.backgroundTasks`): a task whose call still waits for it
+  shows on that call's line.
 - A task that outlives its turn keeps its line in the reply that started it: the session maps the
   task id to that reply, and every later task event for it updates that line only, never another
   reply. A subagent or a command in the background has no line there: when it ends while

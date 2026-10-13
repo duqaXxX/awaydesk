@@ -32,6 +32,7 @@ import {
   WebClient,
 } from "@slack/web-api";
 import { NAME, WORDS } from "../../src/agent/claude/backend.ts";
+import { ASIDE_ID } from "../../src/chat/slack/reply/blocks.ts";
 import { type Json, type JsonObject, slackPayload } from "./fixtures.ts";
 
 /** The agent a provider's texts name in a test: the Claude back end's own name and words. */
@@ -615,9 +616,17 @@ export class FakeSlack extends WebClient {
   #shown(ts: string): [string, JsonObject[]] {
     const message = this.#message(ts);
     if (message.updated || message.chunks.length === 0) {
+      // A line about the work (a task's end) is a context block told by its id: read with the
+      // text, where it sits.
+      const aside = (block: JsonObject): boolean =>
+        block.type === "context" && String(block.block_id ?? "").startsWith(ASIDE_ID);
       const text = message.blocks
-        .filter((block) => block.type === "markdown")
-        .map((block) => str(need(block, "text")))
+        .filter((block) => block.type === "markdown" || aside(block))
+        .map((block) =>
+          aside(block)
+            ? str(need(object(list(need(block, "elements"), "elements")[0], "element"), "text"))
+            : str(need(block, "text")),
+        )
         .join("\n\n");
       const cards = message.blocks.filter((b) => b.type === "task_card").map(cardOf);
       return [text, cards];

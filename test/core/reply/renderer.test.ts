@@ -143,6 +143,22 @@ test("a running command is titled by its description, any other call by its firs
   );
 });
 
+test("a task its call still waits for is running, and not in the background", async () => {
+  // The terminal counts `1 shell still running` for what is in the background alone: a long
+  // command in the foreground shows on its own line (seen in a real session, 2026-10-14).
+  // foreground.jsonl: the task starts, ends, then the call's result arrives.
+  const foreground = recordedEvents("foreground");
+  const started = foreground.findIndex((event) => event.type === "task_started");
+  const [, waiting] = await render(foreground.slice(0, started + 1));
+  assert.equal(waiting.runningTasks.length, 1);
+  assert.deepEqual(waiting.backgroundTasks, []);
+  // background.jsonl: the call's result arrives while its command still runs.
+  const [first = []] = splitTurns(recordedEvents("background"));
+  const [, left] = await render(first);
+  assert.equal(left.runningTasks.length, 1);
+  assert.deepEqual(left.backgroundTasks, left.runningTasks);
+});
+
 test("a failed tool is an error line", async () => {
   const [sink] = await render(recordedEvents("tool-error"));
   assert.ok(sink.tasks.some((t) => t.status === "error"));

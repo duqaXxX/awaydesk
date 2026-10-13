@@ -37,6 +37,7 @@ The first rows are about how a session runs, the others about commands.
 | A question that shows a preview beside each option | Offered | The question comes without previews | [#300](https://github.com/duqaXxX/awaydesk/issues/300) |
 | A subagent that starts subagents in the background | Waits for them | Does not wait: one that ends later reports to the main conversation | none |
 | A subagent that is continued | `Resuming agent <id>` under the line of its first end | The card of the call that continues it, which stays until the subagent ends again | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
+| The end line of a task | Text of the conversation behind a coloured dot | Small and grey behind `✓` or `✗`, once the reply's stream has stopped; text until then | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | A subagent that is stopped | `Agent "<description>" was stopped by Claude`, or `by user`, with a mark of a third colour | `✓ Agent "<description>" stopped` when Claude stops it; no line when you stop the thread with `!stop` | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | A command while it runs | Its description, and under it the command and its seconds: `$ sleep 20 (8s)` | Its description alone, as the title of the run's card | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | A run of calls that has ended, while the reply goes on | A grey line of counts | A card titled with the counts, which becomes the grey line when the reply ends | [#100](https://github.com/duqaXxX/awaydesk/issues/100) |
