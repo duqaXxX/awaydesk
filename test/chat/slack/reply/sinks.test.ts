@@ -4290,6 +4290,12 @@ test("an overtaken reply whose new content would overflow posts nothing", async 
   assert.equal(slack.callsTo("chat.postMessage").length, 0);
   assert.equal(slack.createdTs.length, created, "no message was opened");
   assert.equal(logger.lines.filter((line) => line.level === "WARNING").length, 1);
+  const update = last(slack.callsTo("chat.update"));
+  assert.deepEqual(list(update.blocks).slice(-2), [
+    { type: "divider" },
+    contextBlock("main · ctx 6%"),
+  ]);
+  assert.equal(sink.footerShown, true, "the footer landed under the cut message");
 });
 
 test("an older reply does not post its ending below a newer one that was let go of", async () => {
