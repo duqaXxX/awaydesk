@@ -102,7 +102,7 @@ class MemoryReply implements Reply, Placed {
   }
 
   get resting(): boolean {
-    return this.#finished;
+    return this.#finished && (this.#rested || this.#landed);
   }
 
   get ownFooter(): string | null {
@@ -159,7 +159,9 @@ class MemoryReply implements Reply, Placed {
   rest(): void {
     if (this.#rested) return;
     this.#rested = true;
+    this.#shown = this.#room.footerIf(this.#ref, this);
     this.#write();
+    this.#room.place(this.#ref);
   }
 
   /** The footer shows once the reply waits (`rest`) or ended; a reply that only finished ends at once. */
@@ -170,12 +172,14 @@ class MemoryReply implements Reply, Placed {
   async closeOut(): Promise<boolean> {
     if (this.#closed) return this.#landed;
     this.#closed = true;
+    this.#shown = this.#room.footerIf(this.#ref, this);
     this.#write();
     this.#landed = !this.#lost;
     if (this.#landed && this.#message !== null) {
       this.#message.unfinished = false;
       this.#onOpen(this.#message.id, null);
     }
+    if (this.#landed) this.#room.place(this.#ref);
     this.#resolveLanding(this.#landed);
     return this.#landed;
   }

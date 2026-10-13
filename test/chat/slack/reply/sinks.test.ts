@@ -4432,8 +4432,8 @@ function footerTexts(slack: FakeSlack): Array<string | null> {
 /** A reply that says one line and ends with `footer`, its write landed. */
 async function ended(sink: ReplySink, line: string, footer: string | null): Promise<void> {
   if (line !== "") await sink.text(line);
-  await sink.finish([], null);
-  assert.equal(await soon(sink.closeOutFormatted(footer)), true);
+  await sink.finishFormatted([], footer);
+  assert.equal(await soon(sink.closeOut()), true);
   await settled();
 }
 
@@ -4449,8 +4449,8 @@ async function closingReply(
   await sink.text("Only words.");
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
-  await sink.finish([], null);
-  assert.equal(await soon(sink.closeOutFormatted(footer)), true);
+  await sink.finishFormatted([], footer);
+  assert.equal(await soon(sink.closeOut()), true);
   await settled();
   return sink;
 }
@@ -4900,4 +4900,78 @@ test("a reply that rests is still registered, and its end writes the ending with
   assert.deepEqual(list(ending.blocks).slice(-2), [{ type: "divider" }, contextBlock("footer")]);
   assert.equal(slack.pushes(), 2); // the stop of the rest, and the ending
   assert.ok(!places.holds(sink), "ended, and sealed by the owner's message");
+});
+
+// ---- fix round 1: when a reply counts as at rest
+
+test("a reply whose stream Slack closed shows the footer after rest, found out by the finish flush", async () => {
+  const slack = new FakeSlack();
+  const sink = reply(slack);
+  await sink.text("Started it.");
+  await settled();
+  slack.expire(slack.streamTs[0] ?? ""); // Slack closes the stream; the daemon does not know
+  await sink.text(" More.");
+  await sink.finishFormatted([], "footer"); // its flush is what finds the stream gone
+  sink.rest();
+  await settled();
+  assert.deepEqual(list(last(slack.callsTo("chat.update")).blocks).slice(-2), [
+    { type: "divider" },
+    contextBlock("footer"),
+  ]);
+  await sink.text(" Later.");
+  await settled();
+  assert.deepEqual(list(last(slack.callsTo("chat.update")).blocks).slice(-2), [
+    { type: "divider" },
+    contextBlock("footer"),
+  ]);
+});
+
+test("a reply whose end does not land does not take the footer from the reply above", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const upper = reply(slack, { places });
+  await ended(upper, "Upper.", "a footer");
+  const clock = new FakeClock();
+  const lower = reply(slack, { places, clock, finalRetrySeconds: 0.02 });
+  await lower.text("Lower.");
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  slack.responses["chat.postMessage"] = [rejected("internal_error"), rejected("internal_error")];
+  await lower.finishFormatted([], "b footer");
+  assert.equal(await lower.closeOut(), false);
+  await passed(0.05);
+  await settled();
+  // Before the end lands, the footer stays where it was.
+  assert.deepEqual(footerTexts(slack), ["a footer", null]);
+});
+
+test("a stop that keeps failing does not hide the text that follows", async () => {
+  const slack = new FakeSlack();
+  const [sink] = await finishedReply(slack);
+  slack.responses["chat.stopStream"] = [
+    rejected("ratelimited"),
+    rejected("ratelimited"),
+    { ok: true },
+  ];
+  sink.rest();
+  await settled();
+  await sink.text(" Between.");
+  await settled();
+  assert.ok(
+    JSON.stringify(slack.callsTo("chat.appendStream")).includes("Between."),
+    "the text goes on to the open stream",
+  );
+});
+
+test("a rest told again while the stream is still open tries the stop again", async () => {
+  const slack = new FakeSlack();
+  const [sink] = await finishedReply(slack);
+  slack.responses["chat.stopStream"] = [rejected("ratelimited"), { ok: true }];
+  sink.rest();
+  await settled();
+  assert.equal(slack.callsTo("chat.stopStream").length, 1);
+  sink.rest(); // nothing else changed: only this call can start the pass
+  await settled();
+  assert.equal(slack.callsTo("chat.stopStream").length, 2);
+  assert.equal(slack.pushes(), 1);
 });

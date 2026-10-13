@@ -124,3 +124,43 @@ test("a thread that is not there takes no message", async () => {
   const { chat, channel } = await built();
   await assert.rejects(chat.as(OWNER).says(channel, "hi", { thread: "nothing" }), /no thread/);
 });
+
+test("a reply that only finished does not take the footer from the reply above", async () => {
+  const { chat, provider, channel } = await built();
+  const sent = await chat.as(OWNER).says(channel, "hello");
+  const thread = provider.thread(sent.ref);
+  const footer = {
+    bypass: false,
+    model: "model-a",
+    effort: null,
+    folder: null,
+    branch: null,
+    changes: null,
+    sessionTokens: null,
+    contextPercent: null,
+    sessionLimit: null,
+    weekLimit: null,
+  };
+  const upper = thread.openReply(() => {});
+  await upper.text("Upper");
+  await upper.finish([], footer);
+  await upper.closeOut();
+  const lower = thread.openReply(() => {});
+  await lower.text("Lower");
+  // its end has not landed (and no rest was asked): the footer stays above
+  await lower.finish([], footer);
+  const shown = chat.texts(channel, sent.ref.thread);
+  assert.ok(shown.some((text) => text.startsWith("Upper") && text.includes("model-a")));
+  assert.ok(!shown.some((text) => text.startsWith("Lower") && text.includes("model-a")));
+  lower.rest();
+  assert.ok(
+    chat
+      .texts(channel, sent.ref.thread)
+      .some((t) => t.startsWith("Lower") && t.includes("model-a")),
+  );
+  assert.ok(
+    !chat
+      .texts(channel, sent.ref.thread)
+      .some((t) => t.startsWith("Upper") && t.includes("model-a")),
+  );
+});

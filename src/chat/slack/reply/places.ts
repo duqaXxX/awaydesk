@@ -29,7 +29,7 @@ export function positionOf(ts: string): number | null {
 export interface Placed {
   /** The position of its last message, null while it has none. */
   readonly lastAt: number | null;
-  /** Its end has landed: its last message can be rewritten. */
+  /** It rests or its end has landed: its last message can be rewritten, and it can show a footer. */
   readonly resting: boolean;
   /** The footer its turn left, formatted; null when that turn had none. */
   readonly ownFooter: string | null;
@@ -116,7 +116,7 @@ export class ThreadPlaces {
   }
 
   /**
-   * The tail the reply would be handed if its end had landed now: what its end writes while it
+   * The tail the reply would be handed if it rested now: what its stop or its end writes while it
    * is still on the way, so that a footer is not written where the next pass takes it off.
    */
   tailIf(reply: Placed): Tail<string> {

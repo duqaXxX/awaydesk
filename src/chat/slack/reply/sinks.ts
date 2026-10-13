@@ -469,7 +469,7 @@ export class ReplySink implements Sink {
   private footer: string | null = null;
   /**
    * What the thread's places last handed this reply to show under its last message. Read once
-   * the end has landed; before, `tail` asks the places what it would be.
+   * the reply rests or its end has landed; before, `tail` asks the places what it would be.
    */
   private assigned: Tail<string> = { footer: null, running: false };
   private running = "";
@@ -699,16 +699,17 @@ export class ReplySink implements Sink {
   }
 
   /**
-   * Its turn's part has ended and its last message is no stream: the message can be rewritten,
-   * and the footer shows under it. An end that landed counts, whatever `finish` did.
+   * Its turn's part has ended, it waits (`rest`) or its end has landed, and its last message is
+   * no stream: the message can be rewritten, and the footer shows under it. A reply that only
+   * finished is not at rest, whose end may still fail: it must not take the footer from a reply
+   * above it before it can draw one.
    */
   get resting(): boolean {
     if (this.ended) return true;
+    if (!this.finished || !this.restRequested) return false;
     const last = this.messages.at(-1);
     // A stream not yet started is a stream: the first write opens it.
-    return (
-      this.finished && !(last?.streaming === true || (last?.ts === null && last.mode === "stream"))
-    );
+    return !(last?.streaming === true || (last?.ts === null && last.mode === "stream"));
   }
 
   /** The footer its turn left, formatted; null when that turn had none. */
@@ -772,6 +773,8 @@ export class ReplySink implements Sink {
   rest(): void {
     const first = !this.restRequested;
     this.restRequested = true;
+    // The reply may already be at rest (its stream gone): the placement says what it shows.
+    this.places.place();
     // Called again while the stream is still open, the stop is tried again: it failed before.
     if (first || this.messages.at(-1)?.streaming === true) this.changed();
   }
@@ -971,8 +974,8 @@ export class ReplySink implements Sink {
   /**
    * The footer a message shows: only the reply's last, when the footer rode on its stream's
    * stop or when it is the reply's ending, in a message of its own (`end`), or while the reply
-   * rests before its end (`rest`). A reply that only finished shows none: its end follows at
-   * once, and a footer drawn for that moment would be moved a second later.
+   * rests before its end (`rest`). A reply that only finished shows none: it is not at rest, and
+   * its end follows at once.
    */
   private footerOf(message: Message): Block[] {
     if (
@@ -980,7 +983,7 @@ export class ReplySink implements Sink {
       (this.endMode === "inline" ||
         this.endMode === "moved" ||
         this.closingGone ||
-        (this.endMode === null && this.restRequested && this.resting))
+        (this.endMode === null && this.resting))
     ) {
       return this.closingBlocks();
     }
@@ -1937,7 +1940,7 @@ export class ReplySink implements Sink {
     message.stopUnknown = null;
     message.exact = this.streamShows(message, end);
     message.footer = result === "stopped" ? [...(footer ?? [])] : [];
-    if (end === null && this.finished) this.restOn();
+    if (end === null && this.restRequested) this.restOn();
     return result;
   }
 
@@ -2027,9 +2030,14 @@ export class ReplySink implements Sink {
         // ended or rests), and the update below writes the whole message from the model.
         const footer = this.closedOut || this.restRequested ? this.closingBlocks() : null;
         const result = await this.stop(message, footer, null);
-        if (result === "failed") return false;
-        if (this.closedOut && result === "stopped") this.endMode = "inline";
-        if (message.blind) message.exact = false;
+        if (result === "failed") {
+          // A refused rest keeps appending to the stream, which the next pass or the 280 seconds
+          // stop again; a stream told nothing more, or one the end stops, is not appended to.
+          if (message.blind || this.closedOut) return false;
+        } else {
+          if (this.closedOut && result === "stopped") this.endMode = "inline";
+          if (message.blind) message.exact = false;
+        }
       }
       let step: Step;
       if (message.ts === null) {

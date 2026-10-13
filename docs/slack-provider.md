@@ -116,12 +116,14 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   pass stops the stream with the same footer blocks at its bottom (the stop is the one
   notification, and creates no message, so it takes no lock of the thread's places), and the
   message goes on by `chat.update`, silently, as after the 280 seconds. A running card is rewritten
-  in the same pass. The reply is `resting` from then on (`finish` ran and its last message is no
-  stream), so the thread's footer shows under it before it ends. The report grows the message by
+  in the same pass. The reply counts as at rest from then on (`finish` ran, `rest` was
+  called and its last message is no stream; `rest` itself triggers the placement), so the thread's
+  footer shows under it before it ends. The report grows the message by
   edit, `finish` runs again with the footer of the report turn, and the reply rests again or ends
   as below: the ending is posted with the footer and cut out of the message it grew in. A stop that
-  fails leaves the stream open and the next pass tries again. A reply that only finished, with no
-  `rest`, shows no footer on a message that is not a stream: its end follows at once.
+  fails leaves the stream open, text given meanwhile goes on to it, and the next pass tries again.
+  A reply that only finished, with no `rest` and no landed end, is not at rest: it shows no footer
+  and takes none from the reply above, since its end follows at once and may fail.
 - **280 seconds pass first.** `ReplySink.expire` stops the stream (Slack pushes on the stop, the
   first notification) and the same message keeps growing with `chat.update`, which never notifies
   (measured: "Update after stop is silent"). Each update writes the whole message from the
@@ -182,10 +184,10 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   planned before the reply was overtaken and not yet posted is dropped.
 - **One footer between two owner messages.** The footer is placed by position
   (`ThreadPlaces.place`, from `tails` of the core): in each stretch of a thread between two
-  messages of the owner, the lowest reply whose end has landed shows the footer, and every reply
+  messages of the owner, the lowest reply that is at rest or whose end has landed shows the footer, and every reply
   above it in the stretch shows none. The footer is the latest one a turn of the stretch left, so
   a lower reply whose turn had none shows the upper one's line. A reply writes its end with the
-  footer it would be handed (`ThreadPlaces.tailIf`); once the end has landed the places hand it
+  footer it would be handed (`ThreadPlaces.tailIf`); once the reply rests or its end has landed the places hand it
   the footer (`ReplySink.assign`), and a change is written by a silent edit, or by the stop of a
   stream that is still open. A reply that gives its footer up while its last message is a closing
   message that held the footer alone has that message deleted with `chat.delete`; the reply stays
