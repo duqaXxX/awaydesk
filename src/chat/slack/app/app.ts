@@ -76,11 +76,17 @@ import type { SlackChat } from "../thread.ts";
 import * as voice from "../voice.ts";
 import { Answers, type AppConfig, type AppParts, type Fetch, logger } from "./answers.ts";
 import { Clips } from "./clip.ts";
-import { type ChannelGuard, type Identity, isPromptMessage, messageActor } from "./guards.ts";
+import {
+  type ChannelGuard,
+  type Identity,
+  isPromptMessage,
+  isWrittenMessage,
+  messageActor,
+} from "./guards.ts";
 import { HomeControls } from "./home-controls.ts";
 import { filesOf, inboundMessage } from "./messages.ts";
 import { Open } from "./open.ts";
-import { ThreadOrder } from "./order.ts";
+import { ThreadOrder, threadKey } from "./order.ts";
 import { Requests } from "./requests.ts";
 import { ResumeBind } from "./resume-bind.ts";
 import { type Ack, type Payload, str, text } from "./wire.ts";
@@ -255,15 +261,23 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   app.event("message", async ({ event, body }) => {
     const message = event as unknown as Payload;
     const envelope = body as unknown as Payload;
-    if (!isPromptMessage(message)) return;
+    console.error(
+      "DBG1",
+      JSON.stringify(Object.keys(message)),
+      isWrittenMessage(message),
+      isPromptMessage(message),
+    );
+    if (!isWrittenMessage(message)) return;
     const [user, team] = messageActor(message, envelope);
     const channel = text(message.channel);
     const ts = str(message.ts);
     const threadTs = str(message.thread_ts || ts);
     // The owner and the workspace first, with nothing awaited: anyone else takes no place.
     if (!answers.fromOwner(user, team, channel) || channel === null) return;
-    // (sync) Where the owner's message sits among the replies, whatever becomes of it next.
+    // (sync) Where the owner's message sits among the replies, whatever becomes of it next:
+    // also a message the filter below drops.
     parts.chat.ownerPosted(channel, threadTs, ts);
+    if (!isPromptMessage(message)) return;
     // (sync) The place among the thread's messages is taken in the order the listeners were
     // called, before the first await: the channel check below takes longer for one message than
     // for the next, and a message that passed it first would be handed over first. The place is
@@ -272,7 +286,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     // The exception is a clip whose transcript is in the file's `vtt`: `Clips.takeClip` hands it
     // over after the download of that file, so a typed reply sent after it can be handed over
     // first.
-    const place = order.enter(`${channel}\n${threadTs}`);
+    const place = order.enter(threadKey(channel, threadTs));
     let handed: Promise<void>;
     try {
       await place.turn;

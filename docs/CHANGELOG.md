@@ -10,7 +10,7 @@ All notable changes to this project are documented here. The format follows
 - A reply that has another reply's message below it ends in the message it is in: its footer goes
   under that message by edit, or on the stream's stop, and no ending is posted, which would have
   landed below the other reply. Such a reply opens no continuation message either. The Slack
-  provider keeps the order of each thread's messages in memory (`reply/order.ts`, `ThreadOrder`),
+  provider keeps where each thread's messages sit in memory (`reply/places.ts`, `ThreadPlaces`),
   told of every owner message by the listener and of every reply's last message by its sink; the
   chat seam's `Reply` gains `last` and `overtaken`, which the memory chat implements from its own
   message counter. Nothing in the thread changes yet for a reply with only an owner message below it.

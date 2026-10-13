@@ -360,3 +360,53 @@ test("the threads a chat builds for one Slack thread share the order of its mess
   await apart.settle();
   assert.equal(second.overtaken, false);
 });
+
+// The map of a chat's threads' places, which no member of the provider exposes.
+function trackedThreads(chat: SlackChat): number {
+  return (chat as unknown as { places: Map<string, unknown> }).places.size;
+}
+
+test("a thread that ended its reply and closed leaves nothing in the chat", async () => {
+  const { chat } = made();
+  for (let i = 1; i <= 20; i += 1) {
+    const thread = chat.thread({
+      channel: CHANNEL,
+      thread: `1790000000.00${String(i).padStart(4, "0")}`,
+    });
+    const reply = thread.openReply(() => {});
+    await reply.text(`answer ${i}`);
+    await reply.finish([]);
+    assert.equal(await reply.closeOut(null), true);
+    await thread.close();
+  }
+  assert.equal(trackedThreads(chat), 0);
+});
+
+test("a detached thread object closing does not let go of a live session's replies", async () => {
+  const { chat } = made();
+  const ref = { channel: CHANNEL, thread: THREAD };
+  const live = chat.thread(ref).openReply(() => {});
+  await live.text("one");
+  await live.finish([]);
+  assert.equal(await live.closeOut(null), true);
+  await chat.thread(ref).close(); // a handler's object, which opened nothing
+  assert.equal(trackedThreads(chat), 1);
+});
+
+test("a reply opened and silent keeps the thread's places when another is let go of", async () => {
+  const { chat } = made();
+  const ref = { channel: CHANNEL, thread: THREAD };
+  const ended = chat.thread(ref).openReply(() => {});
+  await ended.text("one");
+  await ended.finish([]);
+  assert.equal(await ended.closeOut(null), true);
+  const silent = chat.thread(ref).openReply(() => {});
+  chat.ownerPosted(CHANNEL, THREAD, "1790000000.900000"); // lets the ended one go
+  const newest = chat.thread(ref).openReply(() => {});
+  await newest.text("two");
+  await newest.settle();
+  await silent.text("three");
+  await silent.settle();
+  assert.equal(newest.overtaken, true, "the silent reply wrote below it, in the same places");
+  assert.equal(silent.overtaken, false);
+});

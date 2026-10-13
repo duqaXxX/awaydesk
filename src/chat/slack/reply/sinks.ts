@@ -102,7 +102,7 @@ import {
 import { mrkdwnEscape } from "./escape.ts";
 import type { Limiter } from "./limiter.ts";
 import { bannerText, markdownBlocks, markdownCut, plainWords } from "./markdown.ts";
-import { positionOf, ThreadOrder } from "./order.ts";
+import { positionOf, ThreadPlaces } from "./places.ts";
 import { Task } from "./tasks.ts";
 
 export const DEBOUNCE_SECONDS = 1.0;
@@ -399,10 +399,10 @@ export interface ReplySinkOptions {
    */
   readonly onWrite?: () => void;
   /**
-   * The order of the thread's messages, shared by every reply of the thread; a reply with a
+   * Where the thread's messages sit, shared by every reply of the thread; a reply with a
    * message of another reply below it ends where it is. Absent, the reply knows of no other.
    */
-  readonly order?: ThreadOrder;
+  readonly places?: ThreadPlaces;
   readonly logger?: Logger;
   /** DEBOUNCE_SECONDS, unless a test shortens it. */
   readonly debounceSeconds?: number;
@@ -436,7 +436,7 @@ export class ReplySink implements Sink {
   private readonly clock: Clock;
   private readonly onOpenReply: ((old: string | null, fresh: string | null) => void) | null;
   private readonly onWrite: (() => void) | null;
-  private readonly order: ThreadOrder;
+  private readonly places: ThreadPlaces;
   private readonly logger: Logger;
   private readonly debounceSeconds: number;
   private readonly finalRetrySeconds: number;
@@ -500,7 +500,8 @@ export class ReplySink implements Sink {
     this.limiter = options.limiter;
     this.clock = options.clock ?? systemClock;
     this.onOpenReply = options.onOpenReply ?? null;
-    this.order = options.order ?? new ThreadOrder();
+    this.places = options.places ?? new ThreadPlaces();
+    this.places.join(this);
     this.onWrite = options.onWrite ?? null;
     this.logger = options.logger ?? defaultLogger;
     this.debounceSeconds = options.debounceSeconds ?? DEBOUNCE_SECONDS;
@@ -574,7 +575,7 @@ export class ReplySink implements Sink {
    */
   private settleOpenReply(): void {
     this.ended = true;
-    this.order.ended(this);
+    this.places.ended(this);
     this.retrack();
   }
 
@@ -651,12 +652,12 @@ export class ReplySink implements Sink {
 
   /** Whether nothing of the owner's and no other reply sits below this reply's last message. */
   get last(): boolean {
-    return this.order.last(this);
+    return this.places.last(this);
   }
 
   /** Whether another reply has a message below this one. */
   get overtaken(): boolean {
-    return this.order.overtaken(this);
+    return this.places.overtaken(this);
   }
 
   /**
@@ -1561,7 +1562,7 @@ export class ReplySink implements Sink {
       return false;
     }
     message.ts = String(posted.ts);
-    this.order.moved(this);
+    this.places.moved(this);
     message.shown = [];
     message.exact = false;
     message.footer = [];
@@ -1608,7 +1609,7 @@ export class ReplySink implements Sink {
         const ts = await this.adopt(attempted, false, take(plainWords(banner), ADOPT_WORDS));
         if (ts !== null) {
           message.ts = ts;
-          this.order.moved(this);
+          this.places.moved(this);
           message.shown = blocks;
           message.footer = footer;
           this.retrack();
@@ -1625,7 +1626,7 @@ export class ReplySink implements Sink {
       return [false, null];
     }
     message.ts = String(posted.ts);
-    this.order.moved(this);
+    this.places.moved(this);
     message.shown = blocks;
     message.footer = footer;
     this.retrack();
@@ -1722,7 +1723,7 @@ export class ReplySink implements Sink {
         streamTs = ts; // it landed: this is that stream
       }
       message.ts = streamTs;
-      this.order.moved(this);
+      this.places.moved(this);
       message.streaming = true;
       message.started = attempted;
       ReplySink.sent(message, plan);
@@ -1927,10 +1928,23 @@ export class ReplySink implements Sink {
       }
       let step: Step;
       if (message.ts === null) {
-        step =
-          message.mode === "stream"
-            ? await this.streamStep(message)
-            : await this.postStep(message, true);
+        // A message is created with the thread's places held, after the decision that it may be.
+        const release = await this.places.lock.acquire();
+        try {
+          if (this.messages.length > 1 && this.places.overtaken(this)) {
+            // A continuation planned before another reply wrote below, not yet posted: it
+            // would land under that reply. The message before it is the reply's last again.
+            this.messages.pop();
+            this.warnCut();
+            continue;
+          }
+          step =
+            message.mode === "stream"
+              ? await this.streamStep(message)
+              : await this.postStep(message, true);
+        } finally {
+          release();
+        }
       } else if (message.streaming) {
         step = await this.streamStep(message);
       } else {
@@ -1939,16 +1953,10 @@ export class ReplySink implements Sink {
       const [ok, overflow] = step;
       if (!ok) return false;
       if (overflow === null) break;
-      if (this.order.overtaken(this)) {
+      if (this.places.overtaken(this)) {
         // Another reply is below: a message opened now would sit below it. What does not fit
         // is cut, as a card's text is.
-        if (!this.cutWarned) {
-          this.cutWarned = true;
-          this.logger.warning(
-            "a reply that another reply sits below shows less than it said: a message " +
-              "opened now would land below that reply",
-          );
-        }
+        this.warnCut();
         break;
       }
       if (sameCursor(overflow, message.start)) {
@@ -1998,7 +2006,19 @@ export class ReplySink implements Sink {
       }
       if (result === "stopped") return true;
     }
-    if (this.endMode === null && this.order.overtaken(this)) {
+    // Everything below may create a message, and is decided with the thread's places held.
+    const release = await this.places.lock.acquire();
+    try {
+      return await this.endCreating(message);
+    } finally {
+      release();
+    }
+  }
+
+  /** The part of `end` that posts: the ending, or the closing message. */
+  private async endCreating(message: Message): Promise<boolean> {
+    const owed = this.endMode === null || (this.endMode === "post" && this.closing === null);
+    if (owed && this.places.overtaken(this)) {
       // Another reply has a message below this one: the ending is not posted (it would land
       // under that reply), and the footer goes under this message by a silent edit.
       this.endMode = "inline";
@@ -2042,6 +2062,16 @@ export class ReplySink implements Sink {
     return this.writeClosing();
   }
 
+  /** Logs once that an overtaken reply shows less than it said. */
+  private warnCut(): void {
+    if (this.cutWarned) return;
+    this.cutWarned = true;
+    this.logger.warning(
+      "a reply that another reply sits below shows less than it said: a message opened now " +
+        "would land below that reply",
+    );
+  }
+
   /**
    * Whether the reply's end is on Slack: the footer rode on the last stream's stop ("inline",
    * set after a stop that landed) or sits in the ending posted as the last message ("moved",
@@ -2077,7 +2107,7 @@ export class ReplySink implements Sink {
           unfurl_media: false,
         });
         this.closing = String(posted.ts);
-        this.order.moved(this);
+        this.places.moved(this);
       } else if (!isDeepStrictEqual(blocks, this.closingShown)) {
         // An edit never notifies (measured 2026-09-27): the text stays as posted.
         await this.limiter.acquire();
@@ -2098,7 +2128,7 @@ export class ReplySink implements Sink {
           take(plainWords(this.banner()), ADOPT_WORDS),
         );
         if (this.closing !== null) {
-          this.order.moved(this);
+          this.places.moved(this);
           this.closingShown = blocks;
           return true;
         }

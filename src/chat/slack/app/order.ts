@@ -6,6 +6,11 @@
  * `core/flows/messages.ts`).
  */
 
+/** The key of a thread among the maps of a provider: its channel and its root. */
+export function threadKey(channel: string, thread: string): string {
+  return `${channel}\n${thread}`;
+}
+
 /** One message's place among its thread's. */
 export interface Place {
   /** Settles when every place entered before this one has been left. */

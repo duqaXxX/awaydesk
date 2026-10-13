@@ -41,7 +41,7 @@ import {
   markdownCut,
   stripMarkdown,
 } from "../../../../src/chat/slack/reply/markdown.ts";
-import { ThreadOrder } from "../../../../src/chat/slack/reply/order.ts";
+import { ThreadPlaces } from "../../../../src/chat/slack/reply/places.ts";
 import {
   ADOPT_SKEW_SECONDS,
   DEBOUNCE_SECONDS,
@@ -147,8 +147,8 @@ interface ReplyOptions {
   debounceSeconds?: number;
   /** The wait before the final write is sent once more (`FINAL_RETRY_SECONDS` unless given). */
   finalRetrySeconds?: number;
-  /** The order of the thread's messages, shared by the replies of a test that has several. */
-  order?: ThreadOrder;
+  /** Where the thread's messages sit, shared by the replies of a test that has several. */
+  places?: ThreadPlaces;
 }
 
 function reply(slack: FakeSlack, options: ReplyOptions = {}): ReplySink {
@@ -168,7 +168,7 @@ function reply(slack: FakeSlack, options: ReplyOptions = {}): ReplySink {
     logger: options.logger ?? new Recorded(),
     debounceSeconds: options.debounceSeconds ?? 0,
     finalRetrySeconds: options.finalRetrySeconds,
-    ...(options.order !== undefined && { order: options.order }),
+    ...(options.places !== undefined && { places: options.places }),
   });
 }
 
@@ -4221,9 +4221,9 @@ const OWNER_TS = "1790000000.900000";
 
 test("a reply overtaken after its stream stopped ends by one edit, with no post", async () => {
   const slack = new FakeSlack();
-  const order = new ThreadOrder();
-  const sink = await longReply(slack, { order });
-  const other = reply(slack, { order });
+  const places = new ThreadPlaces();
+  const sink = await longReply(slack, { places });
+  const other = reply(slack, { places });
   await other.text("Another turn started.");
   await settled();
   assert.equal(sink.overtaken, true);
@@ -4245,9 +4245,9 @@ test("a reply overtaken after its stream stopped ends by one edit, with no post"
 
 test("a reply with only an owner message below it still posts its ending", async () => {
   const slack = new FakeSlack();
-  const order = new ThreadOrder();
-  const sink = await longReply(slack, { order });
-  order.ownerPosted(OWNER_TS);
+  const places = new ThreadPlaces();
+  const sink = await longReply(slack, { places });
+  places.ownerPosted(OWNER_TS);
   assert.equal(sink.overtaken, false);
   assert.equal(sink.last, false);
   assert.equal(await sink.closeOutFormatted("main · ctx 6%"), true);
@@ -4256,11 +4256,11 @@ test("a reply with only an owner message below it still posts its ending", async
 
 test("a reply overtaken while its stream is open ends on its stop, with no post", async () => {
   const slack = new FakeSlack();
-  const order = new ThreadOrder();
-  const sink = reply(slack, { order });
+  const places = new ThreadPlaces();
+  const sink = reply(slack, { places });
   await sink.text("Working on it.");
   await settled();
-  const other = reply(slack, { order });
+  const other = reply(slack, { places });
   await other.text("Another turn started.");
   await settled();
   assert.equal(sink.overtaken, true);
@@ -4273,14 +4273,14 @@ test("a reply overtaken while its stream is open ends on its stop, with no post"
 
 test("an overtaken reply whose new content would overflow posts nothing", async () => {
   const slack = new FakeSlack();
-  const order = new ThreadOrder();
+  const places = new ThreadPlaces();
   const logger = new Recorded();
   const clock = new FakeClock();
-  const sink = reply(slack, { order, logger, clock });
+  const sink = reply(slack, { places, logger, clock });
   await sink.text("Start.");
   await settled();
   await clock.advance(STREAM_SECONDS + 1);
-  const other = reply(slack, { order });
+  const other = reply(slack, { places });
   await other.text("Another turn started.");
   await settled();
   const created = slack.createdTs.length;
@@ -4290,4 +4290,95 @@ test("an overtaken reply whose new content would overflow posts nothing", async 
   assert.equal(slack.callsTo("chat.postMessage").length, 0);
   assert.equal(slack.createdTs.length, created, "no message was opened");
   assert.equal(logger.lines.filter((line) => line.level === "WARNING").length, 1);
+});
+
+test("an older reply does not post its ending below a newer one that was let go of", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const older = await longReply(slack, { places });
+  const newer = reply(slack, { places });
+  await newer.text("The newer answer.");
+  await settled();
+  await newer.finish([]);
+  assert.equal(await newer.closeOutFormatted("newer"), true);
+  places.ownerPosted(OWNER_TS); // the owner wrote below it: the places let it go
+  assert.equal(newer.last, false);
+  assert.equal(older.overtaken, true, "the newer reply still sits below it");
+  const posts = slack.callsTo("chat.postMessage").length;
+  assert.equal(await older.closeOutFormatted("older"), true);
+  assert.equal(slack.callsTo("chat.postMessage").length, posts, "no ending is posted");
+});
+
+test("a closing message whose post failed is not posted once another reply is below", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const clock = new FakeClock();
+  const sink = reply(slack, { places, clock, finalRetrySeconds: 0.02 });
+  await sink.text("Only words.");
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  await sink.finish([]);
+  const answer = slack.responses["chat.postMessage"] as JsonObject;
+  slack.responses["chat.postMessage"] = [rejected("ratelimited"), answer];
+  assert.equal(await sink.closeOutFormatted("footer"), false);
+  const posts = slack.callsTo("chat.postMessage").length;
+  const other = reply(slack, { places });
+  await other.text("Another turn.");
+  await settled();
+  await passed(0.02);
+  assert.equal(await soon(sink.waitLanded()), true);
+  assert.equal(slack.callsTo("chat.postMessage").length, posts, "the retry posts nothing");
+  const update = last(slack.callsTo("chat.update"));
+  assert.deepEqual(list(update.blocks).slice(-2), [{ type: "divider" }, contextBlock("footer")]);
+});
+
+test("a continuation not yet posted is dropped once another reply is below", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const logger = new Recorded();
+  const clock = new FakeClock();
+  const sink = reply(slack, { places, logger, clock });
+  await sink.text("Start.");
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  const answer = slack.responses["chat.postMessage"] as JsonObject;
+  slack.responses["chat.postMessage"] = [rejected("ratelimited"), answer];
+  await sink.text(`\n\n${"word ".repeat(MESSAGE_LIMIT)}`); // overflows: the continuation's post fails
+  await settled();
+  const posts = slack.callsTo("chat.postMessage").length;
+  const other = reply(slack, { places });
+  await other.text("Another turn.");
+  await settled();
+  await sink.text("\n\nmore");
+  await settled();
+  assert.equal(slack.callsTo("chat.postMessage").length, posts, "the continuation is not posted");
+  assert.equal(other.overtaken, false, "so the roles did not flip");
+  assert.equal(sink.overtaken, true);
+  assert.equal(logger.lines.filter((line) => line.level === "WARNING").length >= 1, true);
+});
+
+test("a message is created in a thread by one reply at a time", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const sink = await longReply(slack, { places });
+  const gate = new AsyncEvent();
+  slack.gate = gate;
+  slack.gateMethod = "chat.postMessage";
+  slack.gated.clear();
+  const closing = sink.closeOutFormatted("footer"); // its ending post is held in flight
+  await slack.gated.wait();
+  const other = reply(slack, { places });
+  await other.text("Another turn.");
+  await settled();
+  assert.equal(slack.callsTo("chat.startStream").length, 1, "the other stream waits for the post");
+  slack.gate = null;
+  gate.set();
+  assert.equal(await soon(closing), true);
+  await settled();
+  assert.equal(slack.callsTo("chat.startStream").length, 2);
+  const [, ending] = slack.createdTs;
+  const [, , second] = slack.createdTs;
+  assert.ok(ending !== undefined && second !== undefined && ending < second, "the ending is above");
+  assert.equal(sink.overtaken, true);
+  assert.equal(other.overtaken, false);
 });

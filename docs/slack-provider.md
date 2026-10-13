@@ -152,11 +152,18 @@ started, whichever comes first. Slack closes a stream 5 minutes after `chat.star
   since a new message would land under the other reply. The same reply opens no continuation
   either: what does not fit the message is cut, as a card's text is, and a warning is logged once.
   An owner message below the reply does not change this; its ending is posted as above.
-  `SlackChat` keeps one `ThreadOrder` (`reply/order.ts`) per channel and thread, shared by every
-  `SlackThread` of it, in memory only: the listener tells it the `ts` of every owner message
-  (`SlackChat.ownerPosted`), and each `ReplySink` tells it where its last message moved. A restart
-  forgets it, so the messages written before it are unknown and a footer they show stays where it
-  is. An ended reply with an owner message below it is forgotten.
+  `SlackChat` keeps one `ThreadPlaces` (`reply/places.ts`) per channel and thread, shared by every
+  `SlackThread` of it and in memory only. A `ReplySink` registers with it when it is built and
+  tells it where its last message moved; the listener tells it the `ts` of every message the owner
+  wrote in the thread (`SlackChat.ownerPosted`), also one the prompt filter drops. A reply is let
+  go of once its end has landed and an owner message sits below it, or the `SlackThread` that
+  opened it closed; the highest position of a reply let go of stays in the places, so the answers
+  do not change when it goes. A `SlackThread` lets go only of the replies it opened. The places
+  hold a lock for the creation of a message of any reply of the thread (a stream's start, a
+  continuation, an ending, a closing message) and for the end's decision to create one, so that
+  two replies cannot each decide on the other's absence. A restart forgets the places: the
+  messages written before it are unknown and a footer they show stays where it is. A continuation
+  planned before the reply was overtaken and not yet posted is dropped.
 
 ### Message limits and continuation
 

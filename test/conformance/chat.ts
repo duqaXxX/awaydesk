@@ -696,6 +696,20 @@ export function chatConformance(
         await s.rig.settle();
         assert.equal(first.overtaken, true, "another reply has a message below it");
         assert.equal(second.overtaken, false);
+        assert.equal(second.last, true, "written after the owner's message: nothing is below it");
+      });
+
+      check("an ended reply with the owner below it is not last", async (s) => {
+        const reply = s.provider.thread(s.ref).openReply(() => {});
+        await reply.text("The answer");
+        await reply.finish([]);
+        assert.equal(await reply.closeOut(FOOTER), true);
+        await reply.settle();
+        await s.rig.settle();
+        assert.equal(reply.last, true);
+        await s.rig.owner.says(s.ref.channel, "thanks", { thread: s.ref.thread });
+        assert.equal(reply.last, false, "the owner wrote below it");
+        assert.equal(reply.overtaken, false);
       });
 
       check("a reply with another reply below it ends where it is", async (s) => {

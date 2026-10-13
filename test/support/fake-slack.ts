@@ -390,8 +390,14 @@ export class FakeSlack extends WebClient {
     this.uploaded = uploaded;
   }
 
+  /**
+   * How far apart the ts of two messages the fake creates are, in microseconds: a test that
+   * writes a person's message between two of them sets this above 1 and picks a ts in the gap.
+   */
+  tsStep = 1;
+
   #newTs(): string {
-    return `1790000000.${String(this.createdTs.length + 1).padStart(6, "0")}`;
+    return `1790000000.${String((this.createdTs.length + 1) * this.tsStep).padStart(6, "0")}`;
   }
 
   /** Slack closes a stream that lived 5 minutes and never stopped (measured). */
