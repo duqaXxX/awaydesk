@@ -153,8 +153,8 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   (`ReplySink.text` with `ending`, fed by `TurnRenderer.feedEnding`), so a notice written just
   before it stays in the reply, and a card that closes after it moves under it. No other line of the
   daemon's moves. A footer goes under the line: a report turn cut short renders into a reply that
-  already has the footer of its first turn, and the running list (`⏳ 1 agent`) shows there until the
-  session empties it. When a full message pushed the line, or the note under it, into a
+  already has the footer of its first turn, and the running list (`1 agent still running`) shows
+  there until the session empties it. When a full message pushed the line, or the note under it, into a
   continuation, that message rang when it was posted and is the ending as it stands
   (`ReplySink.opensOnEnding`): no closing message follows. A line that does not fit the room left in
   a message is cut there, as any text is, and the continuation then rings with the rest of it. The
@@ -278,10 +278,39 @@ dropped and the message shows less than the model: unless a later update of it p
 end counts as not landed and the root shows ❌. The update that only folds the cards of a stream sent
 all of its span is the exception, since nothing of the reply is missing. Each stretch of the thread between two owner
 messages shows one footer, on its lowest reply that has ended (see "One footer between two owner
-messages"); only the thread's latest reply adds the counts of what still runs to it
-(`Reply.setLatest`). A card left `in_progress` in a stopped message
+messages"); the list of what still runs sits above that footer on the lowest reply at rest of
+the whole thread (see "The list of what still runs"). A card left `in_progress` in a stopped message
 is stored as an error until it is updated (measured: "Open card stored as error"), so every end
 closes its cards first.
+
+### The list of what still runs
+
+While a subagent or a background command runs, one `task_card` lists it, above the footer's
+divider, in the thread's last reply at rest: the lowest reply of the whole thread (not of a
+stretch) whose turn has ended and whose last message is no stream (`tails` of the core, applied
+by `ThreadPlaces.place`). A newer reply that is still a stream does not take it; one that rests
+does, and the older one is edited without it. `ThreadChat.showRunning` hands the list over and
+the reply that holds it writes it with its next pass, on a reply at rest or one whose end has
+landed. The card is `{ type: "task_card", block_id: "running-list", task_id: "running-list",
+status: "in_progress" }` with the title the core made (`2 agents · 1 shell still running`, cut at
+`blocks.CARD_TITLE_LIMIT`) and `details` of up to `blocks.RUNNING_LIST_LINES` lines, one per task,
+then `+N more`. The `block_id` is the same for the card's whole life, and no tool call's id has
+that form. Taking the list off a reply is an edit too, and no write of it notifies.
+
+A stream's stop carries the footer alone; the edit that follows adds the card, since no stop with
+a `task_card` in its `blocks` was measured. A message that shows the list stays among the open
+replies (`ReplySink.keepsOpen`), and `repair.endReply` removes the block whose `block_id` is
+`running-list` where it closes a left-over card as an error. `ThreadPlaces` does not let go of the
+reply that holds the list while it does, so that the list can always be taken off it.
+
+Measured on 2026-10-12, Slack on desktop: a `task_card` with a fixed `block_id` stays open
+across `chat.update` when the text above it changes, when a line of its `details` is added or
+removed, and when its title changes. A collapsible `container` does not stay open, and a
+`task_card` inside a `container` is refused. A message with two blocks that share one `task_id` is
+refused (`invalid_blocks`); `FakeSlack` does not check it, and `sinks.test.ts` does. Not measured:
+whether the card's `details` count toward the 12,000 characters of a message written by
+`chat.update`. The six lines of 80 characters and the title keep the card and the footer inside
+the margin `blocks.MESSAGE_LIMIT` leaves.
 
 ### Pushes and threads
 

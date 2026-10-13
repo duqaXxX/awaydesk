@@ -6,7 +6,7 @@
  * `TaskCardBlock`, `ContainerBlock`, `RichTextBlock` and the chunks of `AnyChunk`.
  */
 import { NESTED, STOPPED, shownPreview } from "../../../core/port.ts";
-import type { TaskStatus, TaskUpdate } from "../../seam.ts";
+import type { RunningList, TaskStatus, TaskUpdate } from "../../seam.ts";
 import { at, lastNewline, len, take } from "./chars.ts";
 import { shownAsWritten } from "./escape.ts";
 import { markdownBlocks } from "./markdown.ts";
@@ -29,6 +29,11 @@ export const BANNER_LIMIT = 300;
 // holds at most 3,000 characters.
 export const CARD_TEXT_LIMIT = 2_900;
 export const CARD_TITLE_LIMIT = 150;
+// The list of what still runs: its card's id (a tool call's id never has this form), and how many
+// lines it draws before `+N more`. With the footer it stays inside the margins MESSAGE_LIMIT
+// leaves: 6 lines of 80 characters, a title of 150, 3 blocks of the 5 spare.
+export const RUNNING_LIST_ID = "running-list";
+export const RUNNING_LIST_LINES = 6;
 export const CARD_TEXT_FIELDS = ["title", "details", "output"] as const;
 // A stream keeps the details and the output of every `task_update` of a card, each added to what
 // the card holds; an update that carries neither leaves them, and its title replaces the title
@@ -85,6 +90,8 @@ export interface DividerBlock {
 
 export interface TaskCardBlock {
   type: "task_card";
+  /** Set on the list of what still runs alone: the card Slack keeps open across an edit. */
+  block_id?: string;
   task_id: string;
   title: string;
   status: TaskStatus;
@@ -430,6 +437,35 @@ export function cardBlock(update: TaskUpdate): TaskCardBlock {
     if (value !== undefined) block[key] = richText(value);
   }
   return block;
+}
+
+/**
+ * The card of the list of what still runs: one `task_card` that keeps its `block_id` for its whole
+ * life, since Slack leaves a card with a fixed id open across an edit (measured 2026-10-12,
+ * desktop). Past `RUNNING_LIST_LINES` lines the rest is told as `+N more`.
+ */
+export function runningListBlock(running: RunningList): TaskCardBlock {
+  const lines =
+    running.lines.length > RUNNING_LIST_LINES
+      ? [
+          ...running.lines.slice(0, RUNNING_LIST_LINES),
+          `+${running.lines.length - RUNNING_LIST_LINES} more`,
+        ]
+      : running.lines;
+  const block: TaskCardBlock = {
+    type: "task_card",
+    block_id: RUNNING_LIST_ID,
+    task_id: RUNNING_LIST_ID,
+    title: take(running.title, CARD_TITLE_LIMIT),
+    status: "in_progress",
+  };
+  if (lines.length > 0) block.details = richText(take(lines.join("\n"), CARD_TEXT_LIMIT));
+  return block;
+}
+
+/** Whether the block is the list of what still runs. */
+export function isRunningList(block: Block): boolean {
+  return block.type === "task_card" && block.block_id === RUNNING_LIST_ID;
 }
 
 /** The blocks of a message as Slack counts them. */

@@ -1515,40 +1515,36 @@ test("owner query waits for an expected background turn", async (t) => {
   assert.deepEqual(background, [false, true, false]);
 });
 
-/** The running counts a message's footer shows, if any. */
-function runningBlock(blocks: readonly JsonObject[]): string | null {
-  const shown = blocks.filter((block) => !String(block.block_id ?? "").startsWith("spacer"));
-  const last = shown.at(-1);
-  const footer = last?.type === "context" ? last : null;
-  const text = footer === null ? "" : String(at(footer.elements as JsonObject[], 0).text);
-  return text.includes("⏳") ? text.slice(text.indexOf("⏳")) : null;
+/** The title of the list of what still runs that a message shows, if any. */
+function runningTitle(blocks: readonly JsonObject[]): string | null {
+  const card = blocks.find((block) => block.block_id === "running-list");
+  return card === undefined ? null : String(card.title);
 }
 
 function noStreamOpen(h: Harness): boolean {
   return ![...h.slack.messages.values()].some((message) => message.streaming);
 }
 
-test("running counts follow the latest reply", async (t) => {
+test("the list follows the thread's last reply at rest", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harnessFor(t)({ turns: [first, sdkMessages("tools")] });
   const session = h.session();
   await (await session.submit("start it")).done.wait();
-  // The running count lives in the footer, and that one waits for the task; the body never
-  // carries it either, so nothing shows it yet.
-  assert.ok(h.slack.messageBlocks().every((blocks) => runningBlock(blocks) === null));
+  // The first reply waits for the task and rests: it holds the list, above its footer.
+  await h.until(() => runningTitle(at(h.slack.messageBlocks(), 0)) === "1 shell still running");
   await (await session.submit("next")).done.wait();
-  // the first reply's own stop is still deferred; the new, unrelated reply stops at once and
-  // carries the count in its own footer.
+  // The new, unrelated reply ended below it: the list moved to it, and the first shows none.
   assert.deepEqual(h.slack.callsTo("chat.delete"), []);
-  assert.equal(runningBlock(at(h.slack.messageBlocks(), -1)), "⏳ 1 shell");
+  await h.until(() => runningTitle(at(h.slack.messageBlocks(), -1)) === "1 shell still running");
+  await h.until(() => runningTitle(at(h.slack.messageBlocks(), 0)) === null);
   h.clients[0]?.inject([...notice, ...injected]);
   // The first reply is no longer the last thing in the thread: the report opens a reply of its
   // own at the bottom (issue #295).
   await h.until(() => h.bodies().some(isReport));
-  // the task has ended: no reply's footer shows a running count any more. The second reply
-  // already stopped, so this update of it debounces like any other change to a finished reply:
-  // `until` gives it the room to land.
-  await h.until(() => h.slack.messageBlocks().every((blocks) => runningBlock(blocks) === null));
+  // the task has ended: no reply shows a list any more. The second reply already stopped, so
+  // this update of it debounces like any other change to a finished reply: `until` gives it the
+  // room to land.
+  await h.until(() => h.slack.messageBlocks().every((blocks) => runningTitle(blocks) === null));
 });
 
 test("two prompts in a row each reply ends with its own stop", async (t) => {
@@ -1670,7 +1666,7 @@ test("closing the session stops the cards of running tasks", async (t) => {
   const h = harnessFor(t)({ turns: [first] });
   await (await h.session().submit("start it")).done.wait();
   await h.manager.closeAll();
-  assert.equal(runningBlock(at(h.slack.messageBlocks(), 0)), null);
+  assert.equal(runningTitle(at(h.slack.messageBlocks(), 0)), null);
   assert.deepEqual(
     h.cards().map((card) => [card.status, card.output]),
     [["complete", "Stopped"]],
@@ -2492,14 +2488,15 @@ test("status during a turn shows the model and the context", async (t) => {
   assert.ok(text.includes("Model: `claude-haiku-4-5-20251001`") && text.includes("Context: `7%`"));
 });
 
-test("status shows a running task while the reply s own closing still waits", async (t) => {
-  // The closing message (where the running count would show) waits for the task; `!status`
-  // is the one place that still shows it meanwhile.
+test("status shows a running task beside the list the waiting reply holds", async (t) => {
+  // The reply waits for the task and shows it as the list; `!status` says it in its own words.
   const [first] = splitBackground();
   const h = harnessFor(t)({ turns: [first] });
   const session = h.session();
   await (await session.submit("start it")).done.wait();
-  assert.equal(runningBlock(h.slack.messageBlocks().at(-1) ?? []), null);
+  await h.until(
+    () => runningTitle(h.slack.messageBlocks().at(-1) ?? []) === "1 shell still running",
+  );
   assert.ok((await session.status()).endsWith("\nBackground: `1 shell`"));
 });
 
@@ -3213,7 +3210,7 @@ test("the next prompt after bang stop does not wait for a report", async (t) => 
   await (await session.submit("start it")).done.wait();
   assert.ok(await session.stop());
   h.clients[0]?.inject(stoppedEnd(notice));
-  await h.until(() => inside(session).runningCounts() === "");
+  await h.until(() => session.runningKinds === "");
   const following = await session.submit("next");
   await following.done.wait(); // no advance of the sessions' clock: it waits for nothing
   assert.deepEqual(h.clients[0]?.queries, ["start it", "next"]);
@@ -3959,22 +3956,22 @@ test("work drain path leaves hourglass", async (t) => {
   assert.deepEqual(onRoot(h), new Set([Status.ERROR]));
 });
 
-test("close leaves latest closing showing a running shell", async (t) => {
-  // item 3/7: `setRunning("")` on the latest, already-closed-out reply only debounces; a
-  // shutdown's own event loop iteration ends right after `close()` returns, so a `later`
-  // still waiting on its own timer never gets to run, and the closing keeps a stale count.
+test("close leaves no list on the reply that held it", async (t) => {
+  // A shutdown's own event loop iteration ends right after `close()` returns, so a change that
+  // only debounced never gets to run: the close settles the replies the session tracks, and the
+  // list that the close empties must have left the reply it was drawn on.
   const [first] = splitBackground();
   const h = harnessFor(t)({ turns: [first, sdkMessages("tools")] });
   const session = h.session();
   await (await session.submit("start it")).done.wait();
   await (await session.submit("next")).done.wait();
-  assert.equal(runningBlock(h.slack.messageBlocks().at(-1) ?? []), "⏳ 1 shell");
+  await h.until(
+    () => runningTitle(h.slack.messageBlocks().at(-1) ?? []) === "1 shell still running",
+  );
   await session.close();
   await session.doneClosing.wait();
-  const shown = h.slack.messageBlocks().map((blocks) => runningBlock(blocks));
-  assert.ok(shown.every((running) => running === null));
+  assert.ok(h.slack.messageBlocks().every((blocks) => runningTitle(blocks) === null));
 });
-
 test("a top level status word gets no reaction", async (t) => {
   const h = harnessFor(t)({});
   await h.session().status();

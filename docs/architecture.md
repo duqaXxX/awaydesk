@@ -57,8 +57,8 @@ What crosses the chat seam, in both directions:
 
 | Crossing | Direction | What |
 |---|---|---|
-| a reply | core to provider | `ReplySink`: `text`, `task`, `finish` (which takes the footer), `closeOut`, `waitLanded`, `settle`. A session holds it as a `Reply`, which adds `rest`, `setRunning`, `setLatest`, `last` and `overtaken`. A tool's line crosses as a `TaskUpdate` and the footer as `FooterFields`, which the provider formats |
-| a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, `activityRefused`, `written`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
+| a reply | core to provider | `ReplySink`: `text`, `task`, `finish` (which takes the footer), `closeOut`, `waitLanded`, `settle`. A session holds it as a `Reply`, which adds `rest`, `last` and `overtaken`. A tool's line crosses as a `TaskUpdate` and the footer as `FooterFields`, which the provider formats |
+| a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, `activityRefused`, `written`), the list of what still runs (`showRunning`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
 | a channel | core to provider | `ChannelChat`, from `ChatProvider.channel`: `notice`, `say`, `rewrite`, and the lists a word posts (`offer`, `withdraw`) |
 | the provider | core to provider | `ChatProvider`: `name`, `capabilities`, `escape` and `channelName` (what a core text relies on to write a name and a channel for the chat's markup, beside `ThreadChat.link`), `openedAt`, `channelState`, `threadState`, `index` and `openFile` where declared, and `start`, `stop` and `close` |
 | a request | core to provider | typed by what it asks, never by how it is drawn: `OwnerRequest` is a `PermissionRequest`, a `QuestionRequest`, a `HoldRequest` or a `SetupRequest`; a list is an `OwnerList`, of folders or of sessions |
@@ -1246,11 +1246,11 @@ closed when the start returns (`ThreadSession.connect`).
   task's notification never came is logged at INFO (`a reply ended with no report under it in
   <where>`) by `expireInjectedTurn` and `expireUnreported`; nothing is posted for it.
 - What is still running is counted by each task's `kind`, which the back end sets from the type
-  Claude Code names (`constants.TASK_WORDS`; the kind `other` counts as a task) and said once, on
-  the last line of the thread. When the thread's latest reply has ended, the counts close its footer
-  (`⏳ 1 shell · 1 agent`); a new reply takes them over and the previous one drops them, keeping its
-  footer. The thread's status line never says them,
-  and the counts disappear when nothing runs.
+  Claude Code names (`constants.TASK_WORDS`; the kind `other` counts as a task) and said once, as a
+  list: a title (`2 agents · 1 shell still running`) and a line per task, in the order they started
+  (`ThreadSession.runningList`, handed over by `ThreadChat.showRunning`). The chat draws it under
+  the thread's last reply at rest, above the footer; it moves down when a newer reply rests, and
+  goes when nothing runs. The thread's status line never says it.
 - When the Claude Code process goes away (shutdown, an idle close, a process that exits), its tasks
   go with it: their lines close with `Stopped` and the list empties. The map lives in memory only.
 ### A prompt taken into a running turn

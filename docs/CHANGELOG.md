@@ -7,10 +7,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- What still runs in a thread is a list, one card under the thread's last reply at rest and above
+  its footer, in place of the `⏳ 1 shell` count that followed the footer: a title such as
+  `2 agents · 1 shell still running` and a line per subagent or background command, six at most and
+  then `+N more`. It is written whenever it changes, on a reply at rest or one whose end has
+  landed, moves down to a newer reply when that one rests, and goes when nothing runs. The chat
+  seam has `ThreadChat.showRunning(list)`; `Reply.setRunning`, `Reply.setLatest` and the session's
+  `latest` are gone. After a crash `repair.endReply` removes
+  the list's card instead of closing it as an error (#295).
+
 - The thread's status line says `Working…` only while a message of the owner's has no finished
   answer: being submitted, queued, taken, sent and not yet started, or its turn running. A turn
   the agent starts on its own to report a task shows nothing, and the line never counts what still
-  runs (`1 shell still running` is gone from it; the footer counts). `Compacting conversation…`
+  runs (`1 shell still running` is gone from it; the list under the last reply says it). `Compacting conversation…`
   still shows while any turn compacts. `Reply.footerShown` and `texts.STILL_RUNNING_STATUS` are
   gone (#295).
 

@@ -31,7 +31,6 @@ import {
 export interface Inside {
   client: AgentSession | null;
   active: ActiveTurn | null;
-  latest: Reply | null;
   taken: Turn | null;
   sent: Turn[];
   held: unknown[];
@@ -71,7 +70,6 @@ export interface Inside {
   reactDoneIfIdle(signal?: AbortSignal): Promise<void>;
   threadLine(): readonly [string, string];
   runningTaskIds(): string[];
-  runningCounts(): string;
 }
 
 export function inside(session: ThreadSession): Inside {

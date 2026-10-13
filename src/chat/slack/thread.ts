@@ -36,6 +36,7 @@ import {
   type OwnerRequest,
   type Presence,
   type Reply,
+  type RunningList,
   type SessionIndex,
   type SessionStatus,
   type ThreadChat,
@@ -445,6 +446,11 @@ export class SlackThread implements ThreadChat {
     return reply;
   }
 
+  showRunning(list: RunningList | null): void {
+    // No reply was opened yet: there is nothing for the list to sit under.
+    this.places?.showRunning(list);
+  }
+
   showStatus(status: SessionStatus, signal?: AbortSignal): Promise<boolean> {
     return this.reaction.show(REACTIONS[status], signal);
   }
@@ -659,7 +665,10 @@ export class SlackThread implements ThreadChat {
     return endReply(this.slack, this.options.limiter, this.place, reply, note);
   }
 
-  close(): Promise<void> {
+  async close(): Promise<void> {
+    // The list that was just taken off a reply the session no longer tracks only debounced:
+    // nothing else would write it before the process ends.
+    await this.places?.settleListed();
     // The replies this object opened are let go of once their end landed: the session that
     // held them is over, and nothing else would drop them from the thread's places.
     for (const [places, reply] of this.opened) places.closed(reply);
@@ -668,7 +677,7 @@ export class SlackThread implements ThreadChat {
       this.places = null;
       this.lease.give();
     }
-    return this.line.close();
+    await this.line.close();
   }
 
   private get place(): { readonly channel: string; readonly threadTs: string } {

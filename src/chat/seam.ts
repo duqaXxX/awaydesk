@@ -146,9 +146,14 @@ export type MessageId = string;
 /** What the root of a thread shows of its session. */
 export type SessionStatus = "working" | "waiting" | "done" | "error";
 
+/** What still runs in a thread: a title and one line per task. */
+export interface RunningList {
+  readonly title: string;
+  readonly lines: readonly string[];
+}
+
 /**
- * One reply as a session holds it: the reply model, and its place in the thread. Only the
- * thread's latest reply says what still runs, at its end.
+ * One reply as a session holds it: the reply model, and its place in the thread.
  */
 export interface Reply extends ReplySink {
   /**
@@ -157,13 +162,6 @@ export interface Reply extends ReplySink {
    * next write.
    */
   rest(): void;
-  /**
-   * What still runs in the thread (`⏳ 1 shell · 1 agent`), shown after the footer; empty
-   * removes it. Takes effect at once and is written with the reply's next write.
-   */
-  setRunning(counts: string): void;
-  /** Whether this is the thread's latest reply: an older one drops the counts, keeps its footer. */
-  setLatest(latest: boolean): void;
   /** Whether nothing of the owner's and no other reply sits below this reply in the thread. */
   readonly last: boolean;
   /** Whether another reply has a message below this one: it then ends where it is, by edit. */
@@ -182,6 +180,11 @@ export type OpenMessageChange = (old: MessageId | null, fresh: MessageId | null)
  * a failure (ids and codes only) and goes on, since the chat must never stop a turn.
  */
 export interface ThreadChat {
+  /**
+   * What still runs in the thread, drawn above the footer under its last reply at rest; null
+   * removes it. Takes effect at once and is written with that reply's next write.
+   */
+  showRunning(list: RunningList | null): void;
   /**
    * A new reply in the thread. It writes nothing until it is given something to show.
    * `onOpenMessage` is told which of its messages a crash would leave unfinished.

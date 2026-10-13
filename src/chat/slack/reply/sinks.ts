@@ -47,7 +47,7 @@
 import { isDeepStrictEqual } from "node:util";
 import type { WebClient } from "@slack/web-api";
 import { type Clock, systemClock } from "../../../clock.ts";
-import { cancellable, Fold, Mutex, shownPreview, type Tail } from "../../../core/port.ts";
+import { cancellable, Fold, Mutex, shownPreview } from "../../../core/port.ts";
 import { blank, strip } from "../../../text.ts";
 import type { FooterFields, ReplySink as Sink, TaskUpdate } from "../../seam.ts";
 import { formatFooter } from "../footer.ts";
@@ -68,12 +68,14 @@ import {
   cardChunk,
   cardFields,
   contextBlock,
+  isRunningList,
   MESSAGE_LIMIT,
   PREVIEW_CUT,
   plainLines,
   plainText,
   previewBlocks,
   previewContainers,
+  runningListBlock,
   split,
   TERMINAL,
   ZERO_WIDTH_SPACE,
@@ -102,7 +104,7 @@ import {
 import { mrkdwnEscape } from "./escape.ts";
 import type { Limiter } from "./limiter.ts";
 import { bannerText, markdownBlocks, markdownCut, plainWords } from "./markdown.ts";
-import { positionOf, ThreadPlaces } from "./places.ts";
+import { positionOf, type Shown, ThreadPlaces } from "./places.ts";
 import { Task } from "./tasks.ts";
 
 /** What `chat.delete` answers for a message that is not there: it counts as deleted. */
@@ -471,9 +473,7 @@ export class ReplySink implements Sink {
    * What the thread's places last handed this reply to show under its last message. Read once
    * the reply rests or its end has landed; before, `tail` asks the places what it would be.
    */
-  private assigned: Tail<string> = { footer: null, running: false };
-  private running = "";
-  private latest = true;
+  private assigned: Shown = { footer: null, list: null };
   /** Whether closeOut has run; a second call is a no-op. */
   private closedOut = false;
   // Where the footer went once the reply ended: "inline", on the stream's own stop (and on the
@@ -562,6 +562,8 @@ export class ReplySink implements Sink {
   private keepsOpen(message: Message, end: Cursor | null): boolean {
     if (message.ts === null) return false;
     if (message.streaming) return true;
+    // The list of what still runs is no more than a card a crash would leave running.
+    if (message.footer.some(isRunningList)) return true;
     for (const { part, floor, ceil } of this.span(message.start, end)) {
       if (!(part instanceof Tool)) continue;
       const [hasCard] = ReplySink.toolElements(part, floor, ceil);
@@ -581,6 +583,7 @@ export class ReplySink implements Sink {
       const end = following === undefined ? null : following.start;
       if (message.ts !== null && this.keepsOpen(message, end)) wanted.add(message.ts);
     }
+    if (this.closing !== null && this.closingShown.some(isRunningList)) wanted.add(this.closing);
     for (const ts of [...wanted].filter((ts) => !this.tracked.has(ts)).sort()) {
       if (this.track(null, ts)) this.tracked.add(ts);
     }
@@ -653,16 +656,6 @@ export class ReplySink implements Sink {
     return this.rev;
   }
 
-  /**
-   * Show what still runs in this thread (`⏳ 1 shell · 1 agent`) after the footer, or on a line
-   * of its own; empty removes it. Only the thread's latest reply shows one.
-   */
-  async setRunning(counts: string): Promise<void> {
-    if (counts === this.running) return;
-    this.running = counts;
-    if (this.closedOut) this.changed();
-  }
-
   /** The position of the reply's last message in its thread, null while it has none. */
   get lastAt(): number | null {
     // A closing message that was deleted still marks where the reply sat: a reply never moves up.
@@ -678,16 +671,6 @@ export class ReplySink implements Sink {
   /** Whether another reply has a message below this one. */
   get overtaken(): boolean {
     return this.places.overtaken(this);
-  }
-
-  /**
-   * Only the thread's latest reply shows the running counts, at the bottom of the thread; an
-   * older one drops them and keeps its footer, a record of how its turn ended.
-   */
-  async setLatest(latest: boolean): Promise<void> {
-    if (latest === this.latest) return;
-    this.latest = latest;
-    if (this.closedOut) this.changed();
   }
 
   /**
@@ -712,11 +695,12 @@ export class ReplySink implements Sink {
   /**
    * What this reply shows under its last message from now on, as the thread's places worked it
    * out. A change is written unless the last message is a stream, which a stop ends (the reply's
-   * rest or its end). The running list of the tail is not drawn yet.
+   * rest or its end). The footer and the list of what still runs are written when either changed.
    */
-  assign(tail: Tail<string>): void {
-    const moved = tail.footer !== this.assigned.footer;
-    this.assigned = tail;
+  assign(shown: Shown): void {
+    const moved =
+      shown.footer !== this.assigned.footer || !isDeepStrictEqual(shown.list, this.assigned.list);
+    this.assigned = shown;
     if (moved && this.messages.at(-1)?.streaming !== true) this.changed();
   }
 
@@ -951,16 +935,20 @@ export class ReplySink implements Sink {
     return [floor === 0 && top > 0 && !tool.cardless, pieces];
   }
 
+  /** The footer below a divider; empty when there is none. A stream's stop carries only this. */
+  private footerBlocks(): Block[] {
+    const { footer } = this.tail();
+    return footer ? [{ type: "divider" }, contextBlock(footer)] : [];
+  }
+
   /**
-   * The footer below a divider, and after it, on the thread's latest reply only, what still
-   * runs; empty when there is nothing to show.
+   * What the reply shows under its last message: the list of what still runs, when this reply
+   * holds it, above the footer's divider. Not on a stream's stop, which Slack may take the cards
+   * of no more than the footer's blocks of (not measured): the edit that follows the stop adds it.
    */
   private closingBlocks(): Block[] {
-    const lastLine = [this.tail().footer, this.latest ? this.running : ""]
-      .filter((piece) => piece)
-      .join(" · ");
-    if (!lastLine) return [];
-    return [{ type: "divider" }, contextBlock(lastLine)];
+    const { list } = this.tail();
+    return list === null ? this.footerBlocks() : [runningListBlock(list), ...this.footerBlocks()];
   }
 
   /**
@@ -983,7 +971,7 @@ export class ReplySink implements Sink {
   }
 
   /** What the reply shows under its last message: assigned once it rests, else what it would be. */
-  private tail(): Tail<string> {
+  private tail(): Shown {
     return this.resting ? this.assigned : this.places.tailIf(this);
   }
 
@@ -2022,7 +2010,7 @@ export class ReplySink implements Sink {
       if (message.streaming && (message.blind || this.restRequested)) {
         // Told nothing more, or the reply rests: stopped now (with the footer, if the reply has
         // ended or rests), and the update below writes the whole message from the model.
-        const footer = this.closedOut || this.restRequested ? this.closingBlocks() : null;
+        const footer = this.closedOut || this.restRequested ? this.footerBlocks() : null;
         const result = await this.stop(message, footer, null);
         if (result === "failed") {
           // A refused rest keeps appending to the stream, which the next pass or the 280 seconds
@@ -2101,7 +2089,7 @@ export class ReplySink implements Sink {
       return true;
     }
     if (message.streaming) {
-      const result = await this.stop(message, this.closingBlocks(), null);
+      const result = await this.stop(message, this.footerBlocks(), null);
       if (result === "failed") return false;
       if (result === "stopped") this.endMode = "inline";
       // A stream cannot fold its cards: the update that follows its stop does, silently. The
@@ -2277,7 +2265,11 @@ export class ReplySink implements Sink {
     if (this.closingGone) return true;
     let blocks = this.closingBlocks();
     // A footer that is no longer assigned leaves the message with nothing: it goes.
-    if (blocks.length === 0 && this.closing !== null && this.closingShown.some(isDivider)) {
+    if (
+      blocks.length === 0 &&
+      this.closing !== null &&
+      this.closingShown.some((block) => isDivider(block) || isRunningList(block))
+    ) {
       return this.deleteClosing(this.closing, created);
     }
     if (blocks.length === 0) blocks = [contextBlock(ZERO_WIDTH_SPACE)];

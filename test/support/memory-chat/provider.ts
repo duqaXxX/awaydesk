@@ -8,6 +8,8 @@
  * does nothing but leave a record in `Room.strayCalls`, which a test asserts empty. So does a
  * thread asked for that the chat never issued.
  */
+
+import { isDeepStrictEqual } from "node:util";
 import type { Question } from "../../../src/agent/seam.ts";
 import {
   type ChannelChat,
@@ -23,13 +25,21 @@ import {
   type OwnerRequest,
   type Presence,
   type Reply,
+  type RunningList,
   type SessionStatus,
   type TaskUpdate,
   type ThreadChat,
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
 import { isLast, isOvertaken } from "../../../src/core/port.ts";
-import { DAEMON, type MessageKind, type Placed, type Room, type StoredMessage } from "./room.ts";
+import {
+  DAEMON,
+  type MessageKind,
+  type Placed,
+  type Room,
+  type Shown,
+  type StoredMessage,
+} from "./room.ts";
 
 const CAPABILITIES: ChatCapabilities = {
   nativeStreaming: false,
@@ -64,9 +74,9 @@ type Segment =
 /**
  * One reply: a single message whose content grows. Its text and its task lines stand in the
  * order they first came; a task line changes where it stands. After `finish` a line of a run of
- * calls shows its folded words, or goes when they are empty, and the footer is added, then (on
- * the thread's latest reply) the counts of what still runs, from `rest` or `closeOut` on. The
- * message is always an edit, so `rest` only lets the footer show.
+ * calls shows its folded words, or goes when they are empty, and from `rest` or `closeOut` on the
+ * list of what still runs (on the reply the room names) and the footer are added. The message is
+ * always an edit, so `rest` only lets them show.
  */
 class MemoryReply implements Reply, Placed {
   readonly #room: Room;
@@ -78,10 +88,8 @@ class MemoryReply implements Reply, Placed {
   #rested = false;
   #closed = false;
   #footer: string | null = null;
-  /** The footer the room placed here: the reply's own, or the one of a reply above it. */
-  #shown: string | null = null;
-  #running = "";
-  #latest = true;
+  /** What the room placed here: the footer, the reply's own or a reply above's, and the list. */
+  #shown: Shown = { footer: null, list: null };
   #lost = false;
   #landed = false;
   readonly #landing: Promise<boolean>;
@@ -109,9 +117,9 @@ class MemoryReply implements Reply, Placed {
     return this.#footer;
   }
 
-  assign(footer: string | null): void {
-    if (footer === this.#shown) return;
-    this.#shown = footer;
+  assign(shown: Shown): void {
+    if (isDeepStrictEqual(shown, this.#shown)) return;
+    this.#shown = shown;
     if (this.#drawsFooter) this.#write();
   }
 
@@ -147,7 +155,7 @@ class MemoryReply implements Reply, Placed {
     this.#footer = footer === null ? null : footerLine(footer);
     // What the reply writes is what the places would give it: no footer is written where the
     // next pass takes it off.
-    this.#shown = this.#room.footerIf(this.#ref, this);
+    this.#shown = this.#room.shownIf(this.#ref, this);
     this.#write();
     this.#room.place(this.#ref);
   }
@@ -155,7 +163,7 @@ class MemoryReply implements Reply, Placed {
   rest(): void {
     if (this.#rested) return;
     this.#rested = true;
-    this.#shown = this.#room.footerIf(this.#ref, this);
+    this.#shown = this.#room.shownIf(this.#ref, this);
     this.#write();
     this.#room.place(this.#ref);
   }
@@ -168,7 +176,7 @@ class MemoryReply implements Reply, Placed {
   async closeOut(): Promise<boolean> {
     if (this.#closed) return this.#landed;
     this.#closed = true;
-    this.#shown = this.#room.footerIf(this.#ref, this);
+    this.#shown = this.#room.shownIf(this.#ref, this);
     this.#write();
     this.#landed = !this.#lost;
     if (this.#landed && this.#message !== null) {
@@ -189,16 +197,6 @@ class MemoryReply implements Reply, Placed {
     return !this.#lost;
   }
 
-  setRunning(counts: string): void {
-    this.#running = counts;
-    if (this.#closed) this.#write();
-  }
-
-  setLatest(latest: boolean): void {
-    this.#latest = latest;
-    if (this.#closed) this.#write();
-  }
-
   #render(): string {
     const lines = this.#segments.flatMap((segment) => {
       if (segment.kind === "text") return [segment.text.trim()];
@@ -209,8 +207,9 @@ class MemoryReply implements Reply, Placed {
       return [`[${status}] ${title}`, ...shown];
     });
     if (this.#drawsFooter) {
-      lines.push(this.#shown ?? "");
-      if (this.#latest) lines.push(this.#running);
+      const { footer, list } = this.#shown;
+      if (list !== null) lines.push(list.title, ...list.lines.map((line) => `- ${line}`));
+      lines.push(footer ?? "");
     }
     return lines.filter((line) => line !== "").join("\n");
   }
@@ -268,6 +267,10 @@ class MemoryThread implements ThreadChat {
 
   openReply(onOpenMessage: OpenMessageChange): Reply {
     return new MemoryReply(this.#room, this.#ref, onOpenMessage);
+  }
+
+  showRunning(list: RunningList | null): void {
+    this.#room.showRunning(this.#ref, list);
   }
 
   async showStatus(status: SessionStatus): Promise<boolean> {

@@ -569,20 +569,19 @@ test("a crossed owner query is answered in the reply it landed in", async (t) =>
   await owner.done.wait();
   assert.ok(h.slack.streamTs.length === 1 && h.slack.postedTs.length === 0);
   assert.deepEqual(openStreams(h), []);
-  // the reply that carried the answer is the thread's latest, not the discarded owner reply:
-  // it ends with the footer
+  // the reply that carried the answer ends with the footer, as the discarded owner reply never
+  // wrote a message
   const [stop, ...more] = h.slack.callsTo("chat.stopStream");
   assert.equal(more.length, 0);
   assert.ok(blocksOf(stop).some((block) => block.type === "divider"));
-  assert.ok(inside(session).latest !== null && inside(session).latest !== owner.sink);
 });
 
-test("a crossed owner query hands latest to the reply that carried its answer", async (t) => {
+test("a crossed owner query puts the footer under the reply that carried its answer", async (t) => {
   // The report turn that answers the owner's prompt crossed it. The reply that started a task
   // has the owner's message below it, so the answer opens a reply of its own at the bottom (it is
   // not the last thing in the thread, so it takes no report). The owner turn's own reply is
-  // never written, so it must not stay the thread's latest, or the footer that belongs under the
-  // answer has no reply to show.
+  // never written, so the footer that belongs under the answer sits under the reply that
+  // carried it.
   const [first] = splitBackground();
   const taskId = String(systemRecord(first, "task_started").task_id);
   const h = harness(t, [{ turns: [first] }]);
@@ -593,16 +592,18 @@ test("a crossed owner query hands latest to the reply that carried its answer", 
   const carrier = holder.sink;
   const owner = await session.submit("next");
   await h.until(() => h.clients[0]?.queries.join() === "start it,next");
-  assert.ok(inside(session).latest === owner.sink && carrier !== owner.sink);
+  assert.ok(carrier !== owner.sink);
   inside(session).injectedExpected = true; // a report was expected too: the guess that goes wrong
   inside(session).ended = [[taskId, "✓ the task ended"]];
   h.clients[0]?.inject(splitTurns(sdkMessages("tools"))[0] ?? []);
   await owner.done.wait();
-  const latest = inside(session).latest;
-  assert.ok(latest !== null && latest !== carrier && latest !== owner.sink);
   assert.ok(h.replies().at(-1)?.startsWith("✓ the task ended"));
-  // the discarded reply is no longer the latest
-  assert.equal((owner.sink as unknown as { latest: boolean }).latest, false);
+  assert.ok(
+    h.slack
+      .messageBlocks()
+      .at(-1)
+      ?.some((block) => block.type === "divider"),
+  );
 });
 
 test("a close leaves no task waiting on a reply it could not end", async (t) => {
@@ -731,7 +732,7 @@ test("stop clears the thread status", async (t) => {
   await h.until(() => statuses(h).at(-1) === ""); // while the interrupt still winds down
 });
 
-test("a later reply that ended counts the task in its footer, the status says nothing", async (t) => {
+test("a later reply that ended shows the list under it, the status says nothing", async (t) => {
   const [first] = splitBackground();
   const h = harness(t, [{ turns: [first, sdkMessages("tools")] }]);
   const session = h.session();
@@ -739,12 +740,19 @@ test("a later reply that ended counts the task in its footer, the status says no
   await h.until(() => lines(h).at(-1) === ""); // the only reply is open: no footer yet
   await (await session.submit("list the files")).done.wait();
   await h.until(() => h.slack.callsTo("chat.stopStream").length === 1);
-  // The thread's last reply has ended: its footer says what still runs, the status line never.
+  // The thread's last reply has ended: the list says what still runs, the status line never.
   await h.until(() => lines(h).at(-1) === "");
   const [, second] = h.slack.streamTs;
-  const last = h.slack.messages.get(second ?? "")?.blocks.at(-1);
-  const footer = String(((last?.elements ?? []) as JsonObject[])[0]?.text);
-  assert.ok(session.runningKinds !== "" && footer.endsWith(`⏳ ${session.runningKinds}`));
+  await h.until(() =>
+    (h.slack.messages.get(second ?? "")?.blocks ?? []).some(
+      (block) => block.block_id === "running-list",
+    ),
+  );
+  const card = (h.slack.messages.get(second ?? "")?.blocks ?? []).find(
+    (block) => block.block_id === "running-list",
+  );
+  assert.equal(session.runningKinds, "1 shell");
+  assert.equal(card?.title, `${session.runningKinds} still running`);
   await h.sleep(0.05);
   assert.equal(lines(h).at(-1), "");
 });

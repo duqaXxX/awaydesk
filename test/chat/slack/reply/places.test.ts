@@ -1,14 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { type Placed, positionOf, ThreadPlaces } from "../../../../src/chat/slack/reply/places.ts";
-import type { Tail } from "../../../../src/core/port.ts";
+import {
+  type Placed,
+  positionOf,
+  type Shown,
+  ThreadPlaces,
+} from "../../../../src/chat/slack/reply/places.ts";
 
 interface Reply extends Placed {
   lastAt: number | null;
   resting: boolean;
   ownFooter: string | null;
   /** The tails handed to it, in order. */
-  assigned: Tail<string>[];
+  assigned: Shown[];
 }
 
 function reply(ts: string | null, ownFooter: string | null = null): Reply {
@@ -17,7 +21,8 @@ function reply(ts: string | null, ownFooter: string | null = null): Reply {
     resting: false,
     ownFooter,
     assigned: [],
-    assign: (tail) => made.assigned.push(tail),
+    assign: (shown) => made.assigned.push(shown),
+    settle: async () => true,
   };
   return made;
 }
@@ -220,5 +225,57 @@ describe("ThreadPlaces", () => {
     places.moved(upper);
     assert.equal(footerOf(upper), "upper");
     assert.equal(footerOf(lower), null);
+  });
+
+  test("the list is handed to the lowest resting reply, and to no other", () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001");
+    const lower = joined(places, "1760000002.000001");
+    const running = { title: "1 shell still running", lines: ["sleep"] };
+    upper.resting = true;
+    places.showRunning(running);
+    assert.deepEqual(upper.assigned.at(-1)?.list, running);
+    lower.resting = true;
+    places.place();
+    assert.equal(upper.assigned.at(-1)?.list, null);
+    assert.deepEqual(lower.assigned.at(-1)?.list, running);
+    places.showRunning(null);
+    assert.equal(lower.assigned.at(-1)?.list, null);
+  });
+
+  test("the reply that holds the list is not let go of while it does", () => {
+    const places = new ThreadPlaces();
+    const reply = joined(places, "1760000001.000001");
+    reply.resting = true;
+    places.showRunning({ title: "1 shell still running", lines: ["sleep"] });
+    places.ended(reply);
+    places.ownerPosted("1760000002.000001");
+    assert.equal(places.holds(reply), true, "the list could never be taken off a reply that went");
+    places.showRunning(null);
+    assert.equal(places.holds(reply), false, "and it goes once it holds nothing");
+  });
+
+  test("a reply that loses the list to one below is let go of then", () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001");
+    upper.resting = true;
+    places.showRunning({ title: "1 shell still running", lines: ["sleep"] });
+    places.ended(upper);
+    places.ownerPosted("1760000002.000001");
+    const lower = joined(places, "1760000003.000001");
+    lower.resting = true;
+    places.ended(lower);
+    assert.equal(places.holds(upper), false);
+    assert.equal(places.holds(lower), true);
+  });
+
+  test("a closed thread lets go of the reply that holds the list", () => {
+    const places = new ThreadPlaces();
+    const reply = joined(places, "1760000001.000001");
+    reply.resting = true;
+    places.showRunning({ title: "1 shell still running", lines: ["sleep"] });
+    places.ended(reply);
+    places.closed(reply);
+    assert.equal(places.holds(reply), false);
   });
 });

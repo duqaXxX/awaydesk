@@ -185,6 +185,36 @@ function content(n: number): JsonObject[] {
   }));
 }
 
+test("a message left with the list of what still runs is rewritten without it", async () => {
+  // The list is the card the sink writes with a fixed `block_id`: not an error to show, it goes,
+  // and no card is left running beside the line that says the reply stopped.
+  const list = {
+    type: "task_card",
+    block_id: "running-list",
+    task_id: "running-list",
+    title: "1 shell still running",
+    status: "in_progress",
+    details: {
+      type: "rich_text",
+      elements: [
+        { type: "rich_text_section", elements: [{ type: "text", text: "Sleep for 5 seconds" }] },
+      ],
+    },
+  };
+  const running = { type: "task_card", task_id: "t2", title: "Bash", status: "in_progress" };
+  const footer = { type: "context", elements: [{ type: "mrkdwn", text: "main · 12% ctx" }] };
+  const body = [...content(2), running, list, { type: "divider" }, footer];
+  const [blocks] = await repairedBlocks(body);
+  assert.deepEqual(blocks, [
+    ...content(2),
+    { ...running, status: "error" },
+    { type: "divider" },
+    footer,
+    STOPPED_BLOCK,
+  ]);
+  assert.ok(!JSON.stringify(blocks).includes("in_progress"), "no card is left running");
+});
+
 test("a message up to slacks cap less one still gets the stopped line", async () => {
   // Slack's cap is 50 blocks, not the sink's 45: a read-back message (streamed markdown reads
   // back as several blocks) at 49 has room for the line.

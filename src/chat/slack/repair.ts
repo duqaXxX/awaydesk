@@ -21,7 +21,7 @@
 import type { KnownBlock, WebClient } from "@slack/web-api";
 import { getLogger } from "../../log.ts";
 import { isRecord, records } from "../../values.ts";
-import { contextBlock } from "./reply/blocks.ts";
+import { contextBlock, RUNNING_LIST_ID } from "./reply/blocks.ts";
 import { describe, gone, NOT_STREAMING } from "./reply/errors.ts";
 import type { Limiter } from "./reply/limiter.ts";
 
@@ -38,7 +38,8 @@ export const SLACK_BLOCKS = 50;
 /**
  * Stop the reply's message, then rewrite it: its blocks as Slack keeps them, every card left
  * running closed as an error (a stopped message would show it so anyway, until it is updated:
- * measured 2026-09-28), plus the line that says it stopped. Kept within Slack's 50 blocks: at
+ * measured 2026-09-28), the list of what still runs taken off (found by its `block_id`), plus the
+ * line that says it stopped. Kept within Slack's 50 blocks: at
  * the cap the line goes into the last context block (the footer), or is left out if there is
  * none; a block that holds content is never replaced. A failed read or a message already gone
  * is logged and left alone: never replaced with a shorter form that would lose its content.
@@ -82,11 +83,15 @@ export async function endReply(
     return true;
   }
   if (saysStopped(records(message.blocks), note)) return true;
-  let blocks: Block[] = records(message.blocks).map((block) =>
-    block.type === "task_card" && RUNNING_CARD.includes(String(block.status))
-      ? { ...block, status: "error" }
-      : block,
-  );
+  // The list of what still runs is no card of the reply's own work: it goes, where the card of a
+  // call that never ended is closed as an error.
+  let blocks: Block[] = records(message.blocks)
+    .filter((block) => block.block_id !== RUNNING_LIST_ID)
+    .map((block) =>
+      block.type === "task_card" && RUNNING_CARD.includes(String(block.status))
+        ? { ...block, status: "error" }
+        : block,
+    );
   if (blocks.length < SLACK_BLOCKS) blocks.push({ ...contextBlock(note) });
   else blocks = sayStoppedInTheFooter(blocks, note);
   try {

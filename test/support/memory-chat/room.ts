@@ -17,6 +17,7 @@ import {
   type OwnerAnswer,
   type OwnerList,
   type OwnerRequest,
+  type RunningList,
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
 import { type ChatContext, type Tail, type TailEntry, tails } from "../../../src/core/port.ts";
@@ -129,6 +130,13 @@ function shown(message: StoredMessage): ShownMessage {
   return { id, author, kind, text, pressable, unfinished, topLevel };
 }
 
+/** What a reply shows under its message: the footer, and the list of what still runs. */
+export interface Shown {
+  readonly footer: string | null;
+  /** Only the reply that holds the thread's list has one. */
+  readonly list: RunningList | null;
+}
+
 /** A reply the room places the footer of: the same rule as Slack's, over this room's counter. */
 export interface Placed {
   /** The message it writes into; null while it has none. */
@@ -138,7 +146,7 @@ export interface Placed {
   /** The footer its turn left, formatted; null when that turn had none. */
   readonly ownFooter: string | null;
   /** What it shows under its message from now on. */
-  assign(footer: string | null): void;
+  assign(shown: Shown): void;
 }
 
 /** What a memory chat holds, and the test's side of it. */
@@ -154,6 +162,7 @@ export class Room {
   readonly #lists = new Map<MessageId, OpenList>();
   readonly #strays: string[] = [];
   readonly #placed = new Set<Placed>();
+  readonly #running = new Map<string, RunningList>();
   #lookupFails = false;
 
   constructor(owner: string) {
@@ -301,15 +310,29 @@ export class Room {
 
   /**
    * Hands every reply of the thread its footer, with `tails` of the core: one per stretch between
-   * two owner messages, on its lowest ended reply. A reply never moves, so only its text changes.
+   * two owner messages, on its lowest ended reply, and the list of what still runs to the lowest
+   * of them all. A reply never moves, so only its text changes.
    */
   place(ref: ThreadRef): void {
-    for (const [reply, tail] of this.#tails(ref, null)) reply.assign(tail.footer);
+    for (const [reply, tail] of this.#tails(ref, null)) reply.assign(this.#shown(ref, tail));
   }
 
-  /** The footer `subject` would show if its end had landed now: what its end writes at once. */
-  footerIf(ref: ThreadRef, subject: Placed): string | null {
-    return this.#tails(ref, subject).get(subject)?.footer ?? null;
+  /** What still runs in the thread changed; null for nothing. */
+  showRunning(ref: ThreadRef, list: RunningList | null): void {
+    if (list === null) this.#running.delete(key(ref.channel, ref.thread));
+    else this.#running.set(key(ref.channel, ref.thread), list);
+    this.place(ref);
+  }
+
+  /** What `subject` would show if its end had landed now: what its end writes at once. */
+  shownIf(ref: ThreadRef, subject: Placed): Shown {
+    const tail = this.#tails(ref, subject).get(subject);
+    return tail === undefined ? { footer: null, list: null } : this.#shown(ref, tail);
+  }
+
+  #shown(ref: ThreadRef, tail: Tail<string>): Shown {
+    const list = tail.running ? (this.#running.get(key(ref.channel, ref.thread)) ?? null) : null;
+    return { footer: tail.footer, list };
   }
 
   #tails(ref: ThreadRef, subject: Placed | null): Map<Placed, Tail<string>> {

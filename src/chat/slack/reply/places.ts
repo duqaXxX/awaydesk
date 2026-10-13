@@ -13,6 +13,7 @@ import {
   type TailEntry,
   tails,
 } from "../../../core/port.ts";
+import type { RunningList } from "../../seam.ts";
 
 /**
  * A Slack `ts` as an integer of microseconds: exact below 2^53, ordered as the thread is. Null
@@ -25,6 +26,13 @@ export function positionOf(ts: string): number | null {
   return Number.isSafeInteger(position) ? position : null;
 }
 
+/** What a reply shows under its last message: the footer, and the list of what still runs. */
+export interface Shown {
+  readonly footer: string | null;
+  /** Only the reply that holds the thread's list has one. */
+  readonly list: RunningList | null;
+}
+
 /** What the places need of a reply. `ReplySink` implements it. */
 export interface Placed {
   /** The position of its last message, null while it has none. */
@@ -34,7 +42,9 @@ export interface Placed {
   /** The footer its turn left, formatted; null when that turn had none. */
   readonly ownFooter: string | null;
   /** What it shows under its last message from now on. */
-  assign(tail: Tail<string>): void;
+  assign(shown: Shown): void;
+  /** Writes what it still owes now; false when it is not on Slack. */
+  settle(): Promise<boolean>;
 }
 
 export class ThreadPlaces {
@@ -50,6 +60,12 @@ export class ThreadPlaces {
   private readonly done = new Set<Placed>();
   /** The replies whose opening thread object closed. */
   private readonly shut = new Set<Placed>();
+  /** What still runs in the thread, drawn under the reply `tails` names. */
+  private list: RunningList | null = null;
+  /** The reply that holds the list now: it is not let go of while it does. */
+  private holder: Placed | null = null;
+  /** The replies that held the list, for a change of it that only debounced. */
+  private readonly listed = new Set<Placed>();
   private marks: number[] = [];
   /** The highest position of a reply let go of: it still sits in the thread. */
   private floor: number | null = null;
@@ -103,24 +119,54 @@ export class ThreadPlaces {
     this.release();
   }
 
+  /** What still runs in the thread changed; null for nothing. The holder is written at once. */
+  showRunning(list: RunningList | null): void {
+    this.list = list;
+    this.place();
+  }
+
   /**
-   * Work out every reply's tail with `tails` of the core and hand each its own. Sync: a reply
-   * whose tail did not change does nothing. Called whenever a reply's position, its resting or
-   * its own footer changes.
+   * A shutdown's last chance for the change of the list on a reply whose end landed, which no
+   * session settles: taking the list off it only debounced.
    */
-  place(): void {
-    const result = this.tailsWith(null);
-    for (const reply of [...this.replies]) {
-      reply.assign(result.get(reply) ?? { footer: null, running: false });
+  async settleListed(): Promise<void> {
+    for (const reply of [...this.listed]) {
+      if (this.done.has(reply)) await reply.settle().catch(() => {});
     }
   }
 
   /**
-   * The tail the reply would be handed if it rested now: what its stop or its end writes while it
-   * is still on the way, so that a footer is not written where the next pass takes it off.
+   * Work out every reply's tail with `tails` of the core and hand each its own. Sync: a reply
+   * whose tail did not change does nothing. Called whenever a reply's position, its resting or
+   * its own footer changes. A reply that stops holding the list may be let go of from then on.
    */
-  tailIf(reply: Placed): Tail<string> {
-    return this.tailsWith(reply).get(reply) ?? { footer: reply.ownFooter, running: false };
+  place(): void {
+    const result = this.tailsWith(null);
+    let holder: Placed | null = null;
+    for (const reply of [...this.replies]) {
+      const shown = this.shownOf(result.get(reply));
+      if (shown.list !== null) {
+        holder = reply;
+        this.listed.add(reply);
+      }
+      reply.assign(shown);
+    }
+    const previous = this.holder;
+    this.holder = holder;
+    if (previous !== null && previous !== holder) this.release();
+  }
+
+  /**
+   * What the reply would be handed if it rested now: what its stop or its end writes while it is
+   * still on the way, so that a footer is not written where the next pass takes it off.
+   */
+  tailIf(reply: Placed): Shown {
+    return this.shownOf(this.tailsWith(reply).get(reply), reply.ownFooter);
+  }
+
+  private shownOf(tail: Tail<string> | undefined, footer: string | null = null): Shown {
+    if (tail === undefined) return { footer, list: null };
+    return { footer: tail.footer, list: tail.running ? this.list : null };
   }
 
   /** The tails of the registered replies; `subject` counts as resting, and as the lowest if unplaced. */
@@ -170,12 +216,17 @@ export class ThreadPlaces {
       // A closed thread lets go of its replies whether or not their end landed: the session is
       // gone, and nothing else would drop a reply whose end never lands.
       if (!this.shut.has(reply) && !this.done.has(reply)) continue;
+      // The reply that holds the list stays while it does: the list could never be taken off a
+      // reply that is gone. A closed thread lets go of it all the same.
+      if (reply === this.holder && !this.shut.has(reply)) continue;
       if (!this.sealed(reply, top)) continue;
       const at = reply.lastAt;
       if (at !== null) this.floor = Math.max(this.floor ?? at, at);
       this.done.delete(reply);
       this.shut.delete(reply);
       this.replies.delete(reply);
+      this.listed.delete(reply);
+      if (this.holder === reply) this.holder = null;
       gone = true;
     }
     if (gone && this.replies.size === 0) this.onEmpty();

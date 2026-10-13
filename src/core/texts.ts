@@ -291,12 +291,14 @@ export const ACTIVITY_IDLE = "idle";
 export const VERSION_PENDING = "started, version shown after the first turn";
 export const STATUS_BACKGROUND = "Background: `{counts}`";
 export const STATUS_WORKING = "Working in: `{directory}`";
+// The count `!status` adds to a session's row.
 export const RUNNING = "⏳ {counts}";
 // Slack's status line under a thread's last message (issues #83 and #295). A client shows the
 // loading message: `THREAD_WORKING` while a prompt of the owner's is owed its answer.
 // `STILL_RUNNING` is the terminal's words for a task that outlives its turn (`· 1 shell still
-// running`, Claude Code 2.1.287, read 2026-10-02), with no hourglass: an emoji draws large and
-// grey in a status line (seen on desktop, 2026-10-02). `THREAD_WORKING_STATUS` says the same
+// running`, Claude Code 2.1.287, read 2026-10-02), and the title of the list of what still runs,
+// with no hourglass: an emoji draws large and grey in a status line (seen on desktop,
+// 2026-10-02). `THREAD_WORKING_STATUS` says the same
 // after the app's name, which is what a client that draws `<app name> <status>` shows
 // (measured 2026-10-02, desktop and iOS).
 export const THREAD_WORKING = "Working…";

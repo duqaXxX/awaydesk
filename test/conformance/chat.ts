@@ -674,25 +674,62 @@ export function chatConformance(
         assert.equal(await reply.closeOut(), true);
       });
 
-      check("shows what still runs after the footer, of the latest reply alone", async (s) => {
-        const reply = s.provider.thread(s.ref).openReply(() => {});
+      check(
+        "shows what still runs under the thread's last reply at rest, above the footer, and nowhere else",
+        async (s) => {
+          const thread = s.provider.thread(s.ref);
+          const title = "1 agent · 1 shell still running";
+          const running = { title, lines: ["Agent: Look into it", "Sleep for 5 seconds"] };
+          const holders = () => s.rig.read(s.ref).filter((m) => m.text.includes(title));
+          const first = thread.openReply(() => {});
+          await first.text("First reply");
+          await first.finish([], FOOTER);
+          await first.closeOut();
+          thread.showRunning(running);
+          await first.settle();
+          await s.rig.settle();
+          assert.equal(holders().length, 1, "the list shows once");
+          const shown = holders()[0]?.text ?? "";
+          assert.match(shown, /First reply/, "under the reply at rest");
+          assert.match(shown, /Sleep for 5 seconds/, "with a line per task");
+          assert.ok(shown.lastIndexOf(title) < shown.indexOf("model-a"), "above the footer");
+          // A reply written below that has not ended is not at rest: the list stays above it.
+          const second = thread.openReply(() => {});
+          await second.text("Second reply");
+          await second.settle();
+          await s.rig.settle();
+          assert.equal(holders().length, 1);
+          assert.match(holders()[0]?.text ?? "", /First reply/);
+          // Once it rests, the list is under it and the first reply shows none.
+          await second.finish([], FOOTER);
+          await second.closeOut();
+          await second.settle();
+          await first.settle();
+          await s.rig.settle();
+          assert.equal(holders().length, 1, "the list shows once");
+          assert.match(holders()[0]?.text ?? "", /Second reply/);
+        },
+      );
+
+      check("an empty list removes it", async (s) => {
+        const thread = s.provider.thread(s.ref);
+        const title = "1 shell still running";
+        const reply = thread.openReply(() => {});
         await reply.text("Started a command");
         await reply.finish([], FOOTER);
         await reply.closeOut();
-        const showing = () => s.rig.read(s.ref).some((m) => m.text.includes("1 shell"));
-        reply.setRunning("1 shell");
+        thread.showRunning({ title, lines: ["Sleep for 5 seconds"] });
         await reply.settle();
         await s.rig.settle();
-        assert.equal(showing(), true);
-        reply.setLatest(false);
+        assert.equal(s.rig.read(s.ref).filter((m) => m.text.includes(title)).length, 1);
+        thread.showRunning(null);
         await reply.settle();
         await s.rig.settle();
-        assert.equal(showing(), false, "an older reply keeps its footer and drops the counts");
-        reply.setLatest(true);
-        reply.setRunning("");
-        await reply.settle();
-        await s.rig.settle();
-        assert.equal(showing(), false);
+        assert.equal(s.rig.read(s.ref).filter((m) => m.text.includes(title)).length, 0);
+        assert.ok(
+          s.rig.read(s.ref).some((m) => m.text.includes("Started a command")),
+          "the reply keeps what it said",
+        );
       });
 
       check("knows when the owner or another reply wrote below it", async (s) => {

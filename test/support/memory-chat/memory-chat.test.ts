@@ -58,7 +58,7 @@ test("its names are no numbers, and a thread is dated from the clock of its cont
   assert.equal(provider.openedAt({ channel, thread: "nothing" }), null);
 });
 
-test("a reply is one message: text and task lines in order, the footer, then what runs", async () => {
+test("a reply is one message: text and task lines in order, what runs, then the footer", async () => {
   const { chat, provider, channel } = await built();
   const ref = chat.openThread(channel);
   const reply = provider.thread(ref).openReply(() => {});
@@ -84,11 +84,11 @@ test("a reply is one message: text and task lines in order, the footer, then wha
     weekLimit: null,
   });
   await reply.closeOut();
-  reply.setRunning("1 shell");
+  provider.thread(ref).showRunning({ title: "1 shell still running", lines: ["Sleep"] });
   assert.deepEqual(chat.texts(channel, ref.thread).slice(1), [
-    "First words\n[complete] Read a.txt (again)\nMore words\nRead 1 file\nbypass · model-a · /work · +3 -1 · 12% context\n1 shell",
+    "First words\n[complete] Read a.txt (again)\nMore words\nRead 1 file\n1 shell still running\n- Sleep\nbypass · model-a · /work · +3 -1 · 12% context",
   ]);
-  reply.setLatest(false);
+  provider.thread(ref).showRunning(null);
   assert.ok(!chat.texts(channel, ref.thread).join().includes("1 shell"));
 });
 
