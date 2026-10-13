@@ -57,7 +57,9 @@ the CLAUDE.md block, the five sections of the system prompt and 12 of the 14 too
 identical. Three lines of the system prompt differed (who Claude is, the hint on `!`, the note
 on `EndConversation`), two tools differed (the rows on commands and on questions), and the
 terminal sent two tools more. The time limits are the ones the `Bash` tool states to Claude,
-read with and without the variable. That a subagent does not wait for the subagents it started
+read with and without the variable. A command of 40 minutes left in the background of two
+sessions of the SDK was stopped after 30 minutes in the one without the variable and ran to its
+end in the one with `BASH_DEFAULT_TIMEOUT_MS=14400000`. That a subagent does not wait for the subagents it started
 is Claude Code's own statement ([sub-agents](https://code.claude.com/docs/en/sub-agents)), and
 was not run.
 
