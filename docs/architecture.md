@@ -404,7 +404,7 @@ warning or error that names the library, and the daemon logs the states of the c
   same-folder hold or a setup still open is cancelled, as `!stop` would.
 - A thread left with only background tasks says `texts.RESTART_WAITS` in its status line
   (`ThreadSession.threadLine`, brought up to date by `ThreadSession.showRestartWait` at every poll
-  of the drain), naming them by the footer's counts, since the daemon cannot tell whether a task (a
+  of the drain), naming them by their counts (`1 shell`, `2 agents`), since the daemon cannot tell whether a task (a
   dev server, a watcher) ever ends. A status line does not notify and goes with the restart, where a
   message would do both. Where Slack refuses the app a thread status (`ThreadChat.activityRefused`),
   one message says it (`texts.RESTART_WAITS_MESSAGE`). `!stop` ends such tasks with
@@ -556,7 +556,9 @@ The Slack provider's `endReply` (`src/chat/slack/repair.ts`) stops the message's
 and is fine), reads the message back by its own ts (`conversations.replies` with `ts` and `limit=1`)
 and edits it with `chat.update`: its blocks as Slack keeps them, every card left `pending` or
 `in_progress` closed as an error (a stopped stream stores it as one anyway), and the note appended
-as a context block, or, at Slack's 50-block cap, added to the last context block. The stream's own
+as a context block, or, at Slack's 50-block cap, added to the last context block. The list of what still
+runs (the `running-list` block) is taken off. A message left open only because it showed the list
+holds a finished answer, so it loses the block and gets no note. The stream's own
 stop is the one notification the reply owes, and the edit never notifies; nothing is posted. A
 message that cannot be read back, or is gone, is left as it is. Its `withdraw` deletes the message
 (`message_not_found` counts as done) and `showStatus` goes through the same `StatusReaction` a live
@@ -869,7 +871,7 @@ it could not be shown (`texts.APPROVAL_UNPOSTED`), and the tool's line records t
 
 ## Footer
 
-Every reply ends with one context line, but the provider shows it once per stretch of the thread between two messages of the owner, under the lowest reply that has ended. The session hands the reply the footer as fields
+Every reply carries one context line, and the chat shows one per stretch of the thread between two messages of the owner, under the app's last reply at rest (`tails` in `src/core/reply/tail.ts`, a function of the order of the messages: each chat provider keeps the order of its own messages and applies it, and no position crosses the seam). A message of the owner's takes no footer away from the replies above it, and a reply that has none of its own shows the one the reply above it had. A reply is at rest once its turn has ended and its last message can be rewritten: a turn that ends with background work still running stops the stream and rests at once (`Reply.rest`), any other reply rests when its end has landed. The session hands the reply the footer as fields
 (`FooterFields`, from `ThreadSession.footerData`), and the Slack provider writes the line
 (`footer.formatFooter`): `⚡ bypass` when bypass is on, the model from `AgentSession.contextUsage`
 (the SDK's `getContextUsage()`), the effort level, the name of the folder this thread was opened in,
@@ -1158,7 +1160,7 @@ closed when the start returns (`ThreadSession.connect`).
   while a prompt of the owner's is owed its answer: being submitted, queued, taken, sent and not
   yet started, or its turn running (`ThreadSession.promptOwed`). A turn the agent starts to report
   a task owes nobody an answer, so it says nothing, and the line never counts what still runs:
-  the footer does. `Compacting conversation…` from the event `compaction_started` to
+  the list under the last reply at rest does. `Compacting conversation…` from the event `compaction_started` to
   `compaction_ended`, a report turn included: Claude Code
   opens a compaction with a `status` system record that says `compacting`, repeats it while it
   lasts, and ends it with the `status` record that carries `compact_result`, and the back end says
@@ -1213,15 +1215,15 @@ closed when the start returns (`ThreadSession.connect`).
   task of any reply still ran.
 - A background task that finishes between turns sends its notification while the session is idle,
   then Claude Code starts a turn of its own to report it. That turn renders into the reply that
-  started the task (the held-open reply: `ThreadSession.openingTarget`, keyed by the task id through
-  `ThreadSession.taskReplies`), appended after that reply's own body with one line per task it
-  reports, as the terminal prints it (`ThreadSession.endedLine`): a command's notification
+  started the task only while that reply is the last thing in the thread
+  (`ThreadSession.openingTarget`, keyed by the task id through `ThreadSession.taskReplies`),
+  appended after that reply's own body with one line per task it reports, as the terminal prints it (`ThreadSession.endedLine`): a command's notification
   `summary`, which already reads `Background command "..." completed (exit code 0)`, or
   `Agent "<description>" finished` built from the task's `task_started` event, since an agent's
   `summary` is its result; plus the duration when the notification's `usage` reports `duration_ms`
-  (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; only
-  when the reply it would render into is no longer tracked (a restart or an idle close dropped it)
-  does the report get a reply of its own. The next queued message waits for it to finish.
+  (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; when
+  that reply is no longer tracked (a restart or an idle close dropped it) or is not last, the
+  report gets a reply of its own at the bottom. The next queued message waits for it to finish.
   `texts.BACKGROUND_NOTICE` opens it only when no task end was seen. When a message was already sent
   and waits for its turn, that turn comes first, so nothing waits; the turn that reports the task
   follows it on its own (measured: "Prompt sent before a notification"; an older observation,

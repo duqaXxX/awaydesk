@@ -153,8 +153,7 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   (`ReplySink.text` with `ending`, fed by `TurnRenderer.feedEnding`), so a notice written just
   before it stays in the reply, and a card that closes after it moves under it. No other line of the
   daemon's moves. A footer goes under the line: a report turn cut short renders into a reply that
-  already has the footer of its first turn, and the running list (`1 agent still running`) shows
-  there until the session empties it. When a full message pushed the line, or the note under it, into a
+  already has the footer of its first turn. When a full message pushed the line, or the note under it, into a
   continuation, that message rang when it was posted and is the ending as it stands
   (`ReplySink.opensOnEnding`): no closing message follows. A line that does not fit the room left in
   a message is cut there, as any text is, and the continuation then rings with the rest of it. The
@@ -222,8 +221,8 @@ message, or is cut with the preview note when the span is fixed.
 
 ### When a reply ends
 
-The reply ends once its turn has ended and none of its tasks still runs or still waits on a turn
-Claude Code starts to report it (the held-open reply): a task the turn started keeps its card open
+A reply whose turn has ended while a task of it still runs, or still waits on a turn Claude Code
+starts to report it, rests; it ends once none does. A task the turn started keeps its card open
 and updating in place, `ReplySink.finish` ends only the body, and `ThreadSession.stillOwed` decides
 whether `Reply.rest` (still owed) or `ReplySink.closeOut` runs (the CLI can suppress the report's notification, so past
 `constants.INJECTED_TURN_WAIT` `ThreadSession.expireUnreported` gives up on it). A report turn renders
@@ -277,7 +276,7 @@ knew and no content. When Slack refuses an update of any message for its content
 dropped and the message shows less than the model: unless a later update of it passes, the reply's
 end counts as not landed and the root shows ❌. The update that only folds the cards of a stream sent
 all of its span is the exception, since nothing of the reply is missing. Each stretch of the thread between two owner
-messages shows one footer, on its lowest reply that has ended (see "One footer between two owner
+messages shows one footer, on its lowest reply at rest (see "One footer between two owner
 messages"); the list of what still runs sits above that footer on the lowest reply at rest of
 the whole thread (see "The list of what still runs"). A card left `in_progress` in a stopped message
 is stored as an error until it is updated (measured: "Open card stored as error"), so every end

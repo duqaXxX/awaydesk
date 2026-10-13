@@ -760,8 +760,10 @@ it is restarting, a refused attachment, an error) shows small and grey, as the f
 reads apart from Claude's replies. `!help`, `!guide`, `!status` and the answer to a resume show at
 full size.
 
-Every reply ends with a footer, which says how the session stood when its turn ended, and
-keeps it:
+A reply carries a footer, which says how the session stood when its turn ended. Between two of
+your messages one footer shows, under the app's last reply at rest; a message of yours takes no
+footer away from the replies above it, and a reply that has none of its own shows the one the reply
+above it had:
 
 ```
 ⚡ bypass · claude-opus-5-5 · effort medium · my-project · main · (+42,-10) · 10.2M tok · ctx 15% · 5h 16% ↻ 43m · 7d 46% ↻ 3d 4h
@@ -791,9 +793,12 @@ A reply, an approval request and a question post inside the session's own thread
 notifies you on a new message in a thread you started, whatever the channel's own notification
 setting is:
 
-- A reply rings once, when it ends: Slack pushes a stream when it stops, with the start of
-  Claude's answer as the text. The reply ends once the turn has ended and every task it started,
-  and the report for it, are done too.
+- A reply rings once, when its stream stops: Slack pushes a stream when it stops, with the start
+  of Claude's answer as the text. The stream stops when the turn ends, also when a background
+  command or agent it started still runs. The report that follows grows the same message by edit,
+  silently, and the ending, posted as a new message when the reply ends, rings a second time.
+- A reply that has another reply's message below it ends in the message it is in, by edit, and
+  rings no more. A message of yours below it does not have that effect.
 - A reply that is still open after about 4 minutes 40 seconds rings when its stream stops, and a
   second time when it ends: what Claude wrote after its last call and the footer arrive as a
   new message, and the notification reads the start of it.

@@ -7,56 +7,54 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- What still runs in a thread is a list, one card under the thread's last reply at rest and above
-  its footer, in place of the `⏳ 1 shell` count that followed the footer: a title such as
-  `2 agents · 1 shell still running` and a line per subagent or background command, six at most and
-  then `+N more`. It is written whenever it changes, on a reply at rest or one whose end has
-  landed, moves down to a newer reply when that one rests, and goes when nothing runs. The chat
-  seam has `ThreadChat.showRunning(list)`; `Reply.setRunning`, `Reply.setLatest` and the session's
-  `latest` are gone. After a crash `repair.endReply` removes
-  the list's card instead of closing it as an error, and writes no note on a message that only the
-  list kept open (#295).
+- A reply that has another reply's message below it ends in the message it is in, by edit: its
+  footer goes under that message, or on the stream's stop, and no ending is posted, which would have
+  landed below the other reply. Such a reply opens no continuation message either. A message of the
+  owner's below a reply does not have this effect (#295).
 
-- The thread's status line says `Working…` only while a message of the owner's has no finished
-  answer: being submitted, queued, taken, sent and not yet started, or its turn running. A turn
-  the agent starts on its own to report a task shows nothing, and the line never counts what still
-  runs (`1 shell still running` is gone from it; the list under the last reply says it). `Compacting conversation…`
-  still shows while any turn compacts. `Reply.footerShown` and `texts.STILL_RUNNING_STATUS` are
-  gone (#295).
+- The report of a background task renders into the reply that started the task only while that
+  reply is the last thing in the thread; with a message of the owner's or another reply's below
+  it, the report opens a reply of its own at the bottom. A reply left overtaken that ends with no
+  report under it, because the task's notification never came, is logged at INFO (#295).
+
+- Between two messages of the owner one footer shows, under the app's last reply at rest. A
+  message of the owner's takes no footer away from the replies above it, and a reply that has
+  none of its own shows the one the reply above it had. A reply that gives its footer up takes it
+  off by a silent edit, and a closing message that held the footer alone is deleted
+  (`chat.delete`; one that fails is tried once more after `FINAL_RETRY_SECONDS`, and
+  `message_not_found` counts as deleted). After a restart of the daemon the footer an earlier reply
+  shows stays where it is (#295).
 
 - A reply whose turn ends with background work still running rests: its stream is stopped at the
   end of the turn, with the footer under it (the stop is a push, and replaces the one the 280
   second stop made), and its message then changes by edit. A report that renders into it grows it
-  by edit, and its end posts the ending with the footer and cuts it out of the first message. The
-  chat seam's `ReplySink.finish` takes the footer, `closeOut` takes none, and `Reply.rest` is new;
-  the Slack provider and the memory chat show the footer under a reply from `rest` on (#295).
+  by edit, and its end posts the ending with the footer and cuts it out of the first message
+  (#295).
 
-- The Slack provider places the reply footer by position: in each stretch of a thread between two
-  messages of the owner, one footer, under the lowest reply whose end has landed. A reply that
-  gives its footer up takes it off by a silent edit, and a closing message that held the footer
-  alone is deleted (`chat.delete`; one that fails is tried once more after
-  `FINAL_RETRY_SECONDS`, and `message_not_found` counts as deleted). The thread's
-  places live while a thread object that opened a reply in them is open, so a reply let go of by
-  an owner message is still found by the next one (#295).
+- What still runs in a thread is a list: one card under the thread's last reply at rest and above
+  its footer, with a title such as `2 agents · 1 shell still running` and a line per subagent or
+  background command, six at most and then `+N more`. It is written whenever it changes, on a
+  reply at rest or one whose end has landed, moves down to a newer reply when that one rests (not
+  while that reply is still a stream), and goes when nothing runs. The `⏳ 1 shell` count that
+  followed the footer is gone. After a crash `repair.endReply` removes the list's block, and writes
+  no note on a message that only the list kept open (#295).
 
-- The chat seam's `Reply.withdrawFooter` is gone, and so are `ThreadSession.newReportReply` and the
-  bookkeeping behind it: the session no longer takes a footer off the reply above a report, the
-  chat provider places it by position. The memory chat follows the same rule as Slack, with its
-  own message counter, and the chat conformance suite checks it on both providers (#295).
+- The thread's status line says `Working…` only while a message of the owner's has no finished
+  answer: being submitted, queued, taken, sent and not yet started, or its turn running. A turn
+  the agent starts on its own to report a task shows nothing, and the line never counts what still
+  runs. `Compacting conversation…` still shows while any turn compacts (#295).
 
-- The report of a background task renders into the reply that started the task only while that
-  reply is the last thing in the thread; with a message of the owner's or another reply's below
-  it, the report opens a reply of its own at the bottom (#295). A reply left overtaken that ends
-  with no report under it, because the task's notification never came, is logged at INFO.
-
-- A reply that has another reply's message below it ends in the message it is in: its footer goes
-  under that message by edit, or on the stream's stop, and no ending is posted, which would have
-  landed below the other reply. Such a reply opens no continuation message either. The Slack
-  provider keeps where each thread's messages sit in memory (`reply/places.ts`, `ThreadPlaces`),
-  told of every owner message by the listener and of every reply's last message by its sink; the
-  chat seam's `Reply` gains `last` and `overtaken`, which the memory chat implements from its own
-  message counter. Nothing in the thread changes yet for a reply with only an owner message
-  below it.
+- The chat seam gains `ThreadChat.showRunning(list)`, `Reply.rest`, `Reply.last` and
+  `Reply.overtaken`; `ReplySink.finish` takes the footer and `closeOut` takes none. `Reply.setRunning`,
+  `Reply.setLatest`, `Reply.withdrawFooter`, `Reply.footerShown`, `texts.STILL_RUNNING_STATUS`,
+  `ThreadSession.newReportReply` and the session's `latest` are gone: the session no longer takes a
+  footer off the reply above a report, and each chat provider places the footer and the list by
+  position with the core's `tails`. The Slack provider keeps where each thread's messages sit in
+  memory (`reply/places.ts`, `ThreadPlaces`), told of every owner message by the listener and of
+  every reply's last message by its sink; the places live while a thread object that opened a
+  reply in them is open, so a reply let go of by an owner message is still found by the next one.
+  The memory chat follows the same rules with its own message counter, and the chat conformance
+  suite checks both providers (#295).
 
 - The cleanup of `state.json` forgets a thread whose first message Slack no longer has, at start
   and every 6 hours, beside the channels that are gone (#237). The chat seam gains
