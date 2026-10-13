@@ -161,7 +161,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent\n\n",
+      "text": "\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent",
       "type": "markdown_text"
      }
     ],
@@ -175,7 +175,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "Launc",
+      "text": "\n\nLaunc",
       "type": "markdown_text"
      }
     ],

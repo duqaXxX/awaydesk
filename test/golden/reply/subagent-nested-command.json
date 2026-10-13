@@ -6,13 +6,13 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent\n\n",
+     "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent",
      "notice": true
     },
     {
      "call": "text",
      "ending": false,
-     "markdown": "started",
+     "markdown": "\n\nstarted",
      "notice": false
     },
     {
@@ -211,13 +211,13 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent\n\n",
+    "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent",
     "notice": true
    },
    {
     "call": "text",
     "ending": false,
-    "markdown": "started",
+    "markdown": "\n\nstarted",
     "notice": false
    },
    {

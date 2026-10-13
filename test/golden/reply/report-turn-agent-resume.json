@@ -6,13 +6,13 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Test background agent)\n⎿ Backgrounded agent\n\n",
+     "markdown": "**Agent**(Test background agent)\n⎿ Backgrounded agent",
      "notice": true
     },
     {
      "call": "text",
      "ending": false,
-     "markdown": "STARTED",
+     "markdown": "\n\nSTARTED",
      "notice": false
     },
     {
@@ -376,13 +376,13 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Test background agent)\n⎿ Backgrounded agent\n\n",
+    "markdown": "**Agent**(Test background agent)\n⎿ Backgrounded agent",
     "notice": true
    },
    {
     "call": "text",
     "ending": false,
-    "markdown": "STARTED",
+    "markdown": "\n\nSTARTED",
     "notice": false
    },
    {

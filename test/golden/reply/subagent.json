@@ -6,13 +6,13 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\n",
+     "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent",
      "notice": true
     },
     {
      "call": "text",
      "ending": false,
-     "markdown": "I've laun",
+     "markdown": "\n\nI've laun",
      "notice": false
     },
     {
@@ -307,13 +307,13 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\n",
+    "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent",
     "notice": true
    },
    {
     "call": "text",
     "ending": false,
-    "markdown": "I've laun",
+    "markdown": "\n\nI've laun",
     "notice": false
    },
    {

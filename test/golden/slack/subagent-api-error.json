@@ -33,7 +33,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent\n\n",
+      "text": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent",
       "type": "markdown_text"
      }
     ],
@@ -50,7 +50,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "Synthetic answer.",
+      "text": "\n\nSynthetic answer.",
       "type": "markdown_text"
      }
     ],

@@ -79,7 +79,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Test background agent)\n⎿ Backgrounded agent\n\n",
+      "text": "**Agent**(Test background agent)\n⎿ Backgrounded agent",
       "type": "markdown_text"
      }
     ],
@@ -96,7 +96,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "STARTED",
+      "text": "\n\nSTARTED",
       "type": "markdown_text"
      }
     ],

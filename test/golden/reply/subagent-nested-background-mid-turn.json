@@ -42,13 +42,13 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent\n\n",
+     "markdown": "\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent",
      "notice": true
     },
     {
      "call": "text",
      "ending": false,
-     "markdown": "Launc",
+     "markdown": "\n\nLaunc",
      "notice": false
     },
     {
@@ -359,13 +359,13 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent\n\n",
+    "markdown": "\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent",
     "notice": true
    },
    {
     "call": "text",
     "ending": false,
-    "markdown": "Launc",
+    "markdown": "\n\nLaunc",
     "notice": false
    },
    {

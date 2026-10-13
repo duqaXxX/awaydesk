@@ -130,8 +130,10 @@ export class TurnRenderer<Footer = FooterFields> {
   // Calls whose agent runs in the background: a line of text as the terminal writes it, and no
   // card. What the agent does under such a call writes nothing, as in the terminal.
   readonly #launched = new Set<string>();
-  /** A launch line is the last thing written: it ends with its own break. */
-  #afterLaunch = false;
+  // A line of the daemon's inside the reply (an agent's launch, a task's end) is the last thing
+  // written. It ends with no break of its own, since a card that follows needs none and Slack
+  // draws the empty lines; text that follows is set a paragraph apart.
+  #breakOwed = false;
   /** `takePromoted`'s, not yet taken. */
   #promoted: TaskStarted[] = [];
   /** A question's answers, until its call ends. */
@@ -373,11 +375,28 @@ export class TurnRenderer<Footer = FooterFields> {
    * it reports): a blank line still separates it from what is there, as a paragraph break would.
    */
   async feedNotice(text: string): Promise<void> {
-    const prefix = this.#wroteText || this.#lines.size > 0 ? "\n\n" : "";
+    const prefix = this.#wroteText || this.#lines.size > 0 || this.#breakOwed ? "\n\n" : "";
     this.#afterText = false;
-    this.#afterLaunch = false;
+    this.#breakOwed = false;
     await this.#handOver();
     await this.#sink.text(`${prefix}${text}\n\n`, { notice: true, ending: false });
+  }
+
+  /**
+   * A line of the daemon's among what the reply holds: a task's end, said where the turn is.
+   * A paragraph apart from what is before it, and from the text that follows.
+   */
+  async feedLine(text: string): Promise<void> {
+    await this.#line(text);
+  }
+
+  async #line(text: string): Promise<void> {
+    const apart =
+      this.#breakOwed || this.#wroteText || this.#lines.size > 0 || this.#launched.size > 0;
+    this.#afterText = false;
+    await this.#handOver();
+    await this.#sink.text(`${apart ? "\n\n" : ""}${text}`, { notice: true, ending: false });
+    this.#breakOwed = true;
   }
 
   /** A note of the daemon's after what the reply holds: what was not sent, what a restart dropped. */
@@ -539,18 +558,13 @@ export class TurnRenderer<Footer = FooterFields> {
    */
   async #launch(event: TaskStarted, call: string): Promise<void> {
     this.#lines.delete(call);
-    // A line of the daemon's, as `feedNotice` writes one: it is not the turn's text, so a turn
-    // that says nothing else still gets its last text or its error from the turn's end.
-    // Agents started one after the other read as one block, with no empty line between them.
-    const apart =
-      !this.#afterLaunch && (this.#wroteText || this.#lines.size > 0 || this.#launched.size > 0);
+    // A line of the daemon's: it is not the turn's text, so a turn that says nothing else still
+    // gets its last text or its error from the turn's end.
+    const said = launched(event.agentType, event.description);
+    // Written before the agent joins `#launched`: the line is set apart from what came before.
+    await this.#line(said);
     this.#launched.add(call);
     this.#bind(event.taskId, call);
-    this.#afterText = false;
-    await this.#handOver();
-    const said = launched(event.agentType, event.description);
-    await this.#sink.text(`${apart ? "\n\n" : ""}${said}\n\n`, { notice: true, ending: false });
-    this.#afterLaunch = true;
   }
 
   /** The task runs for this reply, on that line or under that call. */
@@ -668,7 +682,7 @@ export class TurnRenderer<Footer = FooterFields> {
       this.#afterText = false;
     }
     this.#lines.set(update.id, update);
-    this.#afterLaunch = false;
+    this.#breakOwed = false;
     await this.#handOver();
     await this.#sink.task(update);
   }
@@ -691,7 +705,8 @@ export class TurnRenderer<Footer = FooterFields> {
   ): Promise<void> {
     if (markdown === "") return;
     const { notice = false, ending = false, piece = false } = options;
-    this.#afterLaunch = false;
+    if (this.#breakOwed && !markdown.startsWith("\n")) markdown = `\n\n${markdown}`;
+    this.#breakOwed = false;
     this.#wroteText = true;
     this.#afterText = !notice; // a notice ends with its own break
     if (piece && !this.#streaming) {

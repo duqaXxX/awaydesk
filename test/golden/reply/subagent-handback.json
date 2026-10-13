@@ -21,7 +21,7 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent\n\n",
+     "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
      "notice": true
     },
     {
@@ -538,7 +538,7 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent\n\n",
+    "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
     "notice": true
    },
    {

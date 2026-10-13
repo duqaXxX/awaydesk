@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- An agent's launch line and the end line of an agent that ends during a turn are written with
+  no break after them: the break showed as empty lines above a card that followed. Text that
+  follows such a line is set a paragraph apart.
+
 - A run of tool calls is drawn as the terminal draws it (issue #299, captured on Claude Code
   2.1.296): one card and no longer two. It names the call that runs now, a command by its
   description, and with no call running it holds the counts of what ended. The counts read as

@@ -1688,7 +1688,7 @@ export class ThreadSession {
       const writing = this.active?.renderer ?? null;
       const reply = this.taskReplies.get(event.taskId) ?? writing;
       if (reply?.lineless(event.taskId)) {
-        if (writing !== null) await writing.feedNotice(this.endedLine(event));
+        if (writing !== null) await writing.feedLine(this.endedLine(event));
         else if (this.sent.length > 0) this.endedAhead.push(this.endedLine(event));
       }
     }
@@ -2293,7 +2293,7 @@ export class ThreadSession {
     if (opening !== null) await renderer.feedNotice(opening);
     const ahead = this.endedAhead;
     this.endedAhead = [];
-    if (ahead.length > 0) await renderer.feedNotice(ahead.join("\n"));
+    if (ahead.length > 0) await renderer.feedLine(ahead.join("\n"));
     if (this.notice !== null) {
       const notice = this.notice;
       this.notice = null;
