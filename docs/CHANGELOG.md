@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `BASH_DEFAULT_TIMEOUT_MS` in `.env`, Claude Code's own variable, reaches every session as
+  written (issue #300). Above 30 minutes it replaces the limit Claude Code puts on a command left
+  running in the background in a session of the SDK, which a terminal session does not have;
+  the same value is how long a command in the foreground may run. The Claude module declares
+  the variables it hands on (`VARIABLES` in `src/agent/claude/module.ts`).
 - A reply ends in the message it is in, by edit, with no new message, when another reply's message
   sits below it, or when it rested for background work, a message of the owner's sits below it and
   no text of Claude's was written to it since it rested: its footer goes under that message, or on
@@ -393,6 +398,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A session starts as a terminal session of Claude Code does (issue #300). It works under Claude
+  Code's own system prompt (`systemPrompt` set to the `claude_code` preset): the SDK sent a
+  minimal one, 679 characters against about 10,000, measured on the first request of both with
+  Claude Code 2.1.296. Fork mode is on (`CLAUDE_CODE_FORK_SUBAGENT=1`), so every subagent runs
+  in the background and Claude no longer picks between foreground and background. The session's
+  web searches refill by 100 an hour (`CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR=100`). The two
+  variables go in the session's `env` under the daemon's own environment, which wins. A session
+  already open keeps the prompt it recorded until its next compaction. The session the usage
+  probe starts is unchanged.
+- `docs/limits.md` lists, in the section of the Claude agent, every difference found between a
+  session started from Slack and an interactive one, the small ones too: the time limits of a
+  command, the tools the terminal alone offers, who Claude is told it is.
 - A stop of the daemon no longer stalls on the pause Slack asks for after a rate limit (issue
   #236). A rate limited call was sent again after `Retry-After`, up to three times, and nothing
   could end that pause. With a long one on a call made while the sessions close, the shutdown

@@ -98,6 +98,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Options` | `canUseTool` | option | session.ts: ClaudeSession.#options | reference | P11 |
 | `Options` | `cwd` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `effort` | option | session.ts: ClaudeSession.#options | reference | P16 |
+| `Options` | `env` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `extraArgs` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `hooks` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `includePartialMessages` | option | session.ts: ClaudeSession.#options | reference | none |
@@ -105,6 +106,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Options` | `resume` | option | session.ts: ClaudeSession.#options | reference | P7 |
 | `Options` | `settingSources` | option | session.ts: ClaudeSession.#options | reference | none |
 | `Options` | `stderr` | option | session.ts: ClaudeSession.#options | reference | none |
+| `Options` | `systemPrompt` | option | session.ts: ClaudeSession.#options | reference | none |
 | `PermissionResult` | `behavior` | option | requests.ts: permissionResult, questionResult | reference | none |
 | `PermissionResult` | `message` | option | requests.ts: permissionResult, questionResult | reference | none |
 | `PermissionResult` | `updatedInput` | option | requests.ts: permissionResult, questionResult | reference | none |

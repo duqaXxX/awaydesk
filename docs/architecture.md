@@ -197,8 +197,10 @@ sessions may start under, two clocks, and `ChatContext.core`, which returns the 
 the daemon has built its sessions. The chat is built before the sessions exist, so `build` must
 not call `core`; a provider calls it when it first needs the core. `config.loadConfig` gives a
 module the values of its own variables only, and a required one that is missing stops the start.
-The Claude entry reads no variable; the Slack entry requires `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`
-and `SLACK_OWNER_USER_ID` and reads `SLACK_USER_TOKEN`.
+The Claude entry requires none and reads `BASH_DEFAULT_TIMEOUT_MS`, a variable of Claude Code that
+it hands to each thread's session; the Slack entry requires `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`
+and `SLACK_OWNER_USER_ID` and reads `SLACK_USER_TOKEN`. A module reads each of its variables by
+name: `loadConfig` gives them readable by lookup and not enumerable, so that nothing prints them.
 
 A capability names a feature that the core offers only when the module supports it. A module
 declares what it supports; for a feature it does not declare, the core does not offer the feature
@@ -1002,7 +1004,14 @@ closed when the start returns (`ThreadSession.connect`).
   options of them: the directory as `cwd`, `resume`, `effort`, `settingSources`,
   `includePartialMessages`, the permission callback, the two hooks,
   `allowDangerouslySkipPermissions`, which makes `!bypass on` possible without turning it on, and
-  the extra argument `replay-user-messages` (above, "A prompt taken into a report turn"). The SDK
+  the extra argument `replay-user-messages` (above, "A prompt taken into a report turn"). Three
+  more make the session start as a terminal session does: `systemPrompt` set to the `claude_code`
+  preset, since the SDK otherwise sends a minimal prompt of its own, and in `env` the variables
+  `CLAUDE_CODE_FORK_SUBAGENT=1` (every subagent runs in the background, as in the terminal) and
+  `CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR=100`. `env` replaces the environment the process
+  inherits, so it holds those two, then the daemon's own environment, then the variables of
+  Claude Code the owner's file sets (`VARIABLES` in `src/agent/claude/module.ts`): a later one
+  wins. The session the usage probe starts gets none of this. The SDK
   runs Claude Code in its non-interactive mode, which treats the two servers built into Claude Code
   differently from the terminal (measured: "Built-in servers"). Computer use is offered in an
   interactive session only and is never there. The Chrome integration is connected only when Claude

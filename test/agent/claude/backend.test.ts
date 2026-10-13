@@ -11,8 +11,10 @@ import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 import { ClaudeBackend } from "../../../src/agent/claude/backend.ts";
 import { CAPABILITIES } from "../../../src/agent/claude/capabilities.ts";
+import { claudeAgent } from "../../../src/agent/claude/module.ts";
 import type { RequestHandler, StartOptions } from "../../../src/agent/seam.ts";
 import { ResumeRefused } from "../../../src/agent/seam.ts";
+import { systemClock } from "../../../src/clock.ts";
 import { FakeSdk, fail } from "../../support/fake-query.ts";
 import { type JsonObject, sdkRecords } from "../../support/fixtures.ts";
 import { gitInit, trust } from "../../support/git-layouts.ts";
@@ -80,6 +82,44 @@ test("the Chrome setting is read at every start", LIMIT, async () => {
   const flags = sdk.queries.map((query) => Object.keys(query.options.extraArgs ?? {}));
   assert.deepEqual(flags, [["replay-user-messages"], ["replay-user-messages", "chrome"]]);
 });
+
+// The daemon hands a module its variables readable by lookup and shown by nothing
+// (`hiddenVariables` in `src/core/config.ts`): a spread of that object copies none of them.
+test("a variable the daemon hands over by lookup alone reaches the session", LIMIT, async () => {
+  const hidden: Record<string, string> = Object.create(null);
+  Object.defineProperty(hidden, "BASH_DEFAULT_TIMEOUT_MS", {
+    value: "21600000",
+    enumerable: false,
+  });
+  const sdk = new FakeSdk();
+  const entry = claudeAgent({ query: sdk.query, home });
+  assert.deepEqual(entry.optional, ["BASH_DEFAULT_TIMEOUT_MS"]);
+  const backend = entry.build({ variables: hidden, clock: systemClock });
+  const session = await backend.start(START, NO_REQUESTS);
+  assert.equal(sdk.only.options.env?.BASH_DEFAULT_TIMEOUT_MS, "21600000");
+  await session.close();
+  await backend.close();
+});
+
+test(
+  "the owner's variables go to a thread's session and not to the daemon's own",
+  LIMIT,
+  async () => {
+    const sdk = new FakeSdk();
+    const backend = new ClaudeBackend({
+      query: sdk.query,
+      home,
+      variables: { BASH_DEFAULT_TIMEOUT_MS: "21600000" },
+    });
+    const thread = await backend.start(START, NO_REQUESTS);
+    const own = await backend.startBare(START.folder, NO_REQUESTS);
+    const [first, second] = sdk.queries;
+    assert.equal(first?.options.env?.BASH_DEFAULT_TIMEOUT_MS, "21600000");
+    assert.equal("env" in (second?.options ?? {}), false);
+    await thread.close();
+    await own.close();
+  },
+);
 
 test("a start where Claude Code refuses the resume rejects with ResumeRefused", LIMIT, async () => {
   const failure = new Error("Claude Code returned an error result: No conversation found");

@@ -148,15 +148,70 @@ test(
       "allowDangerouslySkipPermissions",
       "canUseTool",
       "cwd",
+      "env",
       "extraArgs",
       "hooks",
       "includePartialMessages",
       "settingSources",
       "stderr",
+      "systemPrompt",
     ]);
     assert.deepEqual(Object.keys(options.hooks ?? {}).sort(), ["PostToolUse", "Stop"]);
   },
 );
+
+// What an interactive session has by default and a session of the SDK does not (measured
+// 2026-10-13 on the first request of both, Claude Code 2.1.296, issue #300).
+
+test("a session works under Claude Code's own system prompt", LIMIT, async (t) => {
+  const { query } = await started(t);
+  assert.deepEqual(query.options.systemPrompt, { type: "preset", preset: "claude_code" });
+});
+
+test("a session starts with the defaults of an interactive one", LIMIT, async (t) => {
+  const { query } = await started(t);
+  const env = query.options.env ?? {};
+  assert.equal(env.CLAUDE_CODE_FORK_SUBAGENT, "1");
+  assert.equal(env.CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR, "100");
+  // `env` replaces the inherited environment: without the daemon's own, no path and no home.
+  // Read name by name as the copy holds them: on Windows the path is `Path`, which only
+  // `process.env` itself answers under another case.
+  const own = Object.entries(process.env);
+  assert.ok(own.length > 0);
+  for (const [name, value] of own) assert.equal(env[name], value, name);
+});
+
+test("a variable the daemon's environment sets wins over a default", LIMIT, async (t) => {
+  const before = process.env.CLAUDE_CODE_FORK_SUBAGENT;
+  process.env.CLAUDE_CODE_FORK_SUBAGENT = "0";
+  t.after(() => {
+    if (before === undefined) delete process.env.CLAUDE_CODE_FORK_SUBAGENT;
+    else process.env.CLAUDE_CODE_FORK_SUBAGENT = before;
+  });
+  const { query } = await started(t);
+  assert.equal(query.options.env?.CLAUDE_CODE_FORK_SUBAGENT, "0");
+});
+
+test(
+  "the owner's variables reach Claude Code as written, over the environment",
+  LIMIT,
+  async (t) => {
+    const before = process.env.BASH_DEFAULT_TIMEOUT_MS;
+    process.env.BASH_DEFAULT_TIMEOUT_MS = "1";
+    t.after(() => {
+      if (before === undefined) delete process.env.BASH_DEFAULT_TIMEOUT_MS;
+      else process.env.BASH_DEFAULT_TIMEOUT_MS = before;
+    });
+    const { query } = await started(t, {}, { variables: { BASH_DEFAULT_TIMEOUT_MS: "21600000" } });
+    assert.equal(query.options.env?.BASH_DEFAULT_TIMEOUT_MS, "21600000");
+  },
+);
+
+test("a session of the daemon's own keeps the SDK's defaults", LIMIT, async (t) => {
+  const { query } = await started(t, {}, { bare: true, settingsSources: [] });
+  assert.equal("systemPrompt" in query.options, false);
+  assert.equal("env" in query.options, false);
+});
 
 test("a resumed session passes the stored id, effort and model", LIMIT, async (t) => {
   const { query } = await started(

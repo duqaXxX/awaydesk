@@ -111,9 +111,15 @@ export interface SessionConfig extends StartOptions {
   readonly chrome: boolean;
   /**
    * A session the daemon starts for itself (the usage probe), not for a thread: it is not given
-   * the permission to bypass that a thread's `!bypass on` needs.
+   * the permission to bypass that a thread's `!bypass on` needs, and it keeps the SDK's own
+   * defaults.
    */
   readonly bare?: boolean;
+  /**
+   * The owner's own variables for Claude Code, as the daemon's file gives them: they reach the
+   * process of a thread's session over everything else in its environment.
+   */
+  readonly variables?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -171,6 +177,23 @@ const PERMISSION_MODES: ReadonlySet<string> = new Set([
   "auto",
 ]);
 
+// Claude Code's own system prompt, which a terminal session works under. With no `systemPrompt`
+// the SDK sends a minimal one, "that covers tool calling but omits the rest of the `claude_code`
+// preset's content" (Modifying system prompts, read 2026-10-13): 679 characters against about
+// 10,000, measured the same day on the first request of both (Claude Code 2.1.296, issue #300).
+// Claude Code records the prompt on a session's first request and reuses it until a compaction.
+const SYSTEM_PROMPT = { type: "preset", preset: "claude_code" } as const;
+
+// What an interactive session has by default and a session of the SDK does not (sub-agents and
+// environment variables pages, read 2026-10-13). Fork mode: every subagent runs in the
+// background and the Agent tool loses `run_in_background`; off, Claude picks foreground or
+// background, and picked each once in two identical runs. The refill of a session's web
+// searches: 100 an hour in the terminal, none otherwise.
+const TERMINAL_DEFAULTS: Readonly<Record<string, string>> = {
+  CLAUDE_CODE_FORK_SUBAGENT: "1",
+  CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR: "100",
+};
+
 // A level outside what `CAPABILITIES` declares, or a mode Claude Code does not take, is refused
 // (the seam's contract).
 function effortOf(level: string): EffortLevel {
@@ -215,7 +238,7 @@ export class ClaudeSession implements AgentSession {
   }
 
   #options(requests: RequestHandler): Options {
-    const { folder, resume, model, effort, chrome } = this.#config;
+    const { folder, resume, model, effort, chrome, bare, variables } = this.#config;
     // Makes bypass possible, not active: `setPermissionMode` switches it on the live session.
     // `replay-user-messages` (CLI reference): Claude Code re-emits each prompt with the uuid the
     // daemon sent it under, which tells a prompt it took into a running turn from one that waits
@@ -232,7 +255,13 @@ export class ClaudeSession implements AgentSession {
       ...(model !== null && { model }),
       settingSources: [...this.#config.settingsSources],
       includePartialMessages: true,
-      ...(!this.#config.bare && { allowDangerouslySkipPermissions: true }),
+      ...(!bare && {
+        allowDangerouslySkipPermissions: true,
+        systemPrompt: SYSTEM_PROMPT,
+        // `env` replaces the environment the process would inherit, so the daemon's own is
+        // passed on: over the terminal's defaults, and under what the owner's file sets.
+        env: { ...TERMINAL_DEFAULTS, ...process.env, ...variables },
+      }),
       extraArgs,
       canUseTool: async (toolName, input, context) => {
         // A callback that rejects is answered with a `control_response` of subtype `error`
