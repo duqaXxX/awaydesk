@@ -130,6 +130,24 @@ export function isPromptMessage(event: Payload): boolean {
   );
 }
 
+// The subtypes of a message a person wrote that sits in a thread whatever the daemon makes of it:
+// those of a prompt, and a `/me` line. Edits, deletions and joins are not new messages.
+const WRITTEN_SUBTYPES: readonly string[] = [...PROMPT_SUBTYPES, "me_message"];
+
+/**
+ * A message a person wrote, prompt or not: it takes a place in its thread, below the replies
+ * above it, even when nothing is made of it (a `/me` line, a share with attachments alone).
+ */
+export function isWrittenMessage(event: Payload): boolean {
+  const subtype = "subtype" in event ? event.subtype : "file_share";
+  return (
+    event.type === "message" &&
+    typeof subtype === "string" &&
+    WRITTEN_SUBTYPES.includes(subtype) &&
+    !("bot_id" in event)
+  );
+}
+
 const SHARED_FLAGS = ["is_shared", "is_ext_shared", "is_org_shared", "is_pending_ext_shared"];
 
 export class ChannelGuard {

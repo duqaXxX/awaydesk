@@ -36,8 +36,8 @@ const DISCIPLINE =
 type SinkCall =
   | { call: "text"; markdown: string; notice: boolean; ending: boolean }
   | { call: "task"; update: TaskUpdate }
-  | { call: "finish"; closing: readonly TaskUpdate[] }
-  | { call: "close_out"; footer: string | null }
+  | { call: "finish"; closing: readonly TaskUpdate[]; footer: string | null }
+  | { call: "close_out" }
   | { call: "wait_landed" }
   | { call: "settle" };
 
@@ -61,12 +61,12 @@ class RecordingSink implements Sink<string> {
     this.calls.push({ call: "task", update });
   }
 
-  async finish(closing: readonly TaskUpdate[]): Promise<void> {
-    this.calls.push({ call: "finish", closing });
+  async finish(closing: readonly TaskUpdate[], footer: string | null): Promise<void> {
+    this.calls.push({ call: "finish", closing, footer });
   }
 
-  async closeOut(footer: string | null): Promise<boolean> {
-    this.calls.push({ call: "close_out", footer });
+  async closeOut(): Promise<boolean> {
+    this.calls.push({ call: "close_out" });
     return true;
   }
 
@@ -184,10 +184,13 @@ export async function slackGolden(name: string, reply: JsonObject): Promise<Json
         await sink.settle();
         break;
       case "finish":
-        await sink.finish(list(call.closing, "closing").map(taskUpdate));
+        await sink.finishFormatted(
+          list(call.closing, "closing").map(taskUpdate),
+          optional(call.footer, "footer"),
+        );
         break;
       case "close_out":
-        await sink.closeOutFormatted(optional(call.footer, "footer"));
+        await sink.closeOut();
         break;
       case "wait_landed":
         await sink.waitLanded();

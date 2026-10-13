@@ -17,9 +17,10 @@ import {
   type OwnerAnswer,
   type OwnerList,
   type OwnerRequest,
+  type RunningList,
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
-import type { ChatContext } from "../../../src/core/port.ts";
+import { type ChatContext, type Tail, type TailEntry, tails } from "../../../src/core/port.ts";
 
 /** The owner of a memory chat unless a test names another. */
 export const OWNER = "alice";
@@ -33,6 +34,8 @@ export type MessageKind = "message" | "reply" | "notice" | "reference" | "reques
 /** A message as the chat holds it. */
 export interface StoredMessage {
   readonly id: MessageId;
+  /** Its place in the chat: a larger number was written later (ids do not sort as strings). */
+  readonly position: number;
   readonly channel: string;
   /** The thread it belongs to; null for a line the daemon wrote in a channel outside any. */
   readonly thread: string | null;
@@ -127,6 +130,25 @@ function shown(message: StoredMessage): ShownMessage {
   return { id, author, kind, text, pressable, unfinished, topLevel };
 }
 
+/** What a reply shows under its message: the footer, and the list of what still runs. */
+export interface Shown {
+  readonly footer: string | null;
+  /** Only the reply that holds the thread's list has one. */
+  readonly list: RunningList | null;
+}
+
+/** A reply the room places the footer of: the same rule as Slack's, over this room's counter. */
+export interface Placed {
+  /** The message it writes into; null while it has none. */
+  readonly message: StoredMessage | null;
+  /** It rests (`rest` was called after `finish`) or its end has landed: it can hold the footer. */
+  readonly resting: boolean;
+  /** The footer its turn left, formatted; null when that turn had none. */
+  readonly ownFooter: string | null;
+  /** What it shows under its message from now on. */
+  assign(shown: Shown): void;
+}
+
 /** What a memory chat holds, and the test's side of it. */
 export class Room {
   readonly owner: string;
@@ -139,6 +161,8 @@ export class Room {
   readonly #requests = new Map<string, OpenRequest>();
   readonly #lists = new Map<MessageId, OpenList>();
   readonly #strays: string[] = [];
+  readonly #placed = new Set<Placed>();
+  readonly #running = new Map<string, RunningList>();
   #lookupFails = false;
 
   constructor(owner: string) {
@@ -262,6 +286,82 @@ export class Room {
     return this.#threads.get(key(ref.channel, ref.thread)) ?? null;
   }
 
+  /**
+   * Where the other replies and the owner's messages of `message`'s thread sit, as positions:
+   * what a reply needs to tell whether it is the last and whether it was overtaken.
+   */
+  around(message: StoredMessage): { others: number[]; marks: number[] } {
+    const same = this.#messages.filter(
+      (m) =>
+        !m.deleted && m !== message && m.channel === message.channel && m.thread === message.thread,
+    );
+    return {
+      others: same.filter((m) => m.kind === "reply").map((m) => m.position),
+      marks: same
+        .filter((m) => m.kind === "message" && m.author === this.owner)
+        .map((m) => m.position),
+    };
+  }
+
+  /** A reply whose footer the room places. */
+  join(reply: Placed): void {
+    this.#placed.add(reply);
+  }
+
+  /**
+   * Hands every reply of the thread its footer, with `tails` of the core: one per stretch between
+   * two owner messages, on its lowest ended reply, and the list of what still runs to the lowest
+   * of them all. A reply never moves, so only its text changes.
+   */
+  place(ref: ThreadRef): void {
+    for (const [reply, tail] of this.#tails(ref, null)) reply.assign(this.#shown(ref, tail));
+  }
+
+  /** What still runs in the thread changed; null for nothing. */
+  showRunning(ref: ThreadRef, list: RunningList | null): void {
+    if (list === null) this.#running.delete(key(ref.channel, ref.thread));
+    else this.#running.set(key(ref.channel, ref.thread), list);
+    this.place(ref);
+  }
+
+  /** What `subject` would show if its end had landed now: what its end writes at once. */
+  shownIf(ref: ThreadRef, subject: Placed): Shown {
+    const tail = this.#tails(ref, subject).get(subject);
+    return tail === undefined ? { footer: null, list: null } : this.#shown(ref, tail);
+  }
+
+  #shown(ref: ThreadRef, tail: Tail<string>): Shown {
+    const list = tail.running ? (this.#running.get(key(ref.channel, ref.thread)) ?? null) : null;
+    return { footer: tail.footer, list };
+  }
+
+  #tails(ref: ThreadRef, subject: Placed | null): Map<Placed, Tail<string>> {
+    const entries: TailEntry<Placed, string>[] = [];
+    for (const reply of this.#placed) {
+      const message = reply.message;
+      if (message === null && reply !== subject) continue;
+      if (message !== null && (message.deleted || refOf(message).thread !== ref.thread)) continue;
+      if (message !== null && message.channel !== ref.channel) continue;
+      entries.push({
+        key: reply,
+        at: message?.position ?? Number.POSITIVE_INFINITY,
+        resting: reply.resting || reply === subject,
+        footer: reply.ownFooter,
+      });
+    }
+    const marks = this.#messages
+      .filter(
+        (m) =>
+          !m.deleted &&
+          m.kind === "message" &&
+          m.author === this.owner &&
+          m.channel === ref.channel &&
+          m.thread === ref.thread,
+      )
+      .map((m) => m.position);
+    return tails(entries, marks);
+  }
+
   message(id: MessageId): StoredMessage | null {
     return this.#messages.find((m) => m.id === id && !m.deleted) ?? null;
   }
@@ -289,6 +389,7 @@ export class Room {
     }
     const message: StoredMessage = {
       id,
+      position: this.#sequence,
       channel,
       thread: name,
       topLevel: thread === null,
@@ -353,6 +454,7 @@ export class Room {
     }
     const message = this.write(channel, thread, user, text, "message");
     const sent: Sent = { id: message.id, ref: refOf(message), topLevel: message.topLevel };
+    if (user === this.owner) this.place(sent.ref);
     // The owner check is this path's own: a message of somebody else is in the chat and nowhere else.
     if (user === this.owner && this.#inbound !== null) {
       await this.#inbound.message({

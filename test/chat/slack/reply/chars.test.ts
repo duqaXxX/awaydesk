@@ -437,7 +437,7 @@ async function replay(ops: Op[]): Promise<FakeSlack> {
         await clock.advance(op[1]);
         break;
       case "finish":
-        await sink.finish([]);
+        await sink.finish([], null);
         break;
       case "close":
         await sink.closeOutFormatted(op[1]);

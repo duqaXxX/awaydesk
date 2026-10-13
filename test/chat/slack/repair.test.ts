@@ -185,6 +185,128 @@ function content(n: number): JsonObject[] {
   }));
 }
 
+test("a message left with the list of what still runs is rewritten without it", async () => {
+  // The list is the card the sink writes with a fixed `block_id`: not an error to show, it goes,
+  // and no card is left running beside the line that says the reply stopped.
+  const list = {
+    type: "task_card",
+    block_id: "running-list",
+    task_id: "running-list",
+    title: "1 shell still running",
+    status: "in_progress",
+    details: {
+      type: "rich_text",
+      elements: [
+        { type: "rich_text_section", elements: [{ type: "text", text: "Sleep for 5 seconds" }] },
+      ],
+    },
+  };
+  const running = { type: "task_card", task_id: "t2", title: "Bash", status: "in_progress" };
+  const footer = { type: "context", elements: [{ type: "mrkdwn", text: "main · 12% ctx" }] };
+  const body = [...content(2), running, list, { type: "divider" }, footer];
+  const [blocks] = await repairedBlocks(body);
+  assert.deepEqual(blocks, [
+    ...content(2),
+    { ...running, status: "error" },
+    { type: "divider" },
+    footer,
+    STOPPED_BLOCK,
+  ]);
+  assert.ok(!JSON.stringify(blocks).includes("in_progress"), "no card is left running");
+});
+
+/** The list's card as the sink writes it, and the message around it. */
+const LIST_CARD: JsonObject = {
+  type: "task_card",
+  block_id: "running-list",
+  task_id: "running-list",
+  title: "1 shell still running",
+  status: "in_progress",
+};
+const FOOTER_BLOCKS: JsonObject[] = [
+  { type: "divider" },
+  { type: "context", elements: [{ type: "mrkdwn", text: "main · 12% ctx" }] },
+];
+
+test("a message kept open only by the list gets the list taken off and no note", async () => {
+  // Its answer is finished (its stream is over, no call of it runs): the app did not stop before
+  // this answer, so the line that says so is not written.
+  const { state, slack } = makeState();
+  slack.responses["chat.stopStream"] = rejected("message_not_in_streaming_state");
+  slack.responses["conversations.replies"] = {
+    ok: true,
+    messages: [
+      {
+        ts: "1790000000.000001",
+        text: "The build passed.",
+        blocks: [...content(1), LIST_CARD, ...FOOTER_BLOCKS],
+      },
+    ],
+  };
+  state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
+  await repairCrash(slack, state, new UpdateLimiter());
+  const [update] = slack.callsTo("chat.update");
+  assert.ok(update);
+  assert.deepEqual(blocksOf(update), [...content(1), ...FOOTER_BLOCKS]);
+  assert.equal(update.text, "The build passed.");
+  assert.ok(!JSON.stringify(update).includes(texts.STOPPED_BEFORE_ANSWER));
+  assert.deepEqual(thread(state).openReplies, []);
+});
+
+for (const [how, card] of [
+  ["its block_id alone", { ...LIST_CARD, task_id: "auto-id" }],
+  ["its task_id alone", { ...LIST_CARD, block_id: "auto-block" }],
+] as const) {
+  test(`the list is found by ${how}`, async () => {
+    const { state, slack } = makeState();
+    slack.responses["chat.stopStream"] = rejected("message_not_in_streaming_state");
+    slack.responses["conversations.replies"] = {
+      ok: true,
+      messages: [
+        { ts: "1790000000.000001", text: "Done.", blocks: [...content(1), card, ...FOOTER_BLOCKS] },
+      ],
+    };
+    state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
+    await repairCrash(slack, state, new UpdateLimiter());
+    const [update] = slack.callsTo("chat.update");
+    assert.ok(update);
+    assert.deepEqual(blocksOf(update), [...content(1), ...FOOTER_BLOCKS]);
+  });
+}
+
+test("a message with the list and an open stream or a running call keeps the note", async () => {
+  const runningCall: JsonObject = {
+    type: "task_card",
+    task_id: "t2",
+    title: "Bash",
+    status: "in_progress",
+  };
+  const cases: Array<{ stop: JsonObject | Error; calls: JsonObject[] }> = [
+    { stop: { ok: true }, calls: [] }, // the stream was open
+    { stop: rejected("message_not_in_streaming_state"), calls: [runningCall] },
+  ];
+  for (const { stop, calls } of cases) {
+    const { state, slack } = makeState();
+    slack.responses["chat.stopStream"] = stop;
+    slack.responses["conversations.replies"] = {
+      ok: true,
+      messages: [
+        {
+          ts: "1790000000.000001",
+          blocks: [...content(1), ...calls, LIST_CARD, ...FOOTER_BLOCKS],
+        },
+      ],
+    };
+    state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
+    await repairCrash(slack, state, new UpdateLimiter());
+    const [update] = slack.callsTo("chat.update");
+    assert.ok(update);
+    assert.equal(update.text, texts.STOPPED_BEFORE_ANSWER);
+    assert.deepEqual(blocksOf(update).at(-1), STOPPED_BLOCK);
+    assert.ok(!JSON.stringify(update.blocks).includes("running-list"));
+  }
+});
+
 test("a message up to slacks cap less one still gets the stopped line", async () => {
   // Slack's cap is 50 blocks, not the sink's 45: a read-back message (streamed markdown reads
   // back as several blocks) at 49 has room for the line.

@@ -2,7 +2,8 @@
  * The memory chat: a second chat provider held in memory, for the tests of the seam. Its
  * capabilities are all false (no native streaming, no reactions, no activity line, no session
  * index, no file upload, no line for the owner alone), and it implements every required member
- * of the chat seam for real. It is written against the seam alone.
+ * of the chat seam for real. It is written against the seam and the core's port alone: the port
+ * gives it the rule that places the footer and the list (`tails`, `isLast`, `isOvertaken`).
  *
  * `memoryChat()` is a registry entry that is also the handle on what the provider it builds
  * holds, and on the people a test plays:

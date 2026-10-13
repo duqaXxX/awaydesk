@@ -58,7 +58,7 @@ test("its names are no numbers, and a thread is dated from the clock of its cont
   assert.equal(provider.openedAt({ channel, thread: "nothing" }), null);
 });
 
-test("a reply is one message: text and task lines in order, the footer, then what runs", async () => {
+test("a reply is one message: text and task lines in order, what runs, then the footer", async () => {
   const { chat, provider, channel } = await built();
   const ref = chat.openThread(channel);
   const reply = provider.thread(ref).openReply(() => {});
@@ -71,8 +71,7 @@ test("a reply is one message: text and task lines in order, the footer, then wha
   assert.deepEqual(chat.texts(channel, ref.thread).slice(1), [
     "First words\n[complete] Read a.txt (again)\nMore words\n[complete] Read b.txt\n[complete] Read c.txt",
   ]);
-  await reply.finish([]);
-  await reply.closeOut({
+  await reply.finish([], {
     bypass: true,
     model: "model-a",
     effort: null,
@@ -84,11 +83,12 @@ test("a reply is one message: text and task lines in order, the footer, then wha
     sessionLimit: null,
     weekLimit: null,
   });
-  reply.setRunning("1 shell");
+  await reply.closeOut();
+  provider.thread(ref).showRunning({ title: "1 shell still running", lines: ["Sleep"] });
   assert.deepEqual(chat.texts(channel, ref.thread).slice(1), [
-    "First words\n[complete] Read a.txt (again)\nMore words\nRead 1 file\nbypass · model-a · /work · +3 -1 · 12% context\n1 shell",
+    "First words\n[complete] Read a.txt (again)\nMore words\nRead 1 file\n1 shell still running\n- Sleep\nbypass · model-a · /work · +3 -1 · 12% context",
   ]);
-  reply.setLatest(false);
+  provider.thread(ref).showRunning(null);
   assert.ok(!chat.texts(channel, ref.thread).join().includes("1 shell"));
 });
 
@@ -123,4 +123,44 @@ test("the chat outlives a provider: a new one over the same entry sees the threa
 test("a thread that is not there takes no message", async () => {
   const { chat, channel } = await built();
   await assert.rejects(chat.as(OWNER).says(channel, "hi", { thread: "nothing" }), /no thread/);
+});
+
+test("a reply that only finished does not take the footer from the reply above", async () => {
+  const { chat, provider, channel } = await built();
+  const sent = await chat.as(OWNER).says(channel, "hello");
+  const thread = provider.thread(sent.ref);
+  const footer = {
+    bypass: false,
+    model: "model-a",
+    effort: null,
+    folder: null,
+    branch: null,
+    changes: null,
+    sessionTokens: null,
+    contextPercent: null,
+    sessionLimit: null,
+    weekLimit: null,
+  };
+  const upper = thread.openReply(() => {});
+  await upper.text("Upper");
+  await upper.finish([], footer);
+  await upper.closeOut();
+  const lower = thread.openReply(() => {});
+  await lower.text("Lower");
+  // its end has not landed (and no rest was asked): the footer stays above
+  await lower.finish([], footer);
+  const shown = chat.texts(channel, sent.ref.thread);
+  assert.ok(shown.some((text) => text.startsWith("Upper") && text.includes("model-a")));
+  assert.ok(!shown.some((text) => text.startsWith("Lower") && text.includes("model-a")));
+  lower.rest();
+  assert.ok(
+    chat
+      .texts(channel, sent.ref.thread)
+      .some((t) => t.startsWith("Lower") && t.includes("model-a")),
+  );
+  assert.ok(
+    !chat
+      .texts(channel, sent.ref.thread)
+      .some((t) => t.startsWith("Upper") && t.includes("model-a")),
+  );
 });

@@ -728,7 +728,10 @@ new file's first lines. When the reply ends, a divider and the footer close the 
 each pair of cards gives way to one line (`✓ Ran 2 shell commands · Read 1 file`). A reply still
 running 280 seconds after it started stops being a stream (Slack closes streams at 5 minutes) and
 goes on in the same message, updated instead of streamed; what Claude wrote after its last call
-then arrives in a new message, with the footer under it. A reply longer than one Slack message (12,000 characters or 50 cards) continues in the next one; the text inside collapsed diffs counts toward the 12,000 only while the message is a stream or a post, not once it is edited.
+then arrives in a new message, with the footer under it. A turn that ends with a background command
+or agent still running stops the stream at once, with the footer under it, and the report that
+follows grows the same message by edit; the reply ends, with a new message that holds what Claude
+wrote after its last call, once the task and its report are done. A reply longer than one Slack message (12,000 characters or 50 cards) continues in the next one; the text inside collapsed diffs counts toward the 12,000 only while the message is a stream or a post, not once it is edited.
 
 An approval request is a message of its own in the thread, below the reply, and rings, as a
 question does; once you decide, it disappears and the tool's line in the reply records the call.
@@ -738,14 +741,14 @@ shown.
 Messages sent to a thread while its turn is running wait their turn; each gets its own reply. When
 a background task finishes while nothing runs, Claude Code starts a turn of its own to report it,
 as it does in the terminal: that reply opens with Claude Code's own line for the task's end, such
-as `✓ Agent "review" finished · 3m 59s`. While tasks run, the footer counts them, such as
-`⏳ 1 shell · 1 agent`.
+as `✓ Agent "review" finished · 3m 59s`. While tasks run, a card above the footer of the thread's
+last reply lists them: a title such as `1 agent · 1 shell still running` and a line per task, up to
+six, then `+N more`.
 
-From the moment you send a message until its turn ends, Slack shows `Working…` under the
-thread's last message. When the turn has ended and a command or an agent it started still
-runs, the same line reads `1 shell still running` and follows the count; the reply gets its
-footer once that task and its report have ended. If you sent another message meanwhile and its
-reply has ended, that reply's footer says it instead (`⏳ 1 shell`), until the command ends.
+From the moment you send a message until its answer has ended, Slack shows `Working…` under the
+thread's last message. A turn Claude Code starts on its own to report a task shows no line, and
+the line never counts what still runs: the card above the footer does (`1 shell still running`),
+until the command ends.
 The line goes while an approval or a question waits for you. Slack's clients draw it, and the
 iOS app can show none for a thread that Slack on desktop already has open: with desktop closed,
 or with the thread opened on iOS first, it shows on both (seen on 2026-10-04, five runs read by
@@ -757,8 +760,10 @@ it is restarting, a refused attachment, an error) shows small and grey, as the f
 reads apart from Claude's replies. `!help`, `!guide`, `!status` and the answer to a resume show at
 full size.
 
-Every reply ends with a footer, which says how the session stood when its turn ended, and
-keeps it:
+A reply carries a footer, which says how the session stood when its turn ended. Between two of
+your messages one footer shows, under the app's last reply at rest; a message of yours takes no
+footer away from the replies above it, and a reply that has none of its own shows the one the reply
+above it had:
 
 ```
 ⚡ bypass · claude-opus-5-5 · effort medium · my-project · main · (+42,-10) · 10.2M tok · ctx 15% · 5h 16% ↻ 43m · 7d 46% ↻ 3d 4h
@@ -788,9 +793,15 @@ A reply, an approval request and a question post inside the session's own thread
 notifies you on a new message in a thread you started, whatever the channel's own notification
 setting is:
 
-- A reply rings once, when it ends: Slack pushes a stream when it stops, with the start of
-  Claude's answer as the text. The reply ends once the turn has ended and every task it started,
-  and the report for it, are done too.
+- A reply rings once, when its stream stops: Slack pushes a stream when it stops, with the start
+  of Claude's answer as the text. The stream stops when the turn ends, also when a background
+  command or agent it started still runs. The report that follows grows the same message by edit,
+  silently, and the ending, posted as a new message when the reply ends, rings a second time.
+- A reply that has another reply's message below it ends in the message it is in, by edit, and
+  rings no more. So does a reply that waited for background work, has a message of yours below
+  it and got no text from Claude since; one that is still writing its turn when you write rings
+  with its ending, unless it then waits for background work and gets no text before it ends, and
+  one that got a report rings with it.
 - A reply that is still open after about 4 minutes 40 seconds rings when its stream stops, and a
   second time when it ends: what Claude wrote after its last call and the footer arrive as a
   new message, and the notification reads the start of it.
@@ -936,7 +947,7 @@ earlier manifest lacks it: add `file_change` under **Event Subscriptions**, **Su
 events**, and save. Without it a clip waits 5 minutes and is dropped, since nothing tells the
 app that its transcript is ready.
 
-The line under a thread (`Working…`, `1 shell still running`) is Slack's thread status
+The line under a thread (`Working…`) is Slack's thread status
 (`assistant.threads.setStatus`), which Slack's reference lists under `chat:write`. When Slack
 refuses it, the refusal is logged and the line is skipped.
 

@@ -31,7 +31,6 @@ import {
 export interface Inside {
   client: AgentSession | null;
   active: ActiveTurn | null;
-  latest: Reply | null;
   taken: Turn | null;
   sent: Turn[];
   held: unknown[];
@@ -61,7 +60,7 @@ export interface Inside {
   expectInjectedTurn(): void;
   refreshUsage(): void;
   expireInjectedTurn(signal: AbortSignal): Promise<void>;
-  sweepClosedOut(signal?: AbortSignal): Promise<void>;
+  sweepClosedOut(signal?: AbortSignal, options?: { readonly unreported?: boolean }): Promise<void>;
   stopTaskReplies(): Promise<void>;
   dropClient(): Promise<void>;
   abandon(line: string, options?: object): Promise<boolean>;
@@ -71,7 +70,8 @@ export interface Inside {
   reactDoneIfIdle(signal?: AbortSignal): Promise<void>;
   threadLine(): readonly [string, string];
   runningTaskIds(): string[];
-  runningCounts(): string;
+  runningList(): { title: string; lines: string[] } | null;
+  showRunning(): void;
 }
 
 export function inside(session: ThreadSession): Inside {

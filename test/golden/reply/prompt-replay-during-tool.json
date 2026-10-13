@@ -54,11 +54,11 @@
        "task": true,
        "title": "Bash: sleep 20"
       }
-     ]
+     ],
+     "footer": "footer"
     },
     {
-     "call": "close_out",
-     "footer": "footer"
+     "call": "close_out"
     }
    ],
    "result_set": true,
@@ -151,11 +151,11 @@
     },
     {
      "call": "finish",
-     "closing": []
+     "closing": [],
+     "footer": "footer"
     },
     {
-     "call": "close_out",
-     "footer": "footer"
+     "call": "close_out"
     }
    ],
    "result_set": true,
@@ -171,11 +171,11 @@
     },
     {
      "call": "finish",
-     "closing": []
+     "closing": [],
+     "footer": "footer"
     },
     {
-     "call": "close_out",
-     "footer": "footer"
+     "call": "close_out"
     }
    ],
    "result_set": true,
@@ -309,11 +309,11 @@
    },
    {
     "call": "finish",
-    "closing": []
+    "closing": [],
+    "footer": "footer"
    },
    {
-    "call": "close_out",
-    "footer": "footer"
+    "call": "close_out"
    }
   ],
   "result_set": true,

@@ -21,11 +21,15 @@ export const CHILD_LINES = 10;
 
 /**
  * The reply the renderer writes: the chat seam's `ReplySink`, generic in the footer. The
- * renderer keeps the footer a turn's end decided and hands it back at the reply's end, without
- * ever reading it.
+ * renderer keeps the footer a turn's end decided and hands it to `finish`, without ever reading
+ * it.
  */
-export type Sink<Footer = FooterFields> = Omit<ReplySink, "closeOut"> & {
-  closeOut(footer: Footer | null, signal?: AbortSignal): Promise<boolean>;
+export type Sink<Footer = FooterFields> = Omit<ReplySink, "finish"> & {
+  finish(
+    closing: readonly TaskUpdate[],
+    footer: Footer | null,
+    signal?: AbortSignal,
+  ): Promise<void>;
 };
 
 type EventOf<T extends SessionEvent["type"]> = Extract<SessionEvent, { type: T }>;
@@ -312,7 +316,7 @@ export class TurnRenderer<Footer = FooterFields> {
     // Only ever moves forward: a report turn passes none, and must not erase what an earlier
     // close already decided for a still-deferred end.
     this.#footer = footer ?? this.#footer;
-    await this.#sink.finish(closing, signal);
+    await this.#sink.finish(closing, this.#footer, signal);
   }
 
   /** Whether this reply has already ended. */
@@ -327,7 +331,7 @@ export class TurnRenderer<Footer = FooterFields> {
   async closeOut(signal?: AbortSignal): Promise<boolean> {
     await this.#handOver();
     this.#closedOut = true;
-    return this.#sink.closeOut(this.#footer, signal);
+    return this.#sink.closeOut(signal);
   }
 
   get sink(): Sink<Footer> {

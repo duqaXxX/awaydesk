@@ -35,8 +35,8 @@
  *    (`asking`).
  * 6. Where nothing may happen between a check and an act, the stretch is synchronous and
  *    marked `(sync)` with the reason. JavaScript yields at every `await`, also on a call that
- *    never waits: so around a call that only looks asynchronous (making a reply, moving the
- *    running counts) there is no `await` at all, and a turn is made the active one before its
+ *    never waits: so around a call that only looks asynchronous (making a reply, showing the
+ *    running list) there is no `await` at all, and a turn is made the active one before its
  *    first write.
  * 7. A reaction is asked for at once and not awaited (`react`): the chat makes the changes in
  *    the order they were asked.
@@ -57,7 +57,14 @@ import type {
   TaskKind,
 } from "../../agent/seam.ts";
 import { ResumeRefused } from "../../agent/seam.ts";
-import type { FooterFields, MessageId, Reply, SessionStatus, ThreadChat } from "../../chat/seam.ts";
+import type {
+  FooterFields,
+  MessageId,
+  Reply,
+  RunningList,
+  SessionStatus,
+  ThreadChat,
+} from "../../chat/seam.ts";
 import { getLogger } from "../../log.ts";
 import { strip } from "../../text.ts";
 import { errorName } from "../../values.ts";
@@ -79,7 +86,7 @@ import {
   TurnRenderer,
   taskTitle,
 } from "../reply/renderer.ts";
-import { oneLine } from "../reply/words.ts";
+import { oneLine, TITLE_LIMIT } from "../reply/words.ts";
 import { DENY, type Decision, toAnswer } from "../requests.ts";
 import { type Choice, DEFAULT } from "../setup.ts";
 import * as texts from "../texts.ts";
@@ -190,20 +197,17 @@ export class ThreadSession {
   private readonly taskReplies = new Map<string, TurnRenderer>();
   /** The reply each renderer writes, as the session holds it. */
   private readonly replyOf = new WeakMap<TurnRenderer, Reply>();
-  /** A report's own reply, and the reply that was the thread's latest when it opened. */
-  private readonly above = new WeakMap<Reply, Reply>();
-  /** The thread's newest reply: the only one that shows what is still running. */
-  private latest: Reply | null = null;
   // Replies whose end did not land: no checkmark until the one retry does, a cross if it
   // fails too. Each is settled once more when the session closes.
   private readonly unlanded = new Set<Reply>();
   // What the running turn's reply says when it ends: how many queued messages a restart
   // dropped, since they get no reply of their own.
   private endNotes: string[] = [];
-  // Each task's type and description, for the footer's counts and its end line.
+  // Each task's type and description, for the list of what still runs and the task's end line.
   private readonly tasks = new Map<string, readonly [kind: TaskKind, description: string]>();
   // Ended tasks not yet opened into a report turn's reply: (task id, its formatted end line).
-  // The task id finds the reply that started it (the report renders there).
+  // The task id finds the reply that started it (the report renders there when that reply is
+  // the last thing in the thread).
   private ended: Array<readonly [taskId: string, line: string]> = [];
   // Tasks whose end arrived without their notification yet, by the clock time it arrived: the
   // notification starts the turn that reports them. The CLI can suppress it (SDK
@@ -212,6 +216,9 @@ export class ThreadSession {
   // Tasks `!stop` ended. Claude Code starts no turn to report such a task: its notification
   // stays queued (measured twice on 2026-09-27, Claude Code 2.1.283), so none is awaited.
   private readonly stopped = new Set<string>();
+  // The replies already logged as ended with no report under them: `closeOut` sets its flag
+  // after an await, so two timers waking together would log one reply twice.
+  private readonly endedUnreported = new WeakSet<TurnRenderer>();
   // Clear while a background notification's own turn is expected or running: the owner's
   // next prompt waits, so the two replies never share a thread.
   private readonly settled = new Event();
@@ -226,7 +233,8 @@ export class ThreadSession {
   // the agent has a report to make (`whoseTurn`).
   private notificationWaits = false;
   // The task the agent said its next turn reports (`report_started`): that turn is no prompt's,
-  // and it renders in the reply that started the task, whether or not the task's end came yet.
+  // and it renders in the reply that started the task when that is the last thing in the thread,
+  // whether or not the task's end came yet.
   private reportOf: string | null = null;
   private expiry: Task | null = null;
   /** The agent said it is compacting the conversation and has not said it ended. */
@@ -394,22 +402,22 @@ export class ThreadSession {
 
   /**
    * What the thread's activity line says, empty for nothing, and the same after the app's
-   * name. `Working…` while a prompt is on its way to the agent or a turn runs (issue #83),
-   * `Compacting conversation…` while that turn compacts, in the terminal's words (issue #169).
-   * Once the turn has ended, what it left running (`1 shell still running`, issue #95): a count
-   * that changes cannot live in a reply, whose stream only grows. Nothing while an approval, a
-   * question or a hold waits on the owner, while `!stop` winds a turn down, and once the
-   * session is closed.
+   * name. `Working…` while a prompt of the owner's is owed its answer (`promptOwed`), however
+   * long its turn takes (issue #83), `Compacting conversation…` while any turn compacts, in the
+   * terminal's words (issue #169). A turn the agent starts to report a task owes nobody an
+   * answer and says nothing, and the line never counts what still runs: the list under the
+   * thread's last reply does (issue #295). Nothing while an approval, a question or a hold waits on the owner, while `!stop`
+   * winds a turn down, and once the session is closed. A restart waiting on tasks says which.
    */
   private threadLine(): readonly [text: string, afterName: string] {
     if (this.closedFlag || this.waitingForOwner || this.interrupting) return ["", ""];
-    if (this.busy || this.taken !== null || !this.queue.empty) {
-      if (this.compacting) return [texts.THREAD_COMPACTING, texts.THREAD_COMPACTING_STATUS];
-      return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
+    if (this.compacting && (this.busy || this.promptOwed())) {
+      return [texts.THREAD_COMPACTING, texts.THREAD_COMPACTING_STATUS];
     }
+    if (this.promptOwed()) return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
     const held = this.draining ? this.runningKindsOf({ awaitedOnly: true }) : "";
     if (held) {
-      // A stop that only background tasks hold: said here whatever the footer shows, since
+      // A stop that only background tasks hold: said here whatever the list shows, since
       // `!stop` is what ends the wait.
       const them = held.startsWith("1 ") && !held.includes(" · ") ? "it" : "them";
       return [
@@ -417,16 +425,23 @@ export class ThreadSession {
         texts.fill(texts.RESTART_WAITS_STATUS, { counts: held }),
       ];
     }
-    const kinds = this.runningKindsOf();
-    if (!kinds || (this.latest?.footerShown ?? false)) {
-      // Nothing runs, or the end of the thread's last reply is in the chat: its footer counts
-      // them, and a second line under a footer would say the same twice.
-      return ["", ""];
-    }
-    return [
-      texts.fill(texts.STILL_RUNNING, { counts: kinds }),
-      texts.fill(texts.STILL_RUNNING_STATUS, { counts: kinds }),
-    ];
+    return ["", ""];
+  }
+
+  /**
+   * A prompt of the owner's has no finished answer: it is being submitted, queued, taken by the
+   * worker, sent and not yet started, or its turn runs. A prompt leaves `sent` when its turn
+   * starts, in the step that sets `active`, so neither alone covers it; `active.turn` is null for
+   * a turn the agent started itself.
+   */
+  private promptOwed(): boolean {
+    return (
+      this.pendingSubmits > 0 ||
+      !this.queue.empty ||
+      this.taken !== null ||
+      this.sent.length > 0 ||
+      this.active?.turn != null
+    );
   }
 
   /**
@@ -652,11 +667,6 @@ export class ThreadSession {
   private async feedEndNotes(renderer: TurnRenderer): Promise<void> {
     const notes = this.endNotes;
     this.endNotes = [];
-    if (notes.length > 0) {
-      // The dropped turns' replies are never written, and the newest was the latest: the
-      // reply that says so is the one that has the footer.
-      this.handLatestTo(this.reply(renderer));
-    }
     for (const note of notes) await renderer.feedError(note);
   }
 
@@ -1282,8 +1292,7 @@ export class ThreadSession {
       // The last chance a change still only debounced gets, and the last chance of a reply
       // whose end failed and whose retry is still waiting: each reply once.
       let lost = false;
-      const replies = new Set(this.unlanded);
-      if (this.latest !== null) replies.add(this.latest);
+      const replies = this.openReplies();
       for (const reply of replies) {
         try {
           lost = !(await reply.settle()) || lost;
@@ -1704,7 +1713,7 @@ export class ThreadSession {
       const writing = this.active?.renderer ?? null;
       if (!owed && holder !== writing) {
         this.trackLanding(await holder.closeOut(signal), this.reply(holder));
-        this.showThreadStatus(); // its footer may be what counts the tasks now
+        this.showThreadStatus(); // the task's end may change what the line says
         // `!stop` already reacted ✅ itself; skipped so a stopped task's end does not show it
         // a second time.
         if (!stopped) await this.reactDoneIfIdle(signal);
@@ -1853,12 +1862,13 @@ export class ThreadSession {
 
   /**
    * What opens a report of the agent's own turn (the end of each task it reports), and the
-   * reply that started the first of those tasks (the report renders there), if it is still
-   * tracked. Null when it is not (a restart or an idle close dropped it, or it already ended: a
-   * notification later than INJECTED_TURN_WAIT let `expireUnreported` end it first): the report
-   * then gets a reply of its own, as it always has, rather than an edit of a reply that ended
-   * and will not notify again. The text is null for a report the agent named the task of
-   * (`report_started`) that renders in that task's reply with no end line to open it.
+   * reply of the first of those tasks (then of the task the agent named) that is still tracked,
+   * not ended and the last thing in the thread: the report renders there. Null when none is (a
+   * restart or an idle close dropped it, it already ended because a notification later than
+   * INJECTED_TURN_WAIT let `expireUnreported` end it first, or something sits below it): the
+   * report then gets a reply of its own at the bottom, rather than an edit of a reply that
+   * ended and will not notify again or one the owner has scrolled past. The text is null for a
+   * report the agent named the task of (`report_started`) that renders in that task's reply with no end line to open it.
    */
   private openingTarget(): readonly [text: string | null, target: TurnRenderer | null] {
     const lines = this.ended;
@@ -1867,9 +1877,21 @@ export class ThreadSession {
     // hand-back can come before its task's end, or after an end that came inside a turn.
     const reported = this.reportOf;
     this.reportOf = null;
-    const first = lines[0]?.[0] ?? reported;
-    let target = first === null ? null : (this.taskReplies.get(first) ?? this.showing(first));
-    if (target?.closedOut) target = null;
+    // The report belongs at the bottom of the thread: only a reply that is still the last thing
+    // in it takes the report in; one with a message of the owner's or of another reply below
+    // it would hide the report above them (issue #295).
+    const candidates = [
+      ...lines.map(([taskId]) => taskId),
+      ...(reported === null ? [] : [reported]),
+    ];
+    let target: TurnRenderer | null = null;
+    for (const taskId of candidates) {
+      const reply = this.taskReplies.get(taskId) ?? this.showing(taskId);
+      if (reply !== null && !reply.closedOut && this.reply(reply).last) {
+        target = reply;
+        break;
+      }
+    }
     const ends = lines.map(([, line]) => line).join("\n");
     // In the reply that started the task the report needs no line to say what it is about:
     // the task's card is there. Anywhere else the notice says it, as it always has.
@@ -1953,7 +1975,7 @@ export class ThreadSession {
     const [text, target] = this.openingTarget();
     try {
       if (held.length > 0) {
-        const renderer = target ?? this.newRenderer(this.newReportReply());
+        const renderer = target ?? this.newRenderer(this.newReply());
         await this.standalone(held, text, renderer, signal);
       }
     } catch (error) {
@@ -1968,8 +1990,9 @@ export class ThreadSession {
       try {
         // Catches `target` (nothing more coming for it either, when `held` was empty) and any
         // other reply a joint report turn left stranded, since a report only ever renders into
-        // the first of the tasks it covers.
-        await this.sweepClosedOut(live(signal));
+        // one reply, the first of the tasks it covers that is the last thing in the thread.
+        // A standalone update was posted for `held`: something sits under the replies it left.
+        await this.sweepClosedOut(live(signal), { unreported: held.length === 0 });
         await this.reactDoneIfIdle(live(signal));
       } finally {
         // (sync) Whatever the sweep did: a notification that arrived during its own writes is
@@ -2113,10 +2136,7 @@ export class ThreadSession {
    * still gets the repair's notice.
    */
   private trackLanding(landed: boolean, reply: Reply): void {
-    if (landed) {
-      this.footerMoved(reply);
-      return;
-    }
+    if (landed) return;
     this.unlanded.add(reply);
     if (this.closedFlag) return; // `close` settles every unlanded reply itself
     this.awaitLanding(reply).catch(() => {});
@@ -2127,7 +2147,6 @@ export class ThreadSession {
     this.unlanded.delete(reply);
     if (this.closedFlag) return;
     if (landed) {
-      this.footerMoved(reply);
       await this.reactDoneIfIdle();
     } else {
       // ❌ shown, but `state.json` keeps ⏳ or ✋: the answer never reached the chat.
@@ -2225,11 +2244,11 @@ export class ThreadSession {
     let opening: string | null = null;
     if (turn === null) {
       this.notificationWaits = false;
-      // A report turn renders into the reply that started the task it reports, so no new
-      // message follows for it; only when that reply is no longer tracked does it get one of
-      // its own, as every reply always has.
+      // A report turn renders into the reply that started a task it reports, so no new message
+      // follows for it, but only a reply that is still tracked, not ended and the last thing in
+      // the thread (`openingTarget`); otherwise it gets a reply of its own at the bottom.
       const [text, target] = this.openingTarget();
-      renderer = target ?? this.newRenderer(this.newReportReply());
+      renderer = target ?? this.newRenderer(this.newReply());
       opening = text;
     } else {
       this.reportOf = null; // the prompt's own turn: what was named is not the next turn
@@ -2292,13 +2311,14 @@ export class ThreadSession {
     }
     // Before the close, so the reply's last write already carries the list.
     this.showRunning();
-    // A report that ends with no footer of its own leaves the one above it where it is.
-    if (footer === null) this.above.delete(this.reply(renderer));
     await renderer.close(footer, options.signal);
     // The reply ends at once unless a task this renderer started outlives this very turn;
     // `force` is a stop, an error or a restart, which never waits for one.
     if (options.force || !this.stillOwed(renderer)) {
       this.trackLanding(await renderer.closeOut(options.signal), this.reply(renderer));
+    } else {
+      // Still owed a report: the reply rests, its stream stopped, so that the footer shows.
+      this.reply(renderer).rest();
     }
   }
 
@@ -2319,8 +2339,8 @@ export class ThreadSession {
     for (const renderer of renderers) {
       await renderer.stopRunning().catch(() => {});
     }
-    // Before closeOut: the latest reply's own running counts must already read empty, or its
-    // end would still show a stale `⏳ 1 shell`.
+    // Before closeOut: the list must already read empty, or the reply that holds it would end
+    // with a stale card.
     this.showRunning();
     for (const renderer of renderers) {
       try {
@@ -2329,12 +2349,13 @@ export class ThreadSession {
         // the others still end
       }
     }
-    // The cards `stopRunning` just ended, and the running counts above, only debounce: a
-    // caller closing everything down cannot wait a whole debounce for them. The latest reply
-    // may not itself be one of `renderers` (its own turn need not have started any task).
-    const replies = [...renderers].map((renderer) => this.reply(renderer));
-    if (this.latest !== null) replies.push(this.latest);
-    for (const reply of replies) await reply.settle().catch(() => {});
+    // The cards `stopRunning` just ended, and the list above, only debounce: a caller closing
+    // everything down cannot wait a whole debounce for them.
+    for (const renderer of renderers) {
+      await this.reply(renderer)
+        .settle()
+        .catch(() => {});
+    }
   }
 
   /**
@@ -2374,21 +2395,38 @@ export class ThreadSession {
   }
 
   /**
-   * A report turn's opening names only the reply of the first task it covers when several end
-   * together, so every other reply whose own tasks also finished is checked here instead, since
-   * nothing else rechecks it once the wait that deferred it lifts. Only while nothing is still
-   * expected or running session-wide: `closeReply` already handles the renderer whose own turn
-   * or report just ended, and a currently active one is skipped outright, whatever it reads:
-   * its own turn has not closed it yet, so nothing here is its call to make.
+   * A report turn renders into one reply only (the first of the tasks it covers that is the
+   * last thing in the thread, `openingTarget`) when several end together, so every other reply
+   * whose own tasks also finished is checked here instead, since nothing else rechecks it once
+   * the wait that deferred it lifts. `options.unreported` says that no report followed (the
+   * notification never came): a reply closed out then with a message of the owner's or of another
+   * reply below it is logged. Only while nothing is still expected or running session-wide:
+   * `closeReply` already handles the renderer whose own turn or report just ended, and a
+   * currently active one is skipped outright, whatever it reads: its own turn has not closed it
+   * yet, so nothing here is its call to make.
    */
-  private async sweepClosedOut(signal?: AbortSignal): Promise<void> {
+  private async sweepClosedOut(
+    signal?: AbortSignal,
+    options: { readonly unreported?: boolean } = {},
+  ): Promise<void> {
     const active = this.active?.renderer ?? null;
     for (const renderer of new Set(this.taskReplies.values())) {
       if (this.injectedExpected || !this.settled.isSet) {
         return; // a notification arrived meanwhile: its report may render into this reply
       }
       if (renderer !== active && !this.stillOwed(renderer)) {
-        this.trackLanding(await renderer.closeOut(signal), this.reply(renderer));
+        const reply = this.reply(renderer);
+        // Read before the close: closing it out changes what the thread shows below it.
+        if (
+          options.unreported &&
+          !renderer.closedOut &&
+          !this.endedUnreported.has(renderer) &&
+          !reply.last
+        ) {
+          this.endedUnreported.add(renderer);
+          logger.info(`a reply ended with no report under it in ${this.where}`);
+        }
+        this.trackLanding(await renderer.closeOut(signal), reply);
       }
     }
   }
@@ -2400,14 +2438,19 @@ export class ThreadSession {
   private async expireUnreported(taskId: string, signal: AbortSignal): Promise<void> {
     await this.deps.clock.sleep(INJECTED_TURN_WAIT, signal);
     this.unreported.delete(taskId);
-    await this.sweepClosedOut(signal);
+    await this.sweepClosedOut(signal, { unreported: true });
     await this.reactDoneIfIdle(signal);
   }
 
-  /** `⏳ 1 shell · 2 agents`: the tasks that outlived their turn and still run. */
-  private runningCounts(): string {
-    const kinds = this.runningKindsOf();
-    return kinds ? texts.fill(texts.RUNNING, { counts: kinds }) : "";
+  /**
+   * The replies this session still tracks, which hold a change that only debounced: the ones
+   * whose end did not land, those a task outlives their turn in, and the active turn's.
+   */
+  private openReplies(): Set<Reply> {
+    const replies = new Set(this.unlanded);
+    for (const renderer of this.taskReplies.values()) replies.add(this.reply(renderer));
+    if (this.active !== null) replies.add(this.reply(this.active.renderer));
+    return replies;
   }
 
   /** The tasks still running: those that outlived their turn, and the running turn's. */
@@ -2436,8 +2479,36 @@ export class ThreadSession {
   }
 
   private showRunning(): void {
-    this.showThreadStatus(); // the thread's activity line counts them too, once the turn ended
-    this.latest?.setRunning(this.runningCounts());
+    this.showThreadStatus(); // the activity line follows the same tasks (it never counts them)
+    this.thread.showRunning(this.runningList());
+  }
+
+  /**
+   * What the chat draws above the footer under the thread's last reply at rest: `2 agents · 1
+   * shell still running` and a line per task, in the order they started. Null when none runs.
+   */
+  private runningList(): RunningList | null {
+    const counts = this.runningKindsOf();
+    if (!counts) return null;
+    const order = [...this.tasks.keys()];
+    const rank = (taskId: string): number => {
+      const at = order.indexOf(taskId);
+      return at === -1 ? Number.POSITIVE_INFINITY : at;
+    };
+    const lines = [...this.taskReplies]
+      .filter(([taskId, renderer]) => renderer.runningTasks.includes(taskId))
+      .sort(([a], [b]) => rank(a) - rank(b))
+      .map(([taskId, renderer]) => {
+        const [kind, description] = this.tasks.get(taskId) ?? ["other", ""];
+        let label: string;
+        if (description) {
+          label = kind === "subagent" ? `${TASK_WORDS.subagent[1]}: ${description}` : description;
+        } else {
+          label = renderer.taskTitle(taskId) || taskId;
+        }
+        return oneLine(label, TITLE_LIMIT);
+      });
+    return { title: texts.fill(texts.STILL_RUNNING, { counts }), lines };
   }
 
   private newRenderer(reply: Reply): TurnRenderer {
@@ -2458,46 +2529,11 @@ export class ThreadSession {
     return reply;
   }
 
-  /**
-   * A new reply, which becomes this thread's latest and takes over the running counts. It
-   * writes nothing until the agent has something to show. (sync) Nothing may run between the
-   * reply being made and the counts moving.
-   */
+  /** A new reply. It writes nothing until the agent has something to show. (sync) */
   private newReply(): Reply {
-    const reply = this.thread.openReply((old, fresh) =>
+    return this.thread.openReply((old, fresh) =>
       this.deps.state.replaceOpenReply(this.channelId, this.threadId, old, fresh),
     );
-    const previous = this.latest;
-    this.latest = reply;
-    reply.setRunning(this.runningCounts());
-    if (previous !== null) {
-      previous.setRunning("");
-      previous.setLatest(false);
-    }
-    return reply;
-  }
-
-  /**
-   * `newReply` for a report of a background task whose own reply has ended: the report comes
-   * right under the thread's latest reply, with no message of the owner's between them, so once
-   * it ends with a footer that reply gives its own up (`footerMoved`), whichever turn it was:
-   * the one that started the task or a later one of the owner's (decided by the owner,
-   * 2026-10-12: two replies of the daemon's in a row show one footer, the last). An owner's new
-   * prompt takes no footer away.
-   */
-  private newReportReply(): Reply {
-    const previous = this.latest;
-    const reply = this.newReply();
-    if (previous !== null) this.above.set(reply, previous);
-    return reply;
-  }
-
-  /** The end of `reply` is in the chat: the reply above a report gives up its footer. */
-  private footerMoved(reply: Reply): void {
-    const above = this.above.get(reply);
-    if (above === undefined) return;
-    this.above.delete(reply);
-    above.withdrawFooter();
   }
 
   /**
@@ -2506,22 +2542,6 @@ export class ThreadSession {
    */
   private sink(): Reply | Promise<Reply> {
     return this.newReply();
-  }
-
-  /**
-   * Make `reply` the thread's latest reply again, taking over the footer and the running
-   * counts, when the reply that was the latest will never be written.
-   */
-  private handLatestTo(reply: Reply): void {
-    if (this.latest === reply) return;
-    const previous = this.latest;
-    this.latest = reply;
-    reply.setRunning(this.runningCounts());
-    reply.setLatest(true);
-    if (previous !== null) {
-      previous.setRunning("");
-      previous.setLatest(false);
-    }
   }
 
   /**
@@ -2580,12 +2600,6 @@ export class ThreadSession {
       }
       stopped = result.ending === "interrupted";
       this.interrupting = false; // this turn's own tail, whichever way it ended
-      if (active.turn === null && !injected && this.sent.length > 0) {
-        // An owner prompt crossed a notification: this reply carries its answer, and `settle`
-        // discards the owner turn's own reply, which is the latest now. The footer belongs
-        // under the answer.
-        this.handLatestTo(this.reply(active.renderer));
-      }
       if (released.length > 0) {
         this.endNotes.push(takenNote(released.length, this.names));
         takenNoted = true;
@@ -2756,10 +2770,7 @@ export class ThreadSession {
       if (active !== null) {
         try {
           if (!whole) await active.renderer.feedEnding(line);
-          if (dropped.length > 0) {
-            this.handLatestTo(this.reply(active.renderer));
-            await active.renderer.feedError(notSent(dropped, because));
-          }
+          if (dropped.length > 0) await active.renderer.feedError(notSent(dropped, because));
           await this.feedEndNotes(active.renderer);
           await this.closeReply(active.renderer, null, { force: true });
         } catch {
@@ -2958,8 +2969,8 @@ export class ThreadSession {
   ): Promise<void> {
     try {
       await turn.sink.text(text, { notice: true });
-      await turn.sink.finish([]);
-      this.trackLanding(await turn.sink.closeOut(null), turn.sink);
+      await turn.sink.finish([], null);
+      this.trackLanding(await turn.sink.closeOut(), turn.sink);
       if (options.error) this.reactError();
     } finally {
       turn.done.set();

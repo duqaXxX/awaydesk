@@ -88,6 +88,8 @@ export { FOLDER_ROWS } from "./folders.ts";
 export type { FooterKey } from "./footer.ts";
 export { footerFields } from "./footer.ts";
 export { Fold, shownPreview } from "./reply/fold.ts";
+export type { Tail, TailEntry } from "./reply/tail.ts";
+export { isLast, isOvertaken, tails } from "./reply/tail.ts";
 export { oneLine, STOPPED, TITLE_LIMIT } from "./reply/words.ts";
 export { answerOf } from "./requests.ts";
 export { DirectoryUnavailable, SessionClosed, SessionGone } from "./sessions/errors.ts";

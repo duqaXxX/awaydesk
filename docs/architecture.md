@@ -57,8 +57,8 @@ What crosses the chat seam, in both directions:
 
 | Crossing | Direction | What |
 |---|---|---|
-| a reply | core to provider | `ReplySink`: `text`, `task`, `finish`, `closeOut`, `waitLanded`, `settle`. A session holds it as a `Reply`, which adds `setRunning`, `setLatest`, `withdrawFooter` and `footerShown`. A tool's line crosses as a `TaskUpdate` and the footer as `FooterFields`, which the provider formats |
-| a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, `activityRefused`, `written`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
+| a reply | core to provider | `ReplySink`: `text`, `task`, `finish` (which takes the footer), `closeOut`, `waitLanded`, `settle`. A session holds it as a `Reply`, which adds `rest`, `last` and `overtaken`. A tool's line crosses as a `TaskUpdate` and the footer as `FooterFields`, which the provider formats |
+| a thread | core to provider | `ThreadChat`, one per thread from `ChatProvider.thread`: `openReply`, the root's status (`showStatus`, `clearStatus`, `settleStatus`), the activity line under the last message (`showActivity`, `activityRefused`, `written`), the list of what still runs (`showRunning`), the daemon's own lines (`notice`, `tell`, `say`, `rewrite`, `acknowledge`, `link`), a request put to the owner (`ask`, `withdraw`, `keepAnswers`), a reply a stop left open (`endReply`) and `close` |
 | a channel | core to provider | `ChannelChat`, from `ChatProvider.channel`: `notice`, `say`, `rewrite`, and the lists a word posts (`offer`, `withdraw`) |
 | the provider | core to provider | `ChatProvider`: `name`, `capabilities`, `escape` and `channelName` (what a core text relies on to write a name and a channel for the chat's markup, beside `ThreadChat.link`), `openedAt`, `channelState`, `threadState`, `index` and `openFile` where declared, and `start`, `stop` and `close` |
 | a request | core to provider | typed by what it asks, never by how it is drawn: `OwnerRequest` is a `PermissionRequest`, a `QuestionRequest`, a `HoldRequest` or a `SetupRequest`; a list is an `OwnerList`, of folders or of sessions |
@@ -302,7 +302,7 @@ and `trustedRepository` null without `folderTrust`, `setEffort` and `stopTask` t
 |---|---|---|
 | The owner check | Every inbound path checks that the owner acted before it calls `ChatInbound`, and the core never checks. What "the owner" means is the provider's: the Slack provider requires the configured user and the workspace it started in (`guards.isOwner`) | Three checks send a message, a click and a pick from somebody else. Nothing checks a second workspace |
 | Start and stop | `ChatProvider.start`, `stop` and `close` are called once each, in that order. Before `start` the daemon already calls `thread`, `endReply`, `withdraw`, `showStatus`, `channelState`, `threadState`, `openedAt` and the index's `refresh`, for the crash repair and the cleanup. `ChatEntry.build` must not read the core | `nothing arrives before start`, `nothing arrives after stop` |
-| A reply | `text` and `task` come while the turn runs. `finish` ends the body and may come more than once for one reply, since a report turn writes into the reply that started its task. `closeOut` ends the reply once, with the footer, and answers whether the end landed. `waitLanded` is asked only after a `closeOut` that answered false. `settle` brings the reply to its true form now, at a close. A signal given to any of the four releases the caller only: the write goes on | `carries text, a task line and a footer to its end`, `reports an end that did not land` |
+| A reply | `text` and `task` come while the turn runs. `finish` ends the body with the footer its turn left, and may come more than once for one reply, since a report turn writes into the reply that started its task when that reply is last. `rest` says the reply waits for work its turn started: from then on it changes by rewriting its message, and the footer shows under it before it ends. A reply counts as at rest once `finish` ran and `rest` was called or its end landed, and not before. `closeOut` ends the reply once and answers whether the end landed. Where the footer is shown is the provider's: a reply that has another reply below it in the same stretch shows none. A reply that has another reply's message below it (`Reply.overtaken`), or that rested, is not `last` and got no text of the agent's since it rested, ends in the message it is in, by edit, and opens no message. `waitLanded` is asked only after a `closeOut` that answered false. `settle` brings the reply to its true form now, at a close. A signal given to any of the four releases the caller only: the write goes on | `carries text, a task line and a footer to its end`, `reports an end that did not land`, `a reply knows when the owner or another reply wrote below it`, `a reply with another reply below it ends where it is`, `an ended reply with the owner below it is not last` |
 | A task line | `task` with an id already sent updates that line | The same id is sent twice; nothing checks that one line results |
 | A line of the daemon's | `text` with `notice` is a line of the daemon's own, and with `ending` the line that says how a reply was cut short | Not checked |
 | Markup | The core writes a notice (`tell`, `rewrite`, `ChannelChat.notice`) and a reference (`say`) and names which one (`Markup`). Its texts use backticks and Markdown emphasis. `ChatProvider.escape` makes a name safe for one markup, `ThreadChat.link` writes a link to a thread or answers null, and `ChatProvider.channelName` writes a channel | `leaves a plain word alone when it escapes it`, `link is a string or nothing` |
@@ -404,7 +404,7 @@ warning or error that names the library, and the daemon logs the states of the c
   same-folder hold or a setup still open is cancelled, as `!stop` would.
 - A thread left with only background tasks says `texts.RESTART_WAITS` in its status line
   (`ThreadSession.threadLine`, brought up to date by `ThreadSession.showRestartWait` at every poll
-  of the drain), naming them by the footer's counts, since the daemon cannot tell whether a task (a
+  of the drain), naming them by their counts (`1 shell`, `2 agents`), since the daemon cannot tell whether a task (a
   dev server, a watcher) ever ends. A status line does not notify and goes with the restart, where a
   message would do both. Where Slack refuses the app a thread status (`ThreadChat.activityRefused`),
   one message says it (`texts.RESTART_WAITS_MESSAGE`). `!stop` ends such tasks with
@@ -556,7 +556,9 @@ The Slack provider's `endReply` (`src/chat/slack/repair.ts`) stops the message's
 and is fine), reads the message back by its own ts (`conversations.replies` with `ts` and `limit=1`)
 and edits it with `chat.update`: its blocks as Slack keeps them, every card left `pending` or
 `in_progress` closed as an error (a stopped stream stores it as one anyway), and the note appended
-as a context block, or, at Slack's 50-block cap, added to the last context block. The stream's own
+as a context block, or, at Slack's 50-block cap, added to the last context block. The list of what still
+runs (the `running-list` block) is taken off. A message left open only because it showed the list
+holds a finished answer, so it loses the block and gets no note. The stream's own
 stop is the one notification the reply owes, and the edit never notifies; nothing is posted. A
 message that cannot be read back, or is gone, is left as it is. Its `withdraw` deletes the message
 (`message_not_found` counts as done) and `showStatus` goes through the same `StatusReaction` a live
@@ -803,7 +805,7 @@ A turn that ends with no text and no tool line says `Done. Claude Code returned 
 `Stopped the current turn.` when it was interrupted, so no reply is left empty. When the turn ends,
 every line still in progress is closed first (with `Stopped` when the turn was interrupted), then
 the reply ends. A task that started and has not ended is the exception: its line stays open with
-"Running in background". `TurnRenderer.runningTasks` lists them. Only the task events decide this,
+"Running in background", and the reply rests instead of ending (`Reply.rest`). `TurnRenderer.runningTasks` lists them. Only the task events decide this,
 because a subagent can move to the background with no second `task_started`.
 
 ## Approvals
@@ -869,7 +871,7 @@ it could not be shown (`texts.APPROVAL_UNPOSTED`), and the tool's line records t
 
 ## Footer
 
-Every reply ends with one context line. The session hands the reply the footer as fields
+Every reply carries one context line, and the chat shows one per stretch of the thread between two messages of the owner, under the app's last reply at rest (`tails` in `src/core/reply/tail.ts`, a function of the order of the messages: each chat provider keeps the order of its own messages and applies it, and no position crosses the seam). A message of the owner's takes no footer away from the replies above it, and a reply that has none of its own shows the one the reply above it had. A reply is at rest once its turn has ended and its last message can be rewritten: a turn that ends with background work still running stops the stream and rests at once (`Reply.rest`), any other reply rests when its end has landed. The session hands the reply the footer as fields
 (`FooterFields`, from `ThreadSession.footerData`), and the Slack provider writes the line
 (`footer.formatFooter`): `⚡ bypass` when bypass is on, the model from `AgentSession.contextUsage`
 (the SDK's `getContextUsage()`), the effort level, the name of the folder this thread was opened in,
@@ -1155,16 +1157,14 @@ closed when the start returns (`ThreadSession.connect`).
 - Each `ThreadSession` also has the thread's activity line (`ThreadChat.showActivity`; for a chat
   that declares `activityLine` only), which the Slack provider keeps as one `ThreadStatus` (in `status`): Slack's status line under the thread's
   last message (`assistant.threads.setStatus`), which says `ThreadSession.threadLine`. `Working…`
-  while a prompt is queued, taken or sent or a turn is active (a report turn included), and
-  `Compacting conversation…` from the event `compaction_started` to `compaction_ended`: Claude Code
+  while a prompt of the owner's is owed its answer: being submitted, queued, taken, sent and not
+  yet started, or its turn running (`ThreadSession.promptOwed`). A turn the agent starts to report
+  a task owes nobody an answer, so it says nothing, and the line never counts what still runs:
+  the list under the last reply at rest does. `Compacting conversation…` from the event `compaction_started` to
+  `compaction_ended`, a report turn included: Claude Code
   opens a compaction with a `status` system record that says `compacting`, repeats it while it
   lasts, and ends it with the `status` record that carries `compact_result`, and the back end says
-  each once. The first event also starts the turn it belongs to, when one is due. Once no turn runs
-  and the thread's latest reply is still open, what the session left running,
-  `1 shell still running`, the words the terminal ends such a turn with: a count that changes is a
-  state of the thread and stays out of a reply whose stream only grows. Once the latest reply has
-  ended its footer says it, and the status line says nothing (`Reply.footerShown`: the reply's end
-  has landed on Slack, so a footer that could not be written never silences the line). During a stop
+  each once. The first event also starts the turn it belongs to, when one is due. During a stop
   that only background tasks hold, the line says `texts.RESTART_WAITS` whatever the footer shows.
   Nothing while an approval, a question or a hold waits on the owner, while `!stop` winds a turn
   down, and once the session is closed. `ThreadSession.showThreadStatus` brings the status to that
@@ -1174,7 +1174,7 @@ closed when the start returns (`ThreadSession.connect`).
   instance makes the calls in order, so two quick changes end on the last one and a turn that ends
   at once sets nothing. The line is sent as the one loading message, which is what a client shows,
   with a `status` that says the same after the app's name (`is working…`,
-  `has 1 shell still running`) for a client that draws that instead (with `status` alone, iOS showed
+  `is compacting the conversation…`) for a client that draws that instead (with `status` alone, iOS showed
   nothing: measured: "Thread status on iOS"). Slack removes a status two minutes after it was set
   and clears it when the app replies (documented: "Status removal after two minutes"), so it is set
   again every `status.THREAD_STATUS_REFRESH_SECONDS` and within
@@ -1215,15 +1215,15 @@ closed when the start returns (`ThreadSession.connect`).
   task of any reply still ran.
 - A background task that finishes between turns sends its notification while the session is idle,
   then Claude Code starts a turn of its own to report it. That turn renders into the reply that
-  started the task (the held-open reply: `ThreadSession.openingTarget`, keyed by the task id through
-  `ThreadSession.taskReplies`), appended after that reply's own body with one line per task it
-  reports, as the terminal prints it (`ThreadSession.endedLine`): a command's notification
+  started the task only while that reply is the last thing in the thread
+  (`ThreadSession.openingTarget`, keyed by the task id through `ThreadSession.taskReplies`),
+  appended after that reply's own body with one line per task it reports, as the terminal prints it (`ThreadSession.endedLine`): a command's notification
   `summary`, which already reads `Background command "..." completed (exit code 0)`, or
   `Agent "<description>" finished` built from the task's `task_started` event, since an agent's
   `summary` is its result; plus the duration when the notification's `usage` reports `duration_ms`
-  (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; only
-  when the reply it would render into is no longer tracked (a restart or an idle close dropped it)
-  does the report get a reply of its own. The next queued message waits for it to finish.
+  (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; when
+  that reply is no longer tracked (a restart or an idle close dropped it) or is not last, the
+  report gets a reply of its own at the bottom. The next queued message waits for it to finish.
   `texts.BACKGROUND_NOTICE` opens it only when no task end was seen. When a message was already sent
   and waits for its turn, that turn comes first, so nothing waits; the turn that reports the task
   follows it on its own (measured: "Prompt sent before a notification"; an older observation,
@@ -1240,13 +1240,19 @@ closed when the start returns (`ThreadSession.connect`).
   reply. A background subagent's own calls (a `parentCallId` pointing at a line of an ended turn) go
   under its line the same way and never open a reply. A notification for such a task still makes the
   next queued message wait for the turn Claude Code starts to report it.
+- The report of such a task renders into the task's reply only while that reply is the last thing
+  in the thread (`Reply.last`): no message of the owner's and no other reply's message below it.
+  `ThreadSession.openingTarget` takes the first of the ended tasks' replies, then the reply of the
+  task the agent named, that is still tracked, not ended and last. With none, the report opens a
+  reply of its own at the bottom. A reply that ends with a message of the owner's or another reply below it (`Reply.last`) because the
+  task's notification never came is logged at INFO (`a reply ended with no report under it in
+  <where>`) by `expireInjectedTurn` and `expireUnreported`; nothing is posted for it.
 - What is still running is counted by each task's `kind`, which the back end sets from the type
-  Claude Code names (`constants.TASK_WORDS`; the kind `other` counts as a task) and said once, on
-  the last line of the thread. When the thread's latest reply has ended, the counts close its footer
-  (`⏳ 1 shell · 1 agent`); a new reply takes them over and the previous one drops them, keeping its
-  footer. When the latest reply is still open for its own task, and so has no footer yet, the
-  thread's status line says them (`1 shell · 1 agent still running`). The two never show together,
-  and both disappear when nothing runs.
+  Claude Code names (`constants.TASK_WORDS`; the kind `other` counts as a task) and said once, as a
+  list: a title (`2 agents · 1 shell still running`) and a line per task, in the order they started
+  (`ThreadSession.runningList`, handed over by `ThreadChat.showRunning`). The chat draws it under
+  the thread's last reply at rest, above the footer; it moves down when a newer reply rests, and
+  goes when nothing runs. The thread's status line never says it.
 - When the Claude Code process goes away (shutdown, an idle close, a process that exits), its tasks
   go with it: their lines close with `Stopped` and the list empties. The map lives in memory only.
 ### A prompt taken into a running turn

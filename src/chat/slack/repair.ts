@@ -21,7 +21,7 @@
 import type { KnownBlock, WebClient } from "@slack/web-api";
 import { getLogger } from "../../log.ts";
 import { isRecord, records } from "../../values.ts";
-import { contextBlock } from "./reply/blocks.ts";
+import { contextBlock, RUNNING_LIST_ID } from "./reply/blocks.ts";
 import { describe, gone, NOT_STREAMING } from "./reply/errors.ts";
 import type { Limiter } from "./reply/limiter.ts";
 
@@ -38,7 +38,8 @@ export const SLACK_BLOCKS = 50;
 /**
  * Stop the reply's message, then rewrite it: its blocks as Slack keeps them, every card left
  * running closed as an error (a stopped message would show it so anyway, until it is updated:
- * measured 2026-09-28), plus the line that says it stopped. Kept within Slack's 50 blocks: at
+ * measured 2026-09-28), the list of what still runs taken off (found by its `block_id`), plus the
+ * line that says it stopped. Kept within Slack's 50 blocks: at
  * the cap the line goes into the last context block (the footer), or is left out if there is
  * none; a block that holds content is never replaced. A failed read or a message already gone
  * is logged and left alone: never replaced with a shorter form that would lose its content.
@@ -56,11 +57,16 @@ export async function endReply(
   note: string,
 ): Promise<boolean> {
   const { channel: channelId, threadTs } = place;
+  // Whether the stream may have been open: a stop that was refused for another reason is not
+  // known to have found it over.
+  let streamed = true;
   try {
     await slack.chat.stopStream({ channel: channelId, ts: messageTs });
   } catch (error) {
-    if (describe(error) !== NOT_STREAMING) {
-      // the stream is over already when it is: nothing to stop
+    // the stream is over already when it is: nothing to stop
+    if (describe(error) === NOT_STREAMING) {
+      streamed = false;
+    } else {
       logger.warning(
         `could not stop a crashed reply's stream in ${channelId}/${threadTs}: ${describe(error)}`,
       );
@@ -82,19 +88,33 @@ export async function endReply(
     return true;
   }
   if (saysStopped(records(message.blocks), note)) return true;
-  let blocks: Block[] = records(message.blocks).map((block) =>
+  // The list of what still runs is no card of the reply's own work: it goes, where the card of a
+  // call that never ended is closed as an error.
+  const read = records(message.blocks);
+  const isList = (block: Block): boolean =>
+    block.block_id === RUNNING_LIST_ID || block.task_id === RUNNING_LIST_ID;
+  const kept = read.filter((block) => !isList(block));
+  const callRunning = kept.some(
+    (block) => block.type === "task_card" && RUNNING_CARD.includes(String(block.status)),
+  );
+  // A message kept open only by the list holds a finished answer (its stream is over and no call
+  // of it runs): the app did not stop before it, so no note says so.
+  const onlyList = kept.length < read.length && !streamed && !callRunning;
+  let blocks: Block[] = kept.map((block) =>
     block.type === "task_card" && RUNNING_CARD.includes(String(block.status))
       ? { ...block, status: "error" }
       : block,
   );
-  if (blocks.length < SLACK_BLOCKS) blocks.push({ ...contextBlock(note) });
-  else blocks = sayStoppedInTheFooter(blocks, note);
+  if (!onlyList) {
+    if (blocks.length < SLACK_BLOCKS) blocks.push({ ...contextBlock(note) });
+    else blocks = sayStoppedInTheFooter(blocks, note);
+  }
   try {
     await limiter.acquire();
     await slack.chat.update({
       channel: channelId,
       ts: messageTs,
-      text: note,
+      text: onlyList && typeof message.text === "string" ? message.text : note,
       // Blocks as Slack read them back, sent back as they are: opaque to the library's types.
       blocks: blocks as unknown as KnownBlock[],
     });

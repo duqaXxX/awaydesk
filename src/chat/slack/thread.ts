@@ -36,6 +36,7 @@ import {
   type OwnerRequest,
   type Presence,
   type Reply,
+  type RunningList,
   type SessionIndex,
   type SessionStatus,
   type ThreadChat,
@@ -44,6 +45,7 @@ import {
 import type { AppConfig, Fetch } from "./app/answers.ts";
 import { type BuiltApp, buildApp } from "./app/app.ts";
 import type { ChannelGuard } from "./app/guards.ts";
+import { threadKey } from "./app/order.ts";
 import { SlackChannel } from "./channel.ts";
 import { channelLookup, threadLookup } from "./channels.ts";
 import { holdBlocks } from "./hold.ts";
@@ -54,6 +56,7 @@ import { contextBlock, noticeText, split } from "./reply/blocks.ts";
 import { deleteRequest, describe } from "./reply/errors.ts";
 import { markdownEscape, mrkdwnEscape } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
+import { ThreadPlaces } from "./reply/places.ts";
 import { ReplySink } from "./reply/sinks.ts";
 import { REACTIONS, StatusReaction, ThreadStatus } from "./reply/status.ts";
 import { answeredBlocks, approvalBlocks, questionBlocks } from "./requests.ts";
@@ -142,6 +145,11 @@ export class SlackChat implements ChatProvider {
   private readonly options: SlackChatOptions;
   private readonly stopping = new AbortController();
   private built: BuiltApp | null = null;
+  /**
+   * Where each thread's messages sit, by thread, while a thread object that opened a reply in it
+   * is open (`users`), and after that while a reply of it is registered.
+   */
+  private readonly places = new Map<string, { readonly places: ThreadPlaces; users: number }>();
   private named: Names | null = null;
 
   constructor(options: SlackChatOptions) {
@@ -183,7 +191,55 @@ export class SlackChat implements ChatProvider {
   }
 
   thread(ref: ThreadRef): SlackThread {
-    return new SlackThread(ref.channel, ref.thread, this.options, () => this.names(), this.stopped);
+    return new SlackThread(
+      ref.channel,
+      ref.thread,
+      this.options,
+      () => this.names(),
+      this.stopped,
+      this.leaseOf(ref.channel, ref.thread),
+    );
+  }
+
+  /**
+   * The owner wrote a message at `ts` in a thread. Called by the listener for every owner
+   * message, before anything else of it is decided: a message the core later refuses still sits
+   * below the replies above it.
+   */
+  ownerPosted(channel: string, thread: string, ts: string): void {
+    this.places.get(threadKey(channel, thread))?.places.ownerPosted(ts);
+  }
+
+  /**
+   * The thread's places: one object for every `SlackThread` of it, so that the replies of the
+   * thread's successive sessions see each other. A thread object takes it at its first reply and
+   * gives it back at its close (`ThreadLease`). It lives while one is open: a reply let go of
+   * by an owner message must still be found by the next one. After the last give-back it lives
+   * while a reply is registered with it.
+   */
+  private leaseOf(channel: string, thread: string): ThreadLease {
+    const key = threadKey(channel, thread);
+    return {
+      take: () => {
+        const known = this.places.get(key);
+        if (known !== undefined) {
+          known.users += 1;
+          return known.places;
+        }
+        const made = new ThreadPlaces(() => {
+          const entry = this.places.get(key);
+          if (entry?.places === made && entry.users === 0) this.places.delete(key);
+        });
+        this.places.set(key, { places: made, users: 1 });
+        return made;
+      },
+      give: () => {
+        const entry = this.places.get(key);
+        if (entry === undefined) return;
+        entry.users -= 1;
+        if (entry.users === 0 && !entry.places.held) this.places.delete(key);
+      },
+    };
   }
 
   /**
@@ -198,6 +254,7 @@ export class SlackChat implements ChatProvider {
       this.options,
       () => this.names(),
       this.stopped,
+      this.leaseOf(ref.channel, ref.thread),
       written,
     );
   }
@@ -300,6 +357,12 @@ const withdrawn = new WeakMap<SlackChatOptions, Set<string>>();
 const SETUPS_KEPT = 64;
 const drawnSetups = new WeakMap<SlackChatOptions, Map<string, SetupDraw>>();
 
+/** How a thread object holds its thread's places: taken at its first reply, given back at its close. */
+interface ThreadLease {
+  take(): ThreadPlaces;
+  give(): void;
+}
+
 export class SlackThread implements ThreadChat {
   private readonly channel: string;
   private readonly threadTs: string;
@@ -313,7 +376,12 @@ export class SlackThread implements ThreadChat {
   /** Issues #83 and #95: Slack's status line at the bottom of the thread. */
   private readonly line: ThreadStatus;
   private readonly stopped: AbortSignal;
+  private readonly lease: ThreadLease;
+  /** The places of this thread, once a reply was opened in it and until the close. */
+  private places: ThreadPlaces | null = null;
   private readonly onWritten: () => void;
+  /** The replies this object opened, with the places each is registered in. */
+  private readonly opened: Array<[ThreadPlaces, ReplySink]> = [];
 
   /**
    * `written` stands for this object's own status line where something else holds it: the
@@ -326,6 +394,7 @@ export class SlackThread implements ThreadChat {
     options: SlackChatOptions,
     names: () => Names,
     stopped: AbortSignal,
+    lease: ThreadLease,
     written?: () => void,
   ) {
     this.channel = channelId;
@@ -333,6 +402,7 @@ export class SlackThread implements ThreadChat {
     this.options = options;
     this.names = names;
     this.stopped = stopped;
+    this.lease = lease;
     this.slack = options.slack;
     this.clock = options.clock ?? systemClock;
     this.reaction = new StatusReaction(this.slack, { channel: channelId, rootTs: threadTs });
@@ -346,7 +416,9 @@ export class SlackThread implements ThreadChat {
 
   openReply(onOpenMessage: OpenMessageChange): Reply {
     const { identity } = this.options;
-    return new ReplySink(this.options.replies, {
+    this.places ??= this.lease.take();
+    const places = this.places;
+    const reply = new ReplySink(this.options.replies, {
       channel: this.channel,
       threadTs: this.threadTs,
       teamId: identity.teamId,
@@ -356,6 +428,7 @@ export class SlackThread implements ThreadChat {
       clock: this.clock,
       onOpenReply: onOpenMessage,
       onWrite: () => this.line.wrote(),
+      places,
       ...(this.options.debounceSeconds !== undefined && {
         debounceSeconds: this.options.debounceSeconds,
       }),
@@ -363,6 +436,19 @@ export class SlackThread implements ThreadChat {
         finalRetrySeconds: this.options.finalRetrySeconds,
       }),
     });
+    // A reply the places let go of needs no letting go at close, and must not stay reachable.
+    this.opened.splice(
+      0,
+      this.opened.length,
+      ...this.opened.filter(([held, old]) => held.holds(old)),
+    );
+    this.opened.push([places, reply]);
+    return reply;
+  }
+
+  showRunning(list: RunningList | null): void {
+    // No reply was opened yet: there is nothing for the list to sit under.
+    this.places?.showRunning(list);
   }
 
   showStatus(status: SessionStatus, signal?: AbortSignal): Promise<boolean> {
@@ -579,8 +665,19 @@ export class SlackThread implements ThreadChat {
     return endReply(this.slack, this.options.limiter, this.place, reply, note);
   }
 
-  close(): Promise<void> {
-    return this.line.close();
+  async close(): Promise<void> {
+    // The list that was just taken off a reply the session no longer tracks only debounced:
+    // nothing else would write it before the process ends.
+    await this.places?.settleListed();
+    // The replies this object opened are let go of, their end landed or not: the session that
+    // held them is over, and nothing else would drop them from the thread's places.
+    for (const [places, reply] of this.opened) places.closed(reply);
+    this.opened.length = 0;
+    if (this.places !== null) {
+      this.places = null;
+      this.lease.give();
+    }
+    await this.line.close();
   }
 
   private get place(): { readonly channel: string; readonly threadTs: string } {

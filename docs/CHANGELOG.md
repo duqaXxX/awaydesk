@@ -7,6 +7,60 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A reply ends in the message it is in, by edit, with no new message, when another reply's message
+  sits below it, or when it rested for background work, a message of the owner's sits below it and
+  no text of Claude's was written to it since it rested: its footer goes under that message, or on
+  the stream's stop. A task's end line or a card update is not such text; a report's text is. A
+  reply that has another reply below it opens no continuation message either. A reply still
+  writing its turn when the owner writes posts its ending, unless it then rests and receives no
+  text before it ends; one that rested and then received a report, or the line of a lost process,
+  posts its ending as before (#295).
+
+- The report of a background task renders into the reply that started the task only while that
+  reply is the last thing in the thread; with a message of the owner's or another reply's below
+  it, the report opens a reply of its own at the bottom. A reply left behind by a message of the
+  owner's or another reply's that ends with no report under it, because the task's notification
+  never came, is logged at INFO (#295).
+
+- Between two messages of the owner one footer shows, under the app's last reply at rest. A
+  message of the owner's takes no footer away from the replies above it, and a reply that has
+  none of its own shows the one the reply above it had. A reply that gives its footer up takes it
+  off by a silent edit, and a closing message that held the footer alone is deleted
+  (`chat.delete`; one that fails is tried once more after `FINAL_RETRY_SECONDS`, and
+  `message_not_found` counts as deleted). After a restart of the daemon the footer an earlier reply
+  shows stays where it is (#295).
+
+- A reply whose turn ends with background work still running rests: its stream is stopped at the
+  end of the turn, with the footer under it (the stop is a push, and replaces the one the 280
+  second stop made), and its message then changes by edit. A report that renders into it grows it
+  by edit, and its end then posts the ending with the footer and cuts it out of the first message,
+  unless the reply is no longer the last thing in the thread and got no report (#295).
+
+- What still runs in a thread is a list: one card under the thread's last reply at rest and above
+  its footer, with a title such as `2 agents · 1 shell still running` and a line per subagent or
+  background command, six at most and then `+N more`. It is written whenever it changes, on a
+  reply at rest or one whose end has landed, moves down to a newer reply when that one rests (not
+  while that reply is still a stream), and goes when nothing runs. The `⏳ 1 shell` count that
+  followed the footer is gone. After a crash `repair.endReply` removes the list's block, and writes
+  no note on a message that only the list kept open (#295).
+
+- The thread's status line says `Working…` only while a message of the owner's has no finished
+  answer: being submitted, queued, taken, sent and not yet started, or its turn running. A turn
+  the agent starts on its own to report a task shows nothing, and the line never counts what still
+  runs. `Compacting conversation…` still shows while any turn compacts (#295).
+
+- The chat seam gains `ThreadChat.showRunning(list)`, `Reply.rest`, `Reply.last` and
+  `Reply.overtaken`; `ReplySink.finish` takes the footer and `closeOut` takes none. `Reply.setRunning`,
+  `Reply.setLatest`, `Reply.withdrawFooter`, `Reply.footerShown`, `texts.STILL_RUNNING_STATUS`,
+  `ThreadSession.newReportReply` and the session's `latest` are gone: the session no longer takes a
+  footer off the reply above a report, and each chat provider places the footer and the list by
+  position with the core's `tails`. The Slack provider keeps where each thread's messages sit in
+  memory (`reply/places.ts`, `ThreadPlaces`), told of every owner message by the listener and of
+  every reply's last message by its sink; the places live while a thread object that opened a
+  reply in them is open, so a reply let go of by an owner message is still found by the next one.
+  The memory chat follows the same rules with its own message counter, and the chat conformance
+  suite checks both providers (#295).
+
 - The cleanup of `state.json` forgets a thread whose first message Slack no longer has, at start
   and every 6 hours, beside the channels that are gone (#237). The chat seam gains
   `ChatProvider.threadState`; for Slack, `thread_not_found` from `conversations.replies` on the
@@ -897,12 +951,6 @@ All notable changes to this project are documented here. The format follows
   footer. The text is posted first and then taken out of the message it grew in by a silent
   edit (`ReplySink._end`, `ReplySink._ending_cursor`); an answer that is text alone keeps it,
   and the new message is the footer alone, as before.
-- Every reply keeps its footer once it has ended. Only the counts of what still runs
-  (`⏳ 1 shell`) stay with the thread's latest reply, so a reply that ends after a newer one
-  shows its own footer, with the values of its last turn.
-- What still runs is said once, on the last line of the thread: in the footer when the latest
-  reply has ended, in the thread's status line when that reply is still open. The status line
-  no longer repeats a count the footer above it shows.
 
 - Tool calls in a reply (issue #80): a run of calls, the calls between two pieces of text, is two
   task cards in place of one card per call. The first holds the counts of what ended (`Ran 2 shell
@@ -1001,15 +1049,11 @@ All notable changes to this project are documented here. The format follows
 ### Fixed
 
 - A report of a background task that comes after its reply has ended no longer leaves two footers
-  a few lines apart. The report gets a reply of its own, under `Background task update`, and both
-  replies ended with a footer. Once the report has ended with its footer, the reply above it now
-  gives its own up, by an edit that does not notify (`Reply.withdrawFooter`, a new member of the
-  chat seam that every provider implements). The reply above is the thread's latest when the report opens, whether or not it started the
-  task: two replies of the daemon's in a row show one footer, the last. An owner's next prompt
-  takes no footer away. Three cases keep both footers: the
-  reply above is a closing message that is the footer alone (a long answer of text alone), since
-  the edit would leave it empty; the daemon restarted between the two replies, since the first is
-  no longer held; and a report that ends with no footer of its own.
+  a few lines apart. The report gets a reply of its own, under `Background task update`, and once
+  it has ended the reply above it shows no footer: replies of the daemon's with no message of the
+  owner's between them show one footer, under the last. An owner's next prompt takes no footer
+  away. Where the footer sits is placed by position in the thread. When the daemon restarted
+  between the two replies, the first is no longer held and keeps its footer.
 
 - A stop that does not drain and lands between a turn's end and the close of its reply no longer
   says two things that were not true of that turn (#263). The reply held the whole answer and
@@ -1289,8 +1333,8 @@ All notable changes to this project are documented here. The format follows
   of a tool's title. The same holds for `This reply ended before an answer: …`, after a
   restart of the daemon or a closed session. A notice written just before the line stays in
   the reply, a card that closes after it moves under it, and no other line of the daemon's
-  moves. The running list is no footer: a turn cut while a subagent works closes with
-  `⏳ 1 agent` still showing, and ends with the line too. A reply that ends with its footer is
+  moves. A turn cut while a subagent works ends with the line too, and the list of what
+  still runs is taken off its reply. A reply that ends with its footer is
   unchanged: a line of the daemon's stays where it was written. Not covered: a process lost
   while no turn is active writes no line at all; a reply cut short after text Claude wrote
   past its last call still rings with the start of that text.
@@ -1604,11 +1648,11 @@ All notable changes to this project are documented here. The format follows
 - A skill that runs in a forked context, typed as a command (`!review`), showed nothing but
   `Claude is writing…` while it worked, then its line once it had ended. Its task starts before
   the turn's first message and was held until then; the owner's turn now starts at a task that
-  no call started, so its line (`⏳ /review`) shows while it works. Its agent's calls are not
+  no call started, so its line (`/review`) shows as a card in progress while it works. Its agent's calls are not
   streamed by Claude Code in this case, so the line carries no call count. The new
   `skill-fork-command` stream in `tests/fixtures/sdk/` records it. A task started by a call
   inside a background subagent now goes to the reply that holds that subagent. An agent the
-  command starts inside it shows on the command's line (`⏳ /review · 1 call`, then `⎿ Run the tests`)
+  command starts inside it shows on the command's line (`/review · 1 call`, then `⎿ Run the tests`)
   instead of a second running line.
 - D6 minimum: a Resume click or `!resume <id or name>` that names a session already open in
   another thread of any channel is refused, with a new text, instead of resuming it a second
@@ -1682,8 +1726,8 @@ All notable changes to this project are documented here. The format follows
   What a running line is doing now (a subagent's latest call, a command's latest agent,
   `Running in background`) shows on a line below it, indented under `⎿` as in the terminal,
   instead of after a `·` on the same line.
-- Every line of something still running (a call, a subagent, a task, a skill) is marked `⏳`,
-  as the footer marks running tasks, in place of `…`, which did not read as running.
+- Every line of something still running (a call, a subagent, a task, a skill) is a card in
+  progress, in place of `…`, which did not read as running.
 
 ### Added
 
@@ -1725,9 +1769,8 @@ First release.
   subagent's calls update its line. Claude Code's report of a finished task is a reply of its
   own that opens with Claude Code's line for the task's end (`✓ Agent "review" finished ·
   3m 59s`).
-- A footer on the channel's latest reply: bypass, git branch, model, effort level, context,
-  session tokens, the 5-hour and weekly limits, and the tasks still running (`⏳ 1 shell ·
-  1 agent`). The effort level is the one Claude Code reports to a `Stop` hook. `!status` lists
+- A footer under the app's last reply at rest between two messages of yours: bypass, git
+  branch, model, effort level, context, session tokens, and the 5-hour and weekly limits. The effort level is the one Claude Code reports to a `Stop` hook. `!status` lists
   the same values one per line, or says why Claude Code cannot start.
 - Approvals with Approve and Deny buttons; a decided request is removed and the tool's line
   records the call. A clarifying question is one line with Answer and Skip; Answer opens a form

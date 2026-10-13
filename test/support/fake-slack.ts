@@ -390,8 +390,28 @@ export class FakeSlack extends WebClient {
     this.uploaded = uploaded;
   }
 
+  /**
+   * How far apart the ts of two messages the fake creates are, in microseconds: a test that
+   * writes a person's message between two of them sets this above 1 and picks a ts in the gap.
+   */
+  tsStep = 1;
+
+  #ownerMessages = 0;
+
+  /**
+   * The ts of a message the owner writes now: after every message created so far and before the
+   * next one, as Slack would order it. Needs room between two messages (`tsStep` above the
+   * number of owner messages written in one gap).
+   */
+  ownerTs(): string {
+    this.#ownerMessages += 1;
+    const at = this.createdTs.length * this.tsStep + this.#ownerMessages;
+    if (this.#ownerMessages >= this.tsStep) throw new Error("tsStep leaves no room for the owner");
+    return `1790000000.${String(at).padStart(6, "0")}`;
+  }
+
   #newTs(): string {
-    return `1790000000.${String(this.createdTs.length + 1).padStart(6, "0")}`;
+    return `1790000000.${String((this.createdTs.length + 1) * this.tsStep).padStart(6, "0")}`;
   }
 
   /** Slack closes a stream that lived 5 minutes and never stopped (measured). */

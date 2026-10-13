@@ -84,11 +84,11 @@
        "task": true,
        "title": "Agent: Test background agent"
       }
-     ]
+     ],
+     "footer": "footer"
     },
     {
-     "call": "close_out",
-     "footer": "footer"
+     "call": "close_out"
     }
    ],
    "result_set": true,
@@ -166,11 +166,11 @@
     },
     {
      "call": "finish",
-     "closing": []
+     "closing": [],
+     "footer": "footer"
     },
     {
-     "call": "close_out",
-     "footer": "footer"
+     "call": "close_out"
     }
    ],
    "result_set": true,
@@ -259,11 +259,11 @@
        "task": true,
        "title": "SendMessage: a0d6caecc437a1298"
       }
-     ]
+     ],
+     "footer": "footer"
     },
     {
-     "call": "close_out",
-     "footer": "footer"
+     "call": "close_out"
     }
    ],
    "result_set": true,
@@ -407,11 +407,11 @@
     },
     {
      "call": "finish",
-     "closing": []
+     "closing": [],
+     "footer": "footer"
     },
     {
-     "call": "close_out",
-     "footer": "footer"
+     "call": "close_out"
     }
    ],
    "result_set": true,
@@ -427,11 +427,11 @@
     },
     {
      "call": "finish",
-     "closing": []
+     "closing": [],
+     "footer": "footer"
     },
     {
-     "call": "close_out",
-     "footer": "footer"
+     "call": "close_out"
     }
    ],
    "result_set": true,
@@ -733,11 +733,11 @@
    },
    {
     "call": "finish",
-    "closing": []
+    "closing": [],
+    "footer": "footer"
    },
    {
-    "call": "close_out",
-    "footer": "footer"
+    "call": "close_out"
    }
   ],
   "result_set": true,

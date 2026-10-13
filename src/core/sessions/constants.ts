@@ -27,7 +27,7 @@ export const INJECTED_TURN_WAIT = 30.0;
 // How long the answer to `!stop` waits for the reply it cut short to end. An interrupted turn
 // ends within a second or two; a final write that is retried takes ten.
 export const STOP_TAIL_WAIT = 15.0;
-// Each kind of task as the footer counts it and as its end line names it, the way the terminal
+// Each kind of task as the list of what still runs counts it and as its end line names it, the way the terminal
 // prints `Agent "..." finished`. The agent decides which kind a task is (`task_started.kind`): a
 // kind it does not name arrives as `other`, which counts and reads as a task, so a new one shows
 // with no change.

@@ -54,11 +54,11 @@
        "task": true,
        "title": "Agent: Run two 12-second sleep commands and report finished"
       }
-     ]
+     ],
+     "footer": "footer"
     },
     {
-     "call": "close_out",
-     "footer": "footer"
+     "call": "close_out"
     }
    ],
    "result_set": true,
@@ -232,11 +232,11 @@
     },
     {
      "call": "finish",
-     "closing": []
+     "closing": [],
+     "footer": "footer"
     },
     {
-     "call": "close_out",
-     "footer": "footer"
+     "call": "close_out"
     }
    ],
    "result_set": true,
@@ -415,11 +415,11 @@
    },
    {
     "call": "finish",
-    "closing": []
+    "closing": [],
+    "footer": "footer"
    },
    {
-    "call": "close_out",
-    "footer": "footer"
+    "call": "close_out"
    }
   ],
   "result_set": true,

@@ -46,6 +46,8 @@ class RecordingSink implements Sink<string> {
   notices: string[] = [];
   endings: string[] = [];
   closedOut: boolean | string | null = false;
+  /** The footer the last `finish` was given. */
+  footer: string | null = null;
 
   async text(
     markdown: string,
@@ -60,12 +62,13 @@ class RecordingSink implements Sink<string> {
     this.tasks.push(update);
   }
 
-  async finish(closing: readonly TaskUpdate[]): Promise<void> {
+  async finish(closing: readonly TaskUpdate[], footer: string | null): Promise<void> {
     this.finished = closing;
+    this.footer = footer;
   }
 
-  async closeOut(footer: string | null): Promise<boolean> {
-    this.closedOut = footer;
+  async closeOut(): Promise<boolean> {
+    this.closedOut = this.footer;
     return true;
   }
 

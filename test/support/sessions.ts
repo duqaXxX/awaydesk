@@ -643,6 +643,8 @@ export class Harness {
     options: HarnessOptions,
   ) {
     this.slack = slack;
+    // Room between two messages of the app for the owner's own.
+    slack.tsStep = 1_000;
     this.tmpPath = tmpPath;
     this.state = new StateStore(join(tmpPath, "state.json"));
     this.state.bind(CHANNEL, tmpPath);
@@ -726,7 +728,30 @@ export class Harness {
   session(thread: string = THREAD): ThreadSession {
     const session = this.manager.open(CHANNEL, thread);
     if (session === null) throw new Error("the channel is not bound");
+    this.#hear(session, thread);
     return session;
+  }
+
+  #heard = new WeakSet<ThreadSession>();
+
+  /**
+   * In production the listener tells the provider of every owner message before the core sees
+   * it (`SlackChat.ownerPosted`). The tests call the session's methods behind the listener, so
+   * a prompt or a command given through them tells the provider the same way, at a ts after
+   * everything the thread holds.
+   */
+  #hear(session: ThreadSession, thread: string): void {
+    if (this.#heard.has(session)) return;
+    this.#heard.add(session);
+    const owner = session as unknown as Record<string, (...args: unknown[]) => unknown>;
+    for (const name of ["submit", "status", "stop", "setBypass", "switchBypass"] as const) {
+      const original = owner[name]?.bind(session);
+      if (original === undefined) throw new Error(`a session has no ${name}`);
+      owner[name] = (...args: unknown[]) => {
+        this.chat.ownerPosted(CHANNEL, thread, this.slack.ownerTs());
+        return original(...args);
+      };
+    }
   }
 
   /** The text every posted message ends up showing, in the order they were posted. */

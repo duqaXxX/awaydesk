@@ -198,7 +198,9 @@ function slackPerson(
         await dispatch(message(text, { user, channel, ts }));
         return { id: ts, ref: { channel, thread: ts } };
       }
-      const body = reply(text, options.thread, { user, channel });
+      // Between the last message the fake created and the next one, as in a real thread.
+      const ts = `1790000000.${String(world.slack.createdTs.length * world.slack.tsStep + sequence).padStart(6, "0")}`;
+      const body = reply(text, options.thread, { user, channel, ts });
       await dispatch(body);
       return { id: String(body.event.ts), ref: { channel, thread: options.thread } };
     },
@@ -281,6 +283,7 @@ function pendingOf(ref: ThreadRef, questions: readonly Question[]): Pending {
 
 async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
   const world = worldOf(t);
+  world.slack.tsStep = 100; // room between two messages for a person's
   let built: App | null = null;
   // The questions the checks asked: the core holds each under the id the check chose.
   const asked = new Map<string, Pending>();

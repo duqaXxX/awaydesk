@@ -31,6 +31,7 @@ import {
 import {
   footerWrites,
   inside,
+  isReport,
   nestedBackgroundEndingMidTurn,
   pending,
   splitBackground,
@@ -139,21 +140,38 @@ test("a tool first turn and its cards read as the recorded turn", async (t) => {
   assert.deepEqual(h.slack.messageCards(), [[]]);
 });
 
-test("a reply waits for its background task before it stops", async (t) => {
+test("a reply whose turn left a task running rests with its footer, and its report grows it", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harness(t, [{ turns: [first] }]);
   await (await h.session().submit("start it")).done.wait();
-  await h.sleep(0.05);
-  assert.equal(h.slack.streamTs.length, 1);
-  assert.deepEqual(openStreams(h), h.slack.streamTs); // still open
-  assert.deepEqual(h.slack.callsTo("chat.stopStream"), []);
-  assert.equal(h.slack.pushes(), 0);
-  h.clients[0]?.inject([...notice, ...injected]);
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
-  const summary = systemRecord(notice, "task_notification").summary;
-  assert.ok(h.slack.streamTexts()[0]?.includes(`✓ ${summary}`)); // the report joins the same stream
-  assert.ok(h.slack.streamTs.length === 1 && h.slack.pushes() === 1);
+  // The stream stopped at the end of the turn, with the footer under it: one push.
+  assert.equal(h.slack.streamTs.length, 1);
+  assert.deepEqual(openStreams(h), []);
   assert.ok(h.slack.messageBlocks()[0]?.some((block) => block.type === "divider"));
+  assert.equal(h.slack.pushes(), 1);
+  h.clients[0]?.inject([...notice, ...injected]);
+  await h.until(() => h.slack.callsTo("chat.postMessage").length > 0);
+  await h.until(() => h.reactions().at(-1) === Status.DONE);
+  const summary = systemRecord(notice, "task_notification").summary;
+  const writes = h.slack.apiCalls.filter((call) =>
+    ["chat.update", "chat.postMessage"].includes(call.method),
+  );
+  const dividers = (call: (typeof writes)[number]) =>
+    (call.args.blocks as Array<{ type?: string }>).some((block) => block.type === "divider");
+  // The report grew the first message by edit, the footer still under it ...
+  const grown = writes.findIndex((call) =>
+    JSON.stringify(call.args.blocks).includes(JSON.stringify(summary).slice(1, -1)),
+  );
+  assert.equal(writes[grown]?.method, "chat.update");
+  assert.ok(dividers(writes[grown] as (typeof writes)[number]));
+  // ... then the ending is posted with the footer and cut out of the first message.
+  const posted = writes.findIndex((call) => call.method === "chat.postMessage");
+  assert.ok(posted > grown && dividers(writes[posted] as (typeof writes)[number]));
+  const cut = writes.at(-1);
+  assert.ok(cut?.method === "chat.update" && !dividers(cut));
+  assert.equal(h.slack.streamTs.length, 1);
+  assert.equal(h.slack.pushes(), 2);
 });
 
 test("a process lost while a task runs says so in the reply that waits for it", async (t) => {
@@ -163,14 +181,30 @@ test("a process lost while a task runs says so in the reply that waits for it", 
   const [first] = splitBackground();
   const h = harness(t, [{ turns: [first] }]);
   await (await h.session().submit("start it")).done.wait();
-  await h.sleep(0.05);
-  assert.deepEqual(openStreams(h), h.slack.streamTs); // the reply waits for its task
-  h.clients[0]?.inject([END_OF_STREAM]);
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
+  assert.deepEqual(openStreams(h), []); // the reply rests, waiting for its task
+  h.clients[0]?.inject([END_OF_STREAM]);
   await h.until(() => h.reactions().at(-1) === Status.ERROR);
-  const said = h.slack.streamTexts()[0]?.split("Claude Code reported an error").length;
+  const said = h.slack.messageTexts().join("\n").split("Claude Code reported an error").length;
   assert.equal(said, 2);
-  assert.ok(h.slack.streamTs.length === 1 && h.slack.pushes() === 1);
+  // the stop at the end of the turn, and the ending that says how the reply ended
+  assert.ok(h.slack.streamTs.length === 1 && h.slack.pushes() === 2);
+});
+
+test("a process lost under a command of the owner's says so in a message at the bottom", async (t) => {
+  const [first] = splitBackground();
+  const h = harness(t, [{ turns: [first] }]);
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
+  await session.status(); // a message of the owner's below the waiting reply
+  const created = h.slack.createdTs.length;
+  const pushes = h.slack.pushes();
+  h.clients[0]?.inject([END_OF_STREAM]);
+  await h.until(() => h.reactions().at(-1) === Status.ERROR);
+  assert.equal(h.slack.createdTs.length, created + 1, "the line is a new message at the bottom");
+  assert.match(h.slack.messageTexts().at(-1) ?? "", /Claude Code reported an error/);
+  assert.equal(h.slack.pushes(), pushes + 1);
 });
 
 test("a process lost after its task was reported changes nothing in the thread", async (t) => {
@@ -407,27 +441,26 @@ test("a reply whose end failed shows no checkmark then the cross", async (t) => 
   assert.deepEqual(thread(h).openReplies, [h.slack.streamTs[0]]);
 });
 
-test("a reply whose appends slack refuses ends whole with the checkmark", async (t) => {
+test("a reply that rests ends whole with the checkmark when its report arrives", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harness(t, [{ turns: [first] }], { finalRetrySeconds: 0.05 });
   await (await h.session().submit("start it")).done.wait();
-  await h.sleep(0.05);
-  assert.deepEqual(openStreams(h), h.slack.streamTs); // open: the report is owed to this stream
-  h.slack.responses["chat.appendStream"] = { ok: false, error: "msg_too_long" };
+  await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
+  assert.deepEqual(openStreams(h), []); // stopped at the end of its turn: the report grows it by edit
   h.clients[0]?.inject([...notice, ...injected]);
-  await h.until(() => h.slack.callsTo("chat.appendStream").length > 0); // the refusal did happen
   // The report turn ends on a footer, which runs git in real time: on a slow machine the fake
   // clock's 0.2 seconds pass before it does, so the end is waited for and the 0.2 come after.
   await h.until(() => h.reactions().at(-1) === Status.DONE);
   await h.sleep(0.2); // past where a failed end's retry would have shown the cross
   assert.equal(h.reactions().at(-1), Status.DONE);
   assert.ok(!h.reactions().includes(Status.ERROR));
+  assert.deepEqual(h.slack.callsTo("chat.appendStream"), []);
   const summary = systemRecord(notice, "task_notification").summary;
-  assert.ok(h.slack.streamTexts()[0]?.includes(`✓ ${summary}`)); // the report reached the reply
+  assert.ok(h.slack.messageTexts().join("\n").includes(`✓ ${summary}`)); // the report reached the reply
   assert.deepEqual(openStreams(h), []);
   assert.equal(thread(h).status, null);
   assert.deepEqual(thread(h).openReplies, []);
-  // the footer is in the closing message, as for a reply past STREAM_SECONDS
+  // the footer is in the ending, posted for the report
   assert.equal(blocksOf(h.slack.callsTo("chat.postMessage").at(-1)).at(-1)?.type, "context");
 });
 
@@ -552,18 +585,19 @@ test("a crossed owner query is answered in the reply it landed in", async (t) =>
   await owner.done.wait();
   assert.ok(h.slack.streamTs.length === 1 && h.slack.postedTs.length === 0);
   assert.deepEqual(openStreams(h), []);
-  // the reply that carried the answer is the thread's latest, not the discarded owner reply:
-  // it ends with the footer
+  // the reply that carried the answer ends with the footer, as the discarded owner reply never
+  // wrote a message
   const [stop, ...more] = h.slack.callsTo("chat.stopStream");
   assert.equal(more.length, 0);
   assert.ok(blocksOf(stop).some((block) => block.type === "divider"));
-  assert.ok(inside(session).latest !== null && inside(session).latest !== owner.sink);
 });
 
-test("a crossed owner query hands latest to the reply that carried its answer", async (t) => {
-  // The answer went into the reply that started a task (an older reply, no longer the latest
-  // once the owner wrote again). The owner turn's own reply is never written, so it must not
-  // stay the thread's latest, or the footer that belongs under the answer has no reply to show.
+test("a crossed owner query puts the footer under the reply that carried its answer", async (t) => {
+  // The report turn that answers the owner's prompt crossed it. The reply that started a task
+  // has the owner's message below it, so the answer opens a reply of its own at the bottom (it is
+  // not the last thing in the thread, so it takes no report). The owner turn's own reply is
+  // never written, so the footer that belongs under the answer sits under the reply that
+  // carried it.
   const [first] = splitBackground();
   const taskId = String(systemRecord(first, "task_started").task_id);
   const h = harness(t, [{ turns: [first] }]);
@@ -574,14 +608,22 @@ test("a crossed owner query hands latest to the reply that carried its answer", 
   const carrier = holder.sink;
   const owner = await session.submit("next");
   await h.until(() => h.clients[0]?.queries.join() === "start it,next");
-  assert.ok(inside(session).latest === owner.sink && carrier !== owner.sink);
+  assert.ok(carrier !== owner.sink);
   inside(session).injectedExpected = true; // a report was expected too: the guess that goes wrong
   inside(session).ended = [[taskId, "✓ the task ended"]];
   h.clients[0]?.inject(splitTurns(sdkMessages("tools"))[0] ?? []);
   await owner.done.wait();
-  assert.equal(inside(session).latest, carrier);
-  // the discarded reply is no longer the latest
-  assert.equal((owner.sink as unknown as { latest: boolean }).latest, false);
+  assert.ok(h.replies().at(-1)?.startsWith("✓ the task ended"));
+  const blocks = h.slack.messageBlocks();
+  // One footer, under the reply that carried the answer; the reply above, which the owner's
+  // message sits under, shows none.
+  assert.deepEqual(
+    blocks.map((message) => message.filter((block) => block.type === "divider").length),
+    [0, 1],
+  );
+  const footer = blocks.at(-1)?.at(-1) as JsonObject | undefined;
+  assert.equal(footer?.type, "context");
+  assert.match(JSON.stringify(footer), /claude-haiku/);
 });
 
 test("a close leaves no task waiting on a reply it could not end", async (t) => {
@@ -673,27 +715,31 @@ test("the thread status goes while an approval waits and comes back after it", a
   assert.ok(statuses(h).slice(waiting).includes(texts.THREAD_WORKING_STATUS));
 });
 
-test("a task that outlives its turn is counted by the thread status", async (t) => {
+test("a task that outlives its turn is not counted by the thread status", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harness(t, [{ turns: [first] }]);
   const session = h.session();
   await (await session.submit("start it")).done.wait();
-  const still = `${session.runningKinds} still running`;
-  await h.until(() => lines(h).at(-1) === still); // the turn ended: the prompt is back
-  assert.equal(statuses(h).at(-1), `has ${session.runningKinds} still running`);
+  await h.until(() => lines(h).at(-1) === ""); // the turn ended: nobody is owed an answer
   assert.ok(lines(h)[0] === texts.THREAD_WORKING && session.runningKinds !== "");
-  // The count is a state of the thread, never a line of the reply: a stream only grows.
+  assert.ok(!statuses(h).join().includes("still running"));
+  // The count is a state of the thread, never a line of the reply's stream.
   const told = h.slack.apiCalls.flatMap((call) => (call.args.chunks ?? []) as JsonObject[]);
   assert.ok(!JSON.stringify(told).includes("still running"));
-  // the reply is open
-  assert.deepEqual(openStreams(h), h.slack.streamTs);
-  assert.equal(h.slack.pushes(), 0);
-  h.clients[0]?.inject([...notice, ...injected]);
+  // the reply rests: its stream stopped at the end of the turn, which was a push
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
-  // The report turn says `Working…` again, and the end of everything clears the status.
-  await h.until(() => lines(h).at(-1) === "");
-  assert.ok(lines(h).slice(lines(h).indexOf(still)).includes(texts.THREAD_WORKING));
+  assert.deepEqual(openStreams(h), []);
   assert.equal(h.slack.pushes(), 1);
+  const before = lines(h).length;
+  h.clients[0]?.inject([...notice, ...injected]);
+  await h.until(() => h.slack.callsTo("chat.postMessage").length > 0);
+  // The report turn is the agent's own: the line stays as it was.
+  assert.ok(
+    lines(h)
+      .slice(before)
+      .every((line) => line === ""),
+  );
+  assert.equal(h.slack.pushes(), 2); // the stop at the end of the turn, and the ending
 });
 
 test("stop clears the thread status", async (t) => {
@@ -706,22 +752,27 @@ test("stop clears the thread status", async (t) => {
   await h.until(() => statuses(h).at(-1) === ""); // while the interrupt still winds down
 });
 
-test("a later reply that ended counts the task in its footer not in the status", async (t) => {
+test("a later reply that ended shows the list under it, the status says nothing", async (t) => {
   const [first] = splitBackground();
   const h = harness(t, [{ turns: [first, sdkMessages("tools")] }]);
   const session = h.session();
   await (await session.submit("start it")).done.wait();
-  const still = `${session.runningKinds} still running`;
-  await h.until(() => lines(h).at(-1) === still); // the only reply is open: no footer yet
+  await h.until(() => lines(h).at(-1) === ""); // the only reply is open: no footer yet
   await (await session.submit("list the files")).done.wait();
   await h.until(() => h.slack.callsTo("chat.stopStream").length === 1);
-  // The thread's last reply has ended: its footer says what still runs, and a status line
-  // under that footer would say it twice.
+  // The thread's last reply has ended: the list says what still runs, the status line never.
   await h.until(() => lines(h).at(-1) === "");
   const [, second] = h.slack.streamTs;
-  const last = h.slack.messages.get(second ?? "")?.blocks.at(-1);
-  const footer = String(((last?.elements ?? []) as JsonObject[])[0]?.text);
-  assert.ok(session.runningKinds !== "" && footer.endsWith(`⏳ ${session.runningKinds}`));
+  await h.until(() =>
+    (h.slack.messages.get(second ?? "")?.blocks ?? []).some(
+      (block) => block.block_id === "running-list",
+    ),
+  );
+  const card = (h.slack.messages.get(second ?? "")?.blocks ?? []).find(
+    (block) => block.block_id === "running-list",
+  );
+  assert.equal(session.runningKinds, "1 shell");
+  assert.equal(card?.title, `${session.runningKinds} still running`);
   await h.sleep(0.05);
   assert.equal(lines(h).at(-1), "");
 });
@@ -733,4 +784,67 @@ test("closing a session clears the thread status", async (t) => {
   await h.until(() => statuses(h).length > 0);
   await session.close();
   assert.equal(statuses(h).at(-1), "");
+});
+
+/** The footer each message of the thread shows, by creation: null when it shows none. */
+function footersOf(h: Harness): Array<string | null> {
+  return h.slack.createdTs.map((ts) => {
+    const blocks = h.slack.messages.get(ts)?.blocks ?? [];
+    const [divider, context] = blocks.slice(-2);
+    if (divider?.type !== "divider" || context?.type !== "context") return null;
+    const element = Array.isArray(context.elements) ? context.elements[0] : null;
+    return typeof element === "object" && element !== null && !Array.isArray(element)
+      ? String(element.text)
+      : null;
+  });
+}
+
+test("a thread with an owner prompt between its replies shows one footer per stretch, under the last reply of each", async (t) => {
+  // The recorded background run, with a prompt answered while the command runs: the report goes
+  // to the bottom, in the stretch of the prompt's reply.
+  // The scheduled write itself is pinned by the sink tests: here the core's own calls cause
+  // other passes that would draw the tail too.
+  const [first, notice, injected] = splitBackground();
+  const h = harness(t, [{ turns: [first, sdkMessages("foreground")] }]);
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await (await session.submit("and now?")).done.wait();
+  h.clients[0]?.inject([...notice, ...injected]);
+  await h.until(() => h.replies().some(isReport));
+  await h.idle();
+  await h.sleep(5);
+  const texts = h.replies();
+  assert.equal(texts.findIndex(isReport), 2, texts.join("\n---\n"));
+  // [the first reply] | owner | [the answer, the report]
+  assert.deepEqual(
+    footersOf(h).map((footer) => footer !== null),
+    [true, false, true],
+  );
+});
+
+test("a report that starts while the owner's prompt has no message yet leaves one footer in the stretch below it", async (t) => {
+  // Task 3's carried sequence: the reply H waits on a task, the notification arrives, the owner's
+  // message is told to the places and submitted (its reply has no message yet), then the report
+  // turn starts: H is no longer last, so the report opens a reply below the owner's message, and
+  // the prompt's reply writes below it. The thread reads H, owner, report, prompt's reply.
+  const [first, notice, injected] = splitBackground();
+  const h = harness(t, [{ turns: [first, sdkMessages("foreground")] }]);
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  h.clients[0]?.inject(notice);
+  await h.idle();
+  const prompt = session.submit("and now?");
+  h.clients[0]?.inject(injected);
+  await h.idle();
+  await (await prompt).done.wait();
+  await h.idle();
+  await h.sleep(5);
+  const texts = h.replies();
+  assert.equal(texts.findIndex(isReport), 1, texts.join("\n---\n"));
+  const footers = footersOf(h);
+  assert.deepEqual(
+    footers.map((footer) => footer !== null),
+    [true, false, true],
+    "one footer for the first stretch and one under the prompt's reply",
+  );
 });

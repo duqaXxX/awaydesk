@@ -97,10 +97,17 @@ export interface ReplySink {
     options?: { readonly notice?: boolean; readonly ending?: boolean },
   ): Promise<void>;
   task(update: TaskUpdate): Promise<void>;
-  /** The reply's body has ended; `closing` are the lines still open, closed. */
-  finish(closing: readonly TaskUpdate[], signal?: AbortSignal): Promise<void>;
-  /** Ends the reply, with its footer when the turn has one. False when the end did not land. */
-  closeOut(footer: FooterFields | null, signal?: AbortSignal): Promise<boolean>;
+  /**
+   * The turn's own part has ended; `closing` are the lines still open, closed; `footer` is what
+   * the thread says under its last reply from now on, null when the turn has none.
+   */
+  finish(
+    closing: readonly TaskUpdate[],
+    footer: FooterFields | null,
+    signal?: AbortSignal,
+  ): Promise<void>;
+  /** Ends the reply. False when the end did not land. */
+  closeOut(signal?: AbortSignal): Promise<boolean>;
   waitLanded(signal?: AbortSignal): Promise<boolean>;
   settle(signal?: AbortSignal): Promise<boolean>;
 }
@@ -139,29 +146,26 @@ export type MessageId = string;
 /** What the root of a thread shows of its session. */
 export type SessionStatus = "working" | "waiting" | "done" | "error";
 
+/** What still runs in a thread: a title and one line per task. */
+export interface RunningList {
+  readonly title: string;
+  readonly lines: readonly string[];
+}
+
 /**
- * One reply as a session holds it: the reply model, and its place in the thread. Only the
- * thread's latest reply says what still runs, at its end.
+ * One reply as a session holds it: the reply model, and its place in the thread.
  */
 export interface Reply extends ReplySink {
   /**
-   * What still runs in the thread (`⏳ 1 shell · 1 agent`), shown after the footer; empty
-   * removes it. Takes effect at once and is written with the reply's next write.
+   * The reply waits for work its turn started: from now on it changes by rewriting its message,
+   * so that what the thread shows under its last reply can be drawn there. Takes effect with the
+   * next write.
    */
-  setRunning(counts: string): void;
-  /** Whether this is the thread's latest reply: an older one drops the counts, keeps its footer. */
-  setLatest(latest: boolean): void;
-  /**
-   * Give up this reply's footer: a report of a background task follows it in a reply of its own
-   * that has ended with one, and the thread says how it stands once, at its end. An ended reply
-   * is written again without notifying; one whose footer cannot be taken back keeps it.
-   */
-  withdrawFooter(): void;
-  /**
-   * Whether the reply's end has landed in the chat: its footer is then what says the running
-   * counts, and the thread's activity line does not repeat them.
-   */
-  readonly footerShown: boolean;
+  rest(): void;
+  /** Whether nothing of the owner's and no other reply sits below this reply in the thread. */
+  readonly last: boolean;
+  /** Whether another reply has a message below this one: it then ends where it is, by edit. */
+  readonly overtaken: boolean;
 }
 
 /**
@@ -176,6 +180,11 @@ export type OpenMessageChange = (old: MessageId | null, fresh: MessageId | null)
  * a failure (ids and codes only) and goes on, since the chat must never stop a turn.
  */
 export interface ThreadChat {
+  /**
+   * What still runs in the thread, drawn above the footer under its last reply at rest; null
+   * removes it. Takes effect at once and is written with that reply's next write.
+   */
+  showRunning(list: RunningList | null): void;
   /**
    * A new reply in the thread. It writes nothing until it is given something to show.
    * `onOpenMessage` is told which of its messages a crash would leave unfinished.
