@@ -747,7 +747,6 @@ as `✓ Agent "review" finished · 3m 59s`. While tasks run, the footer counts t
 From the moment you send a message until its answer has ended, Slack shows `Working…` under the
 thread's last message. A turn Claude Code starts on its own to report a task shows no line, and
 the line never counts what still runs: the footer does (`⏳ 1 shell`), until the command ends.
-The reply gets its footer once that task and its report have ended.
 The line goes while an approval or a question waits for you. Slack's clients draw it, and the
 iOS app can show none for a thread that Slack on desktop already has open: with desktop closed,
 or with the thread opened on iOS first, it shows on both (seen on 2026-10-04, five runs read by

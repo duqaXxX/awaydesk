@@ -719,8 +719,16 @@ test("a reply whose end was refused lands it on the retry", async () => {
   await sink.finish([], null);
   slack.responses["chat.stopStream"] = [rejected("ratelimited"), { ok: true }];
   assert.equal(await sink.closeOutFormatted("footer"), false);
+  assert.equal(slack.streamEnds, 0, "Slack holds no ending before the retry");
   await passed(0.02);
   assert.equal(await soon(sink.waitLanded()), true);
+  const stops = slack.callsTo("chat.stopStream");
+  assert.equal(stops.length, 2, "the refused stop and the retry");
+  assert.deepEqual(list(last(stops).blocks).slice(-2), [
+    { type: "divider" },
+    contextBlock("footer"),
+  ]);
+  assert.equal(slack.streamEnds, 1, "and Slack holds the ending after it");
 });
 
 test("the closing message text skips the daemon s own lines", async () => {

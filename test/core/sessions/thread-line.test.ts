@@ -9,8 +9,11 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { APPROVE } from "../../../src/core/requests.ts";
 import { INJECTED_TURN_WAIT } from "../../../src/core/sessions/constants.ts";
+import { CHANNEL, THREAD } from "../../support/fake-slack.ts";
 import {
+  canUseToolCall,
   harnessFor,
   type Item,
   isResult,
@@ -19,10 +22,30 @@ import {
   sdkMessages,
   splitTurns,
 } from "../../support/sessions.ts";
-import { inside, isTaskRecord, play, send, splitBackground, statusLines } from "./helpers.ts";
+import {
+  inside,
+  isTaskRecord,
+  pending,
+  play,
+  send,
+  splitBackground,
+  statusLines,
+} from "./helpers.ts";
 
 const WORKING = "Working…";
 const COMPACTING = "Compacting conversation…";
+
+/** The calls from the first `Working…` to the clear: nothing in between may blink. */
+function assertSteady(lines: readonly string[]): void {
+  const from = lines.indexOf(WORKING);
+  assert.ok(from !== -1, "Working was shown");
+  const to = lines.lastIndexOf("");
+  assert.ok(to > from, "and then cleared");
+  assert.ok(
+    lines.slice(from, to).every((line) => line === WORKING),
+    `the line blinked: ${JSON.stringify(lines)}`,
+  );
+}
 
 function at<T>(list: readonly T[], index: number): T {
   const found = list.at(index);
@@ -36,7 +59,25 @@ test("an owner turn shows Working from the prompt to the end of its reply", asyn
   await turn.done.wait();
   await h.until(() => statusLines(h).at(-1) === "");
   assert.equal(statusLines(h)[0], WORKING);
-  assert.ok(statusLines(h).every((line) => line === WORKING || line === ""));
+  assertSteady(statusLines(h));
+});
+
+// The turn has started and left `sent`: only the active turn tells that its prompt is owed, and
+// the line is worked out again when the answer to the approval comes in.
+test("an owner turn says Working again after an approval, until its reply has ended", async (t) => {
+  const messages = sdkMessages("tools");
+  const ask = canUseToolCall("Bash", { command: "ls" });
+  const h = harnessFor(t)({ turns: [[...messages.slice(0, 21), ask, ...messages.slice(21)]] });
+  const turn = await h.session().submit("list the files");
+  await h.until(() => pending(h.approvals).length > 0);
+  await h.until(() => statusLines(h).at(-1) === "");
+  const waiting = statusLines(h).length;
+  const [approvalId] = pending(h.approvals);
+  assert.ok(approvalId !== undefined);
+  assert.notEqual(h.approvals.resolve(approvalId, CHANNEL, THREAD, APPROVE), null);
+  await turn.done.wait();
+  await h.until(() => statusLines(h).at(-1) === "");
+  assertSteady(statusLines(h).slice(waiting - 1));
 });
 
 test("a task that outlives its turn leaves the line empty, with no count", async (t) => {
@@ -63,7 +104,7 @@ test("an owner prompt sent while a background task runs shows Working", async (t
   await turn.done.wait();
   await h.until(() => statusLines(h).at(-1) === "");
   assert.ok(session.runningKinds !== "", "the task still runs when the answer is in");
-  assert.ok(statusLines(h).every((line) => line === WORKING || line === ""));
+  assertSteady(statusLines(h).slice(before));
 });
 
 // Case 8 of #295: the turns of this recording that report a subagent and a command are the
