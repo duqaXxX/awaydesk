@@ -32,6 +32,7 @@ import { StateStore } from "../../../src/core/state.ts";
 import { type Names, namesOf } from "../../../src/core/texts.ts";
 import { FakeClock } from "../../support/fake-slack.ts";
 import { type MemoryChat, memoryChat, OWNER } from "../../support/memory-chat.ts";
+import { NO_SYNC } from "../../support/no-sync.ts";
 import { PLAIN_CAPABILITIES, PlainAgent, type PlainSession } from "../../support/plain-agent.ts";
 import { settledTurn } from "../../support/sessions.ts";
 
@@ -151,7 +152,7 @@ export class MessagesWorld {
     this.chat = chat;
     this.agent = agent;
     this.channel = chat.openChannel("work");
-    this.state = new StateStore(join(folder, "state.json"));
+    this.state = new StateStore(join(folder, "state.json"), { sync: NO_SYNC });
     this.state.bind(this.channel, folder);
     const names = namesOf(agent, provider);
     const approvals = new Approvals(names);
