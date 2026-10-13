@@ -157,16 +157,30 @@ test("a long command in the foreground stays a call line", async () => {
   assert.deepEqual(renderer.runningTasks, []);
 });
 
-test("a call whose task outlives its result becomes a task line", async () => {
-  // background.jsonl: the call's result arrives while its command still runs.
+test("a call whose task outlives its result stays a call line that completes", async () => {
+  // background.jsonl: the call's result arrives while its command still runs. The terminal
+  // counts the call in its run and draws nothing for the command (issue #299).
   const events = recordedEvents("background");
   const [sink] = await render(events);
   const tools = topLevelToolIds(events);
   assert.equal(tools.length, 1);
   const history = sink.tasks.filter((t) => t.id === tools[0]);
-  assert.equal(history[0]?.task, false); // a call's line until its result
-  assert.ok(history.some((t) => t.task && t.details === BACKGROUND));
-  assert.equal(history.at(-1)?.task, true); // a task's line stays one after the task ends
+  assert.ok(history.every((t) => !t.task && t.details !== BACKGROUND));
+  assert.equal(history.at(-1)?.status, "complete");
+  assert.ok(!sink.tasks.some((t) => t.id.startsWith("task-")));
+});
+
+test("a command left running in the background is counted in its run and has no card", async () => {
+  const [first = [], ...later] = splitTurns(recordedEvents("background"));
+  const [call] = topLevelToolIds(first);
+  const [sink, renderer] = await render(first);
+  assert.ok(!sink.tasks.some((t) => t.task || t.details === BACKGROUND));
+  assert.equal(sink.tasks.filter((t) => t.id === call).at(-1)?.status, "complete");
+  assert.equal(renderer.runningTasks.length, 1);
+  assert.ok(renderer.lineless(renderer.runningTasks[0] ?? ""));
+  for (const event of later.flat()) await renderer.feed(event);
+  assert.ok(!sink.tasks.some((t) => t.task || t.details === BACKGROUND));
+  assert.deepEqual(renderer.runningTasks, []);
 });
 
 test("the calls of a subagent the turn waits for nest in the parent line", async () => {
@@ -265,25 +279,50 @@ test("a background agent of a call the reply never saw has no card and no launch
   assert.ok(renderer.lineless(started.taskId) && renderer.shows(started.taskId));
 });
 
-test("agents started one after the other have no empty line between their launch lines", async () => {
+const TWO_AGENTS = "**2 background agents launched**\n├ Run ls and report contents\n└ Second one";
+
+test("agents started in one message share one launch line, whatever the order of the frames", async () => {
   // The recorded call and task start, then the same two under other ids: no recording holds
-  // two agents started in one message (seen in a real session, 2026-10-13).
+  // two agents started in one message. The second order is the one measured on 2026-10-13:
+  // call A, task A, result A, call B, the message's end, then task B.
   const events = recordedEvents("subagent");
   const started = events.findIndex((event) => event.type === "task_started");
+  const ended = events.findIndex((event) => event.type === "message_ended");
   const call = events.findLast((event, index) => index < started && event.type === "call_started");
   const task = events[started];
   assert.ok(call?.type === "call_started" && task?.type === "task_started");
-  const [sink] = await render([
+  const secondCall: SessionEvent = { ...call, callId: "toolu_second" };
+  const secondTask: SessionEvent = {
+    ...task,
+    callId: "toolu_second",
+    taskId: "second",
+    description: "Second one",
+  };
+  const [together] = await render([
     ...events.slice(0, started + 1),
-    { ...call, callId: "toolu_second" },
-    { ...task, callId: "toolu_second", taskId: "second", description: "Second one" },
+    secondCall,
+    secondTask,
+    ...events.slice(started + 1),
   ]);
+  assert.equal(together.notices.join(""), TWO_AGENTS);
+  assert.deepEqual(together.tasks, []);
+  const [measured] = await render([
+    ...events.slice(0, ended),
+    secondCall,
+    events[ended] as SessionEvent,
+    secondTask,
+    ...events.slice(ended + 1),
+  ]);
+  assert.equal(measured.notices.join(""), TWO_AGENTS);
+  assert.deepEqual(measured.tasks, []);
+});
+
+test("one agent started in a message keeps its own launch line", async () => {
+  const [sink] = await render(recordedEvents("subagent"));
   assert.equal(
     sink.notices.join(""),
-    "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent" +
-      "\n\n**Agent**(Second one)\n⎿ Backgrounded agent",
+    "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent",
   );
-  assert.deepEqual(sink.tasks, []);
 });
 
 test("a launch line ends with no break: a card after it sits right under, text a paragraph apart", async () => {
@@ -498,29 +537,30 @@ test("background notification in a later turn gets a line", async () => {
   assert.ok(last !== undefined && ["complete", "error"].includes(last.status));
 });
 
-test("a task still running when its turn ends stays open until it ends", async () => {
+test("a command still running when its turn ends has no line to leave open", async () => {
   const [first = [], later = []] = splitTurns(recordedEvents("background"));
   const [sink, renderer] = await render(first);
   assert.ok(sink.finished !== null);
-  const open = sink.finished.filter((t) => t.status === "in_progress");
-  assert.equal(open.length, 1);
-  const [running] = open;
-  assert.equal(running?.details, BACKGROUND);
-  assert.ok(renderer.runningTasks.length > 0);
+  assert.deepEqual(sink.finished, []); // the task has no line, so none is listed as open
+  assert.equal(renderer.runningTasks.length, 1);
+  const [running] = renderer.runningTasks;
+  assert.ok(renderer.lineless(running ?? ""));
+  const written = sink.tasks.length;
   for (const event of later) {
     if (event.type === "task_ended" || event.type === "task_updated") await renderer.feed(event);
   }
   assert.equal(renderer.runningTasks.length, 0);
-  assert.equal(sink.tasks.at(-1)?.id, running?.id);
-  assert.equal(sink.tasks.at(-1)?.status, "complete");
+  assert.equal(sink.tasks.length, written); // its end changes no line
 });
 
-test("stopping the running tasks closes their lines", async () => {
+test("stopping the running tasks writes nothing for a task with no line", async () => {
   const [first = []] = splitTurns(recordedEvents("background"));
   const [sink, renderer] = await render(first);
+  const written = sink.tasks.length;
   await renderer.stopRunning();
   assert.equal(renderer.runningTasks.length, 0);
-  assert.ok(sink.tasks.at(-1)?.status === "complete" && sink.tasks.at(-1)?.output === STOPPED);
+  assert.equal(sink.tasks.length, written);
+  assert.ok(!sink.tasks.some((t) => t.output === STOPPED));
 });
 
 for (const name of ["TodoWrite", "mcp__srv__do_thing"]) {
@@ -658,8 +698,8 @@ for (const [summary, status, durationMs, expected] of ENDED_LINES) {
 }
 
 test("tool and task lines carry their name and kind", async () => {
-  const [first = []] = splitTurns(recordedEvents("background"));
-  const [sink] = await render(first);
+  // The recorded task of a subagent the call waits for is the one task that keeps a card.
+  const [sink] = await render(recordedEvents("subagent-foreground"));
   const last = finals([...sink.tasks, ...(sink.finished ?? [])]);
   assert.ok([...last.values()].every((t) => t.name));
   assert.ok([...last.values()].some((t) => t.task));
@@ -956,16 +996,15 @@ test("every frame of a nested task stays off the card list", async () => {
   assert.deepEqual(sink.tasks, []);
 });
 
-test("a task of a call the reply never saw keeps its own line", async () => {
-  // The reply cannot tell the call is nested (a restart dropped what held its root): the task
-  // is shown as any task of an unknown call.
+test("a command task of a call the reply never saw runs with no line", async () => {
+  // The reply cannot tell the call is nested (a restart dropped what held its root): the
+  // terminal draws no card for a command left running, so none is opened.
   const [, later] = nestedCommandTurns();
   const started = firstOf(later, "task_started");
-  const [sink] = await render([started]);
-  assert.deepEqual(
-    sink.tasks.map((t) => t.id),
-    [`task-${started.taskId}`],
-  );
+  const [sink, renderer] = await render([started]);
+  assert.deepEqual(sink.tasks, []);
+  assert.deepEqual(renderer.runningTasks, [started.taskId]);
+  assert.ok(renderer.lineless(started.taskId) && renderer.shows(started.taskId));
 });
 
 /**
@@ -980,7 +1019,7 @@ function nestedBackgroundTurns(): [SessionEvent[], SessionEvent[], string] {
   return [first, later.flat(), calls[0] as string];
 }
 
-test("a subagent s command that outlives its call becomes a task line", async () => {
+test("a subagent s command that outlives its call runs with no line", async () => {
   const [first, later, agentCall] = nestedBackgroundTurns();
   const [sink, renderer] = await render(first);
   assert.equal(renderer.runningTasks.length, 1);
@@ -999,11 +1038,8 @@ test("a subagent s command that outlives its call becomes a task line", async ()
     }
   }
   assert.deepEqual(renderer.runningTasks, [agentTask, started.taskId]);
-  const line = sink.tasks.at(-1);
-  assert.deepEqual(
-    [line?.id, line?.title, line?.status, line?.task],
-    [`task-${started.taskId}`, started.description, "in_progress", true],
-  );
+  assert.ok(!sink.tasks.some((t) => t.id === `task-${started.taskId}`));
+  assert.ok(renderer.lineless(started.taskId));
   assert.deepEqual(
     renderer.takePromoted().map((event) => event.taskId),
     [started.taskId],
@@ -1012,18 +1048,18 @@ test("a subagent s command that outlives its call becomes a task line", async ()
   assert.ok(!renderer.nests(started));
 });
 
-test("an ended command of a subagent ends its line as a background task", async () => {
+test("an ended command of a subagent changes no line", async () => {
   const [first, later, agentCall] = nestedBackgroundTurns();
   const [sink, renderer] = await render(first);
   for (const event of later) await renderer.feed(event);
   const last = finals(sink.tasks);
   const started = firstOf(later, "task_started");
-  // The command the agent left running has its line; the agent, in the background, has none,
-  // nor when that command's end starts it again under its call.
+  // Neither the command the agent left running nor the agent, in the background, has a line,
+  // nor does the command's end when it starts the agent again under its call.
   assert.equal(sink.notices.filter((text) => text.includes("Backgrounded agent")).length, 1);
   assert.ok(renderer.owns(agentCall));
-  assert.deepEqual(new Set(last.keys()), new Set([`task-${started.taskId}`]));
-  assert.equal(last.get(`task-${started.taskId}`)?.status, "complete");
+  assert.equal(last.size, 0);
+  assert.ok(!sink.tasks.some((t) => t.id === `task-${started.taskId}`));
   assert.deepEqual(renderer.runningTasks, []);
 });
 

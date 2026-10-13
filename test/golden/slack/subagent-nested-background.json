@@ -18,16 +18,10 @@
    ]
   ],
   "message_cards": [
-   [
-    {
-     "id": "task-bcyg8i1tv",
-     "status": "complete",
-     "title": "Sleep for 20 seconds then echo done"
-    }
-   ]
+   []
   ],
   "message_texts": [
-   "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent\n\nstartedThe background sleep command was launched.\n\nThe sleep command finished after 20 seconds and exited successfully."
+   "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent\n\nstarted\n\nThe background sleep command was launched.\n\nThe sleep command finished after 20 seconds and exited successfully."
   ],
   "pushes": 1
  },
@@ -70,23 +64,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "task-bcyg8i1tv",
-      "status": "in_progress",
-      "title": "Sleep for 20 seconds then echo done",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 3,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "text": "The backgro",
+      "text": "\n\nThe backgro",
       "type": "markdown_text"
      }
     ],
@@ -95,7 +73,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 4,
+   "after_sink_call": 3,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -109,7 +87,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 5,
+   "after_sink_call": 4,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -123,7 +101,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 6,
+   "after_sink_call": 5,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -137,23 +115,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 7,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "id": "task-bcyg8i1tv",
-      "status": "complete",
-      "title": "Sleep for 20 seconds then echo done",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 9,
+   "after_sink_call": 6,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -167,7 +129,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 10,
+   "after_sink_call": 7,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -181,7 +143,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 11,
+   "after_sink_call": 8,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -195,7 +157,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 12,
+   "after_sink_call": 9,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -209,7 +171,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 13,
+   "after_sink_call": 10,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -223,7 +185,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 14,
+   "after_sink_call": 11,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -237,7 +199,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 15,
+   "after_sink_call": 12,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -251,7 +213,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 16,
+   "after_sink_call": 13,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -265,7 +227,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 18,
+   "after_sink_call": 15,
    "args": {
     "blocks": [
      {

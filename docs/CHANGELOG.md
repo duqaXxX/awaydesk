@@ -7,6 +7,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A command left running in the background has no card, as the terminal draws none (issue #299,
+  captured on Claude Code 2.1.296): its call is counted in its run, and the command shows in the
+  list of what still runs and by its end line. The same holds for a command a subagent leaves
+  running.
+- The subagents one message starts in the background share one launch line,
+  `2 background agents launched`, with what each does under it.
+- A report opens with the end lines of the tasks that had ended when Claude Code began that
+  turn; a task that ends after that waits for the turn that reports it. Before, every end told
+  before the report's first word opened it, and the later report opened with
+  `Background task update`.
+
 - `StateStore` takes the flush of a write as an option, `sync`, which is `fs.fsyncSync` when
   absent, so the daemon writes `state.json` as before. The test worlds pass one that does
   nothing: the disk serves one flush at a time for the whole machine, and the suite's processes

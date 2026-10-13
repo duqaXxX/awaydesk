@@ -13,7 +13,15 @@ import type { FooterFields, Preview, ReplySink, TaskStatus, TaskUpdate } from ".
 import { blank } from "../../text.ts";
 import { formatTokens } from "../footer.ts";
 import * as texts from "../texts.ts";
-import { answered, described, LAUNCHERS, launched, PREVIEWED, preview } from "./previews.ts";
+import {
+  answered,
+  described,
+  LAUNCHERS,
+  type Launch,
+  launchedTogether,
+  PREVIEWED,
+  preview,
+} from "./previews.ts";
 import { BACKGROUND, oneLine, STOPPED, splitLines, TITLE_LIMIT } from "./words.ts";
 
 export const OUTPUT_LIMIT = 200;
@@ -130,6 +138,21 @@ export class TurnRenderer<Footer = FooterFields> {
   // Calls whose agent runs in the background: a line of text as the terminal writes it, and no
   // card. What the agent does under such a call writes nothing, as in the terminal.
   readonly #launched = new Set<string>();
+  // The agents started in the background whose launch line is not written yet. The terminal
+  // writes one line for the agents of one message, so they wait for the message to end and for
+  // every held call of it to say how its agent runs; anything else the reply writes comes
+  // after them.
+  #launches: Launch[] = [];
+  /** A message of the agent's is being written, at the top level. */
+  #messageOpen = false;
+  /** A line of the daemon's was written into the reply. */
+  #wroteLine = false;
+  /** What kind of task each one is, as it said when it started. */
+  readonly #kinds = new Map<string, TaskStarted["kind"]>();
+  // Commands left running in the background. The terminal draws none of them: the call is
+  // counted in its run like any other, and the command shows in the list of what still runs
+  // and by its end line (captured on Claude Code 2.1.296, 2026-10-14).
+  readonly #quiet = new Set<string>();
   // A line of the daemon's inside the reply (an agent's launch, a task's end) is the last thing
   // written. It ends with no break of its own, since a card that follows needs none and Slack
   // draws the empty lines; text that follows is set a paragraph apart.
@@ -180,8 +203,15 @@ export class TurnRenderer<Footer = FooterFields> {
         await this.#text(broken ? `\n\n${event.text}` : event.text, { piece: true });
         break;
       }
+      case "message_started":
+        if (event.parentCallId === null) this.#messageOpen = true;
+        break;
       case "message_ended":
-        if (event.parentCallId === null) await this.#handOver();
+        if (event.parentCallId === null) {
+          await this.#handOver();
+          this.#messageOpen = false;
+          await this.#settleLaunches();
+        }
         break;
       case "text":
         // Text that came whole is a command's own output (`Goal set: …` before a goal's first
@@ -248,15 +278,17 @@ export class TurnRenderer<Footer = FooterFields> {
   /** Whether this reply shows that task, running or ended: on a line, or as a launch line. */
   shows(taskId: string): boolean {
     const id = this.#lineOfTask.get(taskId);
-    return id !== undefined && (this.#lines.has(id) || this.#launched.has(id));
+    return (
+      id !== undefined && (this.#quiet.has(taskId) || this.#lines.has(id) || this.#launched.has(id))
+    );
   }
 
   /**
-   * Whether this reply shows that task with no line of its own (an agent in the background):
-   * nothing here says its end, which is said in words.
+   * Whether this reply shows that task with no line of its own (an agent or a command in the
+   * background): nothing here says its end, which is said in words.
    */
   lineless(taskId: string): boolean {
-    return this.#launched.has(this.#lineOfTask.get(taskId) ?? "");
+    return this.#quiet.has(taskId) || this.#launched.has(this.#lineOfTask.get(taskId) ?? "");
   }
 
   /**
@@ -316,13 +348,14 @@ export class TurnRenderer<Footer = FooterFields> {
   async close(footer: Footer | null, signal?: AbortSignal): Promise<void> {
     const interrupted = this.result !== null && this.result.ending === "interrupted";
     await this.#handOver();
+    await this.#writeLaunches();
     if (!this.#wroteText && this.#lines.size === 0 && this.#launched.size === 0) {
       // A command that prints nothing (a local one, say) still gets a visible answer.
       await this.#text(interrupted ? texts.STOPPED : texts.named(texts.NO_OUTPUT, this.#names), {
         notice: true,
       });
     }
-    const running = new Set(this.#running.values());
+    const running = new Set(this.#carded().map(([, lineId]) => lineId));
     const closing: TaskUpdate[] = [];
     for (const entry of this.#lines.values()) {
       if (running.has(entry.id)) {
@@ -375,6 +408,7 @@ export class TurnRenderer<Footer = FooterFields> {
    * it reports): a blank line still separates it from what is there, as a paragraph break would.
    */
   async feedNotice(text: string): Promise<void> {
+    await this.#writeLaunches();
     const prefix = this.#wroteText || this.#lines.size > 0 || this.#breakOwed ? "\n\n" : "";
     this.#afterText = false;
     this.#breakOwed = false;
@@ -387,16 +421,35 @@ export class TurnRenderer<Footer = FooterFields> {
    * A paragraph apart from what is before it, and from the text that follows.
    */
   async feedLine(text: string): Promise<void> {
+    await this.#writeLaunches();
     await this.#line(text);
   }
 
   async #line(text: string): Promise<void> {
-    const apart =
-      this.#breakOwed || this.#wroteText || this.#lines.size > 0 || this.#launched.size > 0;
+    const apart = this.#breakOwed || this.#wroteText || this.#lines.size > 0 || this.#wroteLine;
     this.#afterText = false;
     await this.#handOver();
     await this.#sink.text(`${apart ? "\n\n" : ""}${text}`, { notice: true, ending: false });
     this.#breakOwed = true;
+    this.#wroteLine = true;
+  }
+
+  /** Write the launch lines that wait, once nothing more can join them. */
+  async #settleLaunches(): Promise<void> {
+    if (!this.#messageOpen && this.#undecided.size === 0) await this.#writeLaunches();
+  }
+
+  /** The launch line of the agents that wait for one: their own, or one for them all. */
+  async #writeLaunches(): Promise<void> {
+    if (this.#launches.length === 0) return;
+    const launches = this.#launches;
+    this.#launches = [];
+    await this.#line(launchedTogether(launches));
+  }
+
+  /** The running tasks that have a line of their own, each with its line's id. */
+  #carded(): [taskId: string, lineId: string][] {
+    return [...this.#running].filter(([taskId]) => !this.#quiet.has(taskId));
   }
 
   /** A note of the daemon's after what the reply holds: what was not sent, what a restart dropped. */
@@ -471,9 +524,21 @@ export class TurnRenderer<Footer = FooterFields> {
   async #callEnded(event: EventOf<"call_ended">): Promise<void> {
     await this.#outlived(event.callId);
     const entry = this.#lines.get(event.callId);
-    if (entry === undefined) return;
+    if (entry === undefined) {
+      await this.#settleLaunches();
+      return;
+    }
     this.#undecided.delete(event.callId); // no task came: the call shows as any other
-    if ([...this.#running.values()].includes(entry.id)) {
+    let outliving = this.#carded()
+      .filter(([, lineId]) => lineId === entry.id)
+      .map(([taskId]) => taskId);
+    if (outliving.length > 0 && outliving.every((id) => this.#kinds.get(id) === "command")) {
+      // A command left running in the background: its call has ended like any other, and is
+      // counted so. The command goes on with no line of its own.
+      for (const taskId of outliving) this.#quiet.add(taskId);
+      outliving = [];
+    }
+    if (outliving.length > 0) {
       // The call only launched a task, which is still running: it outlives the call, so its
       // line becomes a task's line and stays open. A task that ends before its call's result
       // (a long command in the foreground) never gets here.
@@ -503,6 +568,7 @@ export class TurnRenderer<Footer = FooterFields> {
   }
 
   async #taskStarted(event: TaskStarted): Promise<void> {
+    this.#kinds.set(event.taskId, event.kind);
     if (this.nests(event)) {
       // The agent starts a task for a long command a subagent runs in the foreground of its
       // own context (recorded: `subagent-nested-command.jsonl`, CLI 2.1.286). The call already
@@ -560,11 +626,10 @@ export class TurnRenderer<Footer = FooterFields> {
     this.#lines.delete(call);
     // A line of the daemon's: it is not the turn's text, so a turn that says nothing else still
     // gets its last text or its error from the turn's end.
-    const said = launched(event.agentType, event.description);
-    // Written before the agent joins `#launched`: the line is set apart from what came before.
-    await this.#line(said);
     this.#launched.add(call);
     this.#bind(event.taskId, call);
+    this.#launches.push({ agentType: event.agentType, description: event.description });
+    await this.#settleLaunches();
   }
 
   /** The task runs for this reply, on that line or under that call. */
@@ -582,6 +647,12 @@ export class TurnRenderer<Footer = FooterFields> {
       // or one a subagent started. No card, as for any agent in the background, and no launch
       // line, which belongs under its call.
       this.#launched.add(lineId);
+      return;
+    }
+    if (event.kind === "command") {
+      // A command no call of this reply holds: one a subagent left running, or one started
+      // before a restart. No card, as for any command in the background.
+      this.#quiet.add(event.taskId);
       return;
     }
     if (event.callId === null) this.#commands.add(lineId);
@@ -621,7 +692,8 @@ export class TurnRenderer<Footer = FooterFields> {
     }
     this.#running.delete(taskId);
     const lineId = this.#lineOfTask.get(taskId) ?? `task-${taskId}`;
-    if (this.#launched.has(lineId)) return; // no card: its end is the session's end line
+    // No card: its end is the session's end line.
+    if (this.#launched.has(lineId) || this.#quiet.has(taskId)) return;
     const entry =
       this.#lines.get(lineId) ??
       line(lineId, oneLine(summary || taskId, TITLE_LIMIT), "in_progress", {
@@ -682,6 +754,7 @@ export class TurnRenderer<Footer = FooterFields> {
       this.#afterText = false;
     }
     this.#lines.set(update.id, update);
+    await this.#writeLaunches();
     this.#breakOwed = false;
     await this.#handOver();
     await this.#sink.task(update);
@@ -705,6 +778,7 @@ export class TurnRenderer<Footer = FooterFields> {
   ): Promise<void> {
     if (markdown === "") return;
     const { notice = false, ending = false, piece = false } = options;
+    await this.#writeLaunches();
     if (this.#breakOwed && !markdown.startsWith("\n")) markdown = `\n\n${markdown}`;
     this.#breakOwed = false;
     this.#wroteText = true;

@@ -198,6 +198,11 @@ export const BACKGROUND_NOTICE = "_Background task update_";
 // The terminal's two lines for an agent it starts in the background, without its key hints
 // (`↓ to manage · ctrl+o to expand`), captured on Claude Code 2.1.296 (2026-10-13).
 export const AGENT_LAUNCHED = "**{type}**({description})\n⎿ Backgrounded agent";
+// Its one line for several agents started in one message, with what each does under it as a
+// tree (captured the same day: `2 background agents launched`).
+export const AGENTS_LAUNCHED = "**{n} background agents launched**";
+export const AGENTS_LAUNCHED_BRANCH = "├ {description}";
+export const AGENTS_LAUNCHED_LAST = "└ {description}";
 export const PROMPT_IMAGE = "an image";
 export const COMPACTED = "Compacted the conversation: {before} → {after} tokens.";
 export const COMPACTED_PLAIN = "Compacted the conversation.";

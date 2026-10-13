@@ -66,7 +66,7 @@ that is reused keeps its text in its title.
 
 A call with a view of its own has a card of its own, keyed by its call id, and ends the run: a
 subagent the call waits for, whose title counts its calls and whose `details` say what it is doing
-now, a background command, which keeps its card `in_progress` for as long as it runs, a
+now, a
 stopped call, and a failed call of any tool but a command (`previews.failsCounted`), whose card
 says why. A subagent in the background has no card: the core writes its launch line as text
 of the reply (`TurnRenderer`, `previews.launched`). A call that
@@ -230,7 +230,7 @@ message, or is cut with the preview note when the span is fixed.
 ### When a reply ends
 
 A reply whose turn has ended while a task of it still runs, or still waits on a turn Claude Code
-starts to report it, rests; it ends once none does. A task the turn started keeps its card open
+starts to report it, rests; it ends once none does. A task the turn started that has a card keeps it open
 and updating in place, `ReplySink.finish` ends only the body, and `ThreadSession.stillOwed` decides
 whether `Reply.rest` (still owed) or `ReplySink.closeOut` runs (the CLI can suppress the report's notification, so past
 `constants.INJECTED_TURN_WAIT` `ThreadSession.expireUnreported` gives up on it). A report turn renders

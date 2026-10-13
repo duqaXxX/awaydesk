@@ -22,14 +22,14 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": "Running in background",
+      "details": null,
       "folded": null,
       "id": "toolu_01GAH7jrvjETWMqw9bvMyEgL",
       "name": "Bash",
       "output": "Command running in background with ID: bsfqtqmxq. Output is being written to: /private/tmp/claude-502/-home-dev-project-u3rxkt/c24e1570-95f7-4324-bfce-ef5b6381c678/tasks/bsfqtqmxq.output. You will be…",
       "preview": null,
-      "status": "in_progress",
-      "task": true,
+      "status": "complete",
+      "task": false,
       "title": "Sleep for 20 seconds in background"
      }
     },
@@ -41,20 +41,7 @@
     },
     {
      "call": "finish",
-     "closing": [
-      {
-       "calls": 0,
-       "details": "Running in background",
-       "folded": null,
-       "id": "toolu_01GAH7jrvjETWMqw9bvMyEgL",
-       "name": "Bash",
-       "output": "Command running in background with ID: bsfqtqmxq. Output is being written to: /private/tmp/claude-502/-home-dev-project-u3rxkt/c24e1570-95f7-4324-bfce-ef5b6381c678/tasks/bsfqtqmxq.output. You will be…",
-       "preview": null,
-       "status": "in_progress",
-       "task": true,
-       "title": "Sleep for 20 seconds in background"
-      }
-     ],
+     "closing": [],
      "footer": "footer"
     },
     {
@@ -1912,14 +1899,14 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": "Running in background",
+     "details": null,
      "folded": null,
      "id": "toolu_01GAH7jrvjETWMqw9bvMyEgL",
      "name": "Bash",
      "output": "Command running in background with ID: bsfqtqmxq. Output is being written to: /private/tmp/claude-502/-home-dev-project-u3rxkt/c24e1570-95f7-4324-bfce-ef5b6381c678/tasks/bsfqtqmxq.output. You will be…",
      "preview": null,
-     "status": "in_progress",
-     "task": true,
+     "status": "complete",
+     "task": false,
      "title": "Sleep for 20 seconds in background"
     }
    },
@@ -1928,36 +1915,6 @@
     "ending": false,
     "markdown": "STARTED",
     "notice": false
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01GAH7jrvjETWMqw9bvMyEgL",
-     "name": "Bash",
-     "output": null,
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Sleep for 20 seconds in background"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01GAH7jrvjETWMqw9bvMyEgL",
-     "name": "Bash",
-     "output": "Background command \"Sleep for 20 seconds in background\" completed (exit code 0)",
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Sleep for 20 seconds in background"
-    }
    },
    {
     "call": "text",

@@ -49,8 +49,8 @@ npm install -g "./$(npm pack --silent)"
 
 - A session per thread. A message in the channel opens a thread and asks for the model, the
   effort and bypass; a reply in that thread continues the session, even days later.
-- The reply as it is written: Claude's text, the tool calls, a line for each subagent it starts
-  and a card for each background command.
+- The reply as it is written: Claude's text, the tool calls, and a line for the subagents it
+  starts.
 - Approve and Deny buttons for whatever Claude Code asks permission for, and a form for Claude's
   questions.
 - One footer between two of your messages, under the last reply: branch and lines changed, model, effort, context used, usage limits.

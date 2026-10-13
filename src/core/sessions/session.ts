@@ -215,6 +215,12 @@ export class ThreadSession {
   // The task id finds the reply that started it (the report renders there when that reply is
   // the last thing in the thread).
   private ended: Array<readonly [taskId: string, line: string]> = [];
+  // The end lines the turn that has just begun reports, set aside when the agent starts it. A
+  // task that ends after that start is told to the agent in a later turn, and the terminal
+  // prints its line there (measured 2026-10-14, Claude Code 2.1.296: of two agents ending 0.3 s
+  // apart, the second was notified after the first report turn began, and that turn knew of
+  // the first alone).
+  private opening: Array<readonly [taskId: string, line: string]> | null = null;
   // Tasks whose end arrived without their notification yet, by the clock time it arrived: the
   // notification starts the turn that reports them. The CLI can suppress it (SDK
   // TaskUpdatedMessage docstring), so a stop waits for it only INJECTED_TURN_WAIT.
@@ -1636,6 +1642,11 @@ export class ThreadSession {
         if (event.sessionId !== null) {
           this.deps.state.setSession(this.channelId, this.threadId, event.sessionId);
         }
+        // A turn of the agent's own begins: the ends told so far are the ones it reports.
+        if (this.sent.length === 0 && this.opening === null && this.ended.length > 0) {
+          this.opening = this.ended;
+          this.ended = [];
+        }
         break;
       case "mode_changed":
         // Claude Code reports the permission mode after a change (measured after each
@@ -1894,8 +1905,11 @@ export class ThreadSession {
    * report the agent named the task of (`report_started`) that renders in that task's reply with no end line to open it.
    */
   private openingTarget(): readonly [text: string | null, target: TurnRenderer | null] {
-    const lines = this.ended;
-    this.ended = [];
+    // The lines set aside when this turn began, when it began with any; a task that ended
+    // since waits for the turn that reports it.
+    const lines = this.opening ?? this.ended;
+    if (this.opening === null) this.ended = [];
+    this.opening = null;
     // The task the agent named for this turn, when no end line names one: a subagent's
     // hand-back can come before its task's end, or after an end that came inside a turn.
     const reported = this.reportOf;
@@ -1948,6 +1962,7 @@ export class ThreadSession {
       !event.finalText &&
       event.ending === "done" &&
       this.ended.length === 0 &&
+      this.opening === null &&
       this.held.length === 0 &&
       this.notice === null
     );
@@ -1995,11 +2010,22 @@ export class ThreadSession {
     this.injectedExpected = false;
     const held = this.held;
     this.held = [];
+    // An end line waits to be said: of a task with no card (a command or an agent in the
+    // background), nothing else in the reply says that it ended.
+    const unsaid = (this.opening ?? this.ended).map(([, line]) => line);
+    const said = unsaid.length > 0;
     const [text, target] = this.openingTarget();
     try {
       if (held.length > 0) {
         const renderer = target ?? this.newRenderer(this.newReply());
         await this.standalone(held, text, renderer, signal);
+      } else if (said && target !== null && text !== null) {
+        // Into the reply that started the task, which the sweep below then ends. A reply that
+        // is no longer the last thing in the thread gets no line: none is posted for it.
+        await target.feedLine(text);
+      } else if (said && this.promptOwed()) {
+        // A message of the owner's waits below that reply: its own reply says the line.
+        this.endedAhead.push(...unsaid);
       }
     } catch (error) {
       if (error instanceof Cancelled) throw error;
@@ -2276,6 +2302,12 @@ export class ThreadSession {
     } else {
       this.reportOf = null; // the prompt's own turn: what was named is not the next turn
       renderer = this.newRenderer(turn.sink);
+      // The ends told since the last turn and not reported: the agent takes their notifications
+      // into this turn, and the terminal prints their lines before its answer.
+      const unsaid = [...(this.opening ?? []), ...this.ended].map(([, line]) => line);
+      this.opening = null;
+      this.ended = [];
+      this.endedAhead.unshift(...unsaid);
     }
     // (sync) The turn is the active one before its first write: every `await` below yields, and
     // a turn already out of `sent` and not yet active would read as idle to a drain, a `!stop`
@@ -2358,6 +2390,7 @@ export class ThreadSession {
     this.taskReplies.clear();
     this.tasks.clear();
     this.ended = [];
+    this.opening = null;
     this.endedAhead = [];
     this.unreported.clear();
     this.notificationWaits = false;

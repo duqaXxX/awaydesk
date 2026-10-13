@@ -50,14 +50,14 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": "Running in background",
+      "details": null,
       "folded": null,
       "id": "toolu_01JjA7q6WDz1WJ3ezrrPTEkg",
       "name": "Bash",
       "output": "Command running in background with ID: bcyg8i1tv. Output is being written to: /private/tmp/claude-502/-home-dev-project/29225642-a816-42d9-a471-018555d81084/tasks/bcyg8i1tv.output. You will be notifi…",
       "preview": null,
-      "status": "in_progress",
-      "task": true,
+      "status": "complete",
+      "task": false,
       "title": "Sleep for 20 seconds then echo done"
      }
     },
@@ -117,20 +117,7 @@
     },
     {
      "call": "finish",
-     "closing": [
-      {
-       "calls": 0,
-       "details": "Running in background",
-       "folded": null,
-       "id": "toolu_01JjA7q6WDz1WJ3ezrrPTEkg",
-       "name": "Bash",
-       "output": "Command running in background with ID: bcyg8i1tv. Output is being written to: /private/tmp/claude-502/-home-dev-project/29225642-a816-42d9-a471-018555d81084/tasks/bcyg8i1tv.output. You will be notifi…",
-       "preview": null,
-       "status": "in_progress",
-       "task": true,
-       "title": "Sleep for 20 seconds then echo done"
-      }
-     ],
+     "closing": [],
      "footer": "footer"
     },
     {
@@ -250,24 +237,9 @@
     "notice": false
    },
    {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "task-bcyg8i1tv",
-     "name": "local_bash",
-     "output": null,
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Sleep for 20 seconds then echo done"
-    }
-   },
-   {
     "call": "text",
     "ending": false,
-    "markdown": "The backgro",
+    "markdown": "\n\nThe backgro",
     "notice": false
    },
    {
@@ -287,36 +259,6 @@
     "ending": false,
     "markdown": "launched.",
     "notice": false
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "task-bcyg8i1tv",
-     "name": "local_bash",
-     "output": null,
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Sleep for 20 seconds then echo done"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "task-bcyg8i1tv",
-     "name": "local_bash",
-     "output": "Background command \"Sleep for 20 seconds then echo done\" completed (exit code 0)",
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Sleep for 20 seconds then echo done"
-    }
    },
    {
     "call": "text",

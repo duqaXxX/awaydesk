@@ -11,7 +11,16 @@
  */
 import type { DiffHunk, FileChange, Question } from "../../agent/seam.ts";
 import type { Preview } from "../../chat/seam.ts";
-import { AGENT_LAUNCHED, ANSWERED, fill, type Names, named } from "../texts.ts";
+import {
+  AGENT_LAUNCHED,
+  AGENTS_LAUNCHED,
+  AGENTS_LAUNCHED_BRANCH,
+  AGENTS_LAUNCHED_LAST,
+  ANSWERED,
+  fill,
+  type Names,
+  named,
+} from "../texts.ts";
 import { oneLine, spaced, splitLines, TITLE_LIMIT } from "./words.ts";
 
 // How the terminal folds finished calls of these tools. Captured from the terminal on Claude Code
@@ -47,6 +56,29 @@ const AGENT = "Agent";
 export function launched(agentType: string | null, description: string): string {
   const type = agentType === null || agentType === PLAIN_AGENT ? AGENT : agentType;
   return fill(AGENT_LAUNCHED, { type, description: oneLine(description, TITLE_LIMIT) });
+}
+
+/** An agent started in the background, as its launch line names it. */
+export interface Launch {
+  readonly agentType: string | null;
+  readonly description: string;
+}
+
+/**
+ * The terminal's lines for the agents one message started in the background: one agent's own
+ * line, or for several a count and what each does, with no type.
+ */
+export function launchedTogether(launches: readonly Launch[]): string {
+  const [only] = launches;
+  if (only !== undefined && launches.length === 1) {
+    return launched(only.agentType, only.description);
+  }
+  const lines = launches.map(({ description }, index) =>
+    fill(index === launches.length - 1 ? AGENTS_LAUNCHED_LAST : AGENTS_LAUNCHED_BRANCH, {
+      description: oneLine(description, TITLE_LIMIT),
+    }),
+  );
+  return [fill(AGENTS_LAUNCHED, { n: launches.length }), ...lines].join("\n");
 }
 
 // The tools whose failed call the terminal counts with the others and says nothing more of: a
