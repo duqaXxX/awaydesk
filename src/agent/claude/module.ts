@@ -10,6 +10,19 @@ import { ClaudeBackend, type ClaudeBackendOptions } from "./backend.ts";
 export const VARIABLES: readonly string[] = ["BASH_DEFAULT_TIMEOUT_MS"];
 
 /**
+ * The declared variables the owner's file sets, each read by its name: the daemon hands a module
+ * its variables readable by lookup and shown by nothing, so a spread of them copies none.
+ */
+function set(variables: Readonly<Record<string, string>>): Record<string, string> {
+  const found: Record<string, string> = {};
+  for (const name of VARIABLES) {
+    const value = variables[name];
+    if (value !== undefined) found[name] = value;
+  }
+  return found;
+}
+
+/**
  * The entry that builds the Claude back end. `options` are what a test replaces: the SDK's
  * query, the owner's home, the usage probe's start.
  */
@@ -18,6 +31,6 @@ export function claudeAgent(options: ClaudeBackendOptions = {}): AgentEntry {
     required: [],
     optional: VARIABLES,
     build: (context) =>
-      new ClaudeBackend({ clock: context.clock, variables: context.variables, ...options }),
+      new ClaudeBackend({ clock: context.clock, variables: set(context.variables), ...options }),
   };
 }

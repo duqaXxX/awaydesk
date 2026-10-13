@@ -36,7 +36,7 @@ The first rows are about how a session runs, the others about commands.
 | Publishing a page as an artifact | The `Artifact` tool | Not offered | [#300](https://github.com/duqaXxX/awaydesk/issues/300) |
 | A question that shows a preview beside each option | Offered | The question comes without previews | [#300](https://github.com/duqaXxX/awaydesk/issues/300) |
 | A subagent that starts subagents in the background | Waits for them | Does not wait: one that ends later reports to the main conversation | none |
-| How Claude is told who it is | `You are Claude Code, Anthropic's official CLI for Claude.` | `You are a Claude agent, built on Anthropic's Claude Agent SDK.` | none |
+| How Claude is told who it is | `You are Claude Code, Anthropic's official CLI for Claude.` | `You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK.` | none |
 | Sending feedback to Anthropic, ending a conversation | The `SendFeedback` and `EndConversation` tools | Not offered | none |
 | The agent that answers questions about Claude Code, the skills on artifacts | `claude-code-guide` and three skills | Not listed | none |
 | Running a shell command yourself | Claude may suggest that you type `! <command>` | Claude is not told of it, and in Slack `!` starts a command | none |
@@ -57,7 +57,8 @@ the CLAUDE.md block, the five sections of the system prompt and 12 of the 14 too
 identical. Three lines of the system prompt differed (who Claude is, the hint on `!`, the note
 on `EndConversation`), two tools differed (the rows on commands and on questions), and the
 terminal sent two tools more. The time limits are the ones the `Bash` tool states to Claude,
-read with and without the variable. A command of 40 minutes left in the background of two
+read with and without the variable. The line on who Claude is, in the table, is the one a
+session the daemon started quoted when asked. A command of 40 minutes left in the background of two
 sessions of the SDK was stopped after 30 minutes in the one without the variable and ran to its
 end in the one with `BASH_DEFAULT_TIMEOUT_MS=14400000`. That a subagent does not wait for the subagents it started
 is Claude Code's own statement ([sub-agents](https://code.claude.com/docs/en/sub-agents)), and
