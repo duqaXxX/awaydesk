@@ -195,13 +195,15 @@ The reply ends once its turn has ended and none of its tasks still runs or still
 Claude Code starts to report it (the held-open reply): a task the turn started keeps its card open
 and updating in place, `ReplySink.finish` ends only the body, and `ThreadSession.stillOwed` decides
 when `ReplySink.closeOut` runs (the CLI can suppress the report's notification, so past
-`constants.INJECTED_TURN_WAIT` `ThreadSession.expireUnreported` gives up on it). A report turn can
-name only the reply of the first task it covers when several end together;
-`ThreadSession.sweepClosedOut`, run after every turn and after `ThreadSession.expireInjectedTurn`,
-ends every other reply left eligible. A turn Claude Code starts on its own to report a background
-task renders into the reply that started the task (`ThreadSession.openingTarget`); when that reply
-has already ended, the report gets a reply of its own, and the reply above it gives its footer up
-once the report has ended with one (`ThreadSession.newReportReply`). An owner's next prompt takes no
+`constants.INJECTED_TURN_WAIT` `ThreadSession.expireUnreported` gives up on it). A report turn renders
+into one reply only when several tasks end together; `ThreadSession.sweepClosedOut`, run after
+every turn and after `ThreadSession.expireInjectedTurn`, ends every other reply left eligible. A
+turn Claude Code starts on its own to report a background task renders into the reply of the
+first of the ended tasks (then of the task the agent named) whose reply is still tracked, not
+ended and the last thing in the thread (`ThreadSession.openingTarget`, `Reply.last`). When none
+is, the report gets a reply of its own at the bottom, and the reply above it gives its footer up
+once the report has ended with one (`ThreadSession.newReportReply`). A reply that ends with
+another reply below it (`Reply.overtaken`) because no report came is logged at INFO. An owner's next prompt takes no
 footer away.
 
 A background subagent can hand its report back before, or without, a turn of that kind (measured

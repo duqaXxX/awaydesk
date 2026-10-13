@@ -561,9 +561,11 @@ test("a crossed owner query is answered in the reply it landed in", async (t) =>
 });
 
 test("a crossed owner query hands latest to the reply that carried its answer", async (t) => {
-  // The answer went into the reply that started a task (an older reply, no longer the latest
-  // once the owner wrote again). The owner turn's own reply is never written, so it must not
-  // stay the thread's latest, or the footer that belongs under the answer has no reply to show.
+  // The report turn that answers the owner's prompt crossed it. The reply that started a task
+  // has the owner's message below it, so the answer opens a reply of its own at the bottom (it is
+  // not the last thing in the thread, so it takes no report). The owner turn's own reply is
+  // never written, so it must not stay the thread's latest, or the footer that belongs under the
+  // answer has no reply to show.
   const [first] = splitBackground();
   const taskId = String(systemRecord(first, "task_started").task_id);
   const h = harness(t, [{ turns: [first] }]);
@@ -579,7 +581,9 @@ test("a crossed owner query hands latest to the reply that carried its answer", 
   inside(session).ended = [[taskId, "✓ the task ended"]];
   h.clients[0]?.inject(splitTurns(sdkMessages("tools"))[0] ?? []);
   await owner.done.wait();
-  assert.equal(inside(session).latest, carrier);
+  const latest = inside(session).latest;
+  assert.ok(latest !== null && latest !== carrier && latest !== owner.sink);
+  assert.ok(h.replies().at(-1)?.startsWith("✓ the task ended"));
   // the discarded reply is no longer the latest
   assert.equal((owner.sink as unknown as { latest: boolean }).latest, false);
 });

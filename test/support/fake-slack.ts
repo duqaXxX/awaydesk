@@ -396,6 +396,20 @@ export class FakeSlack extends WebClient {
    */
   tsStep = 1;
 
+  #ownerMessages = 0;
+
+  /**
+   * The ts of a message the owner writes now: after every message created so far and before the
+   * next one, as Slack would order it. Needs room between two messages (`tsStep` above the
+   * number of owner messages written in one gap).
+   */
+  ownerTs(): string {
+    this.#ownerMessages += 1;
+    const at = this.createdTs.length * this.tsStep + this.#ownerMessages;
+    if (this.#ownerMessages >= this.tsStep) throw new Error("tsStep leaves no room for the owner");
+    return `1790000000.${String(at).padStart(6, "0")}`;
+  }
+
   #newTs(): string {
     return `1790000000.${String((this.createdTs.length + 1) * this.tsStep).padStart(6, "0")}`;
   }

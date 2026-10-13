@@ -203,7 +203,8 @@ export class ThreadSession {
   // Each task's type and description, for the footer's counts and its end line.
   private readonly tasks = new Map<string, readonly [kind: TaskKind, description: string]>();
   // Ended tasks not yet opened into a report turn's reply: (task id, its formatted end line).
-  // The task id finds the reply that started it (the report renders there).
+  // The task id finds the reply that started it (the report renders there when that reply is
+  // the last thing in the thread).
   private ended: Array<readonly [taskId: string, line: string]> = [];
   // Tasks whose end arrived without their notification yet, by the clock time it arrived: the
   // notification starts the turn that reports them. The CLI can suppress it (SDK
@@ -212,6 +213,9 @@ export class ThreadSession {
   // Tasks `!stop` ended. Claude Code starts no turn to report such a task: its notification
   // stays queued (measured twice on 2026-09-27, Claude Code 2.1.283), so none is awaited.
   private readonly stopped = new Set<string>();
+  // The replies already logged as ended with no report under them: `closeOut` sets its flag
+  // after an await, so two timers waking together would log one reply twice.
+  private readonly endedUnreported = new WeakSet<TurnRenderer>();
   // Clear while a background notification's own turn is expected or running: the owner's
   // next prompt waits, so the two replies never share a thread.
   private readonly settled = new Event();
@@ -226,7 +230,8 @@ export class ThreadSession {
   // the agent has a report to make (`whoseTurn`).
   private notificationWaits = false;
   // The task the agent said its next turn reports (`report_started`): that turn is no prompt's,
-  // and it renders in the reply that started the task, whether or not the task's end came yet.
+  // and it renders in the reply that started the task when that is the last thing in the thread,
+  // whether or not the task's end came yet.
   private reportOf: string | null = null;
   private expiry: Task | null = null;
   /** The agent said it is compacting the conversation and has not said it ended. */
@@ -1981,8 +1986,9 @@ export class ThreadSession {
       try {
         // Catches `target` (nothing more coming for it either, when `held` was empty) and any
         // other reply a joint report turn left stranded, since a report only ever renders into
-        // the first of the tasks it covers.
-        await this.sweepClosedOut(live(signal), { unreported: true });
+        // one reply, the first of the tasks it covers that is the last thing in the thread.
+        // A standalone update was posted for `held`: something sits under the replies it left.
+        await this.sweepClosedOut(live(signal), { unreported: held.length === 0 });
         await this.reactDoneIfIdle(live(signal));
       } finally {
         // (sync) Whatever the sweep did: a notification that arrived during its own writes is
@@ -2238,9 +2244,9 @@ export class ThreadSession {
     let opening: string | null = null;
     if (turn === null) {
       this.notificationWaits = false;
-      // A report turn renders into the reply that started the task it reports, so no new
-      // message follows for it; only when that reply is no longer tracked does it get one of
-      // its own, as every reply always has.
+      // A report turn renders into the reply that started a task it reports, so no new message
+      // follows for it, but only a reply that is still tracked, not ended and the last thing in
+      // the thread (`openingTarget`); otherwise it gets a reply of its own at the bottom.
       const [text, target] = this.openingTarget();
       renderer = target ?? this.newRenderer(this.newReportReply());
       opening = text;
@@ -2387,9 +2393,12 @@ export class ThreadSession {
   }
 
   /**
-   * A report turn's opening names only the reply of the first task it covers when several end
-   * together, so every other reply whose own tasks also finished is checked here instead, since
-   * nothing else rechecks it once the wait that deferred it lifts. Only while nothing is still
+   * A report turn renders into one reply only (the first of the tasks it covers that is the
+   * last thing in the thread, `openingTarget`) when several end together, so every other reply
+   * whose own tasks also finished is checked here instead, since nothing else rechecks it once
+   * the wait that deferred it lifts. `options.unreported` says that no report followed (the
+   * notification never came): a reply closed out then with another reply below it is logged.
+   * Only while nothing is still
    * expected or running session-wide: `closeReply` already handles the renderer whose own turn
    * or report just ended, and a currently active one is skipped outright, whatever it reads:
    * its own turn has not closed it yet, so nothing here is its call to make.
@@ -2406,7 +2415,13 @@ export class ThreadSession {
       if (renderer !== active && !this.stillOwed(renderer)) {
         const reply = this.reply(renderer);
         // Read before the close: closing it out changes what the thread shows below it.
-        if (options.unreported && !renderer.closedOut && reply.overtaken) {
+        if (
+          options.unreported &&
+          !renderer.closedOut &&
+          !this.endedUnreported.has(renderer) &&
+          reply.overtaken
+        ) {
+          this.endedUnreported.add(renderer);
           logger.info(`a reply ended with no report under it in ${this.where}`);
         }
         this.trackLanding(await renderer.closeOut(signal), reply);

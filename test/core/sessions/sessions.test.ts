@@ -1506,8 +1506,9 @@ test("owner query waits for an expected background turn", async (t) => {
   await second.done.wait();
   assert.deepEqual(h.clients[0]?.queries, ["start it", "next"]);
   const background = h.bodies().map(isReport);
-  // The report is appended to the reply that started the task, not a new one of its own.
-  assert.deepEqual(background, [true, false]);
+  // The owner's message sits below the reply that started the task, so the report opens a reply
+  // of its own at the bottom and the answer to the message follows it.
+  assert.deepEqual(background, [false, true, false]);
 });
 
 /** The running counts a message's footer shows, if any. */
@@ -1571,7 +1572,8 @@ test("two prompts in a row each reply ends with its own stop", async (t) => {
 
 test("two prompts tasks ending together each reply ends", async (t) => {
   // The CLI's one report turn opens with the end of every task that finished together but
-  // renders into only the first one's reply; the second must still end, not wait forever for a
+  // renders into only one reply: the first of the tasks' replies that is the last thing in the
+  // thread, B's here, since B sits below A. The other must still end, not wait forever for a
   // report turn that was never coming for it specifically.
   const [first, notice, injected] = splitBackground();
   const [firstB, noticeB] = renamedBackground();

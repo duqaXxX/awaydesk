@@ -167,14 +167,29 @@ test("a continued agent frame never starts a turn", async (t) => {
 });
 
 test("a report turn after a restart renders into the one reply that is the last thing (case 1)", async (t) => {
-  // The daemon never saw the `Agent` call, so the report names no task it tracks; the shell of
-  // the continued turn is shown in the reply of that turn, which nothing sits below. Before the
-  // report went to the bottom it opened a reply of its own in the middle of the thread.
+  // The daemon never saw the `Agent` call, but the agent's own task is shown in the reply of the
+  // continued turn (`taskReplies`), which nothing sits below: the report renders there. Before
+  // the report went to the bottom it opened a reply of its own in the middle of the thread.
   const [h] = await playTheContinuedAgent(t, { restarted: true });
   const texts = h.replies();
   assert.equal(texts.length, 2, texts.join("\n---\n"));
   const [continued, answered] = texts as [string, string];
-  assert.ok(continued.startsWith("SENT") && continued.includes("finished"), continued);
+  assert.ok(continued.startsWith("SENT") && continued.includes("REPORTED"), continued);
   assert.equal(answered, "KIWI");
+  assert.equal(h.slack.callsTo("chat.postMessage").length, 0);
+});
+
+test("a report turn in the daemon that saw the first call opens its own reply below the waiting one", async (t) => {
+  // The reply that started the agent ended with an earlier report; the continued turn's reply sits
+  // below it and the report turn comes after, so the thread reads in the order things happened.
+  const [h] = await playTheContinuedAgent(t, { restarted: false });
+  const texts = h.replies();
+  assert.equal(texts.length, 4, texts.join("\n---\n"));
+  const [started, continued, report, answered] = texts as [string, string, string, string];
+  assert.ok(started.startsWith("STARTED"), started);
+  assert.equal(continued, "SENT");
+  assert.ok(report.includes("REPORTED") && !report.includes("SENT"), report);
+  assert.equal(answered, "KIWI");
+  // The waiting reply ended in place: nothing was posted for any ending.
   assert.equal(h.slack.callsTo("chat.postMessage").length, 0);
 });

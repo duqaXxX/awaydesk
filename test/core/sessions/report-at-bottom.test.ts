@@ -8,9 +8,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { STREAM_SECONDS } from "../../../src/chat/slack/reply/sinks.ts";
 import { INJECTED_TURN_WAIT } from "../../../src/core/sessions/constants.ts";
-import { CHANNEL, THREAD } from "../../support/fake-slack.ts";
-import { harnessFor, sdkMessages } from "../../support/sessions.ts";
-import { isReport, logged, splitBackground } from "./helpers.ts";
+import { harnessFor, isSystem, sdkMessages } from "../../support/sessions.ts";
+import { inside, isReport, logged, splitBackground } from "./helpers.ts";
 
 const ENDED = "a reply ended with no report under it";
 
@@ -50,6 +49,7 @@ test("the same past the stream's own deadline", async (t) => {
   const texts = h.replies();
   assert.ok(texts.findIndex(isReport) > 1, texts.join("\n---\n"));
   assert.ok(!isReport(texts[0] ?? ""), "the first reply holds the report");
+  assert.equal(h.slack.callsTo("chat.postMessage").length, 0);
 });
 
 test("a command typed under the waiting reply sends the report to a reply at the bottom (R1)", async (t) => {
@@ -58,9 +58,7 @@ test("a command typed under the waiting reply sends the report to a reply at the
   const session = h.session();
   await (await session.submit("start it")).done.wait();
   // The `!status` of the owner is a message in the thread, below the waiting reply, which opens
-  // no reply of its own. The gap leaves it a ts between the reply and what comes next.
-  h.slack.tsStep = 1000;
-  h.chat.ownerPosted(CHANNEL, THREAD, "1790000000.000500");
+  // no reply of its own (the harness tells the provider of it, as the listener does).
   await session.status();
   h.clients[0]?.inject([...notice, ...injected]);
   await h.until(() => h.replies().some(isReport));
@@ -88,12 +86,64 @@ test("an overtaken reply whose task ends with no turn is logged, and posts nothi
   const session = h.session();
   await (await session.submit("start it")).done.wait();
   await (await session.submit("and now?")).done.wait();
-  const before = h.slack.callsTo("chat.postMessage").length;
+  const before = h.slack.createdTs.length;
   h.clients[0]?.inject(notice);
   await h.idle();
   await h.clock.advance(INJECTED_TURN_WAIT + 1);
   await h.idle();
   assert.equal(lines.filter((line) => line.startsWith(ENDED)).length, 1, lines.join("\n"));
-  assert.equal(h.slack.callsTo("chat.postMessage").length, before);
+  // No message of any kind: a stream start or a post would be a new message.
+  assert.equal(h.slack.createdTs.length, before);
   assert.ok(!h.replies().some(isReport));
+});
+
+test("the same when the notification never comes (the unreported timer)", async (t) => {
+  const lines = logged(t, "info");
+  const [first, notice] = splitBackground();
+  // The recording without its `task_notification`: Claude Code can suppress it.
+  const ended = notice.filter((item) => !isSystem(item, "task_notification"));
+  assert.ok(ended.length > 0 && ended.length < notice.length);
+  const h = harnessFor(t)({ turns: [first, answer] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await (await session.submit("and now?")).done.wait();
+  const before = h.slack.createdTs.length;
+  h.clients[0]?.inject(ended);
+  await h.idle();
+  await h.clock.advance(INJECTED_TURN_WAIT + 1);
+  await h.idle();
+  assert.equal(lines.filter((line) => line.startsWith(ENDED)).length, 1, lines.join("\n"));
+  assert.equal(h.slack.createdTs.length, before);
+});
+
+test("two sweeps that wake together log one overtaken reply once", async (t) => {
+  const lines = logged(t, "info");
+  const [first, notice] = splitBackground();
+  const ended = notice.filter((item) => !isSystem(item, "task_notification"));
+  const h = harnessFor(t)({ turns: [first, answer] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await (await session.submit("and now?")).done.wait();
+  const [renderer] = [...inside(session).taskReplies.values()];
+  assert.ok(renderer !== undefined);
+  // `closeOut` sets its flag only after an await: hold it there so that the second sweep reads
+  // the reply as still open, as a second timer waking in the same advance would.
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  t.mock.method(renderer, "closeOut", async () => {
+    await gate;
+    return true;
+  });
+  h.clients[0]?.inject(ended);
+  await h.idle();
+  await h.clock.advance(INJECTED_TURN_WAIT + 1);
+  await h.idle();
+  const second = inside(session).sweepClosedOut(undefined, { unreported: true });
+  await h.idle();
+  release();
+  await second;
+  await h.idle();
+  assert.equal(lines.filter((line) => line.startsWith(ENDED)).length, 1, lines.join("\n"));
 });

@@ -61,7 +61,7 @@ export interface Inside {
   expectInjectedTurn(): void;
   refreshUsage(): void;
   expireInjectedTurn(signal: AbortSignal): Promise<void>;
-  sweepClosedOut(signal?: AbortSignal): Promise<void>;
+  sweepClosedOut(signal?: AbortSignal, options?: { readonly unreported?: boolean }): Promise<void>;
   stopTaskReplies(): Promise<void>;
   dropClient(): Promise<void>;
   abandon(line: string, options?: object): Promise<boolean>;
