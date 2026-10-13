@@ -350,6 +350,8 @@ function taskStarted(_memory: Memory, record: WireRecord): SessionEvent[] {
       taskType,
       description,
       callId: words(record.tool_use_id),
+      agentType: words(record.subagent_type),
+      background: typeof record.is_backgrounded === "boolean" ? record.is_backgrounded : null,
     },
   ];
 }

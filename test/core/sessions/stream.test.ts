@@ -395,12 +395,13 @@ test("an error that cuts a turn while its subagent works says so in the message 
   // Issue #165 with a task still counted: the reply closes while `⏳ 1 agent` still shows, and
   // the list empties right after. The closing message was that list alone, then empty.
   const messages = sdkMessages("subagent-foreground");
-  const h = harness(t, [{ turns: [messages.slice(0, 37)] }]);
+  // Up to the task's start: the call's card is held until then, and it opens the stream.
+  const h = harness(t, [{ turns: [messages.slice(0, 39)] }]);
   const turn = await h.session().submit("run it in a subagent");
   await h.until(() => h.slack.callsTo("chat.startStream").length > 0);
   await h.sleep(0.1);
   await h.slackClock.advance(STREAM_SECONDS + 1);
-  h.clients[0]?.inject([...messages.slice(37, 44), END_OF_STREAM]); // cut while the subagent works
+  h.clients[0]?.inject([...messages.slice(39, 44), END_OF_STREAM]); // cut while the subagent works
   await turn.done.wait();
   await h.until(() => h.slack.callsTo("chat.postMessage").length > 0);
   const [closing, ...more] = h.slack.callsTo("chat.postMessage");

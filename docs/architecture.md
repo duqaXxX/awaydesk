@@ -753,7 +753,7 @@ left unfinished does not hide the next turn's text.
 | `call_started` with no parent call | a `tool_use` or `server_tool_use` block | a new tool line, in progress, titled `Name: first string argument` |
 | the same with `parentCallId` set, from the record's `parent_tool_use_id` (a subagent, or a skill run in a forked context) | the same blocks | the parent's line counts the subagent's calls and holds its latest ones (note 2) |
 | `call_ended` for a line | a `tool_result` or `advisor_tool_result` block | the line completes, or shows an error with the output's first line when `isError`; a line whose task already ended as stopped keeps `Stopped` |
-| `task_started` | a `system` record of subtype `task_started` | for a tool call, nothing yet; a task's line once the call's result arrives with the task still running (note 3) |
+| `task_started` | a `system` record of subtype `task_started`; `agentType` is its `subagent_type`, `background` its `is_backgrounded` | for a tool call, nothing yet; a task's line once the call's result arrives with the task still running (note 3). For a subagent in the background, its launch line as text and no line (note 2) |
 | `task_progress` | subtype `task_progress` | the line shows the task's description |
 | `task_ended`, a terminal `task_updated` | subtype `task_notification`; subtype `task_updated` whose patch names the status `completed`, `failed`, `stopped` or `killed` | the line completes, shows an error when the task failed, or completes with `Stopped` |
 | `agent_error` with `parentCallId` set | an `assistant` record that carries `error` | nothing in the reply's text; its words become a nested line of the call's card (note 4) |
@@ -771,10 +771,17 @@ Notes on the table:
    `message_stop`, or once a `message_start` named no id. A subagent's reply arrives the same way,
    as one whole `assistant` record with `parent_tool_use_id` and no stream event (measured:
    "Subagent reply is one record"); the back end emits no text of a subagent.
-2. The count reads `Agent: review · 12 calls`. While the subagent runs, its line holds its latest
-   calls (`renderer.CHILD_LINES`) as the card's `details`; a streamed card is sent each of them once
-   and keeps them all, since a stream only adds to a card's text. The line becomes a task's line: it
-   keeps a card of its own once it ends, in the foreground or in the background.
+2. A call of a tool that starts an agent (`previews.LAUNCHERS`) is kept from the sink until its
+   task starts, since a stream cannot take back a card. A task that starts in the background
+   (`background` true, as every subagent Claude Code starts does with fork mode on) is written as
+   the terminal writes it, two lines of text and no card: `**mechanical**(Background sleeper)`,
+   then `⎿ Backgrounded agent` (`previews.launched`, `texts.AGENT_LAUNCHED`; captured on Claude
+   Code 2.1.296). The type `general-purpose` reads `Agent`. Nothing under that call writes a line
+   from then on, and the task stays one of the reply's running tasks. A subagent the call waits
+   for (a skill run in a fork) gets its card when its task starts: the count reads
+   `Skill: review · 12 calls`, the line holds its latest calls (`renderer.CHILD_LINES`) as the
+   card's `details`, and it keeps a card of its own once it ends. A call that ends with no task
+   shows as any other call.
 3. Claude Code starts a task for a long command in the foreground too, which ends before the call's
    result. When the call's result arrives with its task still running, the line becomes a task's
    line, notes "Running in background" on its nested line and stays in progress. A task started by a
@@ -787,9 +794,10 @@ Notes on the table:
    agent inside that command and shows on the command's line, counted as a call with its
    description, as a subagent's calls show on its line.
 4. A background subagent's own failed request stays out of the reply's text, as a subagent's other
-   text does. The task's `task_ended` event, with status `failed`, then sets the card of the call
-   that started the subagent to an error with the notification's summary as its output
-   (`Agent terminated early due to an API error: ...`). For a subagent run in the foreground Claude
+   text does, and there is no card to carry it. The task's `task_ended` event, with status
+   `failed`, gives the end line its reason, as the terminal prints it: `✗ Agent "<description>"
+   failed: Agent terminated early due to an API error: ...` (`ThreadSession.endedLine`, cut at
+   `constants.FAILURE_LIMIT`). For a subagent run in the foreground Claude
    Code forwards no such message: the card gets the error from the task's notification and the
    call's own result. The session logs `Claude Code reported a subagent's error` with the channel,
    the thread and the category.
@@ -1229,7 +1237,7 @@ closed when the start returns (`ThreadSession.connect`).
   appended after that reply's own body with one line per task it reports, as the terminal prints it (`ThreadSession.endedLine`): a command's notification
   `summary`, which already reads `Background command "..." completed (exit code 0)`, or
   `Agent "<description>" finished` built from the task's `task_started` event, since an agent's
-  `summary` is its result; plus the duration when the notification's `usage` reports `duration_ms`
+  `summary` is its result, except for an agent that failed, whose summary is the reason and follows the words; plus the duration when the notification's `usage` reports `duration_ms`
   (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; when
   that reply is no longer tracked (a restart or an idle close dropped it) or is not last, the
   report gets a reply of its own at the bottom. The next queued message waits for it to finish.
@@ -1246,8 +1254,8 @@ closed when the start returns (`ThreadSession.connect`).
   then carry the other's label.
 - A task that outlives its turn keeps its line in the reply that started it: the session maps the
   task id to that reply, and every later task event for it updates that line only, never another
-  reply. A background subagent's own calls (a `parentCallId` pointing at a line of an ended turn) go
-  under its line the same way and never open a reply. A notification for such a task still makes the
+  reply. A background subagent's own calls (a `parentCallId` pointing at a call of an ended turn) belong
+  to that reply the same way (`TurnRenderer.owns`), write nothing and never open a reply. A notification for such a task still makes the
   next queued message wait for the turn Claude Code starts to report it.
 - The report of such a task renders into the task's reply only while that reply is the last thing
   in the thread (`Reply.last`): no message of the owner's and no other reply's message below it.

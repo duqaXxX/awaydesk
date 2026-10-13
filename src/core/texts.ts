@@ -195,6 +195,9 @@ export const RESTART_HOLD_TASKS = "{counts} running";
 // Ends by itself (`INJECTED_TURN_WAIT`): `!stop` has nothing to stop there.
 export const RESTART_HOLD_REPORT = "a background task is about to report, within 30 seconds";
 export const BACKGROUND_NOTICE = "_Background task update_";
+// The terminal's two lines for an agent it starts in the background, without its key hints
+// (`↓ to manage · ctrl+o to expand`), captured on Claude Code 2.1.296 (2026-10-13).
+export const AGENT_LAUNCHED = "**{type}**({description})\n⎿ Backgrounded agent";
 export const PROMPT_IMAGE = "an image";
 export const COMPACTED = "Compacted the conversation: {before} → {after} tokens.";
 export const COMPACTED_PLAIN = "Compacted the conversation.";

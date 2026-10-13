@@ -148,11 +148,93 @@ test("a call whose task outlives its result becomes a task line", async () => {
   assert.equal(history.at(-1)?.task, true); // a task's line stays one after the task ends
 });
 
-test("subagent calls nest in the parent line", async () => {
-  const events = recordedEvents("subagent");
+test("the calls of a subagent the turn waits for nest in the parent line", async () => {
+  // subagent-foreground.jsonl: `is_backgrounded` false, the call's result is the agent's report.
+  const events = recordedEvents("subagent-foreground");
   const [sink] = await render(events);
   assert.deepEqual(ids(sink.tasks), new Set(topLevelToolIds(events)));
   assert.ok(sink.tasks.some((t) => t.details));
+  assert.ok(!sink.texts.join("").includes("Backgrounded agent"));
+});
+
+// A subagent in the background (issue #299): the terminal writes `type(description)` and
+// `Backgrounded agent` under it, and nothing of what the agent does (captured on Claude Code
+// 2.1.296, 2026-10-13). The reply writes that line as text and no card.
+
+test("a subagent in the background is the terminal's line, with no card", async () => {
+  const [first = [], ...later] = splitTurns(recordedEvents("subagent"));
+  const [call] = topLevelToolIds(first);
+  assert.ok(call !== undefined);
+  const [sink, renderer] = await render(first);
+  assert.deepEqual(sink.notices, [
+    "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\n",
+  ]);
+  assert.deepEqual(sink.tasks, []);
+  // Still this reply's task, which the list of what still runs reads, and still its call.
+  assert.equal(renderer.runningTasks.length, 1);
+  assert.ok(renderer.owns(call) && renderer.shows(renderer.runningTasks[0] ?? ""));
+  // What the agent does and its end write nothing either: the end line is the session's.
+  for (const event of later.flat()) await renderer.feed(event);
+  assert.deepEqual(sink.tasks, []);
+  assert.equal(sink.notices.length, 1);
+  assert.deepEqual(renderer.runningTasks, []);
+});
+
+test("the launch line names the agent's type, and none for the plain one", async () => {
+  // The type is the event's, altered: no recording holds a type other than `general-purpose`,
+  // which the terminal writes as `Agent(...)` (measured 2026-10-13: `mechanical(...)`).
+  const events = recordedEvents("subagent").map((event) =>
+    event.type === "task_started" ? { ...event, agentType: "mechanical" } : event,
+  );
+  const [sink] = await render(events);
+  assert.deepEqual(sink.notices, [
+    "**mechanical**(Run ls and report contents)\n⎿ Backgrounded agent\n\n",
+  ]);
+  const unnamed = recordedEvents("subagent").map((event) =>
+    event.type === "task_started" ? { ...event, agentType: null } : event,
+  );
+  const [plain] = await render(unnamed);
+  assert.ok(plain.notices[0]?.startsWith("**Agent**("));
+});
+
+test("the launch line follows the text before it after a blank line", async () => {
+  const events = recordedEvents("subagent");
+  const started = events.findIndex((event) => event.type === "task_started");
+  const [sink] = await render([
+    ...translated([
+      { type: "stream_event", event: { type: "message_start", message: { id: "m0" } } },
+    ]),
+    { type: "text", text: "Starting it." },
+    ...events.slice(0, started + 1),
+  ]);
+  assert.ok(sink.texts.join("").includes("Starting it.\n\n**Agent**("));
+});
+
+test("a call that starts no agent shows as any other call", async () => {
+  // The recorded stream with the task's frames taken out, as for a call the agent refuses (a
+  // type it does not know): held until its result, then the card every call gets.
+  const events = recordedEvents("subagent").filter((event) => !event.type.startsWith("task_"));
+  const [call] = topLevelToolIds(events);
+  const [sink] = await render(events);
+  const card = sink.tasks.filter((t) => t.id === call);
+  assert.ok(card.length > 0 && card.every((t) => t.status === "complete"));
+  assert.deepEqual(sink.notices, []);
+});
+
+test("an agent that is continued gets no second launch line", async () => {
+  // report-turn-agent-resume.jsonl: the agent's task starts again under the call that
+  // continues it, which is no call that starts an agent and keeps its card. The terminal writes
+  // no second launch line either (captured 2026-10-13, Claude Code 2.1.296).
+  const events = recordedEvents("report-turn-agent-resume");
+  const agents = eventsOf(events, "task_started").filter((event) => event.kind === "subagent");
+  assert.equal(agents.length, 2);
+  assert.equal(agents[0]?.taskId, agents[1]?.taskId);
+  assert.notEqual(agents[0]?.callId, agents[1]?.callId);
+  const [sink, renderer] = await render(events);
+  assert.equal(sink.notices.filter((text) => text.includes("Backgrounded agent")).length, 1);
+  assert.ok(!sink.tasks.some((t) => t.id === agents[0]?.callId));
+  assert.ok(sink.tasks.some((t) => t.id === agents[1]?.callId));
+  assert.deepEqual(renderer.runningTasks, []);
 });
 
 test("a local command shows its result text", async () => {
@@ -253,15 +335,26 @@ test("a subagent s api error is left out of the reply s text", async () => {
 
 test("a subagent s api error shows under its card when no task frame says so", async () => {
   // The recorded stream with the task's own end taken out, as for a subagent whose task frames
-  // never reach this reply (one started by another subagent): the words are still on the card.
-  const events = recordedEvents("subagent-api-error").filter(
-    (event) => event.type !== "task_ended" && event.type !== "task_updated",
-  );
+  // never reach this reply (one started by another subagent), and its start altered to one the
+  // call waits for, which has a card: the words are still on the card. The recording of a
+  // subagent in the foreground holds no such message (its error is the call's result).
+  const events = recordedEvents("subagent-api-error")
+    .filter((event) => event.type !== "task_ended" && event.type !== "task_updated")
+    .map((event) => (event.type === "task_started" ? { ...event, background: false } : event));
   const reply = errorReply(events);
   const [sink] = await render(events);
   const card = sink.tasks.filter((u) => u.id === reply.parentCallId).at(-1);
   assert.ok(card?.details?.split("\n").at(-1)?.startsWith("API Error: 529"));
   assert.equal(card?.calls, 0); // a note under the card, not one more call of the subagent
+  assert.ok(!sink.texts.join("").includes("API Error"));
+});
+
+test("a background subagent s api error writes nothing in the reply", async () => {
+  // subagent-api-error.jsonl: no card to carry it. The terminal says it in the task's end line
+  // (`Agent "..." failed: ...`), which the session writes.
+  const events = recordedEvents("subagent-api-error");
+  const [sink] = await render(events);
+  assert.deepEqual(sink.tasks, []);
   assert.ok(!sink.texts.join("").includes("API Error"));
 });
 
@@ -714,9 +807,9 @@ test("the commands a subagent runs get no line of their own", async () => {
   const [first, later, agentCall] = nestedCommandTurns();
   const [sink, renderer] = await render(first);
   for (const event of later) await renderer.feed(event);
-  // one work, one line: the two commands show on the agent's card, through its call count
-  assert.deepEqual(ids(sink.tasks), new Set([agentCall]));
-  assert.ok(sink.tasks.at(-1)?.calls === 2 && sink.tasks.at(-1)?.status === "complete");
+  // the agent runs in the background: what it does writes nothing, its commands included
+  assert.ok(renderer.owns(agentCall));
+  assert.deepEqual(sink.tasks, []);
   assert.deepEqual(renderer.runningTasks, []);
 });
 
@@ -764,7 +857,8 @@ test("every frame of a nested task stays off the card list", async () => {
   for (const status of ["completed", "killed"]) {
     await renderer.feed({ ...updated, taskId: started.taskId, status, terminal: true });
   }
-  assert.deepEqual(ids(sink.tasks), new Set([agentCall]));
+  assert.ok(renderer.owns(agentCall));
+  assert.deepEqual(sink.tasks, []);
 });
 
 test("a task of a call the reply never saw keeps its own line", async () => {
@@ -829,7 +923,11 @@ test("an ended command of a subagent ends its line as a background task", async 
   for (const event of later) await renderer.feed(event);
   const last = finals(sink.tasks);
   const started = firstOf(later, "task_started");
-  assert.deepEqual(new Set(last.keys()), new Set([agentCall, `task-${started.taskId}`]));
+  // The command the agent left running has its line; the agent, in the background, has none,
+  // nor when that command's end starts it again under its call.
+  assert.equal(sink.notices.filter((text) => text.includes("Backgrounded agent")).length, 1);
+  assert.ok(renderer.owns(agentCall));
+  assert.deepEqual(new Set(last.keys()), new Set([`task-${started.taskId}`]));
   assert.equal(last.get(`task-${started.taskId}`)?.status, "complete");
   assert.deepEqual(renderer.runningTasks, []);
 });
@@ -1034,7 +1132,9 @@ for (const name of ["tools", "foreground", "tool-error", "subagent", "ask"]) {
     const streamed = await renderOrdered(events, true);
     const whole = await renderOrdered(events, false);
     // The same texts and lines in the same order; only the pieces of a text are put together.
-    assert.deepEqual(whole.log, streamed.whole);
+    // Both are read with their texts joined: a note of the daemon's (an agent's launch line)
+    // and the text after it are two writes either way.
+    assert.deepEqual(whole.whole, streamed.whole);
     assert.ok(whole.texts.length <= streamed.texts.length);
     assert.deepEqual(whole.finished, streamed.finished);
     assert.equal(whole.closedOut, streamed.closedOut);

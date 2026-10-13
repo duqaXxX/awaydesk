@@ -65,8 +65,10 @@ what a card already holds (measured: "Card text is appended"), so a card that is
 text in its title.
 
 A call with a view of its own has a card of its own, keyed by its call id, and ends the run: a
-subagent, whose title counts its calls and whose `details` say what it is doing now, a background
-task, which keeps its card `in_progress` for as long as it runs, and a stopped call. A call that
+subagent the call waits for, whose title counts its calls and whose `details` say what it is doing
+now, a background command, which keeps its card `in_progress` for as long as it runs, and a
+stopped call. A subagent in the background has no card: the core writes its launch line as text
+of the reply (`TurnRenderer`, `previews.launched`). A call that
 turns into one of these while a card of a run shows it keeps that card. An `Edit` or a `Write` that
 ended well also ends the run, and has no card: its preview is all that shows it.
 

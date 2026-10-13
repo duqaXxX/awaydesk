@@ -676,6 +676,8 @@ test("a background command is a task of the call that launched it", () => {
       taskType: "local_bash",
       description: "Sleep for 5 seconds then print done",
       callId: call,
+      agentType: null,
+      background: true,
     },
   ]);
   assert.deepEqual(made[45], [
@@ -705,6 +707,8 @@ test("a subagent is a task with its progress and the time it took", () => {
       taskType: "local_agent",
       description: "Run ls and report contents",
       callId: call,
+      agentType: "general-purpose",
+      background: true,
     },
   ]);
   assert.deepEqual(made[73], [
@@ -732,6 +736,8 @@ test("a task no call started names none", () => {
       taskType: "local_agent",
       description: "/list-files",
       callId: null,
+      agentType: "general-purpose",
+      background: false,
     },
   ]);
   assert.deepEqual(made[2], [
@@ -771,6 +777,24 @@ test("a task of a kind the daemon has no word for crosses under the agent's own"
   const { task_type: _, ...untyped } = started;
   const [none] = of(translator.translate(untyped), "task_started");
   assert.deepEqual([none?.kind, none?.taskType], ["other", null]);
+});
+
+test("a task says whether it started in the background, and a subagent its type", () => {
+  // `subagent_type` and `is_backgrounded` of `SDKTaskStartedMessage` (TypeScript SDK 0.3.296).
+  const background = of(events("subagent"), "task_started");
+  assert.deepEqual(
+    background.map((event) => [event.agentType, event.background]),
+    [["general-purpose", true]],
+  );
+  const foreground = of(events("subagent-foreground"), "task_started");
+  assert.deepEqual(
+    foreground.map((event) => [event.agentType, event.background]),
+    [["general-purpose", false]],
+  );
+  // A frame with neither field, as a CLI older than them writes it.
+  const { subagent_type: _type, is_backgrounded: _flag, ...bare } = record("subagent", 30);
+  const [unsaid] = of(new Translator().translate(bare), "task_started");
+  assert.deepEqual([unsaid?.agentType, unsaid?.background], [null, null]);
 });
 
 test("a task's change that is not its end is not terminal", () => {

@@ -11,8 +11,8 @@
  */
 import type { DiffHunk, FileChange, Question } from "../../agent/seam.ts";
 import type { Preview } from "../../chat/seam.ts";
-import { ANSWERED, fill, type Names, named } from "../texts.ts";
-import { spaced, splitLines } from "./words.ts";
+import { AGENT_LAUNCHED, ANSWERED, fill, type Names, named } from "../texts.ts";
+import { oneLine, spaced, splitLines, TITLE_LIMIT } from "./words.ts";
 
 // How the terminal folds finished calls of these tools. Captured from the terminal on Claude Code
 // 2.1.283 (2026-09-27), where Bash also does the searching (the CLI has no Grep or Glob tool):
@@ -35,6 +35,19 @@ export const NEW_FILE_LINES = 10;
 // The tools `preview` reads. A reply shows a call of one only once it has ended: a stream cannot
 // take back a card, and a call that ended well is its preview alone.
 export const PREVIEWED: ReadonlySet<string> = new Set(["Edit", "Write"]);
+// The tools that start an agent. A reply holds a call of one until its task says how it runs: in
+// the background the terminal writes a line and no more (`launched`), and a stream cannot take
+// back a card.
+export const LAUNCHERS: ReadonlySet<string> = new Set(["Agent"]);
+// The type the terminal does not name in that line: it reads `Agent(...)`, as for no type.
+const PLAIN_AGENT = "general-purpose";
+const AGENT = "Agent";
+
+/** The terminal's line for an agent started in the background: its type, then what it does. */
+export function launched(agentType: string | null, description: string): string {
+  const type = agentType === null || agentType === PLAIN_AGENT ? AGENT : agentType;
+  return fill(AGENT_LAUNCHED, { type, description: oneLine(description, TITLE_LIMIT) });
+}
 
 /** How `n` finished calls of `name` read in a folded line. */
 export function folded(name: string, n: number): string {

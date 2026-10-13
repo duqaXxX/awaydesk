@@ -9,21 +9,6 @@
       "calls": 0,
       "details": null,
       "folded": null,
-      "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-      "name": "Agent",
-      "output": null,
-      "preview": null,
-      "status": "in_progress",
-      "task": false,
-      "title": "Agent: Run echo subagent-ok"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
       "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
       "name": "Bash",
       "output": null,
@@ -34,19 +19,10 @@
      }
     },
     {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": "Running in background",
-      "folded": null,
-      "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-      "name": "Agent",
-      "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-      "preview": null,
-      "status": "in_progress",
-      "task": true,
-      "title": "Agent: Run echo subagent-ok"
-     }
+     "call": "text",
+     "ending": false,
+     "markdown": "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent\n\n",
+     "notice": true
     },
     {
      "call": "task",
@@ -61,36 +37,6 @@
       "status": "in_progress",
       "task": true,
       "title": "Bash: sleep 15"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 1,
-      "details": "Bash: echo subagent-ok",
-      "folded": null,
-      "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-      "name": "Agent",
-      "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-      "preview": null,
-      "status": "in_progress",
-      "task": true,
-      "title": "Agent: Run echo subagent-ok"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 1,
-      "details": "Running Echo subagent-ok",
-      "folded": null,
-      "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-      "name": "Agent",
-      "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-      "preview": null,
-      "status": "in_progress",
-      "task": true,
-      "title": "Agent: Run echo subagent-ok"
      }
     },
     {
@@ -264,18 +210,6 @@
     {
      "call": "finish",
      "closing": [
-      {
-       "calls": 1,
-       "details": "Running in background",
-       "folded": null,
-       "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-       "name": "Agent",
-       "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-       "preview": null,
-       "status": "in_progress",
-       "task": true,
-       "title": "Agent: Run echo subagent-ok"
-      },
       {
        "calls": 0,
        "details": "Running in background",
@@ -592,21 +526,6 @@
      "calls": 0,
      "details": null,
      "folded": null,
-     "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-     "name": "Agent",
-     "output": null,
-     "preview": null,
-     "status": "in_progress",
-     "task": false,
-     "title": "Agent: Run echo subagent-ok"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
      "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
      "name": "Bash",
      "output": null,
@@ -617,19 +536,10 @@
     }
    },
    {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": "Running in background",
-     "folded": null,
-     "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-     "name": "Agent",
-     "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Agent: Run echo subagent-ok"
-    }
+    "call": "text",
+    "ending": false,
+    "markdown": "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent\n\n",
+    "notice": true
    },
    {
     "call": "task",
@@ -644,36 +554,6 @@
      "status": "in_progress",
      "task": true,
      "title": "Bash: sleep 15"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 1,
-     "details": "Bash: echo subagent-ok",
-     "folded": null,
-     "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-     "name": "Agent",
-     "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Agent: Run echo subagent-ok"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 1,
-     "details": "Running Echo subagent-ok",
-     "folded": null,
-     "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-     "name": "Agent",
-     "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Agent: Run echo subagent-ok"
     }
    },
    {
@@ -843,66 +723,6 @@
     "ending": false,
     "markdown": "t.",
     "notice": false
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 2,
-     "details": "Bash: echo subagent-ok\nSubagentHandback: subagent-ok",
-     "folded": null,
-     "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-     "name": "Agent",
-     "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Agent: Run echo subagent-ok"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 2,
-     "details": "Run echo subagent-ok",
-     "folded": null,
-     "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-     "name": "Agent",
-     "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Agent: Run echo subagent-ok"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 2,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-     "name": "Agent",
-     "output": null,
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Agent: Run echo subagent-ok"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 2,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-     "name": "Agent",
-     "output": "This agent's report was delivered to you as a message from \"a2212140c7c7bb15e\" (its SubagentHandback call). Read it there; it is not repeated here.",
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Agent: Run echo subagent-ok"
-    }
    },
    {
     "call": "text",

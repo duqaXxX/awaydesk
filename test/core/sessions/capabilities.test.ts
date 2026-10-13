@@ -220,6 +220,9 @@ function subagentTurn(): Item[] {
       taskType: "local_agent",
       description: "look around",
       callId: "agent-1",
+      agentType: "general-purpose",
+      // One the call waits for, which has a card for its calls to be counted on.
+      background: false,
     }),
     event({
       type: "call_started",

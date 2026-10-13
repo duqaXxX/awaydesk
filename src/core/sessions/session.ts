@@ -91,6 +91,7 @@ import { DENY, type Decision, toAnswer } from "../requests.ts";
 import { type Choice, DEFAULT } from "../setup.ts";
 import * as texts from "../texts.ts";
 import {
+  FAILURE_LIMIT,
   HOLD_MARKER,
   IDLE_CLOSE_SECONDS,
   INJECTED_TURN_WAIT,
@@ -204,7 +205,10 @@ export class ThreadSession {
   // dropped, since they get no reply of their own.
   private endNotes: string[] = [];
   // Each task's type and description, for the list of what still runs and the task's end line.
-  private readonly tasks = new Map<string, readonly [kind: TaskKind, description: string]>();
+  private readonly tasks = new Map<
+    string,
+    readonly [kind: TaskKind, description: string, agentType: string | null]
+  >();
   // Ended tasks not yet opened into a report turn's reply: (task id, its formatted end line).
   // The task id finds the reply that started it (the report renders there when that reply is
   // the last thing in the thread).
@@ -1819,7 +1823,7 @@ export class ThreadSession {
   }
 
   private recordTask(event: TaskStarted): void {
-    this.tasks.set(event.taskId, [event.kind, event.description]);
+    this.tasks.set(event.taskId, [event.kind, event.description, event.agentType]);
     if (this.mayHaveOrderedRestart) this.afterRestart.add(event.taskId);
     const kept = this.deps.tasksKept ?? TASKS_KEPT;
     for (const taskId of this.tasks.keys()) {
@@ -1843,7 +1847,9 @@ export class ThreadSession {
 
   /**
    * The terminal's line for a task's end: a command's own summary, or `Agent "..." finished`
-   * from the task's description, plus the duration when the task reports one.
+   * from the task's description, plus the duration when the task reports one. An agent that
+   * failed says why, as the terminal's line does (`Agent "..." failed: <reason>`, captured
+   * 2026-10-13 on Claude Code 2.1.296): its summary is the reason then, not a report.
    */
   private endedLine(event: TaskEnded): string {
     const [kind, description] = this.tasks.get(event.taskId) ?? ["other", ""];
@@ -1856,6 +1862,9 @@ export class ThreadSession {
       const name = TASK_WORDS[kind][1];
       const outcome = event.status === "completed" ? "finished" : event.status;
       text = `${name} "${oneLine(label || event.taskId, 120)}" ${outcome}`;
+      if (kind === "subagent" && event.status === "failed" && event.summary) {
+        text += `: ${oneLine(event.summary, FAILURE_LIMIT)}`;
+      }
     }
     return endedLine(text, event.status, event.durationMs);
   }
@@ -1900,13 +1909,13 @@ export class ThreadSession {
   }
 
   /**
-   * A reply still tracked that shows `taskId`'s line though the task is not its to wait for: a
+   * A reply still tracked that shows `taskId` though the task is not its to wait for: a
    * task that ended inside the turn that started it is tracked nowhere (`closeReply` records the
    * ones that outlive the turn), and its reply stays open only for another task of that turn.
    */
   private showing(taskId: string): TurnRenderer | null {
     for (const reply of this.taskReplies.values()) {
-      if (reply.taskTitle(taskId) !== null) return reply;
+      if (reply.shows(taskId)) return reply;
     }
     return null;
   }
@@ -2499,10 +2508,14 @@ export class ThreadSession {
       .filter(([taskId, renderer]) => renderer.runningTasks.includes(taskId))
       .sort(([a], [b]) => rank(a) - rank(b))
       .map(([taskId, renderer]) => {
-        const [kind, description] = this.tasks.get(taskId) ?? ["other", ""];
+        const [kind, description, agentType] = this.tasks.get(taskId) ?? ["other", "", null];
         let label: string;
-        if (description) {
-          label = kind === "subagent" ? `${TASK_WORDS.subagent[1]}: ${description}` : description;
+        if (description && kind === "subagent") {
+          // The terminal's row: the agent's type, then what it does.
+          if (agentType !== null) return `${agentType}  ${oneLine(description, TITLE_LIMIT)}`;
+          label = `${TASK_WORDS.subagent[1]}: ${description}`;
+        } else if (description) {
+          label = description;
         } else {
           label = renderer.taskTitle(taskId) || taskId;
         }
