@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A reply that has another reply's message below it ends in the message it is in: its footer goes
+  under that message by edit, or on the stream's stop, and no ending is posted, which would have
+  landed below the other reply. Such a reply opens no continuation message either. The Slack
+  provider keeps the order of each thread's messages in memory (`reply/order.ts`, `ThreadOrder`),
+  told of every owner message by the listener and of every reply's last message by its sink; the
+  chat seam's `Reply` gains `last` and `overtaken`, which the memory chat implements from its own
+  message counter. Nothing in the thread changes yet for a reply with only an owner message below it.
+
 - The cleanup of `state.json` forgets a thread whose first message Slack no longer has, at start
   and every 6 hours, beside the channels that are gone (#237). The chat seam gains
   `ChatProvider.threadState`; for Slack, `thread_not_found` from `conversations.replies` on the

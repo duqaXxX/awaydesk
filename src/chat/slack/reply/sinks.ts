@@ -102,6 +102,7 @@ import {
 import { mrkdwnEscape } from "./escape.ts";
 import type { Limiter } from "./limiter.ts";
 import { bannerText, markdownBlocks, markdownCut, plainWords } from "./markdown.ts";
+import { positionOf, ThreadOrder } from "./order.ts";
 import { Task } from "./tasks.ts";
 
 export const DEBOUNCE_SECONDS = 1.0;
@@ -397,6 +398,11 @@ export interface ReplySinkOptions {
    * line when the app replies. Synchronous, never awaited here.
    */
   readonly onWrite?: () => void;
+  /**
+   * The order of the thread's messages, shared by every reply of the thread; a reply with a
+   * message of another reply below it ends where it is. Absent, the reply knows of no other.
+   */
+  readonly order?: ThreadOrder;
   readonly logger?: Logger;
   /** DEBOUNCE_SECONDS, unless a test shortens it. */
   readonly debounceSeconds?: number;
@@ -430,6 +436,7 @@ export class ReplySink implements Sink {
   private readonly clock: Clock;
   private readonly onOpenReply: ((old: string | null, fresh: string | null) => void) | null;
   private readonly onWrite: (() => void) | null;
+  private readonly order: ThreadOrder;
   private readonly logger: Logger;
   private readonly debounceSeconds: number;
   private readonly finalRetrySeconds: number;
@@ -470,6 +477,8 @@ export class ReplySink implements Sink {
   /** The ts of the closing message, once posted. */
   private closing: string | null = null;
   private closingShown: Block[] = [];
+  /** The cut of an overtaken reply was logged: once is enough. */
+  private cutWarned = false;
   // Resolves once the reply is known to have ended on Slack (true) or its one retry failed too
   // (false): what the session waits on before it shows a checkmark.
   private readonly landed: Promise<boolean>;
@@ -491,6 +500,7 @@ export class ReplySink implements Sink {
     this.limiter = options.limiter;
     this.clock = options.clock ?? systemClock;
     this.onOpenReply = options.onOpenReply ?? null;
+    this.order = options.order ?? new ThreadOrder();
     this.onWrite = options.onWrite ?? null;
     this.logger = options.logger ?? defaultLogger;
     this.debounceSeconds = options.debounceSeconds ?? DEBOUNCE_SECONDS;
@@ -564,6 +574,7 @@ export class ReplySink implements Sink {
    */
   private settleOpenReply(): void {
     this.ended = true;
+    this.order.ended(this);
     this.retrack();
   }
 
@@ -630,6 +641,22 @@ export class ReplySink implements Sink {
    */
   get footerShown(): boolean {
     return this.ended && this.messages.length > 0;
+  }
+
+  /** The position of the reply's last message in its thread, null while it has none. */
+  get lastAt(): number | null {
+    const ts = this.closing ?? this.messages.findLast((message) => message.ts !== null)?.ts ?? null;
+    return ts === null ? null : positionOf(ts);
+  }
+
+  /** Whether nothing of the owner's and no other reply sits below this reply's last message. */
+  get last(): boolean {
+    return this.order.last(this);
+  }
+
+  /** Whether another reply has a message below this one. */
+  get overtaken(): boolean {
+    return this.order.overtaken(this);
   }
 
   /**
@@ -1534,6 +1561,7 @@ export class ReplySink implements Sink {
       return false;
     }
     message.ts = String(posted.ts);
+    this.order.moved(this);
     message.shown = [];
     message.exact = false;
     message.footer = [];
@@ -1580,6 +1608,7 @@ export class ReplySink implements Sink {
         const ts = await this.adopt(attempted, false, take(plainWords(banner), ADOPT_WORDS));
         if (ts !== null) {
           message.ts = ts;
+          this.order.moved(this);
           message.shown = blocks;
           message.footer = footer;
           this.retrack();
@@ -1596,6 +1625,7 @@ export class ReplySink implements Sink {
       return [false, null];
     }
     message.ts = String(posted.ts);
+    this.order.moved(this);
     message.shown = blocks;
     message.footer = footer;
     this.retrack();
@@ -1692,6 +1722,7 @@ export class ReplySink implements Sink {
         streamTs = ts; // it landed: this is that stream
       }
       message.ts = streamTs;
+      this.order.moved(this);
       message.streaming = true;
       message.started = attempted;
       ReplySink.sent(message, plan);
@@ -1908,6 +1939,18 @@ export class ReplySink implements Sink {
       const [ok, overflow] = step;
       if (!ok) return false;
       if (overflow === null) break;
+      if (this.order.overtaken(this)) {
+        // Another reply is below: a message opened now would sit below it. What does not fit
+        // is cut, as a card's text is.
+        if (!this.cutWarned) {
+          this.cutWarned = true;
+          this.logger.warning(
+            "a reply that another reply sits below shows less than it said: a message " +
+              "opened now would land below that reply",
+          );
+        }
+        break;
+      }
       if (sameCursor(overflow, message.start)) {
         this.logger.error("a reply's message cannot hold its first element");
         return false;
@@ -1954,6 +1997,12 @@ export class ReplySink implements Sink {
         this.schedule();
       }
       if (result === "stopped") return true;
+    }
+    if (this.endMode === null && this.order.overtaken(this)) {
+      // Another reply has a message below this one: the ending is not posted (it would land
+      // under that reply), and the footer goes under this message by a silent edit.
+      this.endMode = "inline";
+      return (await this.updateStep(message, null))[0];
     }
     if (this.endMode === null) {
       const cursor = this.endingCursor(message);
@@ -2028,6 +2077,7 @@ export class ReplySink implements Sink {
           unfurl_media: false,
         });
         this.closing = String(posted.ts);
+        this.order.moved(this);
       } else if (!isDeepStrictEqual(blocks, this.closingShown)) {
         // An edit never notifies (measured 2026-09-27): the text stays as posted.
         await this.limiter.acquire();
@@ -2048,6 +2098,7 @@ export class ReplySink implements Sink {
           take(plainWords(this.banner()), ADOPT_WORDS),
         );
         if (this.closing !== null) {
+          this.order.moved(this);
           this.closingShown = blocks;
           return true;
         }

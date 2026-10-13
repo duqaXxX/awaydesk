@@ -28,6 +28,7 @@ import {
   type ThreadChat,
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
+import { isLast, isOvertaken } from "../../../src/core/port.ts";
 import { DAEMON, type MessageKind, type Room, type StoredMessage } from "./room.ts";
 
 const CAPABILITIES: ChatCapabilities = {
@@ -93,6 +94,18 @@ class MemoryReply implements Reply {
 
   get footerShown(): boolean {
     return this.#landed && this.#message !== null;
+  }
+
+  // A reply is one message that never moves, so it ends where it is whatever sits below it.
+  get last(): boolean {
+    if (this.#message === null) return false;
+    const { others, marks } = this.#room.around(this.#message);
+    return isLast(this.#message.position, others, marks);
+  }
+
+  get overtaken(): boolean {
+    if (this.#message === null) return false;
+    return isOvertaken(this.#message.position, this.#room.around(this.#message).others);
   }
 
   async text(markdown: string): Promise<void> {

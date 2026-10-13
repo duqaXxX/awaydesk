@@ -33,6 +33,8 @@ export type MessageKind = "message" | "reply" | "notice" | "reference" | "reques
 /** A message as the chat holds it. */
 export interface StoredMessage {
   readonly id: MessageId;
+  /** Its place in the chat: a larger number was written later (ids do not sort as strings). */
+  readonly position: number;
   readonly channel: string;
   /** The thread it belongs to; null for a line the daemon wrote in a channel outside any. */
   readonly thread: string | null;
@@ -262,6 +264,23 @@ export class Room {
     return this.#threads.get(key(ref.channel, ref.thread)) ?? null;
   }
 
+  /**
+   * Where the other replies and the owner's messages of `message`'s thread sit, as positions:
+   * what a reply needs to tell whether it is the last and whether it was overtaken.
+   */
+  around(message: StoredMessage): { others: number[]; marks: number[] } {
+    const same = this.#messages.filter(
+      (m) =>
+        !m.deleted && m !== message && m.channel === message.channel && m.thread === message.thread,
+    );
+    return {
+      others: same.filter((m) => m.kind === "reply").map((m) => m.position),
+      marks: same
+        .filter((m) => m.kind === "message" && m.author === this.owner)
+        .map((m) => m.position),
+    };
+  }
+
   message(id: MessageId): StoredMessage | null {
     return this.#messages.find((m) => m.id === id && !m.deleted) ?? null;
   }
@@ -289,6 +308,7 @@ export class Room {
     }
     const message: StoredMessage = {
       id,
+      position: this.#sequence,
       channel,
       thread: name,
       topLevel: thread === null,

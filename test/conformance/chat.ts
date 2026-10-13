@@ -678,6 +678,45 @@ export function chatConformance(
         assert.equal(showing(), false);
       });
 
+      check("knows when the owner or another reply wrote below it", async (s) => {
+        const first = s.provider.thread(s.ref).openReply(() => {});
+        assert.equal(first.last, false, "a reply with no message is not the last");
+        assert.equal(first.overtaken, false);
+        await first.text("The first answer");
+        await first.settle();
+        await s.rig.settle();
+        assert.equal(first.last, true, "nothing is below it");
+        assert.equal(first.overtaken, false);
+        await s.rig.owner.says(s.ref.channel, "and one more thing", { thread: s.ref.thread });
+        assert.equal(first.last, false, "the owner wrote below it");
+        assert.equal(first.overtaken, false, "which is not another reply");
+        const second = s.provider.thread(s.ref).openReply(() => {});
+        await second.text("The second answer");
+        await second.settle();
+        await s.rig.settle();
+        assert.equal(first.overtaken, true, "another reply has a message below it");
+        assert.equal(second.overtaken, false);
+      });
+
+      check("a reply with another reply below it ends where it is", async (s) => {
+        const first = s.provider.thread(s.ref).openReply(() => {});
+        await first.text("The first answer");
+        await first.settle();
+        const second = s.provider.thread(s.ref).openReply(() => {});
+        await second.text("The second answer");
+        await second.settle();
+        await s.rig.settle();
+        assert.equal(first.overtaken, true);
+        const messages = s.rig.read(s.ref).length;
+        await first.finish([]);
+        assert.equal(await first.closeOut(FOOTER), true, "the end landed");
+        await s.rig.settle();
+        const shown = s.rig.read(s.ref).filter((m) => m.text.includes("The first answer"));
+        assert.equal(shown.length, 1);
+        assert.match(shown[0]?.text ?? "", /model-a/, "the footer is under it");
+        assert.equal(s.rig.read(s.ref).length, messages, "nothing was posted for the end");
+      });
+
       check("gives up its footer when asked, without a new message", async (s) => {
         const reply = s.provider.thread(s.ref).openReply(() => {});
         await reply.text("The build is finished");

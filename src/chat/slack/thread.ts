@@ -54,6 +54,7 @@ import { contextBlock, noticeText, split } from "./reply/blocks.ts";
 import { deleteRequest, describe } from "./reply/errors.ts";
 import { markdownEscape, mrkdwnEscape } from "./reply/escape.ts";
 import type { Limiter } from "./reply/limiter.ts";
+import { ThreadOrder } from "./reply/order.ts";
 import { ReplySink } from "./reply/sinks.ts";
 import { REACTIONS, StatusReaction, ThreadStatus } from "./reply/status.ts";
 import { answeredBlocks, approvalBlocks, questionBlocks } from "./requests.ts";
@@ -142,6 +143,8 @@ export class SlackChat implements ChatProvider {
   private readonly options: SlackChatOptions;
   private readonly stopping = new AbortController();
   private built: BuiltApp | null = null;
+  /** The order of each thread's messages, by channel and thread, while a reply of it is placed. */
+  private readonly orders = new Map<string, ThreadOrder>();
   private named: Names | null = null;
 
   constructor(options: SlackChatOptions) {
@@ -183,7 +186,43 @@ export class SlackChat implements ChatProvider {
   }
 
   thread(ref: ThreadRef): SlackThread {
-    return new SlackThread(ref.channel, ref.thread, this.options, () => this.names(), this.stopped);
+    return new SlackThread(
+      ref.channel,
+      ref.thread,
+      this.options,
+      () => this.names(),
+      this.stopped,
+      (channel, thread) => this.orderOf(channel, thread),
+    );
+  }
+
+  /**
+   * The owner wrote a message at `ts` in a thread. Called by the listener for every owner
+   * message, before anything else of it is decided: a message the core later refuses still sits
+   * below the replies above it.
+   */
+  ownerPosted(channel: string, thread: string, ts: string): void {
+    this.orders.get(orderKey(channel, thread))?.ownerPosted(ts);
+  }
+
+  /**
+   * The thread's order: one object for every `SlackThread` of it, so that the replies of the
+   * thread's successive sessions see each other. Dropped from the map when its last reply is
+   * forgotten, and kept again if a reply it still holds moves.
+   */
+  private orderOf(channel: string, thread: string): ThreadOrder {
+    const key = orderKey(channel, thread);
+    const known = this.orders.get(key);
+    if (known !== undefined) return known;
+    const order: ThreadOrder = new ThreadOrder((present) => {
+      if (present) {
+        if (!this.orders.has(key)) this.orders.set(key, order);
+      } else if (this.orders.get(key) === order) {
+        this.orders.delete(key);
+      }
+    });
+    this.orders.set(key, order);
+    return order;
   }
 
   /**
@@ -198,6 +237,7 @@ export class SlackChat implements ChatProvider {
       this.options,
       () => this.names(),
       this.stopped,
+      (channel, thread) => this.orderOf(channel, thread),
       written,
     );
   }
@@ -300,6 +340,11 @@ const withdrawn = new WeakMap<SlackChatOptions, Set<string>>();
 const SETUPS_KEPT = 64;
 const drawnSetups = new WeakMap<SlackChatOptions, Map<string, SetupDraw>>();
 
+/** The key of a thread's order. */
+function orderKey(channel: string, thread: string): string {
+  return `${channel}\n${thread}`;
+}
+
 export class SlackThread implements ThreadChat {
   private readonly channel: string;
   private readonly threadTs: string;
@@ -313,6 +358,7 @@ export class SlackThread implements ThreadChat {
   /** Issues #83 and #95: Slack's status line at the bottom of the thread. */
   private readonly line: ThreadStatus;
   private readonly stopped: AbortSignal;
+  private readonly orders: (channel: string, thread: string) => ThreadOrder;
   private readonly onWritten: () => void;
 
   /**
@@ -326,6 +372,7 @@ export class SlackThread implements ThreadChat {
     options: SlackChatOptions,
     names: () => Names,
     stopped: AbortSignal,
+    orders: (channel: string, thread: string) => ThreadOrder,
     written?: () => void,
   ) {
     this.channel = channelId;
@@ -333,6 +380,7 @@ export class SlackThread implements ThreadChat {
     this.options = options;
     this.names = names;
     this.stopped = stopped;
+    this.orders = orders;
     this.slack = options.slack;
     this.clock = options.clock ?? systemClock;
     this.reaction = new StatusReaction(this.slack, { channel: channelId, rootTs: threadTs });
@@ -356,6 +404,7 @@ export class SlackThread implements ThreadChat {
       clock: this.clock,
       onOpenReply: onOpenMessage,
       onWrite: () => this.line.wrote(),
+      order: this.orders(this.channel, this.threadTs),
       ...(this.options.debounceSeconds !== undefined && {
         debounceSeconds: this.options.debounceSeconds,
       }),

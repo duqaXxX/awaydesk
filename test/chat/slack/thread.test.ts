@@ -338,3 +338,25 @@ test("the provider gives each thread its own object and shares one budget", asyn
   await other.showStatus("working");
   assert.equal(slack.callsTo("reactions.add")[0]?.timestamp, OTHER_THREAD);
 });
+
+test("the threads a chat builds for one Slack thread share the order of its messages", async () => {
+  const { chat, clock } = made();
+  const ref = { channel: CHANNEL, thread: THREAD };
+  const first = chat.thread(ref).openReply(() => {});
+  await first.text("one");
+  await first.settle();
+  // A later session of the same thread builds a thread object of its own.
+  const second = chat.thread(ref).openReply(() => {});
+  await second.text("two");
+  await second.settle();
+  await settle(clock);
+  assert.equal(first.overtaken, true);
+  assert.equal(second.overtaken, false);
+  chat.ownerPosted(CHANNEL, THREAD, "1790000000.900000");
+  assert.equal(second.last, false);
+  // Another Slack thread has an order of its own.
+  const apart = chat.thread({ channel: CHANNEL, thread: "1790000000.000777" }).openReply(() => {});
+  await apart.text("elsewhere");
+  await apart.settle();
+  assert.equal(second.overtaken, false);
+});

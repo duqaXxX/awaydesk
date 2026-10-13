@@ -262,6 +262,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
     const threadTs = str(message.thread_ts || ts);
     // The owner and the workspace first, with nothing awaited: anyone else takes no place.
     if (!answers.fromOwner(user, team, channel) || channel === null) return;
+    // (sync) Where the owner's message sits among the replies, whatever becomes of it next.
+    parts.chat.ownerPosted(channel, threadTs, ts);
     // (sync) The place among the thread's messages is taken in the order the listeners were
     // called, before the first await: the channel check below takes longer for one message than
     // for the next, and a message that passed it first would be handed over first. The place is

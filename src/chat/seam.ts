@@ -162,6 +162,10 @@ export interface Reply extends ReplySink {
    * counts, and the thread's activity line does not repeat them.
    */
   readonly footerShown: boolean;
+  /** Whether nothing of the owner's and no other reply sits below this reply in the thread. */
+  readonly last: boolean;
+  /** Whether another reply has a message below this one: it then ends where it is, by edit. */
+  readonly overtaken: boolean;
 }
 
 /**

@@ -146,6 +146,17 @@ started, whichever comes first. Slack closes a stream 5 minutes after `chat.star
   a message is cut there, as any text is, and the continuation then rings with the rest of it. The
   new message shows empty in one known case: a turn that ended well with an answer of text alone,
   whose footer could not be built.
+- **Another reply sits below.** A reply whose last message has another reply's message below it
+  ends where it is (`Reply.overtaken`): the footer goes under that message by a silent edit
+  (`ReplySink.end`), or on the stream's stop while it is still a stream, and nothing is posted,
+  since a new message would land under the other reply. The same reply opens no continuation
+  either: what does not fit the message is cut, as a card's text is, and a warning is logged once.
+  An owner message below the reply does not change this; its ending is posted as above.
+  `SlackChat` keeps one `ThreadOrder` (`reply/order.ts`) per channel and thread, shared by every
+  `SlackThread` of it, in memory only: the listener tells it the `ts` of every owner message
+  (`SlackChat.ownerPosted`), and each `ReplySink` tells it where its last message moved. A restart
+  forgets it, so the messages written before it are unknown and a footer they show stays where it
+  is. An ended reply with an owner message below it is forgotten.
 
 ### Message limits and continuation
 

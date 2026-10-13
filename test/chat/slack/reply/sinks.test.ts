@@ -41,6 +41,7 @@ import {
   markdownCut,
   stripMarkdown,
 } from "../../../../src/chat/slack/reply/markdown.ts";
+import { ThreadOrder } from "../../../../src/chat/slack/reply/order.ts";
 import {
   ADOPT_SKEW_SECONDS,
   DEBOUNCE_SECONDS,
@@ -146,6 +147,8 @@ interface ReplyOptions {
   debounceSeconds?: number;
   /** The wait before the final write is sent once more (`FINAL_RETRY_SECONDS` unless given). */
   finalRetrySeconds?: number;
+  /** The order of the thread's messages, shared by the replies of a test that has several. */
+  order?: ThreadOrder;
 }
 
 function reply(slack: FakeSlack, options: ReplyOptions = {}): ReplySink {
@@ -165,6 +168,7 @@ function reply(slack: FakeSlack, options: ReplyOptions = {}): ReplySink {
     logger: options.logger ?? new Recorded(),
     debounceSeconds: options.debounceSeconds ?? 0,
     finalRetrySeconds: options.finalRetrySeconds,
+    ...(options.order !== undefined && { order: options.order }),
   });
 }
 
@@ -4207,4 +4211,83 @@ test("the footer's fields are formatted into the line the end writes", async () 
   const line = formatFooter(fields, clock.time() * 1000);
   assert.ok(line.startsWith("⚡ bypass"));
   assert.equal(footerOf(firstStream(slack).blocks), line);
+});
+
+// ---- a reply with another reply's message below it ends where it is
+// Hand-driven: no recording holds two replies in one thread ending out of turn.
+
+/** A moment above every message a FakeSlack makes in a test. */
+const OWNER_TS = "1790000000.900000";
+
+test("a reply overtaken after its stream stopped ends by one edit, with no post", async () => {
+  const slack = new FakeSlack();
+  const order = new ThreadOrder();
+  const sink = await longReply(slack, { order });
+  const other = reply(slack, { order });
+  await other.text("Another turn started.");
+  await settled();
+  assert.equal(sink.overtaken, true);
+  assert.equal(other.overtaken, false);
+  const pushes = slack.pushes();
+  const posts = slack.callsTo("chat.postMessage").length;
+  const updates = slack.callsTo("chat.update").length;
+  assert.equal(await sink.closeOutFormatted("main · ctx 6%"), true);
+  assert.equal(slack.callsTo("chat.postMessage").length, posts, "nothing is posted");
+  assert.equal(slack.callsTo("chat.update").length, updates + 1, "one edit");
+  assert.equal(slack.pushes(), pushes, "and no push");
+  const update = last(slack.callsTo("chat.update"));
+  assert.deepEqual(list(update.blocks).slice(-2), [
+    { type: "divider" },
+    contextBlock("main · ctx 6%"),
+  ]);
+  assert.equal(sink.footerShown, true);
+});
+
+test("a reply with only an owner message below it still posts its ending", async () => {
+  const slack = new FakeSlack();
+  const order = new ThreadOrder();
+  const sink = await longReply(slack, { order });
+  order.ownerPosted(OWNER_TS);
+  assert.equal(sink.overtaken, false);
+  assert.equal(sink.last, false);
+  assert.equal(await sink.closeOutFormatted("main · ctx 6%"), true);
+  assert.equal(only(slack.callsTo("chat.postMessage")).thread_ts, THREAD);
+});
+
+test("a reply overtaken while its stream is open ends on its stop, with no post", async () => {
+  const slack = new FakeSlack();
+  const order = new ThreadOrder();
+  const sink = reply(slack, { order });
+  await sink.text("Working on it.");
+  await settled();
+  const other = reply(slack, { order });
+  await other.text("Another turn started.");
+  await settled();
+  assert.equal(sink.overtaken, true);
+  await sink.finish([]);
+  assert.equal(await sink.closeOutFormatted("main · ctx 6%"), true);
+  assert.equal(slack.callsTo("chat.postMessage").length, 0);
+  const stop = only(slack.callsTo("chat.stopStream"));
+  assert.deepEqual(list(stop.blocks), [{ type: "divider" }, contextBlock("main · ctx 6%")]);
+});
+
+test("an overtaken reply whose new content would overflow posts nothing", async () => {
+  const slack = new FakeSlack();
+  const order = new ThreadOrder();
+  const logger = new Recorded();
+  const clock = new FakeClock();
+  const sink = reply(slack, { order, logger, clock });
+  await sink.text("Start.");
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  const other = reply(slack, { order });
+  await other.text("Another turn started.");
+  await settled();
+  const created = slack.createdTs.length;
+  await sink.text(`\n\n${"word ".repeat(MESSAGE_LIMIT)}`);
+  await sink.finish([]);
+  assert.equal(await sink.closeOutFormatted("main · ctx 6%"), true);
+  assert.equal(slack.callsTo("chat.postMessage").length, 0);
+  assert.equal(slack.createdTs.length, created, "no message was opened");
+  assert.equal(logger.lines.filter((line) => line.level === "WARNING").length, 1);
 });
