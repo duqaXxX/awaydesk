@@ -246,6 +246,27 @@ test("a background agent of a call the reply never saw has no card and no launch
   assert.ok(renderer.lineless(started.taskId) && renderer.shows(started.taskId));
 });
 
+test("agents started one after the other have no empty line between their launch lines", async () => {
+  // The recorded call and task start, then the same two under other ids: no recording holds
+  // two agents started in one message (seen in a real session, 2026-10-13).
+  const events = recordedEvents("subagent");
+  const started = events.findIndex((event) => event.type === "task_started");
+  const call = events.findLast((event, index) => index < started && event.type === "call_started");
+  const task = events[started];
+  assert.ok(call?.type === "call_started" && task?.type === "task_started");
+  const [sink] = await render([
+    ...events.slice(0, started + 1),
+    { ...call, callId: "toolu_second" },
+    { ...task, callId: "toolu_second", taskId: "second", description: "Second one" },
+  ]);
+  assert.equal(
+    sink.notices.join(""),
+    "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\n" +
+      "**Agent**(Second one)\n⎿ Backgrounded agent\n\n",
+  );
+  assert.deepEqual(sink.tasks, []);
+});
+
 test("a call that starts no agent shows as any other call", async () => {
   // The recorded stream with the task's frames taken out, as for a call the agent refuses (a
   // type it does not know): held until its result, then the card every call gets.

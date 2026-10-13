@@ -1651,6 +1651,25 @@ test("a background agent that ends while a turn runs has its end line in that tu
   assert.equal(session.runningKinds, "");
 });
 
+test("a background agent that ends while a message waits has its end line in that message s reply", async (t) => {
+  // Seen in a real session (2026-10-13): of two agents ending as the owner wrote, one end fell
+  // between the message and the start of its turn, and no line said it.
+  const [first, ...later] = splitTurns(sdkMessages("subagent")) as [Item[], ...Item[][]];
+  const ends = later
+    .flat()
+    .filter((item) => isSystem(item, "task_updated") || isSystem(item, "task_notification"));
+  const h = harnessFor(t)({ turns: [first, sdkMessages("tools")] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  const waiting = session.submit("hello");
+  h.clients[0]?.inject(ends);
+  await (await waiting).done.wait();
+  await h.until(() => session.idle);
+  const line = '✓ Agent "Run ls and report contents" finished';
+  assert.equal(h.bodies().join("\n").split(line).length - 1, 1);
+  assert.ok(at(h.bodies(), -1).includes(line) || at(h.bodies(), 0).includes(line));
+});
+
 test("ended tasks are forgotten past the limit", async (t) => {
   const [first, notice, injected] = splitBackground();
   const renamed = first.map((item) => {

@@ -204,6 +204,8 @@ export class ThreadSession {
   // What the running turn's reply says when it ends: how many queued messages a restart
   // dropped, since they get no reply of their own.
   private endNotes: string[] = [];
+  /** End lines of agents with no card that ended while a message waited for its turn. */
+  private endedAhead: string[] = [];
   // Each task's type and description, for the list of what still runs and the task's end line.
   private readonly tasks = new Map<
     string,
@@ -1678,13 +1680,17 @@ export class ThreadSession {
     ) {
       this.ended.push([event.taskId, this.endedLine(event)]);
     }
-    if (event.type === "task_ended" && this.active !== null && !stopped) {
+    if (event.type === "task_ended" && !stopped) {
       // An agent in the background that ends while a turn runs: with no card to complete, its
       // end is said where the conversation is, as the terminal prints `Agent "..." finished`
-      // among the turn's calls (captured 2026-10-13 on Claude Code 2.1.296).
-      const writing = this.active.renderer;
+      // among the turn's calls (captured 2026-10-13 on Claude Code 2.1.296). One that ends
+      // with a message of the owner's already waiting says it in that message's reply.
+      const writing = this.active?.renderer ?? null;
       const reply = this.taskReplies.get(event.taskId) ?? writing;
-      if (reply.lineless(event.taskId)) await writing.feedNotice(this.endedLine(event));
+      if (reply?.lineless(event.taskId)) {
+        if (writing !== null) await writing.feedNotice(this.endedLine(event));
+        else if (this.sent.length > 0) this.endedAhead.push(this.endedLine(event));
+      }
     }
     if (
       event.type === "task_updated" &&
@@ -2285,6 +2291,9 @@ export class ThreadSession {
     };
     this.active = active;
     if (opening !== null) await renderer.feedNotice(opening);
+    const ahead = this.endedAhead;
+    this.endedAhead = [];
+    if (ahead.length > 0) await renderer.feedNotice(ahead.join("\n"));
     if (this.notice !== null) {
       const notice = this.notice;
       this.notice = null;
@@ -2349,6 +2358,7 @@ export class ThreadSession {
     this.taskReplies.clear();
     this.tasks.clear();
     this.ended = [];
+    this.endedAhead = [];
     this.unreported.clear();
     this.notificationWaits = false;
     this.stopped.clear();

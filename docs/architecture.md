@@ -1257,7 +1257,9 @@ closed when the start returns (`ThreadSession.connect`).
   task id to that reply, and every later task event for it updates that line only, never another
   reply. A subagent in the background has no line there, only its launch line: when it ends while
   a turn runs, its end line is written into the reply of that turn, as the terminal prints it
-  among the turn's calls (`TurnRenderer.lineless`); between turns it opens the report, as below. A background subagent's own calls (a `parentCallId` pointing at a call of an ended turn) belong
+  among the turn's calls (`TurnRenderer.lineless`); when it ends while a message of the owner's
+  waits for its turn, the line opens that message's reply; between turns it opens the report, as
+  below. A background subagent's own calls (a `parentCallId` pointing at a call of an ended turn) belong
   to that reply the same way (`TurnRenderer.owns`), write nothing and never open a reply. A notification for such a task still makes the
   next queued message wait for the turn Claude Code starts to report it.
 - The report of such a task renders into the task's reply only while that reply is the last thing
