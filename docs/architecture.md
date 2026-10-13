@@ -1002,7 +1002,14 @@ closed when the start returns (`ThreadSession.connect`).
   options of them: the directory as `cwd`, `resume`, `effort`, `settingSources`,
   `includePartialMessages`, the permission callback, the two hooks,
   `allowDangerouslySkipPermissions`, which makes `!bypass on` possible without turning it on, and
-  the extra argument `replay-user-messages` (above, "A prompt taken into a report turn"). The SDK
+  the extra argument `replay-user-messages` (above, "A prompt taken into a report turn"). Three
+  more make the session start as a terminal session does: `systemPrompt` set to the `claude_code`
+  preset, since the SDK otherwise sends a minimal prompt of its own, and in `env` the variables
+  `CLAUDE_CODE_FORK_SUBAGENT=1` (every subagent runs in the background, as in the terminal) and
+  `CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR=100`. `env` replaces the environment the process
+  inherits, so it holds those two, then the daemon's own environment, then the variables of
+  Claude Code the owner's file sets (`VARIABLES` in `src/agent/claude/module.ts`): a later one
+  wins. The session the usage probe starts gets none of this. The SDK
   runs Claude Code in its non-interactive mode, which treats the two servers built into Claude Code
   differently from the terminal (measured: "Built-in servers"). Computer use is offered in an
   interactive session only and is never there. The Chrome integration is connected only when Claude

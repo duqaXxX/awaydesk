@@ -81,6 +81,26 @@ test("the Chrome setting is read at every start", LIMIT, async () => {
   assert.deepEqual(flags, [["replay-user-messages"], ["replay-user-messages", "chrome"]]);
 });
 
+test(
+  "the owner's variables go to a thread's session and not to the daemon's own",
+  LIMIT,
+  async () => {
+    const sdk = new FakeSdk();
+    const backend = new ClaudeBackend({
+      query: sdk.query,
+      home,
+      variables: { BASH_DEFAULT_TIMEOUT_MS: "21600000" },
+    });
+    const thread = await backend.start(START, NO_REQUESTS);
+    const own = await backend.startBare(START.folder, NO_REQUESTS);
+    const [first, second] = sdk.queries;
+    assert.equal(first?.options.env?.BASH_DEFAULT_TIMEOUT_MS, "21600000");
+    assert.equal("env" in (second?.options ?? {}), false);
+    await thread.close();
+    await own.close();
+  },
+);
+
 test("a start where Claude Code refuses the resume rejects with ResumeRefused", LIMIT, async () => {
   const failure = new Error("Claude Code returned an error result: No conversation found");
   const refusal = { ...(sdkRecords("interrupt").at(-1) as JsonObject), is_error: true };

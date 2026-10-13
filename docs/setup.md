@@ -183,11 +183,20 @@ named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one
 | `SLACK_USER_TOKEN` | optional: your own `xoxp-…` token, for the Home tab's Delete and Clean up |
 | `AWAYDESK_AGENT` | optional: the agent awaydesk drives; `claude` when absent, the only one this release has |
 | `AWAYDESK_CHAT` | optional: the chat awaydesk is driven from; `slack` when absent, the only one this release has |
+| `BASH_DEFAULT_TIMEOUT_MS` | optional: Claude Code's own variable, in milliseconds, for how long a command may run; see below |
 
 `AWAYDESK_AGENT` and `AWAYDESK_CHAT` can be set or left out: `claude` and `slack` are the only
 agent and chat this release has, and a file without them works as one with them. A value awaydesk does not know
 stops the start, and the message lists the valid ones. A variable that belongs to a module you did
 not select is not read.
+
+`BASH_DEFAULT_TIMEOUT_MS` is a variable of Claude Code, which awaydesk hands to every session as
+you wrote it. In a session started through the Agent SDK, Claude Code stops a command left
+running in the background after 30 minutes, where a terminal session lets it run. A value above
+`1800000` replaces those 30 minutes, up to 24.8 days: `BASH_DEFAULT_TIMEOUT_MS=14400000` gives a
+dev server or a long build 4 hours. The same value becomes how long a command in the foreground
+may run before Claude Code stops waiting for it, 2 minutes when the variable is absent. Claude
+Code reads the value and decides what an invalid one means; awaydesk does not check it.
 
 The workspace ID is not configured: awaydesk reads it from Slack at startup with the bot
 token and rejects events from any other workspace.

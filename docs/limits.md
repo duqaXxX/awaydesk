@@ -20,19 +20,19 @@ Where a limit may have a way around it, the last column names the issue that loo
 ## Limits of the Claude Agent SDK
 
 This is the section of the Claude agent. awaydesk drives Claude Code through the Claude Agent
-SDK, which runs it without its interactive terminal. A session started that way does not start
-as a terminal session does, and Claude Code keeps some features for the interactive terminal: it
-answers a command it does not offer there with `/<name> isn't available in this environment.`
-awaydesk passes every command through as you type it.
+SDK, which runs it without its interactive terminal. awaydesk starts a session with Claude
+Code's own system prompt and with the terminal's defaults for subagents and web searches, which
+the SDK leaves out; what still differs is below. Claude Code also keeps some features for the
+interactive terminal: it answers a command it does not offer there with
+`/<name> isn't available in this environment.` awaydesk passes every command through as you
+type it.
 
 The first rows are about how a session runs, the others about commands.
 
 | What differs | In the terminal | From Slack | Looked into |
 |---|---|---|---|
-| The instructions Claude works under | Claude Code's system prompt: about 10,000 characters on the harness, the session, memory, the environment and the context | The SDK's minimal prompt: a line of identity and a note on web search. The tools and their descriptions, your CLAUDE.md files, settings, skills and hooks are the same | [#300](https://github.com/duqaXxX/awaydesk/issues/300) |
-| Where a subagent runs | Always in the background | In the background, or in the foreground when Claude wants its result first: Claude chooses | [#300](https://github.com/duqaXxX/awaydesk/issues/300) |
-| A command left running in the background | Runs until it ends | Stopped after 30 minutes, or after the time Claude asked for, 2 hours at most. Claude is told and can start it again | [#300](https://github.com/duqaXxX/awaydesk/issues/300) |
-| Web searches in a long session | The session's allowance refills by 100 searches an hour | It does not refill | [#300](https://github.com/duqaXxX/awaydesk/issues/300) |
+| A command left running in the background | Runs until it ends | Stopped after 30 minutes, or after the time Claude asked for, 2 hours at most; Claude is told and can start it again. `BASH_DEFAULT_TIMEOUT_MS` in `.env` replaces the 30 minutes, and the 2 hours when it is longer, up to 24.8 days ([setup.md](setup.md)) | none |
+| How long Claude Code waits for a command in the foreground | 2 minutes by default | The same, unless `BASH_DEFAULT_TIMEOUT_MS` is set: its value replaces the 2 minutes too | none |
 | Publishing a page as an artifact | The `Artifact` tool | Not offered | [#300](https://github.com/duqaXxX/awaydesk/issues/300) |
 | A question that shows a preview beside each option | Offered | The question comes without previews | [#300](https://github.com/duqaXxX/awaydesk/issues/300) |
 | A subagent that starts subagents in the background | Waits for them | Does not wait: one that ends later reports to the main conversation | none |
@@ -53,11 +53,13 @@ The rows on how a session runs were measured on 2026-10-13 with Claude Code 2.1.
 TypeScript SDK 0.3.296. The first request of an interactive session and of a session started
 with awaydesk's options, in the same folder, with the same prompt and model, were written to
 disk with `OTEL_LOG_RAW_API_BODIES` and compared. The model, the thinking and effort settings,
-the CLAUDE.md block and 11 of the 14 tools were identical; the three that differed are the
-rows on subagents, background commands and questions, and the terminal sent two tools more.
-The time limits are the ones the `Bash` tool states to Claude. That a subagent does not wait
-for the subagents it started is Claude Code's own statement
-([sub-agents](https://code.claude.com/docs/en/sub-agents)), and was not run.
+the CLAUDE.md block, the five sections of the system prompt and 12 of the 14 tools were
+identical. Three lines of the system prompt differed (who Claude is, the hint on `!`, the note
+on `EndConversation`), two tools differed (the rows on commands and on questions), and the
+terminal sent two tools more. The time limits are the ones the `Bash` tool states to Claude,
+read with and without the variable. That a subagent does not wait for the subagents it started
+is Claude Code's own statement ([sub-agents](https://code.claude.com/docs/en/sub-agents)), and
+was not run.
 
 The rows on commands were measured on 2026-10-09 with Claude Code 2.1.292 and again on
 2026-10-10 with 2.1.294, and sent

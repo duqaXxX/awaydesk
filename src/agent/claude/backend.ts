@@ -46,6 +46,8 @@ export interface ClaudeBackendOptions {
   readonly bareStart?: BareStart;
   /** Every wait of the usage probe; the system clock when absent. */
   readonly clock?: Clock;
+  /** The owner's own variables for Claude Code, which a thread's session is started with. */
+  readonly variables?: Readonly<Record<string, string>>;
 }
 
 export class ClaudeBackend implements AgentBackend {
@@ -54,11 +56,13 @@ export class ClaudeBackend implements AgentBackend {
   readonly capabilities = CAPABILITIES;
   readonly #query: QueryFunction | undefined;
   readonly #home: string;
+  readonly #variables: Readonly<Record<string, string>>;
   readonly #probe: UsageProbe;
 
   constructor(options: ClaudeBackendOptions = {}) {
     this.#query = options.query;
     this.#home = options.home ?? homedir();
+    this.#variables = options.variables ?? {};
     const bare = options.bareStart ?? ((folder, requests) => this.startBare(folder, requests));
     this.#probe = new UsageProbe(this.#home, bare, { clock: options.clock });
   }
@@ -71,7 +75,11 @@ export class ClaudeBackend implements AgentBackend {
   async start(options: StartOptions, requests: RequestHandler): Promise<AgentSession> {
     // Read at every start, so a change in `/chrome` holds from a session's next start.
     const chrome = await chromeEnabled(this.#home);
-    const session = new ClaudeSession({ ...options, chrome }, requests, this.#query);
+    const session = new ClaudeSession(
+      { ...options, chrome, variables: this.#variables },
+      requests,
+      this.#query,
+    );
     await session.ready();
     return session;
   }
