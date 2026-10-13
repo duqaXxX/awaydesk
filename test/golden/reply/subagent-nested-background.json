@@ -175,51 +175,6 @@
      }
     },
     {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "task-a291e2504de323f06",
-      "name": "local_agent",
-      "output": null,
-      "preview": null,
-      "status": "in_progress",
-      "task": true,
-      "title": "Launch background sleep command"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "task-a291e2504de323f06",
-      "name": "local_agent",
-      "output": null,
-      "preview": null,
-      "status": "complete",
-      "task": true,
-      "title": "Launch background sleep command"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "task-a291e2504de323f06",
-      "name": "local_agent",
-      "output": "The background task completed successfully. The command `sleep 20; echo done` ran for 20 seconds and finished with exit code 0.",
-      "preview": null,
-      "status": "complete",
-      "task": true,
-      "title": "Launch background sleep command"
-     }
-    },
-    {
      "call": "text",
      "ending": false,
      "markdown": "The sleep",

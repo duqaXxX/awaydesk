@@ -1630,6 +1630,27 @@ test("a background agent is a launch line, and its calls write nothing", async (
   assert.equal(h.slack.streamTs.length, 1);
 });
 
+test("a background agent that ends while a turn runs has its end line in that turn s reply", async (t) => {
+  // subagent.jsonl with the frames of the agent's end moved before the first turn's result, as
+  // for an agent quicker than the turn that started it. With no card to complete, the end is a
+  // line of the reply being written, where the terminal prints it (captured 2026-10-13 on
+  // Claude Code 2.1.296).
+  const [first, ...later] = splitTurns(sdkMessages("subagent")) as [Item[], ...Item[][]];
+  const ends = later
+    .flat()
+    .filter((item) => isSystem(item, "task_updated") || isSystem(item, "task_notification"));
+  assert.equal(ends.length, 2);
+  const h = harnessFor(t)({ turns: [[...first.slice(0, -1), ...ends, at(first, -1)]] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await h.until(() => session.idle);
+  const body = at(h.bodies(), 0);
+  assert.equal(body.split('✓ Agent "Run ls and report contents" finished').length - 1, 1);
+  assert.ok(body.indexOf("Backgrounded agent") < body.indexOf("✓ Agent"));
+  assert.deepEqual(h.slack.messageCards().flat(), []);
+  assert.equal(session.runningKinds, "");
+});
+
 test("ended tasks are forgotten past the limit", async (t) => {
   const [first, notice, injected] = splitBackground();
   const renamed = first.map((item) => {
@@ -2671,9 +2692,11 @@ test("a task started after its call ended is an ordinary task of the agent s rep
   await (await session.submit("start it")).done.wait();
   const posted = h.slack.postedTs.length;
   h.clients[0]?.inject([...children, nested]);
-  await h.until(() => h.cards().some((card) => card.title === "nested"));
+  await h.until(() => inside(session).taskReplies.has("nested"));
   assert.ok(h.slack.postedTs.length === posted && h.slack.streamTs.length === 1); // no reply of its own
-  assert.ok(inside(session).taskReplies.has("nested"));
+  // An agent in the background: a running task of that reply, with no card as any such agent.
+  assert.ok(inside(session).runningTaskIds().includes("nested"));
+  assert.ok(!h.cards().some((card) => card.title === "nested"));
 });
 
 test("a nested task that ends before its call s result is the agent s foreground work", async (t) => {

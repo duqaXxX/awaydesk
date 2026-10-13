@@ -210,6 +210,42 @@ test("the launch line follows the text before it after a blank line", async () =
   assert.ok(sink.texts.join("").includes("Starting it.\n\n**Agent**("));
 });
 
+test("a turn that only starts an agent still gets its last text from its end", async () => {
+  // The launch line is the daemon's, not the turn's text: the recorded turn with its text
+  // events taken out, as for a text that came with the turn's end alone.
+  const [first = []] = splitTurns(recordedEvents("subagent"));
+  const silent = first.filter((event) => !event.type.startsWith("text"));
+  const [sink, renderer] = await render(silent);
+  assert.ok(renderer.result?.finalText);
+  assert.ok(sink.texts.join("").endsWith(`Backgrounded agent\n\n${renderer.result.finalText}`));
+});
+
+test("a call under an agent's call that comes before its task writes no card", async () => {
+  // Hand-built order, no recording behind it: the agent's first call ahead of `task_started`.
+  const events = recordedEvents("subagent");
+  const inner = events.find(
+    (event) => event.type === "call_started" && event.parentCallId !== null,
+  );
+  assert.ok(inner !== undefined);
+  const started = events.findIndex((event) => event.type === "task_started");
+  const moved = events.filter((event) => event !== inner);
+  moved.splice(started, 0, inner);
+  const [sink] = await render(moved);
+  assert.deepEqual(sink.tasks, []);
+  assert.equal(sink.notices.length, 1);
+});
+
+test("a background agent of a call the reply never saw has no card and no launch line", async () => {
+  // subagent-nested-background-mid-turn.jsonl: the agent starts again after the reply of its
+  // call has ended, so the frame reaches a reply that holds no call for it.
+  const [started] = eventsOf(recordedEvents("subagent"), "task_started");
+  assert.ok(started !== undefined && started.kind === "subagent" && started.background === true);
+  const [sink, renderer] = await render([started]);
+  assert.deepEqual([sink.tasks, sink.notices], [[], []]);
+  assert.deepEqual(renderer.runningTasks, [started.taskId]);
+  assert.ok(renderer.lineless(started.taskId) && renderer.shows(started.taskId));
+});
+
 test("a call that starts no agent shows as any other call", async () => {
   // The recorded stream with the task's frames taken out, as for a call the agent refuses (a
   // type it does not know): held until its result, then the card every call gets.
@@ -1022,8 +1058,10 @@ test("a card keeps the last ten lines of what runs under it and counts them all"
   const agent: SessionEvent = {
     type: "call_started",
     callId: "toolu_agent",
-    toolName: "Agent",
-    input: { description: "Scan" },
+    // A call that runs calls of its own and is no agent's start, as a skill in a fork: an
+    // `Agent` call is held until its task starts.
+    toolName: "Skill",
+    input: { skill: "Scan" },
     parentCallId: null,
   };
   const inner = Array.from(

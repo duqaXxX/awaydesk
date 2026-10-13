@@ -1678,6 +1678,14 @@ export class ThreadSession {
     ) {
       this.ended.push([event.taskId, this.endedLine(event)]);
     }
+    if (event.type === "task_ended" && this.active !== null && !stopped) {
+      // An agent in the background that ends while a turn runs: with no card to complete, its
+      // end is said where the conversation is, as the terminal prints `Agent "..." finished`
+      // among the turn's calls (captured 2026-10-13 on Claude Code 2.1.296).
+      const writing = this.active.renderer;
+      const reply = this.taskReplies.get(event.taskId) ?? writing;
+      if (reply.lineless(event.taskId)) await writing.feedNotice(this.endedLine(event));
+    }
     if (
       event.type === "task_updated" &&
       event.terminal &&
@@ -1903,7 +1911,7 @@ export class ThreadSession {
     }
     const ends = lines.map(([, line]) => line).join("\n");
     // In the reply that started the task the report needs no line to say what it is about:
-    // the task's card is there. Anywhere else the notice says it, as it always has.
+    // the task's card or launch line is there. Anywhere else the notice says it, as it always has.
     const named = lines.length === 0 && reported !== null && target !== null;
     return [named ? null : ends || texts.BACKGROUND_NOTICE, target];
   }
@@ -2512,7 +2520,10 @@ export class ThreadSession {
         let label: string;
         if (description && kind === "subagent") {
           // The terminal's row: the agent's type, then what it does.
-          if (agentType !== null) return `${agentType}  ${oneLine(description, TITLE_LIMIT)}`;
+          if (agentType !== null) {
+            const type = oneLine(agentType, TITLE_LIMIT / 2);
+            return `${type}  ${oneLine(description, TITLE_LIMIT - Array.from(type).length - 2)}`;
+          }
           label = `${TASK_WORDS.subagent[1]}: ${description}`;
         } else if (description) {
           label = description;

@@ -14,7 +14,8 @@ All notable changes to this project are documented here. The format follows
   removes two drawings of one thing: the card beside the end line, and the card beside the line
   of the list of what still runs. The list's line reads the type, then the description. An
   agent that failed says why in its end line (`✗ Agent "..." failed: <reason>`), where its card
-  said it before. A subagent the call waits for keeps its card.
+  said it before. An agent that ends while a turn runs has its end line in that turn's reply. A
+  subagent the call waits for keeps its card.
 - The agent seam's `task_started` carries `agentType` and `background`, which the Claude back
   end reads from `subagent_type` and `is_backgrounded`. A call of a tool that starts an agent
   (`previews.LAUNCHERS`) is kept from the sink until its task starts.

@@ -38,7 +38,7 @@ The first rows are about how a session runs, the others about commands.
 | A subagent that starts subagents in the background | Waits for them | Does not wait: one that ends later reports to the main conversation | none |
 | Several subagents started in one message | One line, `2 background agents launched`, and under it what each one does | One launch line for each subagent | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | A subagent that is continued | `Resuming agent <id>` under the line of its first end | The card of the call that continues it, which stays until the subagent ends again | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
-| A subagent that is stopped | `Agent "<description>" was stopped by Claude`, or `by user`, with a mark of a third colour | `✓ Agent "<description>" stopped` | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
+| A subagent that is stopped | `Agent "<description>" was stopped by Claude`, or `by user`, with a mark of a third colour | `✓ Agent "<description>" stopped` when Claude stops it; no line when you stop the thread with `!stop` | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | What a subagent was asked | `ctrl+o` shows its prompt under the launch line | Not shown | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | How Claude is told who it is | `You are Claude Code, Anthropic's official CLI for Claude.` | `You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK.` | none |
 | Sending feedback to Anthropic, ending a conversation | The `SendFeedback` and `EndConversation` tools | Not offered | none |

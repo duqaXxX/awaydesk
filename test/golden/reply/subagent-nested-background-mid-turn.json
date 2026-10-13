@@ -258,51 +258,6 @@
   {
    "calls": [
     {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "task-ac6eb99b25fd70fc8",
-      "name": "local_agent",
-      "output": null,
-      "preview": null,
-      "status": "in_progress",
-      "task": true,
-      "title": "Run background sleep command"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "task-ac6eb99b25fd70fc8",
-      "name": "local_agent",
-      "output": null,
-      "preview": null,
-      "status": "complete",
-      "task": true,
-      "title": "Run background sleep command"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "task-ac6eb99b25fd70fc8",
-      "name": "local_agent",
-      "output": "The background command has completed successfully. The 15-second sleep finished and the \"done\" message was echoed (exit code 0).",
-      "preview": null,
-      "status": "complete",
-      "task": true,
-      "title": "Run background sleep command"
-     }
-    },
-    {
      "call": "text",
      "ending": false,
      "markdown": "The 15-sec",

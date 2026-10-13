@@ -248,6 +248,14 @@ export class TurnRenderer<Footer = FooterFields> {
   }
 
   /**
+   * Whether this reply shows that task with no line of its own (an agent in the background):
+   * nothing here says its end, which is said in words.
+   */
+  lineless(taskId: string): boolean {
+    return this.#launched.has(this.#lineOfTask.get(taskId) ?? "");
+  }
+
+  /**
    * Whether this task event is of a task held aside or dropped as the work of a call inside
    * another call, a call whose root this reply holds: the agent reports such a task to the
    * subagent, not to the conversation. False for a call this reply never saw, for a task that
@@ -304,7 +312,7 @@ export class TurnRenderer<Footer = FooterFields> {
   async close(footer: Footer | null, signal?: AbortSignal): Promise<void> {
     const interrupted = this.result !== null && this.result.ending === "interrupted";
     await this.#handOver();
-    if (!this.#wroteText && this.#lines.size === 0) {
+    if (!this.#wroteText && this.#lines.size === 0 && this.#launched.size === 0) {
       // A command that prints nothing (a local one, say) still gets a visible answer.
       await this.#text(interrupted ? texts.STOPPED : texts.named(texts.NO_OUTPUT, this.#names), {
         notice: true,
@@ -490,8 +498,7 @@ export class TurnRenderer<Footer = FooterFields> {
       // The agent of a call already written as a line of text starts again, under that call
       // (recorded: `subagent-nested-background.jsonl`, where the end of a command it left
       // running wakes it): running once more, and no second line.
-      this.#lineOfTask.set(event.taskId, call);
-      this.#running.set(event.taskId, call);
+      this.#bind(event.taskId, call);
       return;
     }
     const held = call !== null && this.#undecided.delete(call) ? this.#lines.get(call) : undefined;
@@ -507,8 +514,7 @@ export class TurnRenderer<Footer = FooterFields> {
       // A call's task: the agent starts one for a long command in the foreground too
       // (recorded: `interrupt.jsonl`, CLI 2.1.283). The line stays the call's until the call's
       // result arrives with the task still running (`#callEnded`).
-      this.#lineOfTask.set(event.taskId, call);
-      this.#running.set(event.taskId, call);
+      this.#bind(event.taskId, call);
       return;
     }
     const command = [...this.#running.values()].reverse().find((id) => this.#commands.has(id));
@@ -530,17 +536,34 @@ export class TurnRenderer<Footer = FooterFields> {
    */
   async #launch(event: TaskStarted, call: string): Promise<void> {
     this.#lines.delete(call);
+    // A line of the daemon's, as `feedNotice` writes one: it is not the turn's text, so a turn
+    // that says nothing else still gets its last text or its error from the turn's end.
+    const apart = this.#wroteText || this.#lines.size > 0 || this.#launched.size > 0;
     this.#launched.add(call);
-    this.#lineOfTask.set(event.taskId, call);
-    this.#running.set(event.taskId, call);
+    this.#bind(event.taskId, call);
+    this.#afterText = false;
+    await this.#handOver();
     const said = launched(event.agentType, event.description);
-    await this.#text(`${this.#wroteText ? "\n\n" : ""}${said}\n\n`, { notice: true });
+    await this.#sink.text(`${apart ? "\n\n" : ""}${said}\n\n`, { notice: true, ending: false });
+  }
+
+  /** The task runs for this reply, on that line or under that call. */
+  #bind(taskId: string, lineId: string): void {
+    this.#lineOfTask.set(taskId, lineId);
+    this.#running.set(taskId, lineId);
   }
 
   async #openLine(event: TaskStarted): Promise<void> {
     const lineId = `task-${event.taskId}`;
-    this.#lineOfTask.set(event.taskId, lineId);
-    this.#running.set(event.taskId, lineId);
+    this.#bind(event.taskId, lineId);
+    if (event.kind === "subagent" && event.background === true) {
+      // A background agent whose call this reply does not hold: one that started again once
+      // the reply of its call had ended (recorded: `subagent-nested-background-mid-turn.jsonl`),
+      // or one a subagent started. No card, as for any agent in the background, and no launch
+      // line, which belongs under its call.
+      this.#launched.add(lineId);
+      return;
+    }
     if (event.callId === null) this.#commands.add(lineId);
     const title = oneLine(event.description, TITLE_LIMIT);
     const name = event.taskType ?? "task";
@@ -599,12 +622,18 @@ export class TurnRenderer<Footer = FooterFields> {
     if (entry === undefined) return;
     // A call that runs calls of its own (a subagent) keeps its line once it ends, whether it
     // ran in the foreground or not: the nested calls are its work, not one more call.
-    await this.#set({
+    await this.#noted(root, {
       ...entry,
       details: this.#under(root, said),
       task: true,
       calls: entry.calls + 1,
     });
+  }
+
+  /** A change to a card from under it: kept, not sent, while the card's call is still held. */
+  async #noted(root: string, update: TaskUpdate): Promise<void> {
+    if (this.#undecided.has(root)) this.#lines.set(root, update);
+    else await this.#set(update);
   }
 
   /**
@@ -615,7 +644,8 @@ export class TurnRenderer<Footer = FooterFields> {
     const root = this.#rootOf.get(parent) ?? parent;
     const entry = this.#lines.get(root);
     if (entry === undefined || words === "") return;
-    await this.#set({ ...entry, details: this.#under(root, oneLine(words, 200)), task: true });
+    const details = this.#under(root, oneLine(words, 200));
+    await this.#noted(root, { ...entry, details, task: true });
   }
 
   /** The nested lines of a card with `said` added: its last `CHILD_LINES`. */
