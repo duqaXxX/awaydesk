@@ -73,7 +73,7 @@ test("a subagent, then the command it left running: the list follows, a task's e
   await h.until(() => holders(h.slack.messageBlocks()).length === 1);
   let list = card(h.slack.messageBlocks().at(-1) ?? []);
   assert.equal(list?.title, "1 agent still running");
-  assert.deepEqual(linesOf(list), ["Agent: Launch background sleep command"]);
+  assert.deepEqual(linesOf(list), ["general-purpose  Launch background sleep command"]);
   // The agent ends and the command it started goes on alone: the agent's line is gone. (The
   // command counts from the agent's end on: a task started inside a call is promoted then.)
   h.clients[0]?.inject([...work, ...report]);

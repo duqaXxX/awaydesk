@@ -4,34 +4,10 @@
   {
    "calls": [
     {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "toolu_013vuT1tVKbAduiW9vAf1YWk",
-      "name": "Agent",
-      "output": null,
-      "preview": null,
-      "status": "in_progress",
-      "task": false,
-      "title": "Agent: Run ls and report contents"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": "Running in background",
-      "folded": null,
-      "id": "toolu_013vuT1tVKbAduiW9vAf1YWk",
-      "name": "Agent",
-      "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-      "preview": null,
-      "status": "in_progress",
-      "task": true,
-      "title": "Agent: Run ls and report contents"
-     }
+     "call": "text",
+     "ending": false,
+     "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\n",
+     "notice": true
     },
     {
      "call": "text",
@@ -161,20 +137,7 @@
     },
     {
      "call": "finish",
-     "closing": [
-      {
-       "calls": 0,
-       "details": "Running in background",
-       "folded": null,
-       "id": "toolu_013vuT1tVKbAduiW9vAf1YWk",
-       "name": "Agent",
-       "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-       "preview": null,
-       "status": "in_progress",
-       "task": true,
-       "title": "Agent: Run ls and report contents"
-      }
-     ],
+     "closing": [],
      "footer": "footer"
     },
     {
@@ -342,34 +305,10 @@
  "whole": {
   "calls": [
    {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "toolu_013vuT1tVKbAduiW9vAf1YWk",
-     "name": "Agent",
-     "output": null,
-     "preview": null,
-     "status": "in_progress",
-     "task": false,
-     "title": "Agent: Run ls and report contents"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": "Running in background",
-     "folded": null,
-     "id": "toolu_013vuT1tVKbAduiW9vAf1YWk",
-     "name": "Agent",
-     "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Agent: Run ls and report contents"
-    }
+    "call": "text",
+    "ending": false,
+    "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\n",
+    "notice": true
    },
    {
     "call": "text",
@@ -496,66 +435,6 @@
     "ending": false,
     "markdown": "s.",
     "notice": false
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 1,
-     "details": "Bash: ls -la",
-     "folded": null,
-     "id": "toolu_013vuT1tVKbAduiW9vAf1YWk",
-     "name": "Agent",
-     "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Agent: Run ls and report contents"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 1,
-     "details": "Running List files and directories in current working directory",
-     "folded": null,
-     "id": "toolu_013vuT1tVKbAduiW9vAf1YWk",
-     "name": "Agent",
-     "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Agent: Run ls and report contents"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 1,
-     "details": null,
-     "folded": null,
-     "id": "toolu_013vuT1tVKbAduiW9vAf1YWk",
-     "name": "Agent",
-     "output": null,
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Agent: Run ls and report contents"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 1,
-     "details": null,
-     "folded": null,
-     "id": "toolu_013vuT1tVKbAduiW9vAf1YWk",
-     "name": "Agent",
-     "output": "The current working directory is empty except for a single file: **Files and directories present:** - `notes.txt` (6 bytes, regular file) That's the only item in `/home/dev/project`.",
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Agent: Run ls and report contents"
-    }
    },
    {
     "call": "text",

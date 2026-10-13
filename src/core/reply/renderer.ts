@@ -13,7 +13,7 @@ import type { FooterFields, Preview, ReplySink, TaskStatus, TaskUpdate } from ".
 import { blank } from "../../text.ts";
 import { formatTokens } from "../footer.ts";
 import * as texts from "../texts.ts";
-import { answered, PREVIEWED, preview } from "./previews.ts";
+import { answered, LAUNCHERS, launched, PREVIEWED, preview } from "./previews.ts";
 import { BACKGROUND, oneLine, STOPPED, splitLines, TITLE_LIMIT } from "./words.ts";
 
 export const OUTPUT_LIMIT = 200;
@@ -125,6 +125,13 @@ export class TurnRenderer<Footer = FooterFields> {
   readonly #aside = new Map<string, TaskStarted>();
   /** Nested calls whose result arrived. */
   readonly #closedCalls = new Set<string>();
+  /** Calls of a tool that starts agents, kept from the sink until their task says how it runs. */
+  readonly #undecided = new Set<string>();
+  // Calls whose agent runs in the background: a line of text as the terminal writes it, and no
+  // card. What the agent does under such a call writes nothing, as in the terminal.
+  readonly #launched = new Set<string>();
+  /** A launch line is the last thing written: it ends with its own break. */
+  #afterLaunch = false;
   /** `takePromoted`'s, not yet taken. */
   #promoted: TaskStarted[] = [];
   /** A question's answers, until its call ends. */
@@ -236,6 +243,20 @@ export class TurnRenderer<Footer = FooterFields> {
     return this.#lines.get(this.#lineOfTask.get(taskId) ?? "")?.title ?? null;
   }
 
+  /** Whether this reply shows that task, running or ended: on a line, or as a launch line. */
+  shows(taskId: string): boolean {
+    const id = this.#lineOfTask.get(taskId);
+    return id !== undefined && (this.#lines.has(id) || this.#launched.has(id));
+  }
+
+  /**
+   * Whether this reply shows that task with no line of its own (an agent in the background):
+   * nothing here says its end, which is said in words.
+   */
+  lineless(taskId: string): boolean {
+    return this.#launched.has(this.#lineOfTask.get(taskId) ?? "");
+  }
+
   /**
    * Whether this task event is of a task held aside or dropped as the work of a call inside
    * another call, a call whose root this reply holds: the agent reports such a task to the
@@ -280,7 +301,7 @@ export class TurnRenderer<Footer = FooterFields> {
 
   /** Whether this reply holds the line of that call, or of the subagent it runs in. */
   owns(callId: string): boolean {
-    return this.#lines.has(callId) || this.#rootOf.has(callId);
+    return this.#lines.has(callId) || this.#rootOf.has(callId) || this.#launched.has(callId);
   }
 
   /**
@@ -293,7 +314,7 @@ export class TurnRenderer<Footer = FooterFields> {
   async close(footer: Footer | null, signal?: AbortSignal): Promise<void> {
     const interrupted = this.result !== null && this.result.ending === "interrupted";
     await this.#handOver();
-    if (!this.#wroteText && this.#lines.size === 0) {
+    if (!this.#wroteText && this.#lines.size === 0 && this.#launched.size === 0) {
       // A command that prints nothing (a local one, say) still gets a visible answer.
       await this.#text(interrupted ? texts.STOPPED : texts.named(texts.NO_OUTPUT, this.#names), {
         notice: true,
@@ -354,6 +375,7 @@ export class TurnRenderer<Footer = FooterFields> {
   async feedNotice(text: string): Promise<void> {
     const prefix = this.#wroteText || this.#lines.size > 0 ? "\n\n" : "";
     this.#afterText = false;
+    this.#afterLaunch = false;
     await this.#handOver();
     await this.#sink.text(`${prefix}${text}\n\n`, { notice: true, ending: false });
   }
@@ -409,12 +431,14 @@ export class TurnRenderer<Footer = FooterFields> {
     const title = taskTitle(event.toolName, event.input);
     const parent = event.parentCallId;
     const root = parent === null ? null : (this.#rootOf.get(parent) ?? parent);
-    if (root !== null && this.#lines.has(root)) {
+    if (root !== null && (this.#lines.has(root) || this.#launched.has(root))) {
       this.#rootOf.set(event.callId, root);
       await this.#child(root, title);
-    } else if (PREVIEWED.has(event.toolName)) {
+    } else if (PREVIEWED.has(event.toolName) || LAUNCHERS.has(event.toolName)) {
       // Kept from the sink until it ends: what shows it then is its preview with no card, or
-      // a card that says why it failed. An approval has a message of its own.
+      // a card that says why it failed. An approval has a message of its own. A call that
+      // starts an agent is kept until its task starts (`#taskStarted`).
+      if (LAUNCHERS.has(event.toolName)) this.#undecided.add(event.callId);
       this.#lines.set(
         event.callId,
         line(event.callId, title, "in_progress", { name: event.toolName }),
@@ -429,6 +453,7 @@ export class TurnRenderer<Footer = FooterFields> {
     await this.#outlived(event.callId);
     const entry = this.#lines.get(event.callId);
     if (entry === undefined) return;
+    this.#undecided.delete(event.callId); // no task came: the call shows as any other
     if ([...this.#running.values()].includes(entry.id)) {
       // The call only launched a task, which is still running: it outlives the call, so its
       // line becomes a task's line and stays open. A task that ends before its call's result
@@ -472,12 +497,27 @@ export class TurnRenderer<Footer = FooterFields> {
     // its later events must reach it, or its end would never close its line.
     this.#inside.delete(event.taskId);
     const call = event.callId;
+    if (call !== null && this.#launched.has(call)) {
+      // The agent of a call already written as a line of text starts again, under that call
+      // (recorded: `subagent-nested-background.jsonl`, where the end of a command it left
+      // running wakes it): running once more, and no second line.
+      this.#bind(event.taskId, call);
+      return;
+    }
+    const held = call !== null && this.#undecided.delete(call) ? this.#lines.get(call) : undefined;
+    if (call !== null && held !== undefined) {
+      if (event.kind === "subagent" && event.background === true) {
+        await this.#launch(event, call);
+        return;
+      }
+      // An agent the call waits for: its card, from here on.
+      await this.#set(held);
+    }
     if (call !== null && this.#lines.has(call)) {
       // A call's task: the agent starts one for a long command in the foreground too
       // (recorded: `interrupt.jsonl`, CLI 2.1.283). The line stays the call's until the call's
       // result arrives with the task still running (`#callEnded`).
-      this.#lineOfTask.set(event.taskId, call);
-      this.#running.set(event.taskId, call);
+      this.#bind(event.taskId, call);
       return;
     }
     const command = [...this.#running.values()].reverse().find((id) => this.#commands.has(id));
@@ -493,10 +533,43 @@ export class TurnRenderer<Footer = FooterFields> {
     await this.#openLine(event);
   }
 
+  /**
+   * An agent started in the background: the terminal's line for it, as text of the reply, and
+   * no card. The task still runs for this reply, which the list of what still runs reads.
+   */
+  async #launch(event: TaskStarted, call: string): Promise<void> {
+    this.#lines.delete(call);
+    // A line of the daemon's, as `feedNotice` writes one: it is not the turn's text, so a turn
+    // that says nothing else still gets its last text or its error from the turn's end.
+    // Agents started one after the other read as one block, with no empty line between them.
+    const apart =
+      !this.#afterLaunch && (this.#wroteText || this.#lines.size > 0 || this.#launched.size > 0);
+    this.#launched.add(call);
+    this.#bind(event.taskId, call);
+    this.#afterText = false;
+    await this.#handOver();
+    const said = launched(event.agentType, event.description);
+    await this.#sink.text(`${apart ? "\n\n" : ""}${said}\n\n`, { notice: true, ending: false });
+    this.#afterLaunch = true;
+  }
+
+  /** The task runs for this reply, on that line or under that call. */
+  #bind(taskId: string, lineId: string): void {
+    this.#lineOfTask.set(taskId, lineId);
+    this.#running.set(taskId, lineId);
+  }
+
   async #openLine(event: TaskStarted): Promise<void> {
     const lineId = `task-${event.taskId}`;
-    this.#lineOfTask.set(event.taskId, lineId);
-    this.#running.set(event.taskId, lineId);
+    this.#bind(event.taskId, lineId);
+    if (event.kind === "subagent" && event.background === true) {
+      // A background agent whose call this reply does not hold: one that started again once
+      // the reply of its call had ended (recorded: `subagent-nested-background-mid-turn.jsonl`),
+      // or one a subagent started. No card, as for any agent in the background, and no launch
+      // line, which belongs under its call.
+      this.#launched.add(lineId);
+      return;
+    }
     if (event.callId === null) this.#commands.add(lineId);
     const title = oneLine(event.description, TITLE_LIMIT);
     const name = event.taskType ?? "task";
@@ -534,6 +607,7 @@ export class TurnRenderer<Footer = FooterFields> {
     }
     this.#running.delete(taskId);
     const lineId = this.#lineOfTask.get(taskId) ?? `task-${taskId}`;
+    if (this.#launched.has(lineId)) return; // no card: its end is the session's end line
     const entry =
       this.#lines.get(lineId) ??
       line(lineId, oneLine(summary || taskId, TITLE_LIMIT), "in_progress", {
@@ -554,12 +628,18 @@ export class TurnRenderer<Footer = FooterFields> {
     if (entry === undefined) return;
     // A call that runs calls of its own (a subagent) keeps its line once it ends, whether it
     // ran in the foreground or not: the nested calls are its work, not one more call.
-    await this.#set({
+    await this.#noted(root, {
       ...entry,
       details: this.#under(root, said),
       task: true,
       calls: entry.calls + 1,
     });
+  }
+
+  /** A change to a card from under it: kept, not sent, while the card's call is still held. */
+  async #noted(root: string, update: TaskUpdate): Promise<void> {
+    if (this.#undecided.has(root)) this.#lines.set(root, update);
+    else await this.#set(update);
   }
 
   /**
@@ -570,7 +650,8 @@ export class TurnRenderer<Footer = FooterFields> {
     const root = this.#rootOf.get(parent) ?? parent;
     const entry = this.#lines.get(root);
     if (entry === undefined || words === "") return;
-    await this.#set({ ...entry, details: this.#under(root, oneLine(words, 200)), task: true });
+    const details = this.#under(root, oneLine(words, 200));
+    await this.#noted(root, { ...entry, details, task: true });
   }
 
   /** The nested lines of a card with `said` added: its last `CHILD_LINES`. */
@@ -587,6 +668,7 @@ export class TurnRenderer<Footer = FooterFields> {
       this.#afterText = false;
     }
     this.#lines.set(update.id, update);
+    this.#afterLaunch = false;
     await this.#handOver();
     await this.#sink.task(update);
   }
@@ -609,6 +691,7 @@ export class TurnRenderer<Footer = FooterFields> {
   ): Promise<void> {
     if (markdown === "") return;
     const { notice = false, ending = false, piece = false } = options;
+    this.#afterLaunch = false;
     this.#wroteText = true;
     this.#afterText = !notice; // a notice ends with its own break
     if (piece && !this.#streaming) {

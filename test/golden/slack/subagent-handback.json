@@ -21,20 +21,14 @@
    [
     {
      "details": "Running in background",
-     "id": "fold:toolu_01DfXaFraaJ6RoMx2AsQa2b5",
+     "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
      "status": "complete",
      "title": "Bash: sleep 15"
-    },
-    {
-     "details": "Running in background\nBash: echo subagent-ok\nRunning Echo subagent-ok\nBash: echo subagent-ok\nSubagentHandback: subagent-ok\nRun echo subagent-ok",
-     "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-     "status": "complete",
-     "title": "Agent: Run echo subagent-ok · 2 calls"
     }
    ]
   ],
   "message_texts": [
-   "Both tasks are started in the background: the subagent that runs `echo subagent-ok` and the command `sleep 15`. Neither has finished yet.\n\nThe subagent finished: `echo subagent-ok` printed `subagent-ok`. The command `sleep 15` is still running.\n\nThe command `sleep 15` ended with exit code 0, so both tasks are done."
+   "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent\n\nBoth tasks are started in the background: the subagent that runs `echo subagent-ok` and the command `sleep 15`. Neither has finished yet.\n\nThe subagent finished: `echo subagent-ok` printed `subagent-ok`. The command `sleep 15` is still running.\n\nThe command `sleep 15` ended with exit code 0, so both tasks are done."
   ],
   "pushes": 1
  },
@@ -46,9 +40,9 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01DfXaFraaJ6RoMx2AsQa2b5",
+      "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
       "status": "in_progress",
-      "title": "Agent: Run echo subagent-ok",
+      "title": "Bash: sleep 15",
       "type": "task_update"
      }
     ],
@@ -65,10 +59,8 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-      "status": "in_progress",
-      "title": "Bash: sleep 15",
-      "type": "task_update"
+      "text": "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent\n\n",
+      "type": "markdown_text"
      }
     ],
     "ts": "1790000000.000001"
@@ -82,9 +74,9 @@
     "chunks": [
      {
       "details": "Running in background",
-      "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
+      "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
       "status": "in_progress",
-      "title": "Agent: Run echo subagent-ok",
+      "title": "Bash: sleep 15",
       "type": "task_update"
      }
     ],
@@ -98,57 +90,6 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "details": "Running in background",
-      "id": "fold:toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-      "status": "in_progress",
-      "title": "Bash: sleep 15",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 4,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "details": "\nBash: echo subagent-ok",
-      "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-      "status": "in_progress",
-      "title": "Agent: Run echo subagent-ok · 1 call",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 5,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "details": "\nRunning Echo subagent-ok",
-      "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-      "status": "in_progress",
-      "title": "Agent: Run echo subagent-ok · 1 call",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 6,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
       "text": "Both ",
       "type": "markdown_text"
      }
@@ -158,7 +99,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 7,
+   "after_sink_call": 4,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -172,7 +113,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 8,
+   "after_sink_call": 5,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -186,7 +127,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 9,
+   "after_sink_call": 6,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -200,7 +141,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 10,
+   "after_sink_call": 7,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -214,7 +155,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 11,
+   "after_sink_call": 8,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -228,7 +169,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 12,
+   "after_sink_call": 9,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -242,7 +183,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 13,
+   "after_sink_call": 10,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -256,7 +197,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 14,
+   "after_sink_call": 11,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -270,7 +211,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 15,
+   "after_sink_call": 12,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -284,7 +225,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 16,
+   "after_sink_call": 13,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -298,7 +239,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 17,
+   "after_sink_call": 14,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -312,7 +253,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 18,
+   "after_sink_call": 15,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -326,7 +267,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 19,
+   "after_sink_call": 16,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -340,7 +281,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 20,
+   "after_sink_call": 17,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -354,7 +295,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 21,
+   "after_sink_call": 18,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -368,7 +309,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 22,
+   "after_sink_call": 19,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -382,7 +323,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 23,
+   "after_sink_call": 20,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -396,7 +337,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 24,
+   "after_sink_call": 21,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -410,7 +351,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 25,
+   "after_sink_call": 22,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -424,7 +365,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 26,
+   "after_sink_call": 23,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -438,7 +379,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 27,
+   "after_sink_call": 24,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -452,7 +393,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 28,
+   "after_sink_call": 25,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -466,7 +407,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 29,
+   "after_sink_call": 26,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -480,7 +421,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 30,
+   "after_sink_call": 27,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -494,7 +435,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 31,
+   "after_sink_call": 28,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -508,7 +449,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 32,
+   "after_sink_call": 29,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -522,7 +463,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 33,
+   "after_sink_call": 30,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -536,57 +477,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 34,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "details": "\nBash: echo subagent-ok\nSubagentHandback: subagent-ok",
-      "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-      "status": "in_progress",
-      "title": "Agent: Run echo subagent-ok · 2 calls",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 35,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "details": "\nRun echo subagent-ok",
-      "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-      "status": "in_progress",
-      "title": "Agent: Run echo subagent-ok · 2 calls",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 36,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "id": "toolu_01DfXaFraaJ6RoMx2AsQa2b5",
-      "status": "complete",
-      "title": "Agent: Run echo subagent-ok · 2 calls",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 38,
+   "after_sink_call": 31,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -600,7 +491,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 39,
+   "after_sink_call": 32,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -614,7 +505,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 40,
+   "after_sink_call": 33,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -628,7 +519,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 41,
+   "after_sink_call": 34,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -642,7 +533,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 42,
+   "after_sink_call": 35,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -656,7 +547,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 43,
+   "after_sink_call": 36,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -670,7 +561,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 44,
+   "after_sink_call": 37,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -684,7 +575,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 45,
+   "after_sink_call": 38,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -698,7 +589,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 46,
+   "after_sink_call": 39,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -712,7 +603,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 47,
+   "after_sink_call": 40,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -726,7 +617,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 48,
+   "after_sink_call": 41,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -740,7 +631,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 49,
+   "after_sink_call": 42,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -754,7 +645,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 50,
+   "after_sink_call": 43,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -768,7 +659,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 51,
+   "after_sink_call": 44,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -782,7 +673,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 52,
+   "after_sink_call": 45,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -796,12 +687,12 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 53,
+   "after_sink_call": 46,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01DfXaFraaJ6RoMx2AsQa2b5",
+      "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
       "status": "complete",
       "title": "Bash: sleep 15",
       "type": "task_update"
@@ -812,7 +703,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 55,
+   "after_sink_call": 48,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -826,7 +717,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 56,
+   "after_sink_call": 49,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -840,7 +731,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 57,
+   "after_sink_call": 50,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -854,7 +745,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 58,
+   "after_sink_call": 51,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -868,7 +759,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 59,
+   "after_sink_call": 52,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -882,7 +773,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 60,
+   "after_sink_call": 53,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -896,7 +787,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 61,
+   "after_sink_call": 54,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -910,7 +801,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 62,
+   "after_sink_call": 55,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -924,7 +815,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 63,
+   "after_sink_call": 56,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -938,7 +829,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 65,
+   "after_sink_call": 58,
    "args": {
     "blocks": [
      {

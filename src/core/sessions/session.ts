@@ -91,6 +91,7 @@ import { DENY, type Decision, toAnswer } from "../requests.ts";
 import { type Choice, DEFAULT } from "../setup.ts";
 import * as texts from "../texts.ts";
 import {
+  FAILURE_LIMIT,
   HOLD_MARKER,
   IDLE_CLOSE_SECONDS,
   INJECTED_TURN_WAIT,
@@ -203,8 +204,13 @@ export class ThreadSession {
   // What the running turn's reply says when it ends: how many queued messages a restart
   // dropped, since they get no reply of their own.
   private endNotes: string[] = [];
+  /** End lines of agents with no card that ended while a message waited for its turn. */
+  private endedAhead: string[] = [];
   // Each task's type and description, for the list of what still runs and the task's end line.
-  private readonly tasks = new Map<string, readonly [kind: TaskKind, description: string]>();
+  private readonly tasks = new Map<
+    string,
+    readonly [kind: TaskKind, description: string, agentType: string | null]
+  >();
   // Ended tasks not yet opened into a report turn's reply: (task id, its formatted end line).
   // The task id finds the reply that started it (the report renders there when that reply is
   // the last thing in the thread).
@@ -1674,6 +1680,18 @@ export class ThreadSession {
     ) {
       this.ended.push([event.taskId, this.endedLine(event)]);
     }
+    if (event.type === "task_ended" && !stopped) {
+      // An agent in the background that ends while a turn runs: with no card to complete, its
+      // end is said where the conversation is, as the terminal prints `Agent "..." finished`
+      // among the turn's calls (captured 2026-10-13 on Claude Code 2.1.296). One that ends
+      // with a message of the owner's already waiting says it in that message's reply.
+      const writing = this.active?.renderer ?? null;
+      const reply = this.taskReplies.get(event.taskId) ?? writing;
+      if (reply?.lineless(event.taskId)) {
+        if (writing !== null) await writing.feedNotice(this.endedLine(event));
+        else if (this.sent.length > 0) this.endedAhead.push(this.endedLine(event));
+      }
+    }
     if (
       event.type === "task_updated" &&
       event.terminal &&
@@ -1819,7 +1837,7 @@ export class ThreadSession {
   }
 
   private recordTask(event: TaskStarted): void {
-    this.tasks.set(event.taskId, [event.kind, event.description]);
+    this.tasks.set(event.taskId, [event.kind, event.description, event.agentType]);
     if (this.mayHaveOrderedRestart) this.afterRestart.add(event.taskId);
     const kept = this.deps.tasksKept ?? TASKS_KEPT;
     for (const taskId of this.tasks.keys()) {
@@ -1843,7 +1861,9 @@ export class ThreadSession {
 
   /**
    * The terminal's line for a task's end: a command's own summary, or `Agent "..." finished`
-   * from the task's description, plus the duration when the task reports one.
+   * from the task's description, plus the duration when the task reports one. An agent that
+   * failed says why, as the terminal's line does (`Agent "..." failed: <reason>`, captured
+   * 2026-10-13 on Claude Code 2.1.296): its summary is the reason then, not a report.
    */
   private endedLine(event: TaskEnded): string {
     const [kind, description] = this.tasks.get(event.taskId) ?? ["other", ""];
@@ -1856,6 +1876,9 @@ export class ThreadSession {
       const name = TASK_WORDS[kind][1];
       const outcome = event.status === "completed" ? "finished" : event.status;
       text = `${name} "${oneLine(label || event.taskId, 120)}" ${outcome}`;
+      if (kind === "subagent" && event.status === "failed" && event.summary) {
+        text += `: ${oneLine(event.summary, FAILURE_LIMIT)}`;
+      }
     }
     return endedLine(text, event.status, event.durationMs);
   }
@@ -1894,19 +1917,19 @@ export class ThreadSession {
     }
     const ends = lines.map(([, line]) => line).join("\n");
     // In the reply that started the task the report needs no line to say what it is about:
-    // the task's card is there. Anywhere else the notice says it, as it always has.
+    // the task's card or launch line is there. Anywhere else the notice says it, as it always has.
     const named = lines.length === 0 && reported !== null && target !== null;
     return [named ? null : ends || texts.BACKGROUND_NOTICE, target];
   }
 
   /**
-   * A reply still tracked that shows `taskId`'s line though the task is not its to wait for: a
+   * A reply still tracked that shows `taskId` though the task is not its to wait for: a
    * task that ended inside the turn that started it is tracked nowhere (`closeReply` records the
    * ones that outlive the turn), and its reply stays open only for another task of that turn.
    */
   private showing(taskId: string): TurnRenderer | null {
     for (const reply of this.taskReplies.values()) {
-      if (reply.taskTitle(taskId) !== null) return reply;
+      if (reply.shows(taskId)) return reply;
     }
     return null;
   }
@@ -2268,6 +2291,9 @@ export class ThreadSession {
     };
     this.active = active;
     if (opening !== null) await renderer.feedNotice(opening);
+    const ahead = this.endedAhead;
+    this.endedAhead = [];
+    if (ahead.length > 0) await renderer.feedNotice(ahead.join("\n"));
     if (this.notice !== null) {
       const notice = this.notice;
       this.notice = null;
@@ -2332,6 +2358,7 @@ export class ThreadSession {
     this.taskReplies.clear();
     this.tasks.clear();
     this.ended = [];
+    this.endedAhead = [];
     this.unreported.clear();
     this.notificationWaits = false;
     this.stopped.clear();
@@ -2499,10 +2526,17 @@ export class ThreadSession {
       .filter(([taskId, renderer]) => renderer.runningTasks.includes(taskId))
       .sort(([a], [b]) => rank(a) - rank(b))
       .map(([taskId, renderer]) => {
-        const [kind, description] = this.tasks.get(taskId) ?? ["other", ""];
+        const [kind, description, agentType] = this.tasks.get(taskId) ?? ["other", "", null];
         let label: string;
-        if (description) {
-          label = kind === "subagent" ? `${TASK_WORDS.subagent[1]}: ${description}` : description;
+        if (description && kind === "subagent") {
+          // The terminal's row: the agent's type, then what it does.
+          if (agentType !== null) {
+            const type = oneLine(agentType, TITLE_LIMIT / 2);
+            return `${type}  ${oneLine(description, TITLE_LIMIT - Array.from(type).length - 2)}`;
+          }
+          label = `${TASK_WORDS.subagent[1]}: ${description}`;
+        } else if (description) {
+          label = description;
         } else {
           label = renderer.taskTitle(taskId) || taskId;
         }

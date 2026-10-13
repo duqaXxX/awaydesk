@@ -273,6 +273,16 @@ export type SessionEvent =
       readonly taskType: string | null;
       readonly description: string;
       readonly callId: string | null;
+      /**
+       * The type of agent a subagent is, as the agent names it (`mechanical`); null for any
+       * other task and when the agent gives none.
+       */
+      readonly agentType: string | null;
+      /**
+       * Whether the task started in the background, the call that started it not waiting for
+       * it; null when the agent does not say.
+       */
+      readonly background: boolean | null;
     }
   | {
       readonly type: "task_progress";

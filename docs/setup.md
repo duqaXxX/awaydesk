@@ -731,8 +731,10 @@ A reply is one message in the session's thread, and a native Slack stream. It ap
 has something to show: its first words, or the card of the first tool it uses. Text then grows in
 the order it is written. The tool calls between two pieces of text show as two cards: the first
 counts what ended, in the terminal's words (`Ran 2 shell commands · Read 1 file`), and the second
-names the call that runs now. A subagent's card counts the calls it made and shows what it is
-doing now, and a background task keeps its card open until it ends. An Edit or a Write shows once it has ended, as
+names the call that runs now. A subagent Claude Code starts in the background is two
+lines of text, as in the terminal, with its type in bold: `mechanical(review)`, then
+`⎿ Backgrounded agent`. It has no card, and what it does shows nowhere in the reply. A background
+command keeps its card open until it ends. An Edit or a Write shows once it has ended, as
 one collapsed block titled with the call (`Update(notes.txt)`) that opens on its diff or on the
 new file's first lines. When the reply ends, a divider and the footer close the same message, and
 each pair of cards gives way to one line (`✓ Ran 2 shell commands · Read 1 file`). A reply still
@@ -751,7 +753,8 @@ shown.
 Messages sent to a thread while its turn is running wait their turn; each gets its own reply. When
 a background task finishes while nothing runs, Claude Code starts a turn of its own to report it,
 as it does in the terminal: that reply opens with Claude Code's own line for the task's end, such
-as `✓ Agent "review" finished · 3m 59s`. While tasks run, a card above the footer of the thread's
+as `✓ Agent "review" finished · 3m 59s`, or `✗ Agent "review" failed: ` and the reason. An agent
+that ends while a turn runs has that line in the turn's reply. While tasks run, a card above the footer of the thread's
 last reply lists them: a title such as `1 agent · 1 shell still running` and a line per task, up to
 six, then `+N more`.
 

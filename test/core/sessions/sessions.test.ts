@@ -1611,21 +1611,63 @@ function hasParent(item: Item): boolean {
   return (recordOf(item)?.parent_tool_use_id ?? null) !== null;
 }
 
-test("a background agent s calls update its card and open no reply", async (t) => {
-  const recorded = sdkMessages("subagent");
-  const turn = at(splitTurns(recorded), 0).filter((item) => !hasParent(item));
-  const children = recorded.filter(hasParent);
-  const h = harnessFor(t)({ turns: [turn] });
-  await (await h.session().submit("start it")).done.wait();
-  const posted = h.slack.postedTs.length;
-  h.clients[0]?.inject(children);
-  // A task that outlived its own turn updating its card afterward debounces like any other
-  // change: `until` gives it the room to land.
-  await h.until(() => h.cards().some((card) => String(card.details ?? "").includes("Bash")));
-  assert.ok(h.slack.postedTs.length === posted && h.slack.streamTs.length === 1);
-  const [agent, ...more] = h.cards().filter((card) => String(card.title).startsWith("Agent"));
-  assert.equal(more.length, 0);
-  assert.ok(String(agent?.details).includes("Bash") && String(agent?.title).includes(" call"));
+test("a background agent is a launch line, and its calls write nothing", async (t) => {
+  // subagent.jsonl: the agent's own calls arrive after the turn that started it has ended.
+  const [first, ...later] = splitTurns(sdkMessages("subagent")) as [Item[], ...Item[][]];
+  assert.ok(later.flat().some(hasParent));
+  const h = harnessFor(t)({ turns: [first] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  const launch = "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent";
+  assert.ok(at(h.bodies(), 0).includes(launch));
+  h.clients[0]?.inject(later.flat());
+  await h.until(() => h.reactions().at(-1) === Status.DONE && session.idle, 3.0);
+  // No card at any point, for the agent or for what it ran, and one launch line.
+  assert.deepEqual(h.slack.messageCards().flat(), []);
+  const body = at(h.bodies(), 0);
+  assert.equal(body.split("Backgrounded agent").length - 1, 1);
+  assert.ok(body.includes('✓ Agent "Run ls and report contents" finished'));
+  assert.equal(h.slack.streamTs.length, 1);
+});
+
+test("a background agent that ends while a turn runs has its end line in that turn s reply", async (t) => {
+  // subagent.jsonl with the frames of the agent's end moved before the first turn's result, as
+  // for an agent quicker than the turn that started it. With no card to complete, the end is a
+  // line of the reply being written, where the terminal prints it (captured 2026-10-13 on
+  // Claude Code 2.1.296).
+  const [first, ...later] = splitTurns(sdkMessages("subagent")) as [Item[], ...Item[][]];
+  const ends = later
+    .flat()
+    .filter((item) => isSystem(item, "task_updated") || isSystem(item, "task_notification"));
+  assert.equal(ends.length, 2);
+  const h = harnessFor(t)({ turns: [[...first.slice(0, -1), ...ends, at(first, -1)]] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await h.until(() => session.idle);
+  const body = at(h.bodies(), 0);
+  assert.equal(body.split('✓ Agent "Run ls and report contents" finished').length - 1, 1);
+  assert.ok(body.indexOf("Backgrounded agent") < body.indexOf("✓ Agent"));
+  assert.deepEqual(h.slack.messageCards().flat(), []);
+  assert.equal(session.runningKinds, "");
+});
+
+test("a background agent that ends while a message waits has its end line in that message s reply", async (t) => {
+  // Seen in a real session (2026-10-13): of two agents ending as the owner wrote, one end fell
+  // between the message and the start of its turn, and no line said it.
+  const [first, ...later] = splitTurns(sdkMessages("subagent")) as [Item[], ...Item[][]];
+  const ends = later
+    .flat()
+    .filter((item) => isSystem(item, "task_updated") || isSystem(item, "task_notification"));
+  const h = harnessFor(t)({ turns: [first, sdkMessages("tools")] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  const waiting = session.submit("hello");
+  h.clients[0]?.inject(ends);
+  await (await waiting).done.wait();
+  await h.until(() => session.idle);
+  const line = '✓ Agent "Run ls and report contents" finished';
+  assert.equal(h.bodies().join("\n").split(line).length - 1, 1);
+  assert.ok(at(h.bodies(), -1).includes(line) || at(h.bodies(), 0).includes(line));
 });
 
 test("ended tasks are forgotten past the limit", async (t) => {
@@ -2669,9 +2711,11 @@ test("a task started after its call ended is an ordinary task of the agent s rep
   await (await session.submit("start it")).done.wait();
   const posted = h.slack.postedTs.length;
   h.clients[0]?.inject([...children, nested]);
-  await h.until(() => h.cards().some((card) => card.title === "nested"));
+  await h.until(() => inside(session).taskReplies.has("nested"));
   assert.ok(h.slack.postedTs.length === posted && h.slack.streamTs.length === 1); // no reply of its own
-  assert.ok(inside(session).taskReplies.has("nested"));
+  // An agent in the background: a running task of that reply, with no card as any such agent.
+  assert.ok(inside(session).runningTaskIds().includes("nested"));
+  assert.ok(!h.cards().some((card) => card.title === "nested"));
 });
 
 test("a nested task that ends before its call s result is the agent s foreground work", async (t) => {
@@ -4307,11 +4351,9 @@ test("a subagent s commands have no card and no end line in the report", async (
   assert.equal(bodies.length, 2); // and its ending is posted as the reply's last message
   const body = at(bodies, 0);
   assert.ok(body.split("✓ ").length - 1 === 1 && body.includes('✓ Agent "'));
-  const cards = h.slack.messageCards(); // the two commands show on the agent's card
-  assert.equal(cards.length, 2);
-  assert.equal(at(cards, 0).length, 1);
-  const card = at(at(cards, 0), 0);
-  assert.ok(String(card.title).endsWith("· 2 calls") && card.status === "complete");
+  // The agent runs in the background: a launch line, and no card for it or for its commands.
+  assert.equal(body.split("Backgrounded agent").length - 1, 1);
+  assert.deepEqual(h.slack.messageCards().flat(), []);
   assert.ok(noStreamOpen(h));
 });
 
@@ -4358,7 +4400,7 @@ test("a subagent s command that outlives its call is a running shell", async (t)
   assert.deepEqual(h.clients[0]?.stoppedTasks, [command]);
 });
 
-test("a background subagent s api error shows on its card and not in the text", async (t) => {
+test("a background subagent s api error is the reason in its end line", async (t) => {
   // subagent-api-error.jsonl (issue #161): a background subagent whose requests all fail,
   // after the main turn's result; then Claude Code's report turn.
   const [first, later] = splitTurns(sdkMessages("subagent-api-error")) as [Item[], Item[]];
@@ -4380,10 +4422,12 @@ test("a background subagent s api error shows on its card and not in the text", 
   const texts_ = h.slack.messageTexts();
   assert.equal(texts_.length, 2); // the reply, and its ending posted when the report came
   const text = String(texts_[0]);
-  assert.ok(!text.includes("API Error")); // not at the top level, as no other text of a subagent is
-  assert.ok(text.split("\n").includes('✗ Agent "Synthetic subtask" failed'));
-  const card = at(at(h.slack.messageCards(), 0), -1); // the report rewrote the card by edit
-  assert.ok(card.status === "error" && String(card.output).startsWith(reason));
+  // The terminal's line: the task's end, then why. The subagent's own message is no line of the
+  // reply, as no other text of a subagent is, and no card is left to carry it.
+  const lines = text.split("\n");
+  assert.equal(lines.filter((line) => line.includes("API Error")).length, 1);
+  assert.ok(lines.some((line) => line.startsWith(`✗ Agent "Synthetic subtask" failed: ${reason}`)));
+  assert.deepEqual(h.slack.messageCards().flat(), []);
   assert.ok(!h.reactions().includes(Status.ERROR)); // the main turn and its report both succeeded
   assert.deepEqual(
     log.entries.filter((entry) => entry.level === "WARNING").map((entry) => entry.message),
@@ -4491,9 +4535,10 @@ test("a subagent s command and the agent s second end close the reply as before"
   assert.ok(session.runningKinds === "" && inside(session).runningTaskIds().length === 0);
   assert.equal(inside(session).unlanded.size, 0);
   assert.ok(noStreamOpen(h));
+  // The command's card alone: the agent that started it has a launch line and no card.
   assert.deepEqual(
     h.cards().map((card) => card.status),
-    ["complete", "complete"],
+    ["complete"],
   );
   assert.equal(h.slack.streamTs.length, 1); // every report rendered into the reply that began it
 });

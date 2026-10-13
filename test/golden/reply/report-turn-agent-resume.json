@@ -4,64 +4,10 @@
   {
    "calls": [
     {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-      "name": "Agent",
-      "output": null,
-      "preview": null,
-      "status": "in_progress",
-      "task": false,
-      "title": "Agent: Test background agent"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": "Running in background",
-      "folded": null,
-      "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-      "name": "Agent",
-      "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-      "preview": null,
-      "status": "in_progress",
-      "task": true,
-      "title": "Agent: Test background agent"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 1,
-      "details": "Bash: sleep 3",
-      "folded": null,
-      "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-      "name": "Agent",
-      "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-      "preview": null,
-      "status": "in_progress",
-      "task": true,
-      "title": "Agent: Test background agent"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 1,
-      "details": "Running sleep 3",
-      "folded": null,
-      "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-      "name": "Agent",
-      "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-      "preview": null,
-      "status": "in_progress",
-      "task": true,
-      "title": "Agent: Test background agent"
-     }
+     "call": "text",
+     "ending": false,
+     "markdown": "**Agent**(Test background agent)\n⎿ Backgrounded agent\n\n",
+     "notice": true
     },
     {
      "call": "text",
@@ -71,20 +17,7 @@
     },
     {
      "call": "finish",
-     "closing": [
-      {
-       "calls": 1,
-       "details": "Running in background",
-       "folded": null,
-       "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-       "name": "Agent",
-       "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-       "preview": null,
-       "status": "in_progress",
-       "task": true,
-       "title": "Agent: Test background agent"
-      }
-     ],
+     "closing": [],
      "footer": "footer"
     },
     {
@@ -441,100 +374,16 @@
  "whole": {
   "calls": [
    {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-     "name": "Agent",
-     "output": null,
-     "preview": null,
-     "status": "in_progress",
-     "task": false,
-     "title": "Agent: Test background agent"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": "Running in background",
-     "folded": null,
-     "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-     "name": "Agent",
-     "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Agent: Test background agent"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 1,
-     "details": "Bash: sleep 3",
-     "folded": null,
-     "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-     "name": "Agent",
-     "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Agent: Test background agent"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 1,
-     "details": "Running sleep 3",
-     "folded": null,
-     "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-     "name": "Agent",
-     "output": "Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)",
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Agent: Test background agent"
-    }
+    "call": "text",
+    "ending": false,
+    "markdown": "**Agent**(Test background agent)\n⎿ Backgrounded agent\n\n",
+    "notice": true
    },
    {
     "call": "text",
     "ending": false,
     "markdown": "STARTED",
     "notice": false
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 1,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-     "name": "Agent",
-     "output": null,
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Agent: Test background agent"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 1,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-     "name": "Agent",
-     "output": "READY",
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Agent: Test background agent"
-    }
    },
    {
     "call": "text",
@@ -607,21 +456,6 @@
     "ending": false,
     "markdown": "SENT",
     "notice": false
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 2,
-     "details": "Bash: sleep 3\nBash: sleep 20",
-     "folded": null,
-     "id": "toolu_01EfzMcm7QNgePnLTZtMW5Mo",
-     "name": "Agent",
-     "output": "READY",
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Agent: Test background agent"
-    }
    },
    {
     "call": "task",

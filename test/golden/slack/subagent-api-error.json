@@ -18,18 +18,10 @@
    ]
   ],
   "message_cards": [
-   [
-    {
-     "details": "Running in background\nAPI Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check your inference gateway (127.0.0.1:58174).",
-     "id": "fold:toolu_synthetic161",
-     "output": "Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check your inference gateway (127.0.0.1:…",
-     "status": "error",
-     "title": "Agent: Synthetic subtask"
-    }
-   ]
+   []
   ],
   "message_texts": [
-   "Synthetic answer.\n\nSynthetic answer."
+   "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent\n\nSynthetic answer.\n\nSynthetic answer."
   ],
   "pushes": 1
  },
@@ -41,10 +33,8 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_synthetic161",
-      "status": "in_progress",
-      "title": "Agent: Synthetic subtask",
-      "type": "task_update"
+      "text": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent\n\n",
+      "type": "markdown_text"
      }
     ],
     "recipient_team_id": "T000TEAM",
@@ -60,23 +50,6 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "details": "Running in background",
-      "id": "fold:toolu_synthetic161",
-      "status": "in_progress",
-      "title": "Agent: Synthetic subtask",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 2,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
       "text": "Synthetic answer.",
       "type": "markdown_text"
      }
@@ -86,57 +59,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 3,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "details": "\nAPI Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check your inference gateway (127.0.0.1:58174).",
-      "id": "fold:toolu_synthetic161",
-      "status": "in_progress",
-      "title": "Agent: Synthetic subtask",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 4,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "id": "fold:toolu_synthetic161",
-      "status": "error",
-      "title": "Agent: Synthetic subtask",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 5,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "id": "fold:toolu_synthetic161",
-      "output": "Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check your inference gateway (127.0.0.1:…",
-      "status": "error",
-      "title": "Agent: Synthetic subtask",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 6,
+   "after_sink_call": 2,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -150,7 +73,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 8,
+   "after_sink_call": 4,
    "args": {
     "blocks": [
      {

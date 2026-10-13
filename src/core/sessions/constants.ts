@@ -42,6 +42,9 @@ export const TASKS_KEPT = 200;
 // The kinds whose notification summary is already the terminal's end line (measured: a
 // command's reads `Background command "..." completed (exit code 0)`; an agent's is its result).
 export const SUMMARY_IS_END_LINE: ReadonlySet<TaskKind> = new Set<TaskKind>(["command"]);
+// How much of the reason an agent failed its end line keeps: the terminal prints it whole, and
+// the longest one captured (a refused request, with its gateway and model) ran to 330 characters.
+export const FAILURE_LIMIT = 400;
 // Tasks whose reply the session remembers. An ended task stays a while, since an agent can
 // report again after its notification; past this many, the oldest ended ones are forgotten.
 export const TASK_REPLIES_KEPT = 100;

@@ -195,7 +195,8 @@ test("a report turn in the daemon that saw the first call opens its own reply be
     string,
     string,
   ];
-  assert.ok(started.startsWith("STARTED"), started);
+  // The agent's launch line, then what the turn that started it said.
+  assert.ok(started.startsWith("**Agent**(") && started.includes("\n\nSTARTED"), started);
   assert.equal(noted, "NOTED"); // the waiting reply's ending, posted when it ended
   assert.equal(continued, "SENT");
   assert.ok(report.includes("REPORTED") && !report.includes("SENT"), report);

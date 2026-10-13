@@ -8,10 +8,8 @@
      "type": "markdown"
     },
     {
-     "status": "complete",
-     "task_id": "fold:toolu_01GnFbhWKZz1fvAwE1B5xJx8",
-     "title": "Agent: Run background sleep command · 1 call",
-     "type": "task_card"
+     "text": "**Agent**(Run background sleep command)\n⎿ Backgrounded agent",
+     "type": "markdown"
     },
     {
      "text": "Launched.\n\nNow running the 40-second Python sleep comma",
@@ -57,11 +55,6 @@
   "message_cards": [
    [
     {
-     "id": "fold:toolu_01GnFbhWKZz1fvAwE1B5xJx8",
-     "status": "complete",
-     "title": "Agent: Run background sleep command · 1 call"
-    },
-    {
      "id": "task-bc0v28vjw",
      "status": "complete",
      "title": "Run sleep for 15 seconds then echo done"
@@ -69,7 +62,7 @@
    ]
   ],
   "message_texts": [
-   "I'll launch the Agent to run the background command now.\n\nLaunched.\n\nNow running the 40-second Python sleep comma\n\nnd:\n\nThe 40-second Python sleep command finished.\n\nThe 15-second background sleep command that the Agent ran finished successfully."
+   "I'll launch the Agent to run the background command now.\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent\n\nLaunched.\n\nNow running the 40-second Python sleep comma\n\nnd:\n\nThe 40-second Python sleep command finished.\n\nThe 15-second background sleep command that the Agent ran finished successfully."
   ],
   "pushes": 1
  },
@@ -168,10 +161,8 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01GnFbhWKZz1fvAwE1B5xJx8",
-      "status": "in_progress",
-      "title": "Agent: Run background sleep command",
-      "type": "task_update"
+      "text": "\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent\n\n",
+      "type": "markdown_text"
      }
     ],
     "ts": "1790000000.000001"
@@ -180,23 +171,6 @@
   },
   {
    "after_sink_call": 7,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "details": "Running in background",
-      "id": "fold:toolu_01GnFbhWKZz1fvAwE1B5xJx8",
-      "status": "in_progress",
-      "title": "Agent: Run background sleep command",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 8,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -210,7 +184,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 9,
+   "after_sink_call": 8,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -224,7 +198,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 10,
+   "after_sink_call": 9,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -238,7 +212,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 11,
+   "after_sink_call": 10,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -252,7 +226,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 12,
+   "after_sink_call": 11,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -266,7 +240,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 13,
+   "after_sink_call": 12,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -280,7 +254,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 14,
+   "after_sink_call": 13,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -294,41 +268,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 15,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "details": "\nBash: sleep 15; echo done",
-      "id": "fold:toolu_01GnFbhWKZz1fvAwE1B5xJx8",
-      "status": "in_progress",
-      "title": "Agent: Run background sleep command · 1 call",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 16,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "details": "\nRunning Run sleep for 15 seconds then echo done",
-      "id": "fold:toolu_01GnFbhWKZz1fvAwE1B5xJx8",
-      "status": "in_progress",
-      "title": "Agent: Run background sleep command · 1 call",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 17,
+   "after_sink_call": 14,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -342,7 +282,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 18,
+   "after_sink_call": 15,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -356,7 +296,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 19,
+   "after_sink_call": 16,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -370,7 +310,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 20,
+   "after_sink_call": 17,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -384,7 +324,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 21,
+   "after_sink_call": 18,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -400,7 +340,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 22,
+   "after_sink_call": 19,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -414,7 +354,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 23,
+   "after_sink_call": 20,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -430,23 +370,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 24,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "id": "fold:toolu_01GnFbhWKZz1fvAwE1B5xJx8",
-      "status": "complete",
-      "title": "Agent: Run background sleep command · 1 call",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 26,
+   "after_sink_call": 21,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -462,7 +386,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 28,
+   "after_sink_call": 23,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -478,7 +402,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 30,
+   "after_sink_call": 25,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -492,7 +416,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 31,
+   "after_sink_call": 26,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -506,7 +430,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 32,
+   "after_sink_call": 27,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -520,7 +444,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 33,
+   "after_sink_call": 28,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -534,7 +458,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 34,
+   "after_sink_call": 29,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -548,7 +472,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 35,
+   "after_sink_call": 30,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -562,7 +486,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 38,
+   "after_sink_call": 31,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -576,7 +500,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 39,
+   "after_sink_call": 32,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -590,7 +514,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 40,
+   "after_sink_call": 33,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -604,7 +528,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 41,
+   "after_sink_call": 34,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -618,7 +542,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 42,
+   "after_sink_call": 35,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -632,7 +556,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 43,
+   "after_sink_call": 36,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -646,7 +570,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 44,
+   "after_sink_call": 37,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -660,7 +584,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 45,
+   "after_sink_call": 38,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -674,7 +598,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 47,
+   "after_sink_call": 40,
    "args": {
     "blocks": [
      {
@@ -696,7 +620,7 @@
    "method": "chat.stopStream"
   },
   {
-   "after_sink_call": 47,
+   "after_sink_call": 40,
    "args": {
     "blocks": [
      {
@@ -704,10 +628,8 @@
       "type": "markdown"
      },
      {
-      "status": "complete",
-      "task_id": "fold:toolu_01GnFbhWKZz1fvAwE1B5xJx8",
-      "title": "Agent: Run background sleep command · 1 call",
-      "type": "task_card"
+      "text": "**Agent**(Run background sleep command)\n⎿ Backgrounded agent",
+      "type": "markdown"
      },
      {
       "text": "Launched.\n\nNow running the 40-second Python sleep comma",

@@ -5,6 +5,23 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- A subagent Claude Code starts in the background is drawn as the terminal draws it (issue #299,
+  captured on Claude Code 2.1.296): two lines of the reply's text, `mechanical(Background
+  sleeper)` with the type in bold and `⎿ Backgrounded agent` under it, and no card. Its calls,
+  the commands it runs and a failed request of its own write nothing in the conversation. This
+  removes two drawings of one thing: the card beside the end line, and the card beside the line
+  of the list of what still runs. The list's line reads the type, then the description. An
+  agent that failed says why in its end line (`✗ Agent "..." failed: <reason>`), where its card
+  said it before. An agent that ends while a turn runs has its end line in that turn's reply, and one that ends
+  while a message waits for its turn has it in that message's reply. Agents started one after
+  the other have no empty line between their launch lines. A
+  subagent the call waits for keeps its card.
+- The agent seam's `task_started` carries `agentType` and `background`, which the Claude back
+  end reads from `subagent_type` and `is_backgrounded`. A call of a tool that starts an agent
+  (`previews.LAUNCHERS`) is kept from the sink until its task starts.
+
 ### Added
 
 - `BASH_DEFAULT_TIMEOUT_MS` in `.env`, Claude Code's own variable, reaches every session as
