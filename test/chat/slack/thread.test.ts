@@ -361,6 +361,27 @@ test("the threads a chat builds for one Slack thread share the order of its mess
   assert.equal(second.overtaken, false);
 });
 
+test("a reply let go of by the owner's message still sees the next reply of its thread below it", async () => {
+  // The commonest sequence: a reply ends, the owner writes, the next reply opens in the same
+  // thread. The places outlive the release, or the two replies are in two objects.
+  const { chat, clock } = made();
+  const thread = chat.thread({ channel: CHANNEL, thread: THREAD });
+  const first = thread.openReply(() => {});
+  await first.text("one");
+  await first.finish([]);
+  assert.equal(await first.closeOut(null), true);
+  chat.ownerPosted(CHANNEL, THREAD, "1790000000.900000"); // lets the first go
+  assert.equal(trackedThreads(chat), 1, "a release by the owner's message keeps the places");
+  const second = thread.openReply(() => {});
+  await second.text("two");
+  await second.settle();
+  await settle(clock);
+  assert.equal(trackedThreads(chat), 1);
+  assert.equal(first.overtaken, true, "the second wrote below it, in the same places");
+  assert.equal(second.overtaken, false);
+  await thread.close();
+});
+
 // The map of a chat's threads' places, which no member of the provider exposes.
 function trackedThreads(chat: SlackChat): number {
   return (chat as unknown as { places: Map<string, unknown> }).places.size;
