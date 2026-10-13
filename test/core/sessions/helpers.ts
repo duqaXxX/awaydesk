@@ -70,6 +70,8 @@ export interface Inside {
   reactDoneIfIdle(signal?: AbortSignal): Promise<void>;
   threadLine(): readonly [string, string];
   runningTaskIds(): string[];
+  runningList(): { title: string; lines: string[] } | null;
+  showRunning(): void;
 }
 
 export function inside(session: ThreadSession): Inside {

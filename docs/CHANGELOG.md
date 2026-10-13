@@ -14,7 +14,8 @@ All notable changes to this project are documented here. The format follows
   landed, moves down to a newer reply when that one rests, and goes when nothing runs. The chat
   seam has `ThreadChat.showRunning(list)`; `Reply.setRunning`, `Reply.setLatest` and the session's
   `latest` are gone. After a crash `repair.endReply` removes
-  the list's card instead of closing it as an error (#295).
+  the list's card instead of closing it as an error, and writes no note on a message that only the
+  list kept open (#295).
 
 - The thread's status line says `Working…` only while a message of the owner's has no finished
   answer: being submitted, queued, taken, sent and not yet started, or its turn running. A turn

@@ -2479,7 +2479,7 @@ export class ThreadSession {
   }
 
   private showRunning(): void {
-    this.showThreadStatus(); // the thread's activity line counts them too, once the turn ended
+    this.showThreadStatus(); // the activity line follows the same tasks (it never counts them)
     this.thread.showRunning(this.runningList());
   }
 

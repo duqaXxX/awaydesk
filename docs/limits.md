@@ -59,7 +59,6 @@ be measured first.
 | The language of what you said | The `language` setting decides | Slack picks the language it hears, clip by clip, and nothing lets an app choose it | [#220](https://github.com/duqaXxX/awaydesk/issues/220) |
 | Being told that Claude waits for your approval | The request appears where you work | A push to your phone does not come for every request. With iOS locked and Slack open in a browser (2026-09-29), a turn that asked two or three times brought no push for any of them. Slack gives an app no way to ask for one | [#71](https://github.com/duqaXxX/awaydesk/issues/71) |
 | The list of what still runs, once you opened it | A line under the prompt counts the tasks and changes by itself (`· 1 shell still running`) | The list is one card. A card you opened closes again after you leave the channel or scroll far away from it | none |
-| How many running tasks are listed | The line counts every task | The card lists 6 of them, then `+N more`; its title counts all | none |
 
 Of three clips spoken in Italian in a workspace set to English (Slack free plan, iOS app,
 2026-10-09), Slack first wrote one in Italian and two as English words that were not what was
@@ -84,6 +83,7 @@ it they cannot be done.
 | Who can use it | Whoever sits at the machine | One Slack user, in private channels that hold that user and the bot, in a workspace with no other member | none |
 | Where it runs | macOS, Linux and Windows | macOS, as a LaunchAgent in your login session | [#197](https://github.com/duqaXxX/awaydesk/issues/197) |
 | Permission modes | Every mode Claude Code has | Bypass on or off for a thread; any other mode is the one your Claude Code settings start in | [#213](https://github.com/duqaXxX/awaydesk/issues/213) |
+| How many running tasks are listed | A line under the prompt counts every task | The card lists 6 of them, then `+N more`; its title counts all | none |
 
 ## Not checked
 

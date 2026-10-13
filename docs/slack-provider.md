@@ -301,7 +301,15 @@ A stream's stop carries the footer alone; the edit that follows adds the card, s
 a `task_card` in its `blocks` was measured. A message that shows the list stays among the open
 replies (`ReplySink.keepsOpen`), and `repair.endReply` removes the block whose `block_id` is
 `running-list` where it closes a left-over card as an error. `ThreadPlaces` does not let go of the
-reply that holds the list while it does, so that the list can always be taken off it.
+reply that holds the list while it does, so that the list can always be taken off it; the close
+of the thread settles every reply that ever held it, let go of or not. A reply takes the list only
+from what the places assigned it once it rests, so the ending of a reply whose end is still on its
+way carries the footer alone and never a second card. A write of the card that failed, or whose
+answer was lost, is written again: the message's shown blocks are forgotten, and a reply at rest
+tries once more after `FINAL_RETRY_SECONDS`. When a continuation is written, the message before it
+is rewritten in the same pass, so that neither the footer nor the card is in two messages. After a
+crash `repair.endReply` takes the card off a message that only the list kept open and writes no
+note on it; one that also has a running call or an open stream keeps the note.
 
 Measured on 2026-10-12, Slack on desktop: a `task_card` with a fixed `block_id` stays open
 across `chat.update` when the text above it changes, when a line of its `details` is added or

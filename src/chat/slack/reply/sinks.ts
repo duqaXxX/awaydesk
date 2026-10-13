@@ -489,6 +489,8 @@ export class ReplySink implements Sink {
   /** The ts of the closing message, once posted. */
   private closing: string | null = null;
   private closingShown: Block[] = [];
+  /** A write of the closing message failed: it may have landed, so what it shows is not known. */
+  private closingUnsure = false;
   /** The closing message was deleted: the footer, if one is assigned again, goes under the body. */
   private closingGone = false;
   /** One more try of a write after the end, when a pass failed (the final write's retry). */
@@ -599,7 +601,7 @@ export class ReplySink implements Sink {
   private settleOpenReply(): void {
     if (!this.ended) {
       // What the end wrote is what it shows now: the places only hand over a change of it.
-      this.assigned = this.places.tailIf(this);
+      this.assigned = { footer: this.places.tailIf(this).footer, list: this.assigned.list };
       this.ended = true;
       // A reply that landed after a lower one took the footer may have drawn it before that: one
       // pass sets the message right, and makes no call when it is.
@@ -873,8 +875,9 @@ export class ReplySink implements Sink {
         const ok = await this.flush();
         if (signal.aborted) return;
         if (!ok) {
-          // A write after the end that failed is tried once more: no later change may come.
-          if (this.landedValue === true) this.retryLater();
+          // A write after the end, or on a reply at rest, that failed is tried once more: with
+          // one long task no later change may come.
+          if (this.landedValue === true || this.resting) this.retryLater();
           return;
         }
         if (this.version === version) return;
@@ -972,7 +975,10 @@ export class ReplySink implements Sink {
 
   /** What the reply shows under its last message: assigned once it rests, else what it would be. */
   private tail(): Shown {
-    return this.resting ? this.assigned : this.places.tailIf(this);
+    if (this.resting) return this.assigned;
+    // The list only from what the places handed this reply once it rests: a reply whose end is on
+    // its way would draw a second card beside the one its holder still shows.
+    return { footer: this.places.tailIf(this).footer, list: null };
   }
 
   /**
@@ -980,7 +986,7 @@ export class ReplySink implements Sink {
    * tail it would be handed, which the stop already carried.
    */
   private restOn(): void {
-    this.assigned = this.places.tailIf(this);
+    this.assigned = { footer: this.places.tailIf(this).footer, list: this.assigned.list };
     this.places.place();
   }
 
@@ -1588,6 +1594,10 @@ export class ReplySink implements Sink {
         message.short = message.short || !whole;
         return [true, overflow];
       }
+      // The write may have landed with its answer lost: what the message shows is not known any
+      // more, and the next pass writes it again rather than find it equal to what it believes.
+      message.shown = null;
+      message.exact = false;
       return [false, null];
     }
     message.shown = blocks;
@@ -2022,6 +2032,7 @@ export class ReplySink implements Sink {
         }
       }
       let step: Step;
+      const fresh = message.ts === null;
       if (message.ts === null) {
         // A message is created with the thread's places held, after the decision that it may be.
         const free = await this.creating();
@@ -2047,6 +2058,19 @@ export class ReplySink implements Sink {
       }
       const [ok, overflow] = step;
       if (!ok) return false;
+      const previous = this.messages.at(-2);
+      if (
+        fresh &&
+        previous !== undefined &&
+        previous.ts !== null &&
+        previous.footer.length > 0 &&
+        message.ts !== null
+      ) {
+        // The continuation is written: the message before it is no longer the reply's last, and
+        // was written as if it were, with the footer and the list. Neither is in two messages of
+        // a reply at rest.
+        if (!(await this.updateStep(previous, message.start))[0]) return false;
+      }
       if (overflow === null) break;
       if (this.places.overtaken(this)) {
         // Another reply is below: a message opened now would sit below it. What does not fit
@@ -2288,7 +2312,7 @@ export class ReplySink implements Sink {
         this.closing = String(posted.ts);
         this.places.moved(this);
         created?.();
-      } else if (!isDeepStrictEqual(blocks, this.closingShown)) {
+      } else if (this.closingUnsure || !isDeepStrictEqual(blocks, this.closingShown)) {
         // An edit never notifies (measured 2026-09-27): the text stays as posted.
         created?.();
         await this.limiter.acquire();
@@ -2302,6 +2326,7 @@ export class ReplySink implements Sink {
       }
     } catch (error) {
       this.logger.warning(`could not write a reply's closing message: ${describe(error)}`);
+      if (this.closing !== null) this.closingUnsure = true;
       if (this.closing === null && unknownOutcome(error)) {
         this.closing = await this.adopt(
           attempted,
@@ -2317,6 +2342,7 @@ export class ReplySink implements Sink {
       return false;
     }
     this.closingShown = blocks;
+    this.closingUnsure = false;
     return true;
   }
 }

@@ -210,6 +210,7 @@ function listCard(running: { title: string; lines: readonly string[] }): JsonObj
 }
 
 const isCard = (block: JsonObject): boolean => block.block_id === LIST_ID;
+const isDivider = (block: JsonObject): boolean => block.type === "divider";
 
 /** One turn of the event loop, which drains every microtask. */
 function tick(): Promise<void> {
@@ -837,8 +838,14 @@ test("a reply cut short while a task still counts ends with the daemon s line", 
   await sink.finish([], null);
   await sink.closeOutFormatted(null);
   const closing = only(slack.callsTo("chat.postMessage"));
-  assert.deepEqual(closing.blocks, [{ type: "markdown", text: ERROR_LINE }, listCard(AGENT)]);
+  // The post that rings carries the line alone; the edit once its end landed adds the list.
+  assert.deepEqual(closing.blocks, [{ type: "markdown", text: ERROR_LINE }]);
   assert.equal(closing.text, bannerText(ERROR_LINE, { limit: BANNER_LIMIT }));
+  await settled();
+  assert.deepEqual(last(slack.messageBlocks()), [
+    { type: "markdown", text: ERROR_LINE },
+    listCard(AGENT),
+  ]);
   places.showRunning(null);
   await settled();
   assert.deepEqual(last(slack.messageBlocks()), [{ type: "markdown", text: ERROR_LINE }]);
@@ -1172,9 +1179,13 @@ test("an unchanged running list writes nothing", async () => {
   await sink.text("Done.");
   await sink.finish([], null);
   await sink.closeOutFormatted("footer");
+  places.showRunning(null);
+  await settled();
+  places.showRunning(SHELL);
+  await settled();
   const before = slack.apiCalls.length;
-  places.showRunning(null);
-  places.showRunning(null);
+  places.showRunning({ ...SHELL, lines: [...SHELL.lines] }); // the same list, another object
+  places.showRunning(SHELL);
   await settled();
   assert.equal(slack.apiCalls.length, before);
 });
@@ -5223,6 +5234,9 @@ test("the closing message that shows the list is tracked, and goes with the list
   places.showRunning(null);
   await settled();
   assert.deepEqual(changes.at(-1), [closing, null]);
+  const [deleted, ...more] = slack.callsTo("chat.delete");
+  assert.equal(deleted?.ts, closing, "the closing message held the list alone: it is deleted");
+  assert.equal(more.length, 0);
 });
 
 test("an owner message below the reply that holds the list does not let the reply go", async () => {
@@ -5255,3 +5269,139 @@ test("a reply that stopped holding the list is let go of when an owner message s
   assert.deepEqual(slack.messageBlocks().at(-1)?.filter(isCard), [listCard(SHELL)]);
   assert.deepEqual(slack.messageBlocks()[0]?.filter(isCard), []);
 });
+
+// ---- fix round 1
+
+/** The cards of the list that all the messages of the thread show. */
+function listCards(slack: FakeSlack): JsonObject[] {
+  return slack.messageBlocks().flatMap((blocks) => blocks.filter(isCard));
+}
+
+test("a card write whose answer was lost is corrected when the list goes, on a resting reply", async () => {
+  const slack = new ResetAfterApply();
+  const places = new ThreadPlaces();
+  const sink = reply(slack, { places });
+  await sink.text("Started it.");
+  await sink.finishFormatted([], "footer");
+  sink.rest();
+  await settled();
+  slack.resetNext = "chat.update"; // the update that adds the card lands, its answer is lost
+  places.showRunning(SHELL);
+  await settled();
+  assert.deepEqual(listCards(slack), [listCard(SHELL)], "it landed");
+  places.showRunning(null);
+  await settled();
+  await sink.settle();
+  assert.deepEqual(listCards(slack), []);
+});
+
+test("a card write whose answer was lost on an ended holder leaves one card when the list moves", async () => {
+  const slack = new ResetAfterApply();
+  slack.tsStep = 10;
+  const places = new ThreadPlaces();
+  const first = await endedReply(slack, places, { finalRetrySeconds: 0.02 });
+  // An earlier edit of the message is known to have landed, with no card in it.
+  places.showRunning(AGENT);
+  await settled();
+  places.showRunning(null);
+  await settled();
+  slack.resetNext = "chat.update";
+  places.showRunning(SHELL);
+  await settled();
+  places.ownerPosted(slack.ownerTs()); // a new stretch: the first reply keeps its own footer
+  const second = reply(slack, { places });
+  await second.text("More.");
+  await second.finish([], null);
+  await second.closeOutFormatted("footer");
+  await settled();
+  assert.deepEqual(slack.messageBlocks()[0]?.filter(isCard), []);
+  assert.deepEqual(listCards(slack), [listCard(SHELL)]);
+  await first.settle();
+  assert.deepEqual(listCards(slack), [listCard(SHELL)]);
+});
+
+test("a closing message whose card write lost its answer is corrected when the list goes", async () => {
+  const slack = new ResetAfterApply();
+  const clock = new FakeClock();
+  const places = new ThreadPlaces();
+  const sink = reply(slack, { clock, places });
+  await sink.text("Done.");
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  await sink.finish([], null);
+  await sink.closeOutFormatted(null);
+  slack.resetNext = "chat.update";
+  places.showRunning(SHELL);
+  await settled();
+  assert.deepEqual(listCards(slack), [listCard(SHELL)], "it landed");
+  places.showRunning(null);
+  await settled();
+  await sink.settle();
+  assert.deepEqual(listCards(slack), []);
+});
+
+test("a failed card write on a resting reply is tried again after the retry pause", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const sink = reply(slack, { places, finalRetrySeconds: 0.02 });
+  await sink.text("Started it.");
+  await sink.finishFormatted([], "footer");
+  sink.rest();
+  await settled();
+  slack.responses["chat.update"] = [networkDown(), { ok: true }];
+  places.showRunning(SHELL);
+  await settled();
+  assert.deepEqual(listCards(slack), [], "the first try failed");
+  await passed(0.05);
+  await settled();
+  assert.deepEqual(listCards(slack), [listCard(SHELL)]);
+});
+
+test("a reply whose end did not land draws no second card, and none is left when the list goes", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const upper = await endedReply(slack, places);
+  places.showRunning(SHELL);
+  await settled();
+  assert.deepEqual(listCards(slack), [listCard(SHELL)]);
+  const lower = await longReply(slack, { places, finalRetrySeconds: 60 });
+  const lowerTs = slack.streamTs[1];
+  // The cut of the lower reply's first message fails: its end does not land.
+  slack.responses["chat.update"] = (args) =>
+    args.ts === lowerTs ? rejected("ratelimited") : { ok: true };
+  assert.equal(await lower.closeOutFormatted("footer"), false);
+  await settled();
+  assert.equal(listCards(slack).length, 1, "the list is drawn once");
+  assert.equal(slack.messageBlocks()[0]?.some(isCard), true, "still on the reply that held it");
+  places.showRunning(null);
+  await settled();
+  assert.deepEqual(listCards(slack), []);
+  await upper.settle();
+});
+
+/** A resting reply that was shown (with the list or not) and whose later words overflow it. */
+async function overflowingRest(withList: boolean): Promise<FakeSlack> {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const sink = reply(slack, { places });
+  await sink.text("Started it.\n");
+  await sink.finishFormatted([], "footer");
+  if (withList) places.showRunning(SHELL);
+  sink.rest();
+  await settled();
+  await sink.text("a line of the report\n".repeat(900)); // past one message
+  await settled();
+  return slack;
+}
+
+for (const withList of [true, false]) {
+  test(`a continuation leaves the footer${withList ? " and the list" : ""} in the last message alone`, async () => {
+    const slack = await overflowingRest(withList);
+    const blocks = slack.messageBlocks();
+    assert.ok(blocks.length >= 2, "the report went on in a continuation");
+    assert.equal(blocks.flat().filter(isDivider).length, 1, "one footer");
+    assert.equal(blocks.flat().filter(isCard).length, withList ? 1 : 0);
+    assert.equal(blocks.at(-1)?.some(isDivider), true, "in the last message");
+    assert.equal(blocks.at(-1)?.some(isCard), withList);
+  });
+}

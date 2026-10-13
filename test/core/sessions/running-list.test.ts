@@ -100,16 +100,54 @@ test("two commands: a line each, in the order they started, and one end takes it
   await h.until(() => holders(h.slack.messageBlocks()).join() === "1");
   const list = card(h.slack.messageBlocks().at(-1) ?? []);
   assert.equal(list?.title, "2 shells still running");
-  assert.deepEqual(linesOf(list), [
-    "Sleep for 5 seconds then print done",
-    "Sleep for 5 seconds then print done",
+  assert.equal(linesOf(list).length, 2);
+  // The recordings give both commands one description: tell them apart as the session stores
+  // them (`recordTask` keeps `[kind, description]`), keeping the order they started in.
+  const tasks = inside(session).tasks;
+  tasks.set("bny2rux7d", ["command", "first sleeper"]);
+  tasks.set("bc41other", ["command", "second sleeper"]);
+  inside(session).showRunning();
+  await h.until(() =>
+    linesOf(card(h.slack.messageBlocks().at(-1) ?? [])).includes("first sleeper"),
+  );
+  assert.deepEqual(linesOf(card(h.slack.messageBlocks().at(-1) ?? [])), [
+    "first sleeper",
+    "second sleeper",
   ]);
   h.clients[0]?.inject(notice); // A ends
   await h.until(
     () => card(h.slack.messageBlocks().at(-1) ?? [])?.title === "1 shell still running",
   );
-  assert.equal(linesOf(card(h.slack.messageBlocks().at(-1) ?? [])).length, 1);
+  assert.deepEqual(linesOf(card(h.slack.messageBlocks().at(-1) ?? [])), ["second sleeper"]);
   assert.equal(holders(h.slack.messageBlocks()).length, 1);
+});
+
+test("a long description is cut to one line of 80, and a task with none shows its call's title", async (t) => {
+  // No recording holds a description over 80 characters or an empty one: the session's records
+  // are set as `recordTask` stores them (`[kind, description]`) through the test interface.
+  const [first] = splitBackground();
+  const [firstB] = renamedBackground();
+  const h = harnessFor(t)({ turns: [first, firstB] });
+  const session = h.session();
+  await (await session.submit("start A")).done.wait();
+  await (await session.submit("start B")).done.wait();
+  await h.until(() => holders(h.slack.messageBlocks()).join() === "1");
+  const tasks = inside(session).tasks;
+  tasks.set("bny2rux7d", ["command", `${"long ".repeat(40)}end`]);
+  tasks.set("bc41other", ["subagent", ""]);
+  const fallback = inside(session).taskReplies.get("bc41other")?.taskTitle("bc41other");
+  assert.ok(typeof fallback === "string" && fallback !== "", "the reply has a title for the task");
+  const shown = inside(session).runningList();
+  assert.equal(shown?.lines.length, 2);
+  assert.ok(
+    (shown?.lines[0] ?? "").length <= 80 && (shown?.lines[0] ?? "").startsWith("long long"),
+  );
+  assert.ok(!(shown?.lines[0] ?? "").includes("end"), "the description is cut");
+  assert.equal(shown?.lines[1], fallback);
+  inside(session).showRunning();
+  await h.until(() =>
+    linesOf(card(h.slack.messageBlocks().at(-1) ?? [])).includes(String(fallback)),
+  );
 });
 
 test("a reply written below takes the list once it rests, and the first loses it", async (t) => {
@@ -179,9 +217,10 @@ test("a report turn opened below the owner's message: the list sits under the pr
   assert.deepEqual(linesOf(list), ["Sleep for 5 seconds then print done"]);
   assert.equal(card(h.slack.messageBlocks()[report] ?? []), null, "the report shows none");
   assert.ok(!JSON.stringify(h.slack.messageBlocks()).includes("⏳"));
-  // Two footers are never in a row: the footer is under the list, once.
-  const footers = h.slack
-    .messageBlocks()
-    .filter((blocks) => blocks.some((b) => b.type === "divider"));
-  assert.ok(footers.length >= 1);
+  // One footer to a stretch between two owner messages, and never two in a row: the first two
+  // replies keep theirs, the report none, and the prompt's reply the last.
+  assert.deepEqual(
+    h.slack.messageBlocks().map((blocks) => blocks.filter((b) => b.type === "divider").length),
+    [1, 1, 0, 1],
+  );
 });

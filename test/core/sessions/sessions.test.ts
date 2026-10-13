@@ -3956,6 +3956,23 @@ test("work drain path leaves hourglass", async (t) => {
   assert.deepEqual(onRoot(h), new Set([Status.ERROR]));
 });
 
+test("close leaves no list when an owner message sits below the reply that held it", async (t) => {
+  // `!status` under the reply that holds the list: the owner's message seals the holder, and
+  // taking the list off it must still be written before the process ends.
+  const [first] = splitBackground();
+  const h = harnessFor(t)({ turns: [first, sdkMessages("tools")] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await (await session.submit("next")).done.wait();
+  await h.until(
+    () => runningTitle(h.slack.messageBlocks().at(-1) ?? []) === "1 shell still running",
+  );
+  await session.status();
+  await session.close();
+  await session.doneClosing.wait();
+  assert.ok(h.slack.messageBlocks().every((blocks) => runningTitle(blocks) === null));
+});
+
 test("close leaves no list on the reply that held it", async (t) => {
   // A shutdown's own event loop iteration ends right after `close()` returns, so a change that
   // only debounced never gets to run: the close settles the replies the session tracks, and the

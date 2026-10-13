@@ -126,13 +126,13 @@ export class ThreadPlaces {
   }
 
   /**
-   * A shutdown's last chance for the change of the list on a reply whose end landed, which no
-   * session settles: taking the list off it only debounced.
+   * A shutdown's last chance for the changes of the list that only debounced, on every reply that
+   * held it, let go of or not, since no session settles a reply whose end landed.
    */
   async settleListed(): Promise<void> {
-    for (const reply of [...this.listed]) {
-      if (this.done.has(reply)) await reply.settle().catch(() => {});
-    }
+    const replies = [...this.listed];
+    this.listed.clear();
+    for (const reply of replies) await reply.settle().catch(() => {});
   }
 
   /**
@@ -225,7 +225,6 @@ export class ThreadPlaces {
       this.done.delete(reply);
       this.shut.delete(reply);
       this.replies.delete(reply);
-      this.listed.delete(reply);
       if (this.holder === reply) this.holder = null;
       gone = true;
     }

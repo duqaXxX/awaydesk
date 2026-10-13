@@ -598,12 +598,16 @@ test("a crossed owner query puts the footer under the reply that carried its ans
   h.clients[0]?.inject(splitTurns(sdkMessages("tools"))[0] ?? []);
   await owner.done.wait();
   assert.ok(h.replies().at(-1)?.startsWith("✓ the task ended"));
-  assert.ok(
-    h.slack
-      .messageBlocks()
-      .at(-1)
-      ?.some((block) => block.type === "divider"),
+  const blocks = h.slack.messageBlocks();
+  // One footer, under the reply that carried the answer; the reply above, which the owner's
+  // message sits under, shows none.
+  assert.deepEqual(
+    blocks.map((message) => message.filter((block) => block.type === "divider").length),
+    [0, 1],
   );
+  const footer = blocks.at(-1)?.at(-1) as JsonObject | undefined;
+  assert.equal(footer?.type, "context");
+  assert.match(JSON.stringify(footer), /claude-haiku/);
 });
 
 test("a close leaves no task waiting on a reply it could not end", async (t) => {

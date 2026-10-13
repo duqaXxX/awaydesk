@@ -13,6 +13,8 @@ interface Reply extends Placed {
   ownFooter: string | null;
   /** The tails handed to it, in order. */
   assigned: Shown[];
+  /** How many times it was told to settle. */
+  settled: number;
 }
 
 function reply(ts: string | null, ownFooter: string | null = null): Reply {
@@ -22,7 +24,11 @@ function reply(ts: string | null, ownFooter: string | null = null): Reply {
     ownFooter,
     assigned: [],
     assign: (shown) => made.assigned.push(shown),
-    settle: async () => true,
+    settled: 0,
+    settle: async () => {
+      made.settled += 1;
+      return true;
+    },
   };
   return made;
 }
@@ -277,5 +283,35 @@ describe("ThreadPlaces", () => {
     places.ended(reply);
     places.closed(reply);
     assert.equal(places.holds(reply), false);
+  });
+
+  test("a reply let go of after it held the list is still settled by the close", async () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001");
+    upper.resting = true;
+    places.showRunning({ title: "1 shell still running", lines: ["sleep"] });
+    places.ended(upper);
+    places.ownerPosted("1760000002.000001");
+    places.showRunning(null); // the holder is sealed, so it is let go of with its edit unwritten
+    assert.equal(places.holds(upper), false);
+    await places.settleListed();
+    assert.equal(upper.settled, 1);
+    await places.settleListed();
+    assert.equal(upper.settled, 1, "once");
+  });
+
+  test("the reply the list moved down from is settled by the close, let go of or not", async () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001");
+    upper.resting = true;
+    places.showRunning({ title: "1 shell still running", lines: ["sleep"] });
+    places.ended(upper);
+    places.ownerPosted("1760000002.000001");
+    const lower = joined(places, "1760000003.000001");
+    lower.resting = true;
+    places.ended(lower);
+    await places.settleListed();
+    assert.equal(upper.settled, 1);
+    assert.equal(lower.settled, 1);
   });
 });
