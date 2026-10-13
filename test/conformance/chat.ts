@@ -381,9 +381,9 @@ export function chatConformance(
   const check = (
     title: string,
     body: (started: Started, t: TestContext) => Promise<void>,
-    marks: { readonly todo?: string | undefined; readonly skip?: string | undefined } = {},
+    marks: { readonly todo?: string | undefined } = {},
   ): void => {
-    test(title, { todo: marks.todo, skip: marks.skip }, async (t) => {
+    test(title, { todo: marks.todo }, async (t) => {
       await body(await start(t, make), t);
     });
   };

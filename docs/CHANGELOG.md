@@ -31,7 +31,8 @@ All notable changes to this project are documented here. The format follows
   provider keeps where each thread's messages sit in memory (`reply/places.ts`, `ThreadPlaces`),
   told of every owner message by the listener and of every reply's last message by its sink; the
   chat seam's `Reply` gains `last` and `overtaken`, which the memory chat implements from its own
-  message counter. Nothing in the thread changes yet for a reply with only an owner message below it.
+  message counter. Nothing in the thread changes yet for a reply with only an owner message
+  below it.
 
 - The cleanup of `state.json` forgets a thread whose first message Slack no longer has, at start
   and every 6 hours, beside the channels that are gone (#237). The chat seam gains
@@ -1027,15 +1028,11 @@ All notable changes to this project are documented here. The format follows
 ### Fixed
 
 - A report of a background task that comes after its reply has ended no longer leaves two footers
-  a few lines apart. The report gets a reply of its own, under `Background task update`, and both
-  replies ended with a footer. Once the report has ended with its footer, the reply above it now
-  gives its own up, by an edit that does not notify (`Reply.withdrawFooter`, a new member of the
-  chat seam that every provider implements). The reply above is the thread's latest when the report opens, whether or not it started the
-  task: two replies of the daemon's in a row show one footer, the last. An owner's next prompt
-  takes no footer away. Three cases keep both footers: the
-  reply above is a closing message that is the footer alone (a long answer of text alone), since
-  the edit would leave it empty; the daemon restarted between the two replies, since the first is
-  no longer held; and a report that ends with no footer of its own.
+  a few lines apart. The report gets a reply of its own, under `Background task update`, and once
+  it has ended the reply above it shows no footer: replies of the daemon's with no message of the
+  owner's between them show one footer, under the last. An owner's next prompt takes no footer
+  away. Where the footer sits is placed by position in the thread. When the daemon restarted
+  between the two replies, the first is no longer held and keeps its footer.
 
 - A stop that does not drain and lands between a turn's end and the close of its reply no longer
   says two things that were not true of that turn (#263). The reply held the whole answer and

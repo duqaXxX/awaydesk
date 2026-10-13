@@ -1087,13 +1087,14 @@ test("a report in a reply of its own takes the footer from the reply above it", 
   await h.idle();
   await h.sleep(3); // the edit waits its debounce, as every change to an ended reply does
   assert.deepEqual(footers(h), [false, true]);
-  // The report's own end rang once; taking the footer back above it is an edit, which does not.
+  // The report's own end rang once; the provider's edit that takes the footer off the reply
+  // above it does not.
   assert.equal(h.slack.pushes(), pushes + 1);
 });
 
-test("a report takes the footer from the reply right above it, whichever turn that was", async (t) => {
-  // Decided by the owner on 2026-10-12: two replies of the daemon's in a row show one footer,
-  // the last. The reply above the report is here an owner's turn that did not start the task.
+test("replies with no owner message between them show one footer, under the last", async (t) => {
+  // The reply above the report is here an owner's turn that did not start the task; the task's
+  // own reply has the owner's prompt below it.
   const [first, notice, injected] = splitBackground();
   const ended = notice.filter(notNotification);
   const notification = notice.filter((item) => !notNotification(item));
@@ -1115,11 +1116,12 @@ test("a report takes the footer from the reply right above it, whichever turn th
   await h.until(() => !session.busy);
   await h.idle();
   await h.sleep(3);
-  // The task's own reply is not right above the report: it keeps its footer.
+  // The task's own reply keeps its footer: the owner's second prompt sits between it and the
+  // reply above the report.
   assert.deepEqual(footers(h), [true, false, true]);
 });
 
-test("a close writes the edit that takes a footer back, when it still waited", async (t) => {
+test("a close flushes the pending footer edit", async (t) => {
   const [first, notice, injected] = splitBackground();
   const ended = notice.filter(notNotification);
   const notification = notice.filter((item) => !notNotification(item));
