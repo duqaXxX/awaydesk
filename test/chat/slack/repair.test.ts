@@ -253,6 +253,27 @@ test("a message kept open only by the list gets the list taken off and no note",
   assert.deepEqual(thread(state).openReplies, []);
 });
 
+for (const [how, card] of [
+  ["its block_id alone", { ...LIST_CARD, task_id: "auto-id" }],
+  ["its task_id alone", { ...LIST_CARD, block_id: "auto-block" }],
+] as const) {
+  test(`the list is found by ${how}`, async () => {
+    const { state, slack } = makeState();
+    slack.responses["chat.stopStream"] = rejected("message_not_in_streaming_state");
+    slack.responses["conversations.replies"] = {
+      ok: true,
+      messages: [
+        { ts: "1790000000.000001", text: "Done.", blocks: [...content(1), card, ...FOOTER_BLOCKS] },
+      ],
+    };
+    state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
+    await repairCrash(slack, state, new UpdateLimiter());
+    const [update] = slack.callsTo("chat.update");
+    assert.ok(update);
+    assert.deepEqual(blocksOf(update), [...content(1), ...FOOTER_BLOCKS]);
+  });
+}
+
 test("a message with the list and an open stream or a running call keeps the note", async () => {
   const runningCall: JsonObject = {
     type: "task_card",

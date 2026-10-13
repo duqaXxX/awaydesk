@@ -2504,7 +2504,7 @@ export class ThreadSession {
         if (description) {
           label = kind === "subagent" ? `${TASK_WORDS.subagent[1]}: ${description}` : description;
         } else {
-          label = renderer.taskTitle(taskId) ?? taskId;
+          label = renderer.taskTitle(taskId) || taskId;
         }
         return oneLine(label, TITLE_LIMIT);
       });

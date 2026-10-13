@@ -106,6 +106,14 @@ test("two commands: a line each, in the order they started, and one end takes it
   const tasks = inside(session).tasks;
   tasks.set("bny2rux7d", ["command", "first sleeper"]);
   tasks.set("bc41other", ["command", "second sleeper"]);
+  // A reply is registered for a task when its turn closes, a nested task's at its start: the
+  // map of replies can hold the tasks in another order than they started in. Put it so.
+  const replies = inside(session).taskReplies;
+  const firstReply = replies.get("bny2rux7d");
+  assert.ok(firstReply !== undefined);
+  replies.delete("bny2rux7d");
+  replies.set("bny2rux7d", firstReply);
+  assert.deepEqual([...replies.keys()], ["bc41other", "bny2rux7d"]);
   inside(session).showRunning();
   await h.until(() =>
     linesOf(card(h.slack.messageBlocks().at(-1) ?? [])).includes("first sleeper"),
@@ -223,4 +231,20 @@ test("a report turn opened below the owner's message: the list sits under the pr
     h.slack.messageBlocks().map((blocks) => blocks.filter((b) => b.type === "divider").length),
     [1, 1, 0, 1],
   );
+});
+
+test("a task with no description and an empty title shows its id", async (t) => {
+  // The title a reply holds for a task can be an empty string; `??` would keep it. The session's
+  // record is set as `recordTask` stores it, and the renderer's answer is the one a line with no
+  // title gives.
+  const [first] = splitBackground();
+  const h = harnessFor(t)({ turns: [first] });
+  const session = h.session();
+  await (await session.submit("start A")).done.wait();
+  await h.until(() => holders(h.slack.messageBlocks()).join() === "0");
+  inside(session).tasks.set("bny2rux7d", ["command", ""]);
+  const renderer = inside(session).taskReplies.get("bny2rux7d");
+  assert.ok(renderer !== undefined);
+  t.mock.method(renderer, "taskTitle", () => "");
+  assert.deepEqual(inside(session).runningList()?.lines, ["bny2rux7d"]);
 });

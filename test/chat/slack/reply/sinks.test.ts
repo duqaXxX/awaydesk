@@ -5405,3 +5405,20 @@ for (const withList of [true, false]) {
     assert.equal(blocks.at(-1)?.some(isCard), withList);
   });
 }
+
+// ---- fix round 2
+
+test("replies that held the list and were let go of are not kept by the places", async () => {
+  const slack = new FakeSlack();
+  slack.tsStep = 10;
+  const places = new ThreadPlaces();
+  places.showRunning(SHELL);
+  for (let turn = 0; turn < 6; turn += 1) {
+    places.ownerPosted(slack.ownerTs());
+    await endedReply(slack, places);
+    await settled();
+  }
+  const listed = (places as unknown as { listed: Set<unknown> }).listed;
+  assert.equal(listed.size, 1, "only the reply that holds the list");
+  assert.equal(listCards(slack).length, 1);
+});

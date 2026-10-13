@@ -1967,11 +1967,20 @@ export class ReplySink implements Sink {
    * wait, so a wait never drops a change. `later` runs this again when `version` moved during
    * it. A pass: never cancelled (see the top of this file).
    */
+  /** Whether a message of the reply, or its closing message, still shows the list. */
+  private showsList(): boolean {
+    return (
+      this.messages.some((message) => message.footer.some(isRunningList)) ||
+      this.closingShown.some(isRunningList)
+    );
+  }
+
   private async flush(): Promise<boolean> {
     const release = await this.lock.acquire();
     try {
       const ok = await this.sync();
       if (ok && this.closedOut) this.settleOpenReply();
+      if (ok && this.assigned.list === null && !this.showsList()) this.places.unlisted(this);
       return ok;
     } finally {
       release();
@@ -2250,7 +2259,7 @@ export class ReplySink implements Sink {
   /** The retry of a write after the end failed too: the next change of the reply writes it. */
   private warnGaveUp(): void {
     this.logger.warning(
-      "could not bring a reply's footer to the thread after its end, tried twice: " +
+      "could not bring a reply's footer to the thread once it rested or ended, tried twice: " +
         "the next change of the reply writes it",
     );
   }

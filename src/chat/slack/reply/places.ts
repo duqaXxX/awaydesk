@@ -126,6 +126,14 @@ export class ThreadPlaces {
   }
 
   /**
+   * The reply no longer shows the list and is not to: the close has nothing to settle on it. The
+   * holder stays, since the list may be handed to it again.
+   */
+  unlisted(reply: Placed): void {
+    if (reply !== this.holder) this.listed.delete(reply);
+  }
+
+  /**
    * A shutdown's last chance for the changes of the list that only debounced, on every reply that
    * held it, let go of or not, since no session settles a reply whose end landed.
    */

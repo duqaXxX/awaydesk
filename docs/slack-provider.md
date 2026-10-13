@@ -299,8 +299,9 @@ that form. Taking the list off a reply is an edit too, and no write of it notifi
 
 A stream's stop carries the footer alone; the edit that follows adds the card, since no stop with
 a `task_card` in its `blocks` was measured. A message that shows the list stays among the open
-replies (`ReplySink.keepsOpen`), and `repair.endReply` removes the block whose `block_id` is
-`running-list` where it closes a left-over card as an error. `ThreadPlaces` does not let go of the
+replies (`ReplySink.keepsOpen`), and `repair.endReply` removes the block whose `block_id` or
+`task_id` is `running-list`, where it closes a left-over card as an error; on a message that only
+the list kept open it writes no note. `ThreadPlaces` does not let go of the
 reply that holds the list while it does, so that the list can always be taken off it; the close
 of the thread settles every reply that ever held it, let go of or not. A reply takes the list only
 from what the places assigned it once it rests, so the ending of a reply whose end is still on its
