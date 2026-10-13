@@ -4,19 +4,6 @@
   "message_blocks": [
    [
     {
-     "elements": [
-      {
-       "text": "✗ AskUserQuestion",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
-    },
-    {
-     "text": "I attempted to ask you those questions, but it appears this session is running in a non-interactive mode, which means the AskUserQuestion tool cannot collect your responses interactively.\n\nTo answer your request directly, I would have asked:\n1. **Which colour do you prefer?** (single choice: Red or Blue)\n2. **Do you also like green?** (multi-select: Yes or No)\n\nIf you're in an interactive Claude Code session, please feel free to provide your answers directly, and I can proceed with whatever task you need help with!",
-     "type": "markdown"
-    },
-    {
      "type": "divider"
     },
     {
@@ -31,7 +18,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "id": "fold:toolu_01P24zAVmj8jzZshmnA3vd6n",
+     "output": "recording only",
+     "status": "error",
+     "title": "AskUserQuestion"
+    }
+   ]
   ],
   "message_texts": [
    "I attempted to ask you those questions, but it appears this session is running in a non-interactive mode, which means the AskUserQuestion tool cannot collect your responses interactively.\n\nTo answer your request directly, I would have asked:\n1. **Which colour do you prefer?** (single choice: Red or Blue)\n2. **Do you also like green?** (multi-select: Yes or No)\n\nIf you're in an interactive Claude Code session, please feel free to provide your answers directly, and I can proceed with whatever task you need help with!"
@@ -66,8 +60,9 @@
     "chunks": [
      {
       "id": "fold:toolu_01P24zAVmj8jzZshmnA3vd6n",
+      "output": "recording only",
       "status": "error",
-      "title": "AskUserQuestion · recording only",
+      "title": "AskUserQuestion",
       "type": "task_update"
      }
     ],
@@ -908,42 +903,6 @@
     "ts": "1790000000.000001"
    },
    "method": "chat.stopStream"
-  },
-  {
-   "after_sink_call": 61,
-   "args": {
-    "blocks": [
-     {
-      "elements": [
-       {
-        "text": "✗ AskUserQuestion",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     },
-     {
-      "text": "I attempted to ask you those questions, but it appears this session is running in a non-interactive mode, which means the AskUserQuestion tool cannot collect your responses interactively.\n\nTo answer your request directly, I would have asked:\n1. **Which colour do you prefer?** (single choice: Red or Blue)\n2. **Do you also like green?** (multi-select: Yes or No)\n\nIf you're in an interactive Claude Code session, please feel free to provide your answers directly, and I can proceed with whatever task you need help with!",
-      "type": "markdown"
-     },
-     {
-      "type": "divider"
-     },
-     {
-      "elements": [
-       {
-        "text": "footer",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
-     }
-    ],
-    "channel": "C000CHAN",
-    "text": "I attempted to ask you those questions, but it appears this session is running in a non-interactive mode, which means the AskUserQuestion tool cannot collect your responses interactively.",
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.update"
   }
  ]
 }

@@ -23,7 +23,7 @@
      "details": "Running in background",
      "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
      "status": "complete",
-     "title": "Bash: sleep 15"
+     "title": "Wait 15 seconds"
     }
    ]
   ],
@@ -42,7 +42,7 @@
      {
       "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
       "status": "in_progress",
-      "title": "Bash: sleep 15",
+      "title": "Wait 15 seconds",
       "type": "task_update"
      }
     ],
@@ -76,7 +76,7 @@
       "details": "Running in background",
       "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
       "status": "in_progress",
-      "title": "Bash: sleep 15",
+      "title": "Wait 15 seconds",
       "type": "task_update"
      }
     ],
@@ -694,7 +694,7 @@
      {
       "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
       "status": "complete",
-      "title": "Bash: sleep 15",
+      "title": "Wait 15 seconds",
       "type": "task_update"
      }
     ],

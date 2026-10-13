@@ -61,7 +61,7 @@
     {
      "elements": [
       {
-       "text": "✓ Read 1 file",
+       "text": "Read 1 file",
        "type": "mrkdwn"
       }
      ],
@@ -72,13 +72,24 @@
      "type": "markdown"
     },
     {
-     "elements": [
-      {
-       "text": "✗ Edit",
-       "type": "mrkdwn"
-      }
-     ],
-     "type": "context"
+     "output": {
+      "elements": [
+       {
+        "elements": [
+         {
+          "text": "<tool_use_error>String to replace not found in file.",
+          "type": "text"
+         }
+        ],
+        "type": "rich_text_section"
+       }
+      ],
+      "type": "rich_text"
+     },
+     "status": "error",
+     "task_id": "toolu_01UGwcwQUu5z8LDz4ucFDRL4",
+     "title": "Edit: /home/dev/project/notes.txt",
+     "type": "task_card"
     },
     {
      "text": "**Step 2: Edit notes.txt (retry)**",
@@ -203,7 +214,14 @@
    ]
   ],
   "message_cards": [
-   []
+   [
+    {
+     "id": "toolu_01UGwcwQUu5z8LDz4ucFDRL4",
+     "output": "<tool_use_error>String to replace not found in file.",
+     "status": "error",
+     "title": "Edit: /home/dev/project/notes.txt"
+    }
+   ]
   ],
   "message_texts": [
    "I'll do these steps one at a time as requested.\n\n**Step 1: Write new.txt with numbers 1-15**\n\n**Step 2: Read notes.txt to see current content**\n\n**Step 2: Edit notes.txt to replace 'beta' with 'gamma'**\n\n**Step 2: Edit notes.txt (retry)**\n\n**Step 3: Write notes.txt with the two lines \"one\" and \"two\"**\n\nDone"
@@ -511,7 +529,7 @@
      {
       "id": "fold:toolu_01UZ6XRyij8tgTWjuvFsDqh4",
       "status": "complete",
-      "title": "Read: /home/dev/project/notes.txt",
+      "title": "Read 1 file",
       "type": "task_update"
      }
     ],
@@ -609,9 +627,10 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01UGwcwQUu5z8LDz4ucFDRL4",
+      "id": "toolu_01UGwcwQUu5z8LDz4ucFDRL4",
+      "output": "<tool_use_error>String to replace not found in file.",
       "status": "error",
-      "title": "Edit: /home/dev/project/notes.txt · <tool_use_error>String to replace not found in file.",
+      "title": "Edit: /home/dev/project/notes.txt",
       "type": "task_update"
      }
     ],
@@ -1011,7 +1030,7 @@
      {
       "elements": [
        {
-        "text": "✓ Read 1 file",
+        "text": "Read 1 file",
         "type": "mrkdwn"
        }
       ],
@@ -1022,13 +1041,24 @@
       "type": "markdown"
      },
      {
-      "elements": [
-       {
-        "text": "✗ Edit",
-        "type": "mrkdwn"
-       }
-      ],
-      "type": "context"
+      "output": {
+       "elements": [
+        {
+         "elements": [
+          {
+           "text": "<tool_use_error>String to replace not found in file.",
+           "type": "text"
+          }
+         ],
+         "type": "rich_text_section"
+        }
+       ],
+       "type": "rich_text"
+      },
+      "status": "error",
+      "task_id": "toolu_01UGwcwQUu5z8LDz4ucFDRL4",
+      "title": "Edit: /home/dev/project/notes.txt",
+      "type": "task_card"
      },
      {
       "text": "**Step 2: Edit notes.txt (retry)**",

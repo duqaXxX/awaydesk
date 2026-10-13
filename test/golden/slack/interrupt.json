@@ -23,7 +23,7 @@
      "id": "fold:toolu_014RM24vF5EeUNHQ57579Vma",
      "output": "Stopped",
      "status": "complete",
-     "title": "Bash: python3 -c 'import time; time.sleep(30)'"
+     "title": "Sleep for 30 seconds using Python"
     }
    ]
   ],
@@ -42,7 +42,7 @@
      {
       "id": "fold:toolu_014RM24vF5EeUNHQ57579Vma",
       "status": "in_progress",
-      "title": "Bash: python3 -c 'import time; time.sleep(30)'",
+      "title": "Sleep for 30 seconds using Python",
       "type": "task_update"
      }
     ],
@@ -62,7 +62,7 @@
       "id": "fold:toolu_014RM24vF5EeUNHQ57579Vma",
       "output": "Stopped",
       "status": "complete",
-      "title": "Bash: python3 -c 'import time; time.sleep(30)'",
+      "title": "Sleep for 30 seconds using Python",
       "type": "task_update"
      }
     ],

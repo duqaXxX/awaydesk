@@ -15,7 +15,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: sleep 20"
+      "title": "Background sleep for 20 seconds"
      }
     },
     {
@@ -30,7 +30,7 @@
       "preview": null,
       "status": "in_progress",
       "task": true,
-      "title": "Bash: sleep 20"
+      "title": "Background sleep for 20 seconds"
      }
     },
     {
@@ -52,7 +52,7 @@
        "preview": null,
        "status": "in_progress",
        "task": true,
-       "title": "Bash: sleep 20"
+       "title": "Background sleep for 20 seconds"
       }
      ],
      "footer": "footer"
@@ -110,7 +110,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: sleep 5"
+      "title": "Foreground sleep for 5 seconds"
      }
     },
     {
@@ -125,7 +125,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: sleep 5"
+      "title": "Foreground sleep for 5 seconds"
      }
     },
     {
@@ -140,7 +140,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: sleep 5"
+      "title": "Foreground sleep for 5 seconds"
      }
     },
     {
@@ -1950,7 +1950,7 @@
      "preview": null,
      "status": "in_progress",
      "task": false,
-     "title": "Bash: sleep 20"
+     "title": "Background sleep for 20 seconds"
     }
    },
    {
@@ -1965,7 +1965,7 @@
      "preview": null,
      "status": "in_progress",
      "task": true,
-     "title": "Bash: sleep 20"
+     "title": "Background sleep for 20 seconds"
     }
    },
    {
@@ -1986,7 +1986,7 @@
      "preview": null,
      "status": "complete",
      "task": true,
-     "title": "Bash: sleep 20"
+     "title": "Background sleep for 20 seconds"
     }
    },
    {
@@ -2001,7 +2001,7 @@
      "preview": null,
      "status": "complete",
      "task": true,
-     "title": "Bash: sleep 20"
+     "title": "Background sleep for 20 seconds"
     }
    },
    {
@@ -2016,7 +2016,7 @@
      "preview": null,
      "status": "in_progress",
      "task": false,
-     "title": "Bash: sleep 5"
+     "title": "Foreground sleep for 5 seconds"
     }
    },
    {
@@ -2031,7 +2031,7 @@
      "preview": null,
      "status": "complete",
      "task": false,
-     "title": "Bash: sleep 5"
+     "title": "Foreground sleep for 5 seconds"
     }
    },
    {
@@ -2046,7 +2046,7 @@
      "preview": null,
      "status": "complete",
      "task": false,
-     "title": "Bash: sleep 5"
+     "title": "Foreground sleep for 5 seconds"
     }
    },
    {

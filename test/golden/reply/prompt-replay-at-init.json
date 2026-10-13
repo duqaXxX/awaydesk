@@ -15,7 +15,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: sleep 20"
+      "title": "Sleep for 20 seconds in background"
      }
     },
     {
@@ -30,7 +30,7 @@
       "preview": null,
       "status": "in_progress",
       "task": true,
-      "title": "Bash: sleep 20"
+      "title": "Sleep for 20 seconds in background"
      }
     },
     {
@@ -52,7 +52,7 @@
        "preview": null,
        "status": "in_progress",
        "task": true,
-       "title": "Bash: sleep 20"
+       "title": "Sleep for 20 seconds in background"
       }
      ],
      "footer": "footer"
@@ -1905,7 +1905,7 @@
      "preview": null,
      "status": "in_progress",
      "task": false,
-     "title": "Bash: sleep 20"
+     "title": "Sleep for 20 seconds in background"
     }
    },
    {
@@ -1920,7 +1920,7 @@
      "preview": null,
      "status": "in_progress",
      "task": true,
-     "title": "Bash: sleep 20"
+     "title": "Sleep for 20 seconds in background"
     }
    },
    {
@@ -1941,7 +1941,7 @@
      "preview": null,
      "status": "complete",
      "task": true,
-     "title": "Bash: sleep 20"
+     "title": "Sleep for 20 seconds in background"
     }
    },
    {
@@ -1956,7 +1956,7 @@
      "preview": null,
      "status": "complete",
      "task": true,
-     "title": "Bash: sleep 20"
+     "title": "Sleep for 20 seconds in background"
     }
    },
    {

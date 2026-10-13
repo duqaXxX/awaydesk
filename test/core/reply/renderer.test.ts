@@ -122,6 +122,27 @@ test("tools turn streams text and one line per tool", async () => {
   assert.ok(renderer.result !== null);
 });
 
+test("a running command is titled by its description, any other call by its first argument", async () => {
+  // The terminal's live line for a command reads its description (captured on Claude Code
+  // 2.1.296: `Sleeping 20 seconds then printing marker`), with the command under it.
+  const events = recordedEvents("tools");
+  const calls = eventsOf(events, "call_started");
+  const command = calls.find(
+    (event) => event.toolName === "Bash" && typeof event.input.description === "string",
+  );
+  assert.ok(command !== undefined);
+  const [sink] = await render(events);
+  assert.equal(sink.tasks.find((t) => t.id === command.callId)?.title, command.input.description);
+  // A command with no description, and a call of another tool, keep the generic title.
+  const bare: SessionEvent = { ...command, callId: "toolu_bare", input: { command: "ls -la" } };
+  const other: SessionEvent = { ...command, callId: "toolu_other", toolName: "WebFetch" };
+  const [plain] = await render([bare, other]);
+  assert.deepEqual(
+    plain.tasks.map((t) => t.title),
+    ["Bash: ls -la", taskTitle("WebFetch", command.input)],
+  );
+});
+
 test("a failed tool is an error line", async () => {
   const [sink] = await render(recordedEvents("tool-error"));
   assert.ok(sink.tasks.some((t) => t.status === "error"));

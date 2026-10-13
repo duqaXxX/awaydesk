@@ -4446,10 +4446,11 @@ test("a foreground subagent s api error shows on its card", async (t) => {
   await (await session.submit("start it")).done.wait();
   await h.until(() => h.reactions().at(-1) === Status.DONE);
   const card = at(taskCards(h), -1);
-  // One card for the whole run: the fold puts a failed call's output after its title.
+  // A failed call of a tool the fold has no count for keeps a card of its own, with the error
+  // in its output.
   assert.equal(card.status, "error");
   assert.ok(
-    String(card.title).includes("Agent terminated early due to an API error: API Error: 529"),
+    String(card.output).includes("Agent terminated early due to an API error: API Error: 529"),
   );
   assert.ok(!h.slack.streamTexts().join("").includes("API Error"));
 });

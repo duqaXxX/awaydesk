@@ -163,7 +163,7 @@
       "preview": null,
       "status": "in_progress",
       "task": false,
-      "title": "Bash: ls -la"
+      "title": "List files and directories in current working directory"
      }
     },
     {
@@ -178,7 +178,7 @@
       "preview": null,
       "status": "complete",
       "task": false,
-      "title": "Bash: ls -la"
+      "title": "List files and directories in current working directory"
      }
     },
     {

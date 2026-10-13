@@ -6,7 +6,7 @@
     {
      "elements": [
       {
-       "text": "✗ Read 1 file · Ran 1 shell command",
+       "text": "Read 1 file, ran 1 shell command",
        "type": "mrkdwn"
       }
      ],
@@ -67,7 +67,7 @@
      {
       "id": "fold:toolu_01YYyHT3cAveY6vGoBUSEazb",
       "status": "error",
-      "title": "Read: /home/dev/project/missing.txt · File does not exist. Note: your current working directory is /home/dev/project.",
+      "title": "Read 1 file",
       "type": "task_update"
      }
     ],
@@ -82,14 +82,8 @@
     "chunks": [
      {
       "id": "fold:toolu_01YYyHT3cAveY6vGoBUSEazb",
-      "status": "error",
-      "title": "✗ Read 1 file",
-      "type": "task_update"
-     },
-     {
-      "id": "now:toolu_01Q8BHFdBEFU1YJffhnsR7fb",
       "status": "in_progress",
-      "title": "Bash: python3 -c 'import sys; sys.exit(1)'",
+      "title": "Run Python command that exits with error code 1",
       "type": "task_update"
      }
     ],
@@ -103,9 +97,9 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "now:toolu_01Q8BHFdBEFU1YJffhnsR7fb",
+      "id": "fold:toolu_01YYyHT3cAveY6vGoBUSEazb",
       "status": "error",
-      "title": "Bash: python3 -c 'import sys; sys.exit(1)' · Exit code 1",
+      "title": "Read 1 file, ran 1 shell command",
       "type": "task_update"
      }
     ],
@@ -268,7 +262,7 @@
      {
       "elements": [
        {
-        "text": "✗ Read 1 file · Ran 1 shell command",
+        "text": "Read 1 file, ran 1 shell command",
         "type": "mrkdwn"
        }
       ],

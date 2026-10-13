@@ -28,7 +28,7 @@
     {
      "elements": [
       {
-       "text": "✓ Ran 1 shell command",
+       "text": "Ran 1 shell command",
        "type": "mrkdwn"
       }
      ],
@@ -361,7 +361,7 @@
      {
       "id": "fold:toolu_01QpTjiHn9CtQiYmXdMKovV8",
       "status": "in_progress",
-      "title": "Bash: python3 -c \"import time; time.sleep(40)\"",
+      "title": "Run 40-second sleep in Python",
       "type": "task_update"
      }
     ],
@@ -393,7 +393,7 @@
      {
       "id": "fold:toolu_01QpTjiHn9CtQiYmXdMKovV8",
       "status": "complete",
-      "title": "Bash: python3 -c \"import time; time.sleep(40)\"",
+      "title": "Ran 1 shell command",
       "type": "task_update"
      }
     ],
@@ -648,7 +648,7 @@
      {
       "elements": [
        {
-        "text": "✓ Ran 1 shell command",
+        "text": "Ran 1 shell command",
         "type": "mrkdwn"
        }
       ],

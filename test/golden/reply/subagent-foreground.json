@@ -37,7 +37,7 @@
      "call": "task",
      "update": {
       "calls": 1,
-      "details": "Bash: ls",
+      "details": "List files and directories in current working directory",
       "folded": null,
       "id": "toolu_01JmXiUhDKZ3KxHbHsCr33WE",
       "name": "Agent",
@@ -238,7 +238,7 @@
     "call": "task",
     "update": {
      "calls": 1,
-     "details": "Bash: ls",
+     "details": "List files and directories in current working directory",
      "folded": null,
      "id": "toolu_01JmXiUhDKZ3KxHbHsCr33WE",
      "name": "Agent",

@@ -13,7 +13,7 @@ import type { FooterFields, Preview, ReplySink, TaskStatus, TaskUpdate } from ".
 import { blank } from "../../text.ts";
 import { formatTokens } from "../footer.ts";
 import * as texts from "../texts.ts";
-import { answered, LAUNCHERS, launched, PREVIEWED, preview } from "./previews.ts";
+import { answered, described, LAUNCHERS, launched, PREVIEWED, preview } from "./previews.ts";
 import { BACKGROUND, oneLine, STOPPED, splitLines, TITLE_LIMIT } from "./words.ts";
 
 export const OUTPUT_LIMIT = 200;
@@ -428,7 +428,7 @@ export class TurnRenderer<Footer = FooterFields> {
   }
 
   async #callStarted(event: EventOf<"call_started">): Promise<void> {
-    const title = taskTitle(event.toolName, event.input);
+    const title = described(event.toolName, event.input) ?? taskTitle(event.toolName, event.input);
     const parent = event.parentCallId;
     const root = parent === null ? null : (this.#rootOf.get(parent) ?? parent);
     if (root !== null && (this.#lines.has(root) || this.#launched.has(root))) {

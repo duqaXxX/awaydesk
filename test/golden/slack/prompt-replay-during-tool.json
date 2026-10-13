@@ -6,7 +6,7 @@
     {
      "status": "complete",
      "task_id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
-     "title": "Bash: sleep 20",
+     "title": "Sleep for 20 seconds in background",
      "type": "task_card"
     },
     {
@@ -16,7 +16,7 @@
     {
      "elements": [
       {
-       "text": "✓ Ran 1 shell command",
+       "text": "Ran 1 shell command",
        "type": "mrkdwn"
       }
      ],
@@ -45,7 +45,7 @@
     {
      "id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
      "status": "complete",
-     "title": "Bash: sleep 20"
+     "title": "Sleep for 20 seconds in background"
     }
    ]
   ],
@@ -64,7 +64,7 @@
      {
       "id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
       "status": "in_progress",
-      "title": "Bash: sleep 20",
+      "title": "Sleep for 20 seconds in background",
       "type": "task_update"
      }
     ],
@@ -84,7 +84,7 @@
       "details": "Running in background",
       "id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
       "status": "in_progress",
-      "title": "Bash: sleep 20",
+      "title": "Sleep for 20 seconds in background",
       "type": "task_update"
      }
     ],
@@ -114,7 +114,7 @@
      {
       "id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
       "status": "complete",
-      "title": "Bash: sleep 20",
+      "title": "Sleep for 20 seconds in background",
       "type": "task_update"
      }
     ],
@@ -130,7 +130,7 @@
      {
       "id": "fold:toolu_01JTnajtU3fJhEjrcoTjZxN8",
       "status": "in_progress",
-      "title": "Bash: sleep 15",
+      "title": "Sleep for 15 seconds in foreground",
       "type": "task_update"
      }
     ],
@@ -146,7 +146,7 @@
      {
       "id": "fold:toolu_01JTnajtU3fJhEjrcoTjZxN8",
       "status": "complete",
-      "title": "Bash: sleep 15",
+      "title": "Ran 1 shell command",
       "type": "task_update"
      }
     ],
@@ -211,7 +211,7 @@
      {
       "status": "complete",
       "task_id": "fold:toolu_01LCo5tHeWDBK4833FMV9SQi",
-      "title": "Bash: sleep 20",
+      "title": "Sleep for 20 seconds in background",
       "type": "task_card"
      },
      {
@@ -221,7 +221,7 @@
      {
       "elements": [
        {
-        "text": "✓ Ran 1 shell command",
+        "text": "Ran 1 shell command",
         "type": "mrkdwn"
        }
       ],

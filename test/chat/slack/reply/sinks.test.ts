@@ -376,7 +376,7 @@ test("text grows the stream and a card updates in place", async () => {
   assert.deepEqual(slack.messageTexts(), ["Let me look.\n\nThe tree is clean."]);
   // one card, which the stream keeps updating where it first appeared
   assert.deepEqual(slack.messageCards(), [
-    [{ id: "fold:t1", title: "Bash: t1", status: "complete" }],
+    [{ id: "fold:t1", title: "Ran 1 shell command", status: "complete" }],
   ]);
   const chunks = slack.callsTo("chat.appendStream").flatMap((a) => list(a.chunks));
   assert.deepEqual(
@@ -398,7 +398,7 @@ test("changes inside one debounce go in one append", async () => {
   const append = only(slack.callsTo("chat.appendStream"));
   assert.deepEqual(append.chunks, [
     { type: "markdown_text", text: "BCD" },
-    { type: "task_update", id: "fold:t1", title: "Bash: t1", status: "complete" },
+    { type: "task_update", id: "fold:t1", title: "Ran 1 shell command", status: "complete" },
   ]);
 });
 
@@ -1558,11 +1558,10 @@ test("a card says what the tool line said", async () => {
       status: "in_progress",
       details: "Read: x\nBash: ls",
     },
-    // a call of a run of calls says why it failed in its title: its card is reused, and
-    // Slack appends `output` to what a card already holds
-    { id: "fold:b", title: "Bash: b · exit 1", status: "error" },
+    // a failed Bash is counted with the other calls of its run: its card says no why
+    { id: "fold:b", title: "Ran 1 shell command", status: "error" },
     { id: "c", title: "Bash: c", status: "complete", output: STOPPED },
-    { id: "fold:d", title: "Bash: d", status: "complete" },
+    { id: "fold:d", title: "Ran 1 shell command", status: "complete" },
   ]);
 });
 
@@ -1679,9 +1678,10 @@ test("a failed call shows its error even if it carries a preview", async () => {
   assert.deepEqual(start.chunks, [
     {
       type: "task_update",
-      id: "fold:e",
-      title: "Edit: e · File not found",
+      id: "e",
+      title: "Edit: e",
       status: "error",
+      output: "File not found",
     },
   ]);
 });
@@ -1703,13 +1703,7 @@ test("an edit and a write show as the terminal shows them", async () => {
   );
   assert.deepEqual(
     cards.filter((c) => str(c.title).startsWith("Edit")).map((c) => [c.title, c.status]),
-    [
-      [
-        "Edit: /home/dev/project/notes.txt · " +
-          "<tool_use_error>String to replace not found in file.",
-        "error",
-      ],
-    ],
+    [["Edit: /home/dev/project/notes.txt", "error"]],
   );
   const shown = chunks.filter((c) => c.type === "blocks").flatMap((c) => list(c.blocks));
   assert.deepEqual(
@@ -2270,7 +2264,7 @@ test("update limiter refund never exceeds burst", async () => {
 
 // The helpers of the tests that follow.
 
-// A run of calls: two cards while the reply is written, a line of counts once its body ended.
+// A run of calls: one card while the reply is written, a line of counts once its body ended.
 
 export function context(text: string): ContextBlock {
   return { type: "context", elements: [{ type: "mrkdwn", text }] };
@@ -2902,22 +2896,19 @@ test("a start with nothing to compare is not adopted", async () => {
   assert.equal(slack.callsTo("chat.startStream").length, 2); // tried again, not guessed at
 });
 
-// A run of calls: two cards while the reply is written, a line of counts once its body ended.
+// A run of calls: one card while the reply is written, a line of counts once its body ended.
 
 /** Whether `blocks` holds `block`, by value. */
 function includesBlock(blocks: readonly JsonObject[], block: object): boolean {
   return blocks.some((b) => isDeepStrictEqual(b, block));
 }
 
-test("a run of calls streams as the counts and the call shown", async () => {
+test("a run of calls streams as one card of counts", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack);
   await runOfCalls(sink);
   assert.deepEqual(slack.messageCards(), [
-    [
-      { id: "fold:a", title: "Ran 1 shell command · Read 1 file", status: "complete" },
-      { id: "now:b", title: "Bash: c · Exit code 1", status: "error" },
-    ],
+    [{ id: "fold:a", title: "Ran 2 shell commands, read 1 file", status: "complete" }],
   ]);
   // No chunk carries text Slack would append to what a reused card holds.
   assert.ok(!allChunks(slack).some((c) => "details" in c || "output" in c));
@@ -2935,7 +2926,7 @@ test("the end folds the run into a line with a silent update", async () => {
   assert.equal(update.ts, slack.streamTs[0]);
   assert.deepEqual(update.blocks, [
     { type: "markdown", text: "Let me look." },
-    context("✓ Ran 1 shell command · Read 1 file · ✗ Ran 1 shell command"),
+    context("Ran 2 shell commands, read 1 file"),
     { type: "markdown", text: "One test fails." },
     { type: "divider" },
     context("main · ctx 6%"),
@@ -2970,7 +2961,7 @@ test("a fold that cannot be written does not undo the end", async () => {
   await settled(); // the fold Slack refused is tried again with the next write
   const updates = slack.callsTo("chat.update");
   assert.equal(updates.length, 2);
-  assert.deepEqual(get(last(updates), "blocks", 0), context("✓ Ran 1 shell command"));
+  assert.deepEqual(get(last(updates), "blocks", 0), context("Ran 1 shell command"));
   assert.equal(slack.pushes(), 1); // no second stop, no closing message
   assert.deepEqual(slack.postedTs, []);
 });
@@ -2998,11 +2989,11 @@ test("a stream slack closed first is folded before its closing message", async (
   slack.expire(slack.streamTs[0] ?? "");
   assert.equal(await sink.closeOutFormatted("footer"), true);
   const update = only(slack.callsTo("chat.update"));
-  assert.deepEqual(update.blocks, [context("✓ Ran 1 shell command")]);
+  assert.deepEqual(update.blocks, [context("Ran 1 shell command")]);
   assert.equal(slack.postedTs.length, 1); // the footer's own message, as for any stream Slack closed
 });
 
-test("past the window the run keeps its two cards until the body ends", async () => {
+test("past the window the run keeps its one card until the body ends", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
@@ -3014,14 +3005,11 @@ test("past the window the run keeps its two cards until the body ends", async ()
   const blocks = list(last(slack.callsTo("chat.update")).blocks);
   assert.deepEqual(
     blocks.map((b) => [b.type, b.title, b.status]),
-    [
-      ["task_card", "Ran 1 shell command", "complete"],
-      ["task_card", "Read: b", "in_progress"],
-    ],
+    [["task_card", "Read: b", "in_progress"]],
   );
   await sink.finish([tool("b", "Read")], null);
   assert.deepEqual(last(slack.callsTo("chat.update")).blocks, [
-    context("✓ Ran 1 shell command · Read 1 file"),
+    context("Ran 1 shell command, read 1 file"),
   ]);
 });
 
@@ -3036,7 +3024,7 @@ test("a task that outlives the turn keeps its card beside the folded line", asyn
   await sink.finish([], null);
   assert.equal(await sink.closeOutFormatted(null), true);
   const blocks = list(last(slack.callsTo("chat.update")).blocks);
-  assert.deepEqual(blocks[0], context("✓ Read 1 file"));
+  assert.deepEqual(blocks[0], context("Read 1 file"));
   assert.ok(blocks[1]?.type === "task_card" && blocks[1].status === "in_progress");
 });
 
@@ -3054,7 +3042,7 @@ test("a run in a message the reply has left is folded at the end too", async () 
   await sink.finish([], null);
   assert.equal(await sink.closeOutFormatted(null), true);
   const first = slack.messageBlocks()[0] ?? [];
-  assert.deepEqual(first[0], context("✓ Ran 1 shell command"));
+  assert.deepEqual(first[0], context("Ran 1 shell command"));
   assert.ok(first.every((block) => block.task_id !== "fold:a"));
 });
 
