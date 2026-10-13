@@ -197,8 +197,10 @@ sessions may start under, two clocks, and `ChatContext.core`, which returns the 
 the daemon has built its sessions. The chat is built before the sessions exist, so `build` must
 not call `core`; a provider calls it when it first needs the core. `config.loadConfig` gives a
 module the values of its own variables only, and a required one that is missing stops the start.
-The Claude entry reads no variable; the Slack entry requires `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`
-and `SLACK_OWNER_USER_ID` and reads `SLACK_USER_TOKEN`.
+The Claude entry requires none and reads `BASH_DEFAULT_TIMEOUT_MS`, a variable of Claude Code that
+it hands to each thread's session; the Slack entry requires `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`
+and `SLACK_OWNER_USER_ID` and reads `SLACK_USER_TOKEN`. A module reads each of its variables by
+name: `loadConfig` gives them readable by lookup and not enumerable, so that nothing prints them.
 
 A capability names a feature that the core offers only when the module supports it. A module
 declares what it supports; for a feature it does not declare, the core does not offer the feature

@@ -223,7 +223,8 @@ How the file is read:
   relative path is refused, since launchd starts awaydesk in `/` and a terminal in its own folder.
   It must name a directory that exists once links are followed; the message shows the path it
   resolved to.
-- Nothing is put in the process environment, and the `.env` of a repository is never read.
+- Nothing is put in awaydesk's own process environment, and the `.env` of a repository is never
+  read. `BASH_DEFAULT_TIMEOUT_MS` alone is handed on, to the Claude Code sessions awaydesk starts.
 
 ### Checkpoint 2: the daemon reads `.env` and connects
 
