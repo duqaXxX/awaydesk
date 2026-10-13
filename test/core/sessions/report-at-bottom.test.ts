@@ -79,7 +79,7 @@ test("nothing below the waiting reply: the report renders in it", async (t) => {
   assert.equal(h.bodies().filter(isReport).length, 1);
 });
 
-test("an overtaken reply whose task ends with no turn is logged, and posts nothing", async (t) => {
+test("an overtaken reply whose task ends with no turn is logged, and says the end where it is", async (t) => {
   const lines = logged(t, "info");
   const [first, notice] = splitBackground();
   const h = harnessFor(t)({ turns: [first, answer] });
@@ -92,9 +92,10 @@ test("an overtaken reply whose task ends with no turn is logged, and posts nothi
   await h.clock.advance(INJECTED_TURN_WAIT + 1);
   await h.idle();
   assert.equal(lines.filter((line) => line.startsWith(ENDED)).length, 1, lines.join("\n"));
-  // No message of any kind: a stream start or a post would be a new message.
+  // No message of any kind: a stream start or a post would be a new message. The command has
+  // no card to complete, so its end line is written into the reply that started it, by edit.
   assert.equal(h.slack.createdTs.length, before);
-  assert.ok(!h.replies().some(isReport));
+  assert.deepEqual(h.replies().map(isReport), [true, false]);
 });
 
 test("the same when the notification never comes (the unreported timer)", async (t) => {

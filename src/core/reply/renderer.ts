@@ -232,7 +232,11 @@ export class TurnRenderer<Footer = FooterFields> {
         await this.#taskStarted(event);
         break;
       case "task_progress": {
-        const entry = this.#lines.get(this.#lineOfTask.get(event.taskId) ?? "");
+        // A task with no line of its own writes nothing: its call's line, if it had one, is
+        // an ended call's.
+        const entry = this.lineless(event.taskId)
+          ? undefined
+          : this.#lines.get(this.#lineOfTask.get(event.taskId) ?? "");
         if (entry !== undefined) {
           await this.#set({ ...entry, details: oneLine(event.description, OUTPUT_LIMIT) });
         }
@@ -349,7 +353,12 @@ export class TurnRenderer<Footer = FooterFields> {
     const interrupted = this.result !== null && this.result.ending === "interrupted";
     await this.#handOver();
     await this.#writeLaunches();
-    if (!this.#wroteText && this.#lines.size === 0 && this.#launched.size === 0) {
+    if (
+      !this.#wroteText &&
+      !this.#wroteLine &&
+      this.#lines.size === 0 &&
+      this.#launched.size === 0
+    ) {
       // A command that prints nothing (a local one, say) still gets a visible answer.
       await this.#text(interrupted ? texts.STOPPED : texts.named(texts.NO_OUTPUT, this.#names), {
         notice: true,
@@ -414,6 +423,16 @@ export class TurnRenderer<Footer = FooterFields> {
     this.#breakOwed = false;
     await this.#handOver();
     await this.#sink.text(`${prefix}${text}\n\n`, { notice: true, ending: false });
+  }
+
+  /**
+   * What opens a turn the agent starts on its own: the end lines of the tasks it reports. A
+   * note as `feedNotice` writes one, and the reply's content: a turn that then says nothing has
+   * said this, and gets no line about an answer with no text.
+   */
+  async feedOpening(text: string): Promise<void> {
+    await this.feedNotice(text);
+    this.#wroteLine = true;
   }
 
   /**

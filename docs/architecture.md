@@ -798,7 +798,7 @@ Notes on the table:
    result, it outlives the call and becomes a task of the reply, like a top-level one
    (`TurnRenderer.nests`, `TurnRenderer.takePromoted`): a command with no line, any other kind
    with a line of its own. A task with no call in the reply gets a new
-   line; one started by a call the reply never saw, while such a task (a command's) runs, is an
+   line, unless it is a command or an agent in the background, which have none; one started by a call the reply never saw, while such a task (a command's) runs, is an
    agent inside that command and shows on the command's line, counted as a call with its
    description, as a subagent's calls show on its line.
 4. A background subagent's own failed request stays out of the reply's text, as a subagent's other

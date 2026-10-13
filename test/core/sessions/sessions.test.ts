@@ -1703,7 +1703,7 @@ test("a failed background task shows why in the reply that started it", async (t
   assert.ok(started.includes("✗") && started.includes(words));
 });
 
-test("closing the session stops the cards of running tasks", async (t) => {
+test("closing the session leaves no card and no stream for running tasks", async (t) => {
   const [first] = splitBackground();
   const h = harnessFor(t)({ turns: [first] });
   await (await h.session().submit("start it")).done.wait();
@@ -1806,6 +1806,10 @@ test("a task that ends after a report turn began waits for the next report turn"
   const text = h.replies().join("\n");
   assert.ok(text.includes('Background command "Sleep for 5 seconds then print done" completed'));
   assert.ok(!text.includes("Second sleep"));
+  // No turn comes to report the second: once the wait for one has passed, its end is said in
+  // the reply that started it. The first report's start had cancelled the wait.
+  await reportTurnNeverCame(h);
+  await h.until(() => h.replies().join("\n").includes('Background command "Second sleep"'), 3.0);
 });
 
 test("a query crossing a notification never hangs", async (t) => {

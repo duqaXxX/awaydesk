@@ -1840,6 +1840,9 @@ export class ThreadSession {
           this.active = null;
           this.compacting = false;
           this.showThreadStatus(); // whichever way it ended, `!stop` included
+          // An end told after this turn had begun is reported in a turn to come, which
+          // nothing waits for yet: the turn's start cancelled the wait.
+          if (this.ended.length > 0) this.notified();
         }
       }
       // Checked only now, with the turn no longer active: `finish` alone still reads busy.
@@ -2012,8 +2015,13 @@ export class ThreadSession {
     this.held = [];
     // An end line waits to be said: of a task with no card (a command or an agent in the
     // background), nothing else in the reply says that it ended.
-    const unsaid = (this.opening ?? this.ended).map(([, line]) => line);
+    const pending = this.opening ?? this.ended;
+    const unsaid = pending.map(([, line]) => line);
     const said = unsaid.length > 0;
+    // The reply that holds the first of those tasks, whatever sits below it.
+    const [first] = pending;
+    const holder =
+      first === undefined ? null : (this.taskReplies.get(first[0]) ?? this.showing(first[0]));
     const [text, target] = this.openingTarget();
     try {
       if (held.length > 0) {
@@ -2026,6 +2034,10 @@ export class ThreadSession {
       } else if (said && this.promptOwed()) {
         // A message of the owner's waits below that reply: its own reply says the line.
         this.endedAhead.push(...unsaid);
+      } else if (said && holder !== null && !holder.closedOut) {
+        // Something sits below that reply and nothing is coming: the line is written where the
+        // task started, by an edit that notifies nobody, as its card ended in place before.
+        await holder.feedLine(unsaid.join("\n"));
       }
     } catch (error) {
       if (error instanceof Cancelled) throw error;
@@ -2322,7 +2334,7 @@ export class ThreadSession {
       unanswered: null,
     };
     this.active = active;
-    if (opening !== null) await renderer.feedNotice(opening);
+    if (opening !== null) await renderer.feedOpening(opening);
     const ahead = this.endedAhead;
     this.endedAhead = [];
     if (ahead.length > 0) await renderer.feedLine(ahead.join("\n"));
@@ -2347,7 +2359,7 @@ export class ThreadSession {
     renderer: TurnRenderer,
     signal?: AbortSignal,
   ): Promise<void> {
-    if (text !== null) await renderer.feedNotice(text);
+    if (text !== null) await renderer.feedOpening(text);
     for (const event of events) await renderer.feed(event);
     await this.closeReply(renderer, null, { signal });
   }
@@ -2438,13 +2450,18 @@ export class ThreadSession {
 
   /**
    * Whether one of `renderer`'s own tasks still keeps its reply's stream open: one still runs,
-   * or ended less than INJECTED_TURN_WAIT ago with no notification yet (its report, if any, not
-   * in yet). The CLI can suppress the notification altogether (SDK TaskUpdatedMessage
+   * or ended with its end line still to be said, or ended less than INJECTED_TURN_WAIT ago with
+   * no notification yet (its report, if any, not in yet). The CLI can suppress the notification altogether (SDK TaskUpdatedMessage
    * docstring), so past that wait this stops counting it: `expireUnreported` rechecks then,
    * since nothing else would.
    */
   private stillOwed(renderer: TurnRenderer): boolean {
     if (renderer.runningTasks.length > 0) return true;
+    // An end line not yet said belongs to a turn to come, or to the wait for one: the reply
+    // that started its task stays open to take it.
+    for (const [taskId] of [...(this.opening ?? []), ...this.ended]) {
+      if (this.taskReplies.get(taskId) === renderer) return true;
+    }
     const now = this.deps.clock.time();
     for (const [taskId, ended] of this.unreported) {
       if (now - ended < INJECTED_TURN_WAIT && this.taskReplies.get(taskId) === renderer) {

@@ -17,6 +17,9 @@ All notable changes to this project are documented here. The format follows
   turn; a task that ends after that waits for the turn that reports it. Before, every end told
   before the report's first word opened it, and the later report opened with
   `Background task update`.
+- With no card to complete, a task's end that no report turn follows is written into the reply
+  that started it, by an edit that notifies nobody, or at the top of the reply to a message of
+  the owner's that waits. The owner's next turn takes the ends told since the last one.
 
 - `StateStore` takes the flush of a write as an option, `sync`, which is `fs.fsyncSync` when
   absent, so the daemon writes `state.json` as before. The test worlds pass one that does

@@ -42,6 +42,7 @@ The first rows are about how a session runs, the others about commands.
 | A run of calls that has ended, while the reply goes on | A grey line of counts | A card titled with the counts, which becomes the grey line when the reply ends | [#100](https://github.com/duqaXxX/awaydesk/issues/100) |
 | The counts of a run | A command is counted by what it does: `Listed 1 directory`, `Searched for 2 patterns` | Every command is `Ran 1 shell command` | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | The calls of a run, one by one | `ctrl+o` opens each call with its output | Not shown | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
+| Several subagents started in one message, one of which waits for an approval | The line of the ones already running is written at once | It is written when the last one has started, or when the reply writes anything else | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | What a subagent was asked | `ctrl+o` shows its prompt under the launch line | Not shown | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | How Claude is told who it is | `You are Claude Code, Anthropic's official CLI for Claude.` | `You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK.` | none |
 | Sending feedback to Anthropic, ending a conversation | The `SendFeedback` and `EndConversation` tools | Not offered | none |
