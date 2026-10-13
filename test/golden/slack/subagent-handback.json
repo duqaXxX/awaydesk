@@ -4,6 +4,23 @@
   "message_blocks": [
    [
     {
+     "elements": [
+      {
+       "text": "Ran 1 shell command",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    },
+    {
+     "text": "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
+     "type": "markdown"
+    },
+    {
+     "text": "Both tasks are started in the background: the subagent that runs `echo subagent-ok` and the command `sleep 15`. Neither has finished yet.\n\nThe subagent finished: `echo subagent-ok` printed `subagent-ok`. The command `sleep 15` is still running.\n\nThe command `sleep 15` ended with exit code 0, so both tasks are done.",
+     "type": "markdown"
+    },
+    {
      "type": "divider"
     },
     {
@@ -18,17 +35,10 @@
    ]
   ],
   "message_cards": [
-   [
-    {
-     "details": "Running in background",
-     "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
-     "status": "complete",
-     "title": "Wait 15 seconds"
-    }
-   ]
+   []
   ],
   "message_texts": [
-   "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agentBoth tasks are started in the background: the subagent that runs `echo subagent-ok` and the command `sleep 15`. Neither has finished yet.\n\nThe subagent finished: `echo subagent-ok` printed `subagent-ok`. The command `sleep 15` is still running.\n\nThe command `sleep 15` ended with exit code 0, so both tasks are done."
+   "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent\n\nBoth tasks are started in the background: the subagent that runs `echo subagent-ok` and the command `sleep 15`. Neither has finished yet.\n\nThe subagent finished: `echo subagent-ok` printed `subagent-ok`. The command `sleep 15` is still running.\n\nThe command `sleep 15` ended with exit code 0, so both tasks are done."
   ],
   "pushes": 1
  },
@@ -73,10 +83,9 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "details": "Running in background",
       "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
-      "status": "in_progress",
-      "title": "Wait 15 seconds",
+      "status": "complete",
+      "title": "Ran 1 shell command",
       "type": "task_update"
      }
     ],
@@ -692,22 +701,6 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
-      "status": "complete",
-      "title": "Wait 15 seconds",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 48,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
       "text": "\n\nThe comm",
       "type": "markdown_text"
      }
@@ -717,7 +710,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 49,
+   "after_sink_call": 47,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -731,7 +724,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 50,
+   "after_sink_call": 48,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -745,7 +738,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 51,
+   "after_sink_call": 49,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -759,7 +752,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 52,
+   "after_sink_call": 50,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -773,7 +766,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 53,
+   "after_sink_call": 51,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -787,7 +780,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 54,
+   "after_sink_call": 52,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -801,7 +794,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 55,
+   "after_sink_call": 53,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -815,7 +808,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 56,
+   "after_sink_call": 54,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -829,7 +822,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 58,
+   "after_sink_call": 56,
    "args": {
     "blocks": [
      {
@@ -849,6 +842,46 @@
     "ts": "1790000000.000001"
    },
    "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 56,
+   "args": {
+    "blocks": [
+     {
+      "elements": [
+       {
+        "text": "Ran 1 shell command",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
+      "type": "markdown"
+     },
+     {
+      "text": "Both tasks are started in the background: the subagent that runs `echo subagent-ok` and the command `sleep 15`. Neither has finished yet.\n\nThe subagent finished: `echo subagent-ok` printed `subagent-ok`. The command `sleep 15` is still running.\n\nThe command `sleep 15` ended with exit code 0, so both tasks are done.",
+      "type": "markdown"
+     },
+     {
+      "type": "divider"
+     },
+     {
+      "elements": [
+       {
+        "text": "footer",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "Both tasks are started in the background: the subagent that runs echo subagent-ok and the command sleep 15. Neither has finished yet.",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
   }
  ]
 }

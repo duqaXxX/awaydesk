@@ -37,36 +37,6 @@
       "calls": 0,
       "details": null,
       "folded": null,
-      "id": "task-bxc2i5omc",
-      "name": "local_bash",
-      "output": null,
-      "preview": null,
-      "status": "in_progress",
-      "task": true,
-      "title": "sleep 3"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "task-bxc2i5omc",
-      "name": "local_bash",
-      "output": "sleep 3",
-      "preview": null,
-      "status": "complete",
-      "task": true,
-      "title": "sleep 3"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
       "id": "task-a0d6caecc437a1298",
       "name": "task",
       "output": null,

@@ -22,14 +22,14 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": "Running in background",
+      "details": null,
       "folded": null,
       "id": "toolu_01LiZwhcy5g12fYSVLgAq5TS",
       "name": "Bash",
       "output": "Command running in background with ID: bny2rux7d. Output is being written to: /private/tmp/claude-502/-home-dev-project/93f0c865-cbfb-4117-963b-cbcd8c9be267/tasks/bny2rux7d.output. You will be notifi…",
       "preview": null,
-      "status": "in_progress",
-      "task": true,
+      "status": "complete",
+      "task": false,
       "title": "Sleep for 5 seconds then print done"
      }
     },
@@ -41,20 +41,7 @@
     },
     {
      "call": "finish",
-     "closing": [
-      {
-       "calls": 0,
-       "details": "Running in background",
-       "folded": null,
-       "id": "toolu_01LiZwhcy5g12fYSVLgAq5TS",
-       "name": "Bash",
-       "output": "Command running in background with ID: bny2rux7d. Output is being written to: /private/tmp/claude-502/-home-dev-project/93f0c865-cbfb-4117-963b-cbcd8c9be267/tasks/bny2rux7d.output. You will be notifi…",
-       "preview": null,
-       "status": "in_progress",
-       "task": true,
-       "title": "Sleep for 5 seconds then print done"
-      }
-     ],
+     "closing": [],
      "footer": "footer"
     },
     {
@@ -276,14 +263,14 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": "Running in background",
+     "details": null,
      "folded": null,
      "id": "toolu_01LiZwhcy5g12fYSVLgAq5TS",
      "name": "Bash",
      "output": "Command running in background with ID: bny2rux7d. Output is being written to: /private/tmp/claude-502/-home-dev-project/93f0c865-cbfb-4117-963b-cbcd8c9be267/tasks/bny2rux7d.output. You will be notifi…",
      "preview": null,
-     "status": "in_progress",
-     "task": true,
+     "status": "complete",
+     "task": false,
      "title": "Sleep for 5 seconds then print done"
     }
    },
@@ -292,36 +279,6 @@
     "ending": false,
     "markdown": "started",
     "notice": false
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01LiZwhcy5g12fYSVLgAq5TS",
-     "name": "Bash",
-     "output": null,
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Sleep for 5 seconds then print done"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01LiZwhcy5g12fYSVLgAq5TS",
-     "name": "Bash",
-     "output": "Background command \"Sleep for 5 seconds then print done\" completed (exit code 0)",
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Sleep for 5 seconds then print done"
-    }
    },
    {
     "call": "text",

@@ -7,6 +7,30 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A task's end line is drawn small and grey, as the count of a run of calls is (the owner's
+  choice, 2026-10-14; the terminal writes it as text behind a coloured dot). The chat seam's
+  `ReplySink.text` takes `aside` for such a line; the Slack provider draws it as a `context`
+  block once the message is written by an update, and as text while it is a stream.
+- The list of what still runs counts what is in the background alone
+  (`TurnRenderer.backgroundTasks`). A long command the turn still waits for was counted as
+  `1 shell still running` beside its own card.
+
+- A command left running in the background has no card, as the terminal draws none (issue #299,
+  captured on Claude Code 2.1.296): its call is counted in its run, and the command shows in the
+  list of what still runs and by its end line. A command a subagent leaves running has no end
+  line either: its end is told to the subagent, which reports it, and the terminal prints the
+  agent's own end alone. Two subagents running one command each wrote two identical
+  `Background command` lines before (#276).
+- The subagents one message starts in the background share one launch line,
+  `2 background agents launched`, with what each does under it.
+- A report opens with the end lines of the tasks that had ended when Claude Code began that
+  turn; a task that ends after that waits for the turn that reports it. Before, every end told
+  before the report's first word opened it, and the later report opened with
+  `Background task update`.
+- With no card to complete, a task's end that no report turn follows is written into the reply
+  that started it, by an edit that notifies nobody, or at the top of the reply to a message of
+  the owner's that waits. The owner's next turn takes the ends told since the last one.
+
 - `StateStore` takes the flush of a write as an option, `sync`, which is `fs.fsyncSync` when
   absent, so the daemon writes `state.json` as before. The test worlds pass one that does
   nothing: the disk serves one flush at a time for the whole machine, and the suite's processes

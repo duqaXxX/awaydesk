@@ -204,6 +204,10 @@ export class ThreadSession {
   // What the running turn's reply says when it ends: how many queued messages a restart
   // dropped, since they get no reply of their own.
   private endNotes: string[] = [];
+  // Tasks a subagent started and left running (a command in the background). Their end is told
+  // to the subagent, which reports it: the terminal prints no line for it in the conversation
+  // (captured 2026-10-14, Claude Code 2.1.296), and neither does a reply.
+  private readonly ownedBySubagent = new Set<string>();
   /** End lines of agents with no card that ended while a message waited for its turn. */
   private endedAhead: string[] = [];
   // Each task's type and description, for the list of what still runs and the task's end line.
@@ -215,6 +219,12 @@ export class ThreadSession {
   // The task id finds the reply that started it (the report renders there when that reply is
   // the last thing in the thread).
   private ended: Array<readonly [taskId: string, line: string]> = [];
+  // The end lines the turn that has just begun reports, set aside when the agent starts it. A
+  // task that ends after that start is told to the agent in a later turn, and the terminal
+  // prints its line there (measured 2026-10-14, Claude Code 2.1.296: of two agents ending 0.3 s
+  // apart, the second was notified after the first report turn began, and that turn knew of
+  // the first alone).
+  private opening: Array<readonly [taskId: string, line: string]> | null = null;
   // Tasks whose end arrived without their notification yet, by the clock time it arrived: the
   // notification starts the turn that reports them. The CLI can suppress it (SDK
   // TaskUpdatedMessage docstring), so a stop waits for it only INJECTED_TURN_WAIT.
@@ -1636,6 +1646,11 @@ export class ThreadSession {
         if (event.sessionId !== null) {
           this.deps.state.setSession(this.channelId, this.threadId, event.sessionId);
         }
+        // A turn of the agent's own begins: the ends told so far are the ones it reports.
+        if (this.sent.length === 0 && this.opening === null && this.ended.length > 0) {
+          this.opening = this.ended;
+          this.ended = [];
+        }
         break;
       case "mode_changed":
         // Claude Code reports the permission mode after a change (measured after each
@@ -1671,16 +1686,18 @@ export class ThreadSession {
     }
     if (event.type === "task_started") this.recordTask(event);
     const stopped = task !== null && this.stopped.has(task.taskId);
+    const owned = task !== null && this.ownedBySubagent.has(task.taskId);
     if (
       event.type === "task_ended" &&
       this.active === null &&
       this.sent.length === 0 &&
       !stopped &&
+      !owned &&
       this.background
     ) {
       this.ended.push([event.taskId, this.endedLine(event)]);
     }
-    if (event.type === "task_ended" && !stopped) {
+    if (event.type === "task_ended" && !stopped && !owned) {
       // An agent in the background that ends while a turn runs: with no card to complete, its
       // end is said where the conversation is, as the terminal prints `Agent "..." finished`
       // among the turn's calls (captured 2026-10-13 on Claude Code 2.1.296). One that ends
@@ -1712,6 +1729,7 @@ export class ThreadSession {
       if (this.active === null && !stopped && this.background) this.notificationWaits = true;
       this.unreported.delete(event.taskId);
       this.stopped.delete(event.taskId);
+      this.ownedBySubagent.delete(event.taskId);
       // Read above for the end line, which comes after the terminal task_updated (recorded
       // order); a task whose notification never comes goes with the process.
       this.tasks.delete(event.taskId);
@@ -1816,6 +1834,9 @@ export class ThreadSession {
     }
     await active.renderer.feed(event);
     this.adoptPromoted(active.renderer);
+    // A call's end can leave its task running in the background, which the list then counts.
+    if (event.type === "call_ended" && active.renderer.backgroundTasks.length > 0)
+      this.showRunning();
     if (event.type === "turn_ended") {
       // The turn stays active until its reply is closed: the footer is read first, and a
       // drain that saw this thread idle meanwhile would exit before the reply's end, leaving
@@ -1829,6 +1850,9 @@ export class ThreadSession {
           this.active = null;
           this.compacting = false;
           this.showThreadStatus(); // whichever way it ended, `!stop` included
+          // An end told after this turn had begun is reported in a turn to come, which
+          // nothing waits for yet: the turn's start cancelled the wait.
+          if (this.ended.length > 0) this.notified();
         }
       }
       // Checked only now, with the turn no longer active: `finish` alone still reads busy.
@@ -1855,6 +1879,7 @@ export class ThreadSession {
     for (const started of promoted) {
       this.recordTask(started);
       this.taskReplies.set(started.taskId, renderer);
+      this.ownedBySubagent.add(started.taskId);
     }
     if (promoted.length > 0) this.showRunning();
   }
@@ -1893,9 +1918,16 @@ export class ThreadSession {
    * ended and will not notify again or one the owner has scrolled past. The text is null for a
    * report the agent named the task of (`report_started`) that renders in that task's reply with no end line to open it.
    */
-  private openingTarget(): readonly [text: string | null, target: TurnRenderer | null] {
-    const lines = this.ended;
-    this.ended = [];
+  private openingTarget(): readonly [
+    text: string | null,
+    target: TurnRenderer | null,
+    aside: boolean,
+  ] {
+    // The lines set aside when this turn began, when it began with any; a task that ended
+    // since waits for the turn that reports it.
+    const lines = this.opening ?? this.ended;
+    if (this.opening === null) this.ended = [];
+    this.opening = null;
     // The task the agent named for this turn, when no end line names one: a subagent's
     // hand-back can come before its task's end, or after an end that came inside a turn.
     const reported = this.reportOf;
@@ -1919,7 +1951,8 @@ export class ThreadSession {
     // In the reply that started the task the report needs no line to say what it is about:
     // the task's card or launch line is there. Anywhere else the notice says it, as it always has.
     const named = lines.length === 0 && reported !== null && target !== null;
-    return [named ? null : ends || texts.BACKGROUND_NOTICE, target];
+    // End lines are lines about the work; the notice that stands in for them is the daemon's.
+    return [named ? null : ends || texts.BACKGROUND_NOTICE, target, ends !== ""];
   }
 
   /**
@@ -1948,6 +1981,7 @@ export class ThreadSession {
       !event.finalText &&
       event.ending === "done" &&
       this.ended.length === 0 &&
+      this.opening === null &&
       this.held.length === 0 &&
       this.notice === null
     );
@@ -1995,11 +2029,31 @@ export class ThreadSession {
     this.injectedExpected = false;
     const held = this.held;
     this.held = [];
-    const [text, target] = this.openingTarget();
+    // An end line waits to be said: of a task with no card (a command or an agent in the
+    // background), nothing else in the reply says that it ended.
+    const pending = this.opening ?? this.ended;
+    const unsaid = pending.map(([, line]) => line);
+    const said = unsaid.length > 0;
+    // The reply that holds the first of those tasks, whatever sits below it.
+    const [first] = pending;
+    const holder =
+      first === undefined ? null : (this.taskReplies.get(first[0]) ?? this.showing(first[0]));
+    const [text, target, aside] = this.openingTarget();
     try {
       if (held.length > 0) {
         const renderer = target ?? this.newRenderer(this.newReply());
-        await this.standalone(held, text, renderer, signal);
+        await this.standalone(held, text, aside, renderer, signal);
+      } else if (said && target !== null && text !== null) {
+        // Into the reply that started the task, which the sweep below then ends. A reply that
+        // is no longer the last thing in the thread gets no line: none is posted for it.
+        await target.feedLine(text);
+      } else if (said && this.promptOwed()) {
+        // A message of the owner's waits below that reply: its own reply says the line.
+        this.endedAhead.push(...unsaid);
+      } else if (said && holder !== null && !holder.closedOut) {
+        // Something sits below that reply and nothing is coming: the line is written where the
+        // task started, by an edit that notifies nobody, as its card ended in place before.
+        await holder.feedLine(unsaid.join("\n"));
       }
     } catch (error) {
       if (error instanceof Cancelled) throw error;
@@ -2265,17 +2319,25 @@ export class ThreadSession {
     this.expiry?.cancel();
     let renderer: TurnRenderer;
     let opening: string | null = null;
+    let openingAside = false;
     if (turn === null) {
       this.notificationWaits = false;
       // A report turn renders into the reply that started a task it reports, so no new message
       // follows for it, but only a reply that is still tracked, not ended and the last thing in
       // the thread (`openingTarget`); otherwise it gets a reply of its own at the bottom.
-      const [text, target] = this.openingTarget();
+      const [text, target, aside] = this.openingTarget();
       renderer = target ?? this.newRenderer(this.newReply());
       opening = text;
+      openingAside = aside;
     } else {
       this.reportOf = null; // the prompt's own turn: what was named is not the next turn
       renderer = this.newRenderer(turn.sink);
+      // The ends told since the last turn and not reported: the agent takes their notifications
+      // into this turn, and the terminal prints their lines before its answer.
+      const unsaid = [...(this.opening ?? []), ...this.ended].map(([, line]) => line);
+      this.opening = null;
+      this.ended = [];
+      this.endedAhead.unshift(...unsaid);
     }
     // (sync) The turn is the active one before its first write: every `await` below yields, and
     // a turn already out of `sent` and not yet active would read as idle to a drain, a `!stop`
@@ -2290,7 +2352,7 @@ export class ThreadSession {
       unanswered: null,
     };
     this.active = active;
-    if (opening !== null) await renderer.feedNotice(opening);
+    if (opening !== null) await renderer.feedOpening(opening, openingAside);
     const ahead = this.endedAhead;
     this.endedAhead = [];
     if (ahead.length > 0) await renderer.feedLine(ahead.join("\n"));
@@ -2312,10 +2374,11 @@ export class ThreadSession {
   private async standalone(
     events: readonly TaskEvent[],
     text: string | null,
+    aside: boolean,
     renderer: TurnRenderer,
     signal?: AbortSignal,
   ): Promise<void> {
-    if (text !== null) await renderer.feedNotice(text);
+    if (text !== null) await renderer.feedOpening(text, aside);
     for (const event of events) await renderer.feed(event);
     await this.closeReply(renderer, null, { signal });
   }
@@ -2358,7 +2421,9 @@ export class ThreadSession {
     this.taskReplies.clear();
     this.tasks.clear();
     this.ended = [];
+    this.opening = null;
     this.endedAhead = [];
+    this.ownedBySubagent.clear();
     this.unreported.clear();
     this.notificationWaits = false;
     this.stopped.clear();
@@ -2405,13 +2470,18 @@ export class ThreadSession {
 
   /**
    * Whether one of `renderer`'s own tasks still keeps its reply's stream open: one still runs,
-   * or ended less than INJECTED_TURN_WAIT ago with no notification yet (its report, if any, not
-   * in yet). The CLI can suppress the notification altogether (SDK TaskUpdatedMessage
+   * or ended with its end line still to be said, or ended less than INJECTED_TURN_WAIT ago with
+   * no notification yet (its report, if any, not in yet). The CLI can suppress the notification altogether (SDK TaskUpdatedMessage
    * docstring), so past that wait this stops counting it: `expireUnreported` rechecks then,
    * since nothing else would.
    */
   private stillOwed(renderer: TurnRenderer): boolean {
     if (renderer.runningTasks.length > 0) return true;
+    // An end line not yet said belongs to a turn to come, or to the wait for one: the reply
+    // that started its task stays open to take it.
+    for (const [taskId] of [...(this.opening ?? []), ...this.ended]) {
+      if (this.taskReplies.get(taskId) === renderer) return true;
+    }
     const now = this.deps.clock.time();
     for (const [taskId, ended] of this.unreported) {
       if (now - ended < INJECTED_TURN_WAIT && this.taskReplies.get(taskId) === renderer) {
@@ -2483,9 +2553,11 @@ export class ThreadSession {
   /** The tasks still running: those that outlived their turn, and the running turn's. */
   private runningTaskIds(): string[] {
     const outlived = [...this.taskReplies]
-      .filter(([taskId, reply]) => reply.runningTasks.includes(taskId))
+      .filter(([taskId, reply]) => reply.backgroundTasks.includes(taskId))
       .map(([taskId]) => taskId);
-    const current = this.active?.renderer.runningTasks ?? [];
+    // What runs in the background, as the terminal counts it: a command the turn is still
+    // waiting for shows on its own line and is no shell left running.
+    const current = this.active?.renderer.backgroundTasks ?? [];
     return [...new Set([...outlived, ...current])];
   }
 
@@ -2497,7 +2569,7 @@ export class ThreadSession {
     const counts = new Map<string, number>();
     for (const [taskId, renderer] of this.taskReplies) {
       if (options.awaitedOnly && this.afterRestart.has(taskId)) continue;
-      if (renderer.runningTasks.includes(taskId)) {
+      if (renderer.backgroundTasks.includes(taskId)) {
         const counted = TASK_WORDS[this.tasks.get(taskId)?.[0] ?? "other"][0];
         counts.set(counted, (counts.get(counted) ?? 0) + 1);
       }
@@ -2523,7 +2595,7 @@ export class ThreadSession {
       return at === -1 ? Number.POSITIVE_INFINITY : at;
     };
     const lines = [...this.taskReplies]
-      .filter(([taskId, renderer]) => renderer.runningTasks.includes(taskId))
+      .filter(([taskId, renderer]) => renderer.backgroundTasks.includes(taskId))
       .sort(([a], [b]) => rank(a) - rank(b))
       .map(([taskId, renderer]) => {
         const [kind, description, agentType] = this.tasks.get(taskId) ?? ["other", "", null];

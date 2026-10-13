@@ -1703,16 +1703,14 @@ test("a failed background task shows why in the reply that started it", async (t
   assert.ok(started.includes("✗") && started.includes(words));
 });
 
-test("closing the session stops the cards of running tasks", async (t) => {
+test("closing the session leaves no card and no stream for running tasks", async (t) => {
   const [first] = splitBackground();
   const h = harnessFor(t)({ turns: [first] });
   await (await h.session().submit("start it")).done.wait();
   await h.manager.closeAll();
   assert.equal(runningTitle(at(h.slack.messageBlocks(), 0)), null);
-  assert.deepEqual(
-    h.cards().map((card) => [card.status, card.output]),
-    [["complete", "Stopped"]],
-  );
+  // A command left running has no card to stop (issue #299): the list is all that showed it.
+  assert.deepEqual(h.cards(), []);
   assert.ok(noStreamOpen(h));
 });
 
@@ -1750,7 +1748,7 @@ test("an idle close ends a reply that still waited for its task", async (t) => {
   assert.deepEqual(h.slack.postedTs, []);
 });
 
-test("a notification with no turn updates its line and releases the queue", async (t) => {
+test("a notification with no turn is said in the reply to the next message and releases the queue", async (t) => {
   const [first, notice] = splitBackground();
   const h = harnessFor(t)({ turns: [first, sdkMessages("tools")] });
   const session = h.session();
@@ -1760,18 +1758,58 @@ test("a notification with no turn updates its line and releases the queue", asyn
   const second = await session.submit("next");
   await reportTurnNeverCame(h); // the wait for a report turn passes
   await second.done.wait();
-  // The task is known: its end shows on the line where it started, not in a post of its own.
-  // That line updates a reply whose own turn has already finished, which debounces like any
-  // other change to a finished reply: `until` gives it the room to land.
-  await h.until(
-    () =>
-      h
-        .cards()
-        .map((card) => card.status)
-        .join() === "complete",
-  );
-  assert.ok(!h.replies().some(isReport));
+  // The task has no line, and the owner's message came before any report: its end is said at
+  // the top of the reply to that message, where the terminal prints it, and in no post of its
+  // own.
+  await h.until(() => isReport(at(h.replies(), 1)));
+  assert.ok(!isReport(at(h.replies(), 0)));
+  assert.equal(h.slack.streamTs.length, 2);
+  assert.deepEqual(h.slack.callsTo("chat.postMessage"), []);
   assert.deepEqual(h.clients[0]?.queries, ["start it", "next"]);
+});
+
+/** A recorded background task's records, as another task of the same turn. */
+function asSecondTask(item: Item): Item {
+  return JSON.parse(
+    JSON.stringify(item)
+      .replaceAll("bny2rux7d", "bny2other")
+      .replaceAll("toolu_01LiZwhcy5g12fYSVLgAq5TS", "toolu_01OTHERxxxxxxxxxxxxxxxxx")
+      .replaceAll("Sleep for 5 seconds then print done", "Second sleep"),
+  );
+}
+
+test("a task that ends after a report turn began waits for the next report turn", async (t) => {
+  // Measured 2026-10-14 (Claude Code 2.1.296): of two tasks ending 0.3 s apart, the second was
+  // notified after the first report turn began, and that turn knew of the first alone. The
+  // records of the second task are the recorded ones under other ids.
+  const [first, notice, injected] = splitBackground();
+  const started = first.findIndex((item) => isSystem(item, "task_started"));
+  const turn = [
+    ...first.slice(0, started + 1),
+    asSecondTask(at(first, started)),
+    ...first.slice(started + 1),
+  ];
+  const late = notice.filter(
+    (item) => isSystem(item, "task_updated") || isSystem(item, "task_notification"),
+  );
+  const h = harnessFor(t)({ turns: [turn] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  h.clients[0]?.inject(notice);
+  await h.sleep(0.05);
+  h.clients[0]?.inject(injected.slice(0, 1)); // the report turn begins with its init record
+  await h.sleep(0.05);
+  h.clients[0]?.inject(late.map(asSecondTask)); // the second task ends before the turn's first message
+  await h.sleep(0.05);
+  h.clients[0]?.inject(injected.slice(1));
+  await h.until(() => inside(session).active === null && h.replies().some(isReport), 3.0);
+  const text = h.replies().join("\n");
+  assert.ok(text.includes('Background command "Sleep for 5 seconds then print done" completed'));
+  assert.ok(!text.includes("Second sleep"));
+  // No turn comes to report the second: once the wait for one has passed, its end is said in
+  // the reply that started it. The first report's start had cancelled the wait.
+  await reportTurnNeverCame(h);
+  await h.until(() => h.replies().join("\n").includes('Background command "Second sleep"'), 3.0);
 });
 
 test("a query crossing a notification never hangs", async (t) => {
@@ -1801,7 +1839,12 @@ test("a notification after the owner query was sent leaves the turn to the owner
   await h.sleep(0.05);
   h.clients[0]?.answer(sdkMessages("tools"));
   await second.done.wait();
-  assert.ok(!h.replies().some(isReport));
+  // The command has no line to update, so its end opens the owner's reply, where the terminal
+  // prints it; no report reply of its own follows.
+  const replies = h.replies();
+  assert.equal(replies.length, 2);
+  assert.ok(!isReport(at(replies, 0)) && isReport(at(replies, 1)));
+  assert.equal(h.slack.streamTs.length, 2);
 });
 
 function loseEveryWrite(h: Harness): void {
@@ -4487,7 +4530,9 @@ test("the reply is not ended while its turn is still active", async (t) => {
   h.clients[0]?.inject(tail);
   await turn.done.wait();
   await h.until(() => h.reactions().at(-1) === Status.DONE);
-  assert.deepEqual(footerWrites(h), ["chat.stopStream"]); // ended once, by its own turn, with the footer
+  // Ended once, by its own turn, with the footer. The update that follows the stop is the
+  // silent one that draws the command's end line small and grey, which a stream cannot.
+  assert.deepEqual(footerWrites(h), ["chat.stopStream", "chat.update"]);
 });
 
 test("a recorded turn that outlives its subagent s command ends once with its footer", async (t) => {
@@ -4536,12 +4581,15 @@ test("a subagent s command and the agent s second end close the reply as before"
   assert.ok(session.runningKinds === "" && inside(session).runningTaskIds().length === 0);
   assert.equal(inside(session).unlanded.size, 0);
   assert.ok(noStreamOpen(h));
-  // The command's card alone: the agent that started it has a launch line and no card.
-  assert.deepEqual(
-    h.cards().map((card) => card.status),
-    ["complete"],
-  );
+  // No card at all: the agent that started the command has a launch line, and the command,
+  // left running, has none.
+  assert.deepEqual(h.cards(), []);
   assert.equal(h.slack.streamTs.length, 1); // every report rendered into the reply that began it
+  // The command's end is told to the subagent, which reports it: the terminal prints no line
+  // for it in the conversation (captured 2026-10-14), only the agent's own ends.
+  const body = h.bodies().join("\n");
+  assert.ok(!body.includes("Background command"), body);
+  assert.equal(body.split("✓ Agent ").length - 1, 2);
 });
 
 test("a posted and a removed request are logged by id and age only", async (t) => {

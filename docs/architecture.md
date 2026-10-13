@@ -776,7 +776,10 @@ Notes on the table:
    (`background` true, as every subagent Claude Code starts does with fork mode on) is written as
    the terminal writes it, two lines of text and no card: `**mechanical**(Background sleeper)`,
    then `⎿ Backgrounded agent` (`previews.launched`, `texts.AGENT_LAUNCHED`; captured on Claude
-   Code 2.1.296). The type `general-purpose` reads `Agent`. Nothing under that call writes a line
+   Code 2.1.296). The agents one message starts share one line, `2 background agents launched`
+   with what each does under it (`previews.launchedTogether`): the line is written when the
+   message has ended and every held call of it has said how its agent runs, or before anything
+   else the reply writes. The type `general-purpose` reads `Agent`. Nothing under that call writes a line
    from then on, and the task stays one of the reply's running tasks. A subagent the call waits
    for (a skill run in a fork) gets its card when its task starts: the count reads
    `Skill: review · 12 calls`, the line holds its latest calls (`renderer.CHILD_LINES`) as the
@@ -784,14 +787,18 @@ Notes on the table:
    shows as any other call. A background subagent whose call the reply does not hold (one that
    starts again after that reply ended, one a subagent started) gets no card and no launch line.
 3. Claude Code starts a task for a long command in the foreground too, which ends before the call's
-   result. When the call's result arrives with its task still running, the line becomes a task's
-   line, notes "Running in background" on its nested line and stays in progress. A task started by a
+   result. When the call's result arrives with its task still running, a command's call ends as
+   any other and is counted in its run: the command goes on with no line, as the terminal draws
+   none for it (`TurnRenderer.lineless`), and its end is the session's end line. For any other
+   kind of task the line becomes a task's line, notes "Running in background" on its nested line
+   and stays in progress. A task started by a
    call inside another call (a long command a subagent runs) is held aside while that call is open:
    it gets no line and the session does not track it. If it ends before the call's result, it was
    the subagent's foreground work and stays off the reply; if it is still running at the call's
-   result, it outlives the call and becomes a task with its own line, like a top-level one
-   (`TurnRenderer.nests`, `TurnRenderer.takePromoted`). A task with no call in the reply gets a new
-   line; one started by a call the reply never saw, while such a task (a command's) runs, is an
+   result, it outlives the call and becomes a task of the reply, like a top-level one
+   (`TurnRenderer.nests`, `TurnRenderer.takePromoted`): a command with no line, any other kind
+   with a line of its own. A task with no call in the reply gets a new
+   line, unless it is a command or an agent in the background, which have none; one started by a call the reply never saw, while such a task (a command's) runs, is an
    agent inside that command and shows on the command's line, counted as a call with its
    description, as a subagent's calls show on its line.
 4. A background subagent's own failed request stays out of the reply's text, as a subagent's other
@@ -815,8 +822,8 @@ Notes on the table:
 A turn that ends with no text and no tool line says `Done. Claude Code returned no text.`, or
 `Stopped the current turn.` when it was interrupted, so no reply is left empty. When the turn ends,
 every line still in progress is closed first (with `Stopped` when the turn was interrupted), then
-the reply ends. A task that started and has not ended is the exception: its line stays open with
-"Running in background", and the reply rests instead of ending (`Reply.rest`). `TurnRenderer.runningTasks` lists them. Only the task events decide this,
+the reply ends. A task that started and has not ended is the exception: its line, when it has
+one, stays open with "Running in background", and the reply rests instead of ending (`Reply.rest`). `TurnRenderer.runningTasks` lists them. Only the task events decide this,
 because a subagent can move to the background with no second `task_started`.
 
 ## Approvals
@@ -1235,7 +1242,7 @@ closed when the start returns (`ThreadSession.connect`).
   then Claude Code starts a turn of its own to report it. That turn renders into the reply that
   started the task only while that reply is the last thing in the thread
   (`ThreadSession.openingTarget`, keyed by the task id through `ThreadSession.taskReplies`),
-  appended after that reply's own body with one line per task it reports, as the terminal prints it (`ThreadSession.endedLine`): a command's notification
+  appended after that reply's own body with one line per task it reports, the tasks that had ended when the agent began the turn (a `session_started` with no prompt queued sets their lines aside; a task that ends after it waits for the next report), as the terminal prints it (`ThreadSession.endedLine`): a command's notification
   `summary`, which already reads `Background command "..." completed (exit code 0)`, or
   `Agent "<description>" finished` built from the task's `task_started` event, since an agent's
   `summary` is its result, except for an agent that failed, whose summary is the reason and follows the words; plus the duration when the notification's `usage` reports `duration_ms`
@@ -1253,9 +1260,16 @@ closed when the start returns (`ThreadSession.connect`).
   (`ThreadSession.whoseTurn`). Where no replay settles it, `turn_ended` tells who started the turn,
   and the queue is put back in order (`ThreadSession.settle`, which logs it); that one reply can
   then carry the other's label.
+- A task a subagent started and left running (`ThreadSession.ownedBySubagent`, a command
+  promoted through `TurnRenderer.takePromoted`) gets no end line: its end is told to the
+  subagent, whose own end is the one the conversation reports.
+- An end line is written `aside` (`ReplySink.text`): a line about the work, which a chat may draw
+  smaller, as it draws the count of a run of calls. The list of what still runs counts the tasks in
+  the background alone (`TurnRenderer.backgroundTasks`): a task whose call still waits for it
+  shows on that call's line.
 - A task that outlives its turn keeps its line in the reply that started it: the session maps the
   task id to that reply, and every later task event for it updates that line only, never another
-  reply. A subagent in the background has no line there, only its launch line: when it ends while
+  reply. A subagent or a command in the background has no line there: when it ends while
   a turn runs, its end line is written into the reply of that turn, as the terminal prints it
   among the turn's calls (`TurnRenderer.lineless`); when it ends while a message of the owner's
   waits for its turn, the line opens that message's reply; between turns it opens the report, as

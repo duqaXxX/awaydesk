@@ -112,21 +112,6 @@
      "notice": false
     },
     {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "task-bc0v28vjw",
-      "name": "local_bash",
-      "output": null,
-      "preview": null,
-      "status": "in_progress",
-      "task": true,
-      "title": "Run sleep for 15 seconds then echo done"
-     }
-    },
-    {
      "call": "text",
      "ending": false,
      "markdown": "nd:",
@@ -145,36 +130,6 @@
       "status": "in_progress",
       "task": false,
       "title": "Run 40-second sleep in Python"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "task-bc0v28vjw",
-      "name": "local_bash",
-      "output": null,
-      "preview": null,
-      "status": "complete",
-      "task": true,
-      "title": "Run sleep for 15 seconds then echo done"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "task-bc0v28vjw",
-      "name": "local_bash",
-      "output": "Background command \"Run sleep for 15 seconds then echo done\" completed (exit code 0)",
-      "preview": null,
-      "status": "complete",
-      "task": true,
-      "title": "Run sleep for 15 seconds then echo done"
      }
     },
     {
@@ -429,21 +384,6 @@
     "notice": false
    },
    {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "task-bc0v28vjw",
-     "name": "local_bash",
-     "output": null,
-     "preview": null,
-     "status": "in_progress",
-     "task": true,
-     "title": "Run sleep for 15 seconds then echo done"
-    }
-   },
-   {
     "call": "text",
     "ending": false,
     "markdown": "nd:",
@@ -462,36 +402,6 @@
      "status": "in_progress",
      "task": false,
      "title": "Run 40-second sleep in Python"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "task-bc0v28vjw",
-     "name": "local_bash",
-     "output": null,
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Run sleep for 15 seconds then echo done"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "task-bc0v28vjw",
-     "name": "local_bash",
-     "output": "Background command \"Run sleep for 15 seconds then echo done\" completed (exit code 0)",
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Run sleep for 15 seconds then echo done"
     }
    },
    {

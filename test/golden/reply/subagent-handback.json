@@ -28,14 +28,14 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": "Running in background",
+      "details": null,
       "folded": null,
       "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
       "name": "Bash",
       "output": "Command running in background with ID: btmuz8js3. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/btmuz8js3.output. You will be notified when it completes. To check interim outpu…",
       "preview": null,
-      "status": "in_progress",
-      "task": true,
+      "status": "complete",
+      "task": false,
       "title": "Wait 15 seconds"
      }
     },
@@ -209,20 +209,7 @@
     },
     {
      "call": "finish",
-     "closing": [
-      {
-       "calls": 0,
-       "details": "Running in background",
-       "folded": null,
-       "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
-       "name": "Bash",
-       "output": "Command running in background with ID: btmuz8js3. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/btmuz8js3.output. You will be notified when it completes. To check interim outpu…",
-       "preview": null,
-       "status": "in_progress",
-       "task": true,
-       "title": "Wait 15 seconds"
-      }
-     ],
+     "closing": [],
      "footer": "footer"
     },
     {
@@ -545,14 +532,14 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": "Running in background",
+     "details": null,
      "folded": null,
      "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
      "name": "Bash",
      "output": "Command running in background with ID: btmuz8js3. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/btmuz8js3.output. You will be notified when it completes. To check interim outpu…",
      "preview": null,
-     "status": "in_progress",
-     "task": true,
+     "status": "complete",
+     "task": false,
      "title": "Wait 15 seconds"
     }
    },
@@ -813,36 +800,6 @@
     "ending": false,
     "markdown": "unning.",
     "notice": false
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
-     "name": "Bash",
-     "output": null,
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Wait 15 seconds"
-    }
-   },
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
-     "name": "Bash",
-     "output": "Background command \"Wait 15 seconds\" completed (exit code 0)",
-     "preview": null,
-     "status": "complete",
-     "task": true,
-     "title": "Wait 15 seconds"
-    }
    },
    {
     "call": "text",

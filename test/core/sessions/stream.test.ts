@@ -474,8 +474,12 @@ test("a reply whose stream slack stopped is not ended while its turn is still ac
   const session = h.session();
   const turn = await session.submit("start it");
   await h.until(() => h.slack.callsTo("chat.startStream").length > 0);
-  h.clients[0]?.inject(commandEnd); // its card is the append Slack refuses
-  await h.until(() => h.slack.callsTo("chat.stopStream").length === 1); // which stops the stream
+  h.clients[0]?.inject(commandEnd);
+  // The end of a subagent's command writes nothing since issue #299, so a line fed to the
+  // reply stands in for the write Slack refuses, which stops the stream.
+  await h.sleep(0.05);
+  await inside(session).active?.renderer.feedLine("A line of the reply.");
+  await h.until(() => h.slack.callsTo("chat.stopStream").length === 1);
   await h.sleep(0.3);
   assert.ok(inside(session).active !== null && !turn.done.isSet);
   assert.deepEqual(h.slack.callsTo("chat.postMessage"), []); // no closing message before the turn ends

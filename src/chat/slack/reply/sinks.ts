@@ -52,6 +52,7 @@ import { blank, strip } from "../../../text.ts";
 import type { FooterFields, ReplySink as Sink, TaskUpdate } from "../../seam.ts";
 import { formatFooter } from "../footer.ts";
 import {
+  asideBlock,
   BANNER_LIMIT,
   BLOCKS_LIMIT,
   type Block,
@@ -150,13 +151,16 @@ class Text {
   notice: boolean;
   /** A notice that says how a reply was cut short (`endingCursor`). */
   ending: boolean;
+  /** A line about the work (a task's end): grey once the message is written by an update. */
+  aside: boolean;
   /** Bumped when it changes: a message whose parts kept theirs is not rendered again. */
   rev: number;
 
-  constructor(text: string, notice: boolean, ending: boolean, rev: number) {
+  constructor(text: string, notice: boolean, ending: boolean, aside: boolean, rev: number) {
     this.text = text;
     this.notice = notice;
     this.ending = ending;
+    this.aside = aside;
     this.rev = rev;
   }
 }
@@ -622,20 +626,30 @@ export class ReplySink implements Sink {
    */
   async text(
     markdown: string,
-    options: { readonly notice?: boolean; readonly ending?: boolean } = {},
+    options: {
+      readonly notice?: boolean;
+      readonly ending?: boolean;
+      readonly aside?: boolean;
+    } = {},
   ): Promise<void> {
     const ending = options.ending ?? false;
     const notice = (options.notice ?? false) || ending;
+    const aside = options.aside ?? false;
     if (!blank(markdown)) this.fold.text();
     // The line a lost process writes (a notice that is an ending) is new text, and the last.
     if (this.restRequested && (!notice || ending) && !blank(markdown))
       this.reportedSinceRest = true;
     const last = this.parts.at(-1);
-    if (last instanceof Text && last.notice === notice && last.ending === ending) {
+    if (
+      last instanceof Text &&
+      last.notice === notice &&
+      last.ending === ending &&
+      last.aside === aside
+    ) {
       last.text += markdown;
       last.rev = this.nextRev();
     } else {
-      this.parts.push(new Text(markdown, notice, ending, this.nextRev()));
+      this.parts.push(new Text(markdown, notice, ending, aside, this.nextRev()));
     }
     this.changed();
   }
@@ -1298,6 +1312,9 @@ export class ReplySink implements Sink {
     }
     for (const { index, part, floor, ceil } of this.span(message.start, end)) {
       if (part instanceof Text) {
+        // A line about the work reads grey once the body has ended, which a stream cannot
+        // show: like a run's folded line.
+        if (folding && this.finished && part.aside && !blank(part.text)) return false;
         const sentTo = Math.max(message.textSent.get(index) ?? 0, floor);
         if (!blank(part.text.slice(sentTo, ceil ?? undefined))) return false;
       } else {
@@ -1384,7 +1401,10 @@ export class ReplySink implements Sink {
             return [blocks, [index, floor + lead + stop + skip]];
           }
         }
-        blocks.push({ type: "markdown", text: words });
+        // A line about the work is small and grey, as the count of a run of calls is.
+        blocks.push(
+          part.aside ? asideBlock(mrkdwnEscape(words), index) : { type: "markdown", text: words },
+        );
         size += len(words);
         count += markdownBlocks(words);
       } else {

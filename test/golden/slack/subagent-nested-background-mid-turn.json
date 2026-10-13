@@ -12,17 +12,7 @@
      "type": "markdown"
     },
     {
-     "text": "Launched.\n\nNow running the 40-second Python sleep comma",
-     "type": "markdown"
-    },
-    {
-     "status": "complete",
-     "task_id": "task-bc0v28vjw",
-     "title": "Run sleep for 15 seconds then echo done",
-     "type": "task_card"
-    },
-    {
-     "text": "nd:",
+     "text": "Launched.\n\nNow running the 40-second Python sleep command:",
      "type": "markdown"
     },
     {
@@ -53,16 +43,10 @@
    ]
   ],
   "message_cards": [
-   [
-    {
-     "id": "task-bc0v28vjw",
-     "status": "complete",
-     "title": "Run sleep for 15 seconds then echo done"
-    }
-   ]
+   []
   ],
   "message_texts": [
-   "I'll launch the Agent to run the background command now.\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent\n\nLaunched.\n\nNow running the 40-second Python sleep comma\n\nnd:\n\nThe 40-second Python sleep command finished.\n\nThe 15-second background sleep command that the Agent ran finished successfully."
+   "I'll launch the Agent to run the background command now.\n\n**Agent**(Run background sleep command)\n⎿ Backgrounded agent\n\nLaunched.\n\nNow running the 40-second Python sleep command:\n\nThe 40-second Python sleep command finished.\n\nThe 15-second background sleep command that the Agent ran finished successfully."
   ],
   "pushes": 1
  },
@@ -329,22 +313,6 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "task-bc0v28vjw",
-      "status": "in_progress",
-      "title": "Run sleep for 15 seconds then echo done",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 19,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
       "text": "nd:",
       "type": "markdown_text"
      }
@@ -354,7 +322,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 20,
+   "after_sink_call": 19,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -370,23 +338,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 21,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "id": "task-bc0v28vjw",
-      "status": "complete",
-      "title": "Run sleep for 15 seconds then echo done",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 23,
+   "after_sink_call": 20,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -402,7 +354,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 25,
+   "after_sink_call": 22,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -416,7 +368,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 26,
+   "after_sink_call": 23,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -430,7 +382,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 27,
+   "after_sink_call": 24,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -444,7 +396,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 28,
+   "after_sink_call": 25,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -458,7 +410,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 29,
+   "after_sink_call": 26,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -472,7 +424,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 30,
+   "after_sink_call": 27,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -486,7 +438,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 31,
+   "after_sink_call": 28,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -500,7 +452,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 32,
+   "after_sink_call": 29,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -514,7 +466,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 33,
+   "after_sink_call": 30,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -528,7 +480,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 34,
+   "after_sink_call": 31,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -542,7 +494,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 35,
+   "after_sink_call": 32,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -556,7 +508,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 36,
+   "after_sink_call": 33,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -570,7 +522,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 37,
+   "after_sink_call": 34,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -584,7 +536,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 38,
+   "after_sink_call": 35,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -598,7 +550,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 40,
+   "after_sink_call": 37,
    "args": {
     "blocks": [
      {
@@ -620,7 +572,7 @@
    "method": "chat.stopStream"
   },
   {
-   "after_sink_call": 40,
+   "after_sink_call": 37,
    "args": {
     "blocks": [
      {
@@ -632,17 +584,7 @@
       "type": "markdown"
      },
      {
-      "text": "Launched.\n\nNow running the 40-second Python sleep comma",
-      "type": "markdown"
-     },
-     {
-      "status": "complete",
-      "task_id": "task-bc0v28vjw",
-      "title": "Run sleep for 15 seconds then echo done",
-      "type": "task_card"
-     },
-     {
-      "text": "nd:",
+      "text": "Launched.\n\nNow running the 40-second Python sleep command:",
       "type": "markdown"
      },
      {

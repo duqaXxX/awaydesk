@@ -6,17 +6,11 @@
     {
      "elements": [
       {
-       "text": "Read 3 files",
+       "text": "Read 3 files, ran 1 shell command",
        "type": "mrkdwn"
       }
      ],
      "type": "context"
-    },
-    {
-     "status": "complete",
-     "task_id": "toolu_01S4Zo6WwvXe5mEVGuBqBXoL",
-     "title": "Bash: sleep 25; echo ledger-done",
-     "type": "task_card"
     },
     {
      "text": "started",
@@ -54,13 +48,7 @@
    ]
   ],
   "message_cards": [
-   [
-    {
-     "id": "toolu_01S4Zo6WwvXe5mEVGuBqBXoL",
-     "status": "complete",
-     "title": "Bash: sleep 25; echo ledger-done"
-    }
-   ]
+   []
   ],
   "message_texts": [
    "started\n\nCompacted the conversation: 68.2k → 10.7k tokens.\n\nThe background command completed successfully with output: `ledger-done`\n\nAll files have been read and the background process has finished executing. Waiting for next instruction."
@@ -192,14 +180,7 @@
      {
       "id": "fold:toolu_01KQBBbM87jm3tLZFvPivBaW",
       "status": "complete",
-      "title": "Read 3 files",
-      "type": "task_update"
-     },
-     {
-      "details": "Running in background",
-      "id": "toolu_01S4Zo6WwvXe5mEVGuBqBXoL",
-      "status": "in_progress",
-      "title": "Bash: sleep 25; echo ledger-done",
+      "title": "Read 3 files, ran 1 shell command",
       "type": "task_update"
      }
     ],
@@ -227,22 +208,6 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "toolu_01S4Zo6WwvXe5mEVGuBqBXoL",
-      "status": "complete",
-      "title": "Bash: sleep 25; echo ledger-done",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 11,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
       "text": "\n\nCompacted the conversation: 68.2k → 10.7k tokens.\n\n",
       "type": "markdown_text"
      }
@@ -252,7 +217,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 12,
+   "after_sink_call": 10,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -268,7 +233,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 13,
+   "after_sink_call": 11,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -284,7 +249,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 14,
+   "after_sink_call": 12,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -298,7 +263,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 15,
+   "after_sink_call": 13,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -312,7 +277,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 16,
+   "after_sink_call": 14,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -326,7 +291,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 17,
+   "after_sink_call": 15,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -340,7 +305,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 18,
+   "after_sink_call": 16,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -354,7 +319,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 19,
+   "after_sink_call": 17,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -368,7 +333,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 20,
+   "after_sink_call": 18,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -382,7 +347,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 21,
+   "after_sink_call": 19,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -396,7 +361,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 22,
+   "after_sink_call": 20,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -410,7 +375,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 23,
+   "after_sink_call": 21,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -424,7 +389,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 24,
+   "after_sink_call": 22,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -438,7 +403,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 25,
+   "after_sink_call": 23,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -452,7 +417,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 26,
+   "after_sink_call": 24,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -466,7 +431,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 27,
+   "after_sink_call": 25,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -480,7 +445,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 28,
+   "after_sink_call": 26,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -494,7 +459,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 30,
+   "after_sink_call": 28,
    "args": {
     "blocks": [
      {
@@ -516,23 +481,17 @@
    "method": "chat.stopStream"
   },
   {
-   "after_sink_call": 30,
+   "after_sink_call": 28,
    "args": {
     "blocks": [
      {
       "elements": [
        {
-        "text": "Read 3 files",
+        "text": "Read 3 files, ran 1 shell command",
         "type": "mrkdwn"
        }
       ],
       "type": "context"
-     },
-     {
-      "status": "complete",
-      "task_id": "toolu_01S4Zo6WwvXe5mEVGuBqBXoL",
-      "title": "Bash: sleep 25; echo ledger-done",
-      "type": "task_card"
      },
      {
       "text": "started",
