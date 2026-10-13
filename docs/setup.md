@@ -733,7 +733,8 @@ the order it is written. The tool calls between two pieces of text show as one c
 draws one line for them: it names the call that runs now, a command by its description, and once
 the calls have ended it counts them in the terminal's words (`Ran 2 shell commands, read 1 file`).
 A command that failed is counted with the others, as in the terminal; a failed call of another
-tool keeps a card that says why. A subagent Claude Code starts in the background is two
+tool keeps a card that says why. A command left running in the background has a card of its own,
+titled by its description too. A subagent Claude Code starts in the background is two
 lines of text, as in the terminal, with its type in bold: `mechanical(review)`, then
 `⎿ Backgrounded agent`. It has no card, and what it does shows nowhere in the reply. A background
 command keeps its card open until it ends. An Edit or a Write shows once it has ended, as

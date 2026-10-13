@@ -67,8 +67,8 @@ that is reused keeps its text in its title.
 A call with a view of its own has a card of its own, keyed by its call id, and ends the run: a
 subagent the call waits for, whose title counts its calls and whose `details` say what it is doing
 now, a background command, which keeps its card `in_progress` for as long as it runs, a
-stopped call, and a failed call of a tool the terminal was not seen to count (any but `Bash` and
-`Read`), whose card says why. A subagent in the background has no card: the core writes its launch line as text
+stopped call, and a failed call of any tool but a command (`previews.failsCounted`), whose card
+says why. A subagent in the background has no card: the core writes its launch line as text
 of the reply (`TurnRenderer`, `previews.launched`). A call that
 turns into one of these keeps the run's card when it was the run's only call. An `Edit` or a `Write` that
 ended well also ends the run, and has no card: its preview is all that shows it.

@@ -12,7 +12,9 @@ All notable changes to this project are documented here. The format follows
   description, and with no call running it holds the counts of what ended. The counts read as
   the terminal's line: `Ran 2 shell commands, read 1 file`, a comma between two counts, a
   capital on the first, no `✓` and no `✗`, a failed command counted with the others. A failed
-  call of a tool other than `Bash` and `Read` keeps a card of its own that says why.
+  call of any other tool keeps a card of its own that says why. A command's card and line are
+  titled by its description wherever they show: the run's card, the card of a background
+  command, the line under a subagent's card.
 
 - A subagent Claude Code starts in the background is drawn as the terminal draws it (issue #299,
   captured on Claude Code 2.1.296): two lines of the reply's text, `mechanical(Background

@@ -49,9 +49,14 @@ export function launched(agentType: string | null, description: string): string 
   return fill(AGENT_LAUNCHED, { type, description: oneLine(description, TITLE_LIMIT) });
 }
 
-/** Whether the terminal's fold has words of its own for that tool's calls. */
-export function worded(name: string): boolean {
-  return Object.hasOwn(WORDS, name);
+// The tools whose failed call the terminal counts with the others and says nothing more of: a
+// command that exits with an error was seen counted in `ran 4 shell commands` (captured on
+// Claude Code 2.1.296, 2026-10-13). No other tool's failure was captured.
+const FAILS_COUNTED: ReadonlySet<string> = new Set(["Bash"]);
+
+/** Whether a failed call of that tool is counted in its run with the calls that ended well. */
+export function failsCounted(name: string): boolean {
+  return FAILS_COUNTED.has(name);
 }
 
 // The input the terminal titles a running call by: a command's line reads its description

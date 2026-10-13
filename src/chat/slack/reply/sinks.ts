@@ -419,7 +419,7 @@ export interface ReplySinkOptions {
 
 /**
  * One reply in a Slack thread, as a native stream: Claude's text as it is written, and task
- * cards for its tools, updated in place, in the order things happen: two per run of calls
+ * cards for its tools, updated in place, in the order things happen: one per run of calls
  * (`core/reply/fold`), which a silent update folds into a line of counts once the stream has
  * stopped at the reply's end. The stream starts with the first content (never a placeholder) and
  * stops with the reply's end, the footer at the bottom.
@@ -458,7 +458,7 @@ export class ReplySink implements Sink {
   private readonly parts: Part[] = [];
   /** By the id of the card that shows them. */
   private readonly tools = new Map<string, Tool>();
-  /** Which cards show the calls: two per run of calls. */
+  /** Which cards show the calls: one per run of calls. */
   private readonly fold = new Fold();
   private readonly messages: Message[] = [];
   private pending: Task<void> | null = null;
@@ -641,7 +641,7 @@ export class ReplySink implements Sink {
   }
 
   /**
-   * A call's new state, on the cards that show it: a run of calls shares two cards
+   * A call's new state, on the cards that show it: a run of calls shares one card
    * (`core/reply/fold`), a call with a view of its own has one.
    */
   async task(update: TaskUpdate): Promise<void> {
@@ -1043,8 +1043,8 @@ export class ReplySink implements Sink {
   private cutBefore(message: Message, index: number | null, notices = false): Cursor | null {
     if (index === null || upTo([index, 0], message.start)) return null;
     const cursor: Cursor = [index, 0];
-    // Something of the answer must stay before it, and show: a card that draws (a folded run's
-    // second card draws nothing), a preview, or words of Claude's. A message left with a line
+    // Something of the answer must stay before it, and show: a card that draws, a preview, or
+    // words of Claude's. A message left with a line
     // of the daemon's alone, or with nothing, is no answer: cutting Claude's text there would
     // move the whole answer out. The line on how the reply ended is no part of the answer, so
     // a line of the daemon's is enough to stay above it.

@@ -21,7 +21,7 @@
  * (measured 2026-10-01), so a card that is reused keeps its text in its title.
  */
 import type { Preview, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
-import { folded, worded } from "./previews.ts";
+import { failsCounted, folded } from "./previews.ts";
 import { STOPPED } from "./words.ts";
 
 export const ENDED: readonly TaskStatus[] = ["complete", "error"];
@@ -37,11 +37,12 @@ export function shownPreview(update: TaskUpdate): Preview | null {
 
 /**
  * Whether a call is drawn on its run's card rather than on a card of its own. A call that failed
- * is counted with the others only for the tools the terminal was seen to count so (a command
- * that exits with an error); a failed call of any other tool keeps a card that says why.
+ * is counted with the others only where the terminal was seen to count it so (a command that
+ * exits with an error, `previews.failsCounted`); any other failed call keeps a card that says
+ * why.
  */
 export function folds(update: TaskUpdate): boolean {
-  if (update.status === "error" && !worded(update.name)) return false;
+  if (update.status === "error" && !failsCounted(update.name)) return false;
   return (
     update.name !== "" && !update.task && shownPreview(update) === null && update.output !== STOPPED
   );
@@ -117,19 +118,6 @@ export class Fold {
   private readonly own = new Map<string, string>();
   private current: Run | null = null;
   private readonly sent = new Map<string, TaskUpdate>();
-  /** Every card id given out: none is used twice. */
-  private readonly cards = new Set<string>();
-
-  /**
-   * A new card's id, named after the call it first shows. A card a call took for its own keeps
-   * its id, so a second card named after the same call gets a longer one.
-   */
-  private card(kind: string, call: string): string {
-    let card = `${kind}:${call}`;
-    while (this.cards.has(card)) card += "+";
-    this.cards.add(card);
-    return card;
-  }
 
   /** Text was written: the calls after it are a new run. */
   text(): void {
@@ -183,7 +171,8 @@ export class Fold {
   private draw(run: Run): TaskUpdate[] {
     const first = run.calls.values().next().value;
     if (first === undefined) return [];
-    run.card = run.card || this.card("fold", first.id);
+    // Named after the run's first call: a call that takes a card of its own is named by its id.
+    run.card ??= `fold:${first.id}`;
     const running = [...run.calls.values()].filter((call) => !ENDED.includes(call.status));
     const now = running.at(-1);
     // A call still running when the reply's body ends has no count yet and stays a card.

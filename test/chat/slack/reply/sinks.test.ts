@@ -20,8 +20,11 @@ import {
   blocksCount,
   blockText,
   CARD_TEXT_LIMIT,
+  type CardChunk,
+  type CardHeld,
   CONTEXT_LIMIT,
   type ContextBlock,
+  cardAddition,
   cardBlock,
   contextBlock,
   lacking,
@@ -2798,7 +2801,7 @@ test("a message whose span did not change is not rendered again", async () => {
   // An ES export cannot be patched, and `pieceBlocks` reads the text of a piece through
   // `Tool.piece` alone: the test counts the calls of that method on the one tool that holds a
   // preview.
-  // Task cards fill the message, not `Read` calls: the fold keeps 60 `Read` calls to two cards, so
+  // Task cards fill the message, not `Read` calls: the fold keeps 60 `Read` calls to one card, so
   // the reply never rolls over, no message freezes, and an empty `calls` would hold whether or not
   // the skip existed (checked by running it, 2026-10-10). The fold leaves task cards alone, so the
   // first message does freeze with its preview.
@@ -5533,4 +5536,25 @@ test("replies that held the list and were let go of are not kept by the places",
   const listed = (places as unknown as { listed: Set<unknown> }).listed;
   assert.equal(listed.size, 1, "only the reply that holds the list");
   assert.equal(listCards(slack).length, 1);
+});
+
+test("a card whose title grows back is charged once for its longest title", () => {
+  // A run's card alternates between the call that runs and the counts (issue #299): each long
+  // title must not be charged again, or a reply of many calls would fill a message that holds
+  // one short card.
+  const long = "x".repeat(60);
+  let sent: CardChunk | undefined;
+  let held: CardHeld = {};
+  let total = 0;
+  for (const title of [long, "Ran 1 shell command", long, "Ran 2 shell commands", long]) {
+    const chunk: CardChunk = { type: "task_update", id: "fold:a", title, status: "in_progress" };
+    const [, after, cost] = cardAddition(chunk, sent, held, null);
+    sent = chunk;
+    held = after;
+    total += cost;
+  }
+  assert.equal(
+    total,
+    cardAddition({ ...(sent as CardChunk), title: long }, undefined, {}, null)[2],
+  );
 });

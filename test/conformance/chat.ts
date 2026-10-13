@@ -623,17 +623,17 @@ export function chatConformance(
         const opened: Array<[MessageId | null, MessageId | null]> = [];
         const reply = s.provider.thread(s.ref).openReply((old, fresh) => opened.push([old, fresh]));
         await reply.text("The build is finished\n\n");
-        // The core draws a run of calls as one card: the call while it runs, then its count, so
-        // the line is looked for while the call runs.
-        await reply.task(line("call-1", "Read notes.txt", "in_progress"));
+        // A task's line, which keeps its title once it has ended (a call's line may give way to
+        // a count of its run).
+        const ended = { ...line("call-1", "Read notes.txt", "complete"), task: true };
+        await reply.task({ ...ended, status: "in_progress" });
+        await reply.task(ended);
         await reply.settle();
         await s.rig.settle();
         assert.ok(
           s.rig.read(s.ref).some((m) => m.text.includes("Read notes.txt")),
           "the task line is shown while the reply runs",
         );
-        await reply.task(line("call-1", "Read notes.txt", "complete"));
-        await reply.settle();
         await reply.finish([], FOOTER);
         assert.equal(await reply.closeOut(), true, "the end landed");
         assert.equal(await reply.waitLanded(), true);
