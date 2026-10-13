@@ -669,7 +669,7 @@ export class SlackThread implements ThreadChat {
     // The list that was just taken off a reply the session no longer tracks only debounced:
     // nothing else would write it before the process ends.
     await this.places?.settleListed();
-    // The replies this object opened are let go of once their end landed: the session that
+    // The replies this object opened are let go of, their end landed or not: the session that
     // held them is over, and nothing else would drop them from the thread's places.
     for (const [places, reply] of this.opened) places.closed(reply);
     this.opened.length = 0;

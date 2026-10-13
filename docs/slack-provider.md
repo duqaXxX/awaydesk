@@ -121,7 +121,7 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   footer shows under it before it ends. The report grows the message by
   edit, `finish` runs again with the footer of the report turn, and the reply rests again or ends
   as below: the ending is posted with the footer and cut out of the message it grew in. A stop that
-  fails leaves the stream open, text given meanwhile goes on to it, and the next pass tries again.
+  fails leaves the stream open, text given meanwhile goes on to it, and the next pass tries again, which a try after `FINAL_RETRY_SECONDS` starts when nothing else changes.
   A reply that only finished, with no `rest` and no landed end, is not at rest: it shows no footer
   and takes none from the reply above, since its end follows at once and may fail.
 - **280 seconds pass first.** `ReplySink.expire` stops the stream (Slack pushes on the stop, the
@@ -159,12 +159,16 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   a message is cut there, as any text is, and the continuation then rings with the rest of it. The
   new message shows empty in one known case: a turn that ended well with an answer of text alone,
   whose footer could not be built.
-- **Another reply sits below.** A reply whose last message has another reply's message below it
-  ends where it is (`Reply.overtaken`): the footer goes under that message by a silent edit
-  (`ReplySink.end`), or on the stream's stop while it is still a stream, and nothing is posted,
-  since a new message would land under the other reply. The same reply opens no continuation
-  either: what does not fit the message is cut, as a card's text is, and a warning is logged once.
-  An owner message below the reply does not change this; its ending is posted as above.
+- **Something sits below.** A reply ends where it is when another reply's message sits below its
+  last message (`Reply.overtaken`), or when it rested, a message of the owner's sits below it and
+  no text of Claude's was written to it since it rested (`ReplySink.leftBehind`): the footer goes
+  under that message by a silent edit (`ReplySink.end`), or on the stream's stop while it is still
+  a stream, and nothing is posted, since a new message would land under the other reply, or
+  repeat the old text as the newest in the thread. A task's end line or a card update is not such
+  text; a report's text is. A reply with another reply below it opens no continuation either:
+  what does not fit the message is cut, as a card's text is, and a warning is logged once. A reply
+  that is still writing its turn when the owner writes, or that rested and then got a report,
+  posts its ending as above.
   `SlackChat` keeps one `ThreadPlaces` (`reply/places.ts`) per channel and thread, shared by every
   `SlackThread` of it and in memory only. A `SlackThread` takes it at its first reply and gives it
   back at its close; it lives while one is open, and after the last give-back while a reply is
@@ -232,8 +236,8 @@ turn Claude Code starts on its own to report a background task renders into the 
 first of the ended tasks (then of the task the agent named) whose reply is still tracked, not
 ended and the last thing in the thread (`ThreadSession.openingTarget`, `Reply.last`). When none
 is, the report gets a reply of its own at the bottom (`ThreadSession.newReply`), and the
-footer goes to the lowest reply of the stretch (see "One footer between two owner messages"). A reply that ends with
-another reply below it (`Reply.overtaken`) because no report came is logged at INFO. An owner's next prompt takes no
+footer goes to the lowest reply of the stretch (see "One footer between two owner messages"). A reply that ends with a
+message of the owner's or another reply below it (`Reply.last`) because no report came is logged at INFO. An owner's next prompt takes no
 footer away.
 
 A background subagent can hand its report back before, or without, a turn of that kind (measured

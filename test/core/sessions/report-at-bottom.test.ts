@@ -116,6 +116,26 @@ test("the same when the notification never comes (the unreported timer)", async 
   assert.equal(h.slack.createdTs.length, before);
 });
 
+test("a reply with a command of the owner's below it ends where it is when the notification never comes", async (t) => {
+  const lines = logged(t, "info");
+  const [first, notice] = splitBackground();
+  const ended = notice.filter((item) => !isSystem(item, "task_notification"));
+  const h = harnessFor(t)({ turns: [first] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await session.status(); // a message of the owner's below the waiting reply, no reply of its own
+  const before = h.slack.createdTs.length;
+  const posts = h.slack.callsTo("chat.postMessage").length;
+  h.clients[0]?.inject(ended);
+  await h.idle();
+  await h.clock.advance(INJECTED_TURN_WAIT + 1);
+  await h.idle();
+  assert.equal(lines.filter((line) => line.startsWith(ENDED)).length, 1, lines.join("\n"));
+  assert.equal(h.slack.createdTs.length, before, "no new message: it ended in place");
+  assert.equal(h.slack.callsTo("chat.postMessage").length, posts);
+  assert.ok(!h.replies().some(isReport));
+});
+
 test("two sweeps that wake together log one overtaken reply once", async (t) => {
   const lines = logged(t, "info");
   const [first, notice] = splitBackground();

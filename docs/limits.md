@@ -58,7 +58,7 @@ be measured first.
 | Speaking a message | Dictation writes your words as you speak | You send an audio clip and choose **Generate transcript** on it: Slack writes no transcript by itself | none |
 | The language of what you said | The `language` setting decides | Slack picks the language it hears, clip by clip, and nothing lets an app choose it | [#220](https://github.com/duqaXxX/awaydesk/issues/220) |
 | Being told that Claude waits for your approval | The request appears where you work | A push to your phone does not come for every request. With iOS locked and Slack open in a browser (2026-09-29), a turn that asked two or three times brought no push for any of them. Slack gives an app no way to ask for one | [#71](https://github.com/duqaXxX/awaydesk/issues/71) |
-| The list of what still runs, once you opened it | A line under the prompt counts the tasks and changes by itself (`· 1 shell still running`) | The list is one card, under the thread's last reply at rest: while a newer reply is still being written it stays on the reply above. A card you opened closes again after you leave the channel or scroll far away from it | none |
+| The list of what still runs, once you opened it | A line under the prompt counts the tasks and changes by itself (`· 1 shell still running`) | The list is one card, under the thread's last reply at rest. A card you opened closes again after you leave the channel or scroll far away from it | none |
 
 Of three clips spoken in Italian in a workspace set to English (Slack free plan, iOS app,
 2026-10-09), Slack first wrote one in Italian and two as English words that were not what was

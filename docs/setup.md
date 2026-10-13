@@ -798,7 +798,9 @@ setting is:
   command or agent it started still runs. The report that follows grows the same message by edit,
   silently, and the ending, posted as a new message when the reply ends, rings a second time.
 - A reply that has another reply's message below it ends in the message it is in, by edit, and
-  rings no more. A message of yours below it does not have that effect.
+  rings no more. So does a reply that waited for background work, has a message of yours below
+  it and got no text from Claude since; one that is still writing its turn when you write, or got
+  a report, rings with its ending.
 - A reply that is still open after about 4 minutes 40 seconds rings when its stream stops, and a
   second time when it ends: what Claude wrote after its last call and the footer arrive as a
   new message, and the notification reads the start of it.

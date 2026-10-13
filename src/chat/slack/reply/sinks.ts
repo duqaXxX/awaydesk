@@ -468,6 +468,8 @@ export class ReplySink implements Sink {
   private finished = false;
   /** `rest` was called: the reply's messages are no longer streams. */
   private restRequested = false;
+  /** The agent's own words were written after the reply rested: a report turn's text. */
+  private reportedSinceRest = false;
   private footer: string | null = null;
   /**
    * What the thread's places last handed this reply to show under its last message. Read once
@@ -495,7 +497,7 @@ export class ReplySink implements Sink {
   private closingGone = false;
   /** One more try of a write after the end, when a pass failed (the final write's retry). */
   private tailRetry: Task<void> | null = null;
-  /** `settle` ran: the reply is being closed down, and no retry may outlive it. */
+  /** `settle`'s own flush is running: no retry may outlive it. */
   private settling = false;
   /** The retry of a write after the end is running its pass. */
   private retrying = false;
@@ -623,6 +625,7 @@ export class ReplySink implements Sink {
     const ending = options.ending ?? false;
     const notice = (options.notice ?? false) || ending;
     if (!blank(markdown)) this.fold.text();
+    if (this.restRequested && !notice && !blank(markdown)) this.reportedSinceRest = true;
     const last = this.parts.at(-1);
     if (last instanceof Text && last.notice === notice && last.ending === ending) {
       last.text += markdown;
@@ -844,8 +847,14 @@ export class ReplySink implements Sink {
     }
     this.retry?.cancel();
     this.tailRetry?.cancel();
-    this.settling = true; // the flush below may fail a write that would start a retry
-    const ok = await cancellable(this.flush(), signal);
+    // The flush below may fail a write that would start a retry; later changes retry as usual.
+    this.settling = true;
+    let ok: boolean;
+    try {
+      ok = await cancellable(this.flush(), signal);
+    } finally {
+      this.settling = false;
+    }
     if (this.closedOut && this.landedValue === null) this.resolve(ok);
     return ok || this.landedValue === true;
   }
@@ -1655,7 +1664,7 @@ export class ReplySink implements Sink {
       return false;
     }
     message.ts = String(posted.ts);
-    this.places.moved(this);
+    this.places.moved();
     message.shown = [];
     message.exact = false;
     message.footer = [];
@@ -1702,7 +1711,7 @@ export class ReplySink implements Sink {
         const ts = await this.adopt(attempted, false, take(plainWords(banner), ADOPT_WORDS));
         if (ts !== null) {
           message.ts = ts;
-          this.places.moved(this);
+          this.places.moved();
           created?.();
           message.shown = blocks;
           message.footer = footer;
@@ -1720,7 +1729,7 @@ export class ReplySink implements Sink {
       return [false, null];
     }
     message.ts = String(posted.ts);
-    this.places.moved(this);
+    this.places.moved();
     // The message sits where it sits: the edit that follows waits for the budget without
     // holding the thread's other replies back.
     created?.();
@@ -1820,7 +1829,7 @@ export class ReplySink implements Sink {
         streamTs = ts; // it landed: this is that stream
       }
       message.ts = streamTs;
-      this.places.moved(this);
+      this.places.moved();
       message.streaming = true;
       message.started = attempted;
       ReplySink.sent(message, plan);
@@ -2035,6 +2044,10 @@ export class ReplySink implements Sink {
           // A refused rest keeps appending to the stream, which the next pass or the 280 seconds
           // stop again; a stream told nothing more, or one the end stops, is not appended to.
           if (message.blind || this.closedOut) return false;
+          // No change may come before then: one more try after the pause, as for a write on a
+          // reply at rest.
+          if (this.retrying) this.warnGaveUp();
+          else this.retryLater();
         } else {
           if (this.closedOut && result === "stopped") this.endMode = "inline";
           if (message.blind) message.exact = false;
@@ -2159,12 +2172,22 @@ export class ReplySink implements Sink {
     };
   }
 
+  /**
+   * A reply at rest that is no longer the last thing in the thread and was written no words of
+   * the agent's since it rested: its ending would only be its old text again.
+   */
+  private leftBehind(): boolean {
+    return this.restRequested && !this.reportedSinceRest && !this.last;
+  }
+
   /** The part of `end` that posts: the ending, or the closing message. */
   private async endCreating(message: Message, free: () => void): Promise<boolean> {
     const owed = this.endMode === null || (this.endMode === "post" && this.closing === null);
-    if (owed && this.places.overtaken(this)) {
-      // Another reply has a message below this one: the ending is not posted (it would land
-      // under that reply), and the footer goes under this message by a silent edit.
+    if (owed && (this.places.overtaken(this) || this.leftBehind())) {
+      // Another reply has a message below this one, or this one rested, was left behind by the
+      // owner's and has nothing to report: the ending is not posted (it would land under that
+      // message, or repeat old text as the newest), and the footer goes under this message by a
+      // silent edit.
       this.endMode = "inline";
       free();
       return (await this.updateStep(message, null))[0];
@@ -2232,7 +2255,7 @@ export class ReplySink implements Sink {
     }
     this.closingGone = true;
     this.closingShown = [];
-    this.places.moved(this);
+    this.places.moved();
     return true;
   }
 
@@ -2319,7 +2342,7 @@ export class ReplySink implements Sink {
           unfurl_media: false,
         });
         this.closing = String(posted.ts);
-        this.places.moved(this);
+        this.places.moved();
         created?.();
       } else if (this.closingUnsure || !isDeepStrictEqual(blocks, this.closingShown)) {
         // An edit never notifies (measured 2026-09-27): the text stays as posted.
@@ -2343,7 +2366,7 @@ export class ReplySink implements Sink {
           take(plainWords(this.banner()), ADOPT_WORDS),
         );
         if (this.closing !== null) {
-          this.places.moved(this);
+          this.places.moved();
           this.closingShown = blocks;
           return true;
         }

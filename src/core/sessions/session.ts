@@ -203,7 +203,7 @@ export class ThreadSession {
   // What the running turn's reply says when it ends: how many queued messages a restart
   // dropped, since they get no reply of their own.
   private endNotes: string[] = [];
-  // Each task's type and description, for the footer's counts and its end line.
+  // Each task's type and description, for the list of what still runs and the task's end line.
   private readonly tasks = new Map<string, readonly [kind: TaskKind, description: string]>();
   // Ended tasks not yet opened into a report turn's reply: (task id, its formatted end line).
   // The task id finds the reply that started it (the report renders there when that reply is
@@ -405,8 +405,8 @@ export class ThreadSession {
    * name. `Working…` while a prompt of the owner's is owed its answer (`promptOwed`), however
    * long its turn takes (issue #83), `Compacting conversation…` while any turn compacts, in the
    * terminal's words (issue #169). A turn the agent starts to report a task owes nobody an
-   * answer and says nothing, and the line never counts what still runs: the footer does (issue
-   * #295). Nothing while an approval, a question or a hold waits on the owner, while `!stop`
+   * answer and says nothing, and the line never counts what still runs: the list under the
+   * thread's last reply does (issue #295). Nothing while an approval, a question or a hold waits on the owner, while `!stop`
    * winds a turn down, and once the session is closed. A restart waiting on tasks says which.
    */
   private threadLine(): readonly [text: string, afterName: string] {
@@ -417,7 +417,7 @@ export class ThreadSession {
     if (this.promptOwed()) return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
     const held = this.draining ? this.runningKindsOf({ awaitedOnly: true }) : "";
     if (held) {
-      // A stop that only background tasks hold: said here whatever the footer shows, since
+      // A stop that only background tasks hold: said here whatever the list shows, since
       // `!stop` is what ends the wait.
       const them = held.startsWith("1 ") && !held.includes(" · ") ? "it" : "them";
       return [
@@ -1713,7 +1713,7 @@ export class ThreadSession {
       const writing = this.active?.renderer ?? null;
       if (!owed && holder !== writing) {
         this.trackLanding(await holder.closeOut(signal), this.reply(holder));
-        this.showThreadStatus(); // its footer may be what counts the tasks now
+        this.showThreadStatus(); // the task's end may change what the line says
         // `!stop` already reacted ✅ itself; skipped so a stopped task's end does not show it
         // a second time.
         if (!stopped) await this.reactDoneIfIdle(signal);
@@ -2350,12 +2350,12 @@ export class ThreadSession {
       }
     }
     // The cards `stopRunning` just ended, and the list above, only debounce: a caller closing
-    // everything down cannot wait a whole debounce for them. The reply that holds the list may
-    // not itself be one of `renderers` (its own turn need not have started any task): the active
-    // turn's is settled too.
-    const replies = new Set([...renderers].map((renderer) => this.reply(renderer)));
-    if (this.active !== null) replies.add(this.reply(this.active.renderer));
-    for (const reply of replies) await reply.settle().catch(() => {});
+    // everything down cannot wait a whole debounce for them.
+    for (const renderer of renderers) {
+      await this.reply(renderer)
+        .settle()
+        .catch(() => {});
+    }
   }
 
   /**
@@ -2399,11 +2399,11 @@ export class ThreadSession {
    * last thing in the thread, `openingTarget`) when several end together, so every other reply
    * whose own tasks also finished is checked here instead, since nothing else rechecks it once
    * the wait that deferred it lifts. `options.unreported` says that no report followed (the
-   * notification never came): a reply closed out then with another reply below it is logged.
-   * Only while nothing is still
-   * expected or running session-wide: `closeReply` already handles the renderer whose own turn
-   * or report just ended, and a currently active one is skipped outright, whatever it reads:
-   * its own turn has not closed it yet, so nothing here is its call to make.
+   * notification never came): a reply closed out then with a message of the owner's or of another
+   * reply below it is logged. Only while nothing is still expected or running session-wide:
+   * `closeReply` already handles the renderer whose own turn or report just ended, and a
+   * currently active one is skipped outright, whatever it reads: its own turn has not closed it
+   * yet, so nothing here is its call to make.
    */
   private async sweepClosedOut(
     signal?: AbortSignal,
@@ -2421,7 +2421,7 @@ export class ThreadSession {
           options.unreported &&
           !renderer.closedOut &&
           !this.endedUnreported.has(renderer) &&
-          reply.overtaken
+          !reply.last
         ) {
           this.endedUnreported.add(renderer);
           logger.info(`a reply ended with no report under it in ${this.where}`);

@@ -4992,6 +4992,53 @@ test("a reply that rests is still registered, and its end writes the ending with
   assert.ok(!places.holds(sink), "ended, and sealed by the owner's message");
 });
 
+// ---- a reply at rest that something sits below: it ends where it is
+
+/** A reply at rest with a message of the owner's below it. */
+async function restedUnderOwner(slack: FakeSlack): Promise<[ReplySink, ThreadPlaces]> {
+  slack.tsStep = 10;
+  const places = new ThreadPlaces();
+  const [sink] = await finishedReply(slack, 0, { places });
+  sink.rest();
+  await settled();
+  places.ownerPosted(slack.ownerTs());
+  return [sink, places];
+}
+
+test("a rested reply with an owner message below it and no words since ends by edit, with no post", async () => {
+  const slack = new FakeSlack();
+  const [sink] = await restedUnderOwner(slack);
+  const pushes = slack.pushes();
+  // The task's end line is the daemon's, not the agent's words.
+  await sink.text("\n\nThe task ended.", { notice: true });
+  assert.equal(await sink.closeOutFormatted("footer"), true);
+  assert.deepEqual(slack.callsTo("chat.postMessage"), [], "no new message");
+  assert.equal(slack.pushes(), pushes, "no push");
+  assert.equal(slack.messageTexts()[0], "Started it.\n\nThe task ended.");
+  assert.deepEqual(list(last(slack.callsTo("chat.update")).blocks).slice(-2), [
+    { type: "divider" },
+    contextBlock("footer"),
+  ]);
+});
+
+test("a rested reply that received the agent's words since posts its ending", async () => {
+  const slack = new FakeSlack();
+  const [sink] = await restedUnderOwner(slack);
+  await sink.text(" The report.");
+  assert.equal(await sink.closeOutFormatted("footer"), true);
+  assert.equal(slack.callsTo("chat.postMessage").length, 1);
+});
+
+test("a reply still writing its turn when the owner writes posts its ending", async () => {
+  const slack = new FakeSlack();
+  slack.tsStep = 10;
+  const places = new ThreadPlaces();
+  const [sink] = await finishedReply(slack, STREAM_SECONDS + 1, { places });
+  places.ownerPosted(slack.ownerTs()); // finished, not at rest
+  assert.equal(await sink.closeOutFormatted("footer"), true);
+  assert.equal(slack.callsTo("chat.postMessage").length, 1);
+});
+
 // ---- fix round 1: when a reply counts as at rest
 
 test("a reply whose stream Slack closed shows the footer after rest, found out by the finish flush", async () => {
@@ -5051,6 +5098,32 @@ test("a stop that keeps failing does not hide the text that follows", async () =
     JSON.stringify(slack.callsTo("chat.appendStream")).includes("Between."),
     "the text goes on to the open stream",
   );
+});
+
+test("a refused rest stop is tried again after the retry pause, with no other change", async () => {
+  const slack = new FakeSlack();
+  const [sink] = await finishedReply(slack, 0, { finalRetrySeconds: 0.02 });
+  slack.responses["chat.stopStream"] = [rejected("ratelimited"), { ok: true }];
+  sink.rest();
+  await settled();
+  assert.equal(slack.callsTo("chat.stopStream").length, 1);
+  await passed(0.05);
+  await settled();
+  assert.equal(slack.callsTo("chat.stopStream").length, 2);
+  assert.equal(slack.messages.get(slack.streamTs[0] ?? "")?.streaming, false);
+});
+
+test("a rest stop refused twice is logged as given up", async () => {
+  const slack = new FakeSlack();
+  const logger = new Recorded();
+  const [sink] = await finishedReply(slack, 0, { finalRetrySeconds: 0.02, logger });
+  slack.responses["chat.stopStream"] = [rejected("ratelimited"), rejected("ratelimited")];
+  sink.rest();
+  await settled();
+  await passed(0.05);
+  await settled();
+  assert.equal(slack.callsTo("chat.stopStream").length, 2);
+  assert.equal(logger.lines.filter((line) => line.message.includes("tried twice")).length, 1);
 });
 
 test("a rest told again while the stream is still open tries the stop again", async () => {
@@ -5256,10 +5329,11 @@ test("an owner message below the reply that holds the list does not let the repl
 
 test("a reply that stopped holding the list is let go of when an owner message sits below it", async () => {
   const slack = new FakeSlack();
+  slack.tsStep = 10;
   const places = new ThreadPlaces();
   const first = await endedReply(slack, places);
   places.showRunning(SHELL);
-  places.ownerPosted(OWNER_TS);
+  places.ownerPosted(slack.ownerTs());
   const second = reply(slack, { places });
   await second.text("More.");
   await second.finish([], null);
@@ -5348,6 +5422,24 @@ test("a failed card write on a resting reply is tried again after the retry paus
   await sink.finishFormatted([], "footer");
   sink.rest();
   await settled();
+  slack.responses["chat.update"] = [networkDown(), { ok: true }];
+  places.showRunning(SHELL);
+  await settled();
+  assert.deepEqual(listCards(slack), [], "the first try failed");
+  await passed(0.05);
+  await settled();
+  assert.deepEqual(listCards(slack), [listCard(SHELL)]);
+});
+
+test("a reply that was settled and goes on is tried again after a failed write", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const sink = reply(slack, { places, finalRetrySeconds: 0.02 });
+  await sink.text("Started it.");
+  await sink.finishFormatted([], "footer");
+  sink.rest();
+  await settled();
+  await sink.settle(); // the agent's process died, the session goes on
   slack.responses["chat.update"] = [networkDown(), { ok: true }];
   places.showRunning(SHELL);
   await settled();

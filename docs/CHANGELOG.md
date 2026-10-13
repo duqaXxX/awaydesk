@@ -7,15 +7,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- A reply that has another reply's message below it ends in the message it is in, by edit: its
-  footer goes under that message, or on the stream's stop, and no ending is posted, which would have
-  landed below the other reply. Such a reply opens no continuation message either. A message of the
-  owner's below a reply does not have this effect (#295).
+- A reply ends in the message it is in, by edit, with no new message, when another reply's message
+  sits below it, or when it rested for background work, a message of the owner's sits below it and
+  no text of Claude's was written to it since it rested: its footer goes under that message, or on
+  the stream's stop. A task's end line or a card update is not such text; a report's text is. A
+  reply that has another reply below it opens no continuation message either. A reply still
+  writing its turn when the owner writes, and one that rested and then received a report, post
+  their ending as before (#295).
 
 - The report of a background task renders into the reply that started the task only while that
   reply is the last thing in the thread; with a message of the owner's or another reply's below
-  it, the report opens a reply of its own at the bottom. A reply left overtaken that ends with no
-  report under it, because the task's notification never came, is logged at INFO (#295).
+  it, the report opens a reply of its own at the bottom. A reply left behind by a message of the
+  owner's or another reply's that ends with no report under it, because the task's notification
+  never came, is logged at INFO (#295).
 
 - Between two messages of the owner one footer shows, under the app's last reply at rest. A
   message of the owner's takes no footer away from the replies above it, and a reply that has
@@ -28,8 +32,8 @@ All notable changes to this project are documented here. The format follows
 - A reply whose turn ends with background work still running rests: its stream is stopped at the
   end of the turn, with the footer under it (the stop is a push, and replaces the one the 280
   second stop made), and its message then changes by edit. A report that renders into it grows it
-  by edit, and its end posts the ending with the footer and cuts it out of the first message
-  (#295).
+  by edit, and its end then posts the ending with the footer and cuts it out of the first message,
+  unless the reply is no longer the last thing in the thread and got no report (#295).
 
 - What still runs in a thread is a list: one card under the thread's last reply at rest and above
   its footer, with a title such as `2 agents · 1 shell still running` and a line per subagent or
@@ -946,12 +950,6 @@ All notable changes to this project are documented here. The format follows
   footer. The text is posted first and then taken out of the message it grew in by a silent
   edit (`ReplySink._end`, `ReplySink._ending_cursor`); an answer that is text alone keeps it,
   and the new message is the footer alone, as before.
-- Every reply keeps its footer once it has ended. Only the counts of what still runs
-  (`⏳ 1 shell`) stay with the thread's latest reply, so a reply that ends after a newer one
-  shows its own footer, with the values of its last turn.
-- What still runs is said once, on the last line of the thread: in the footer when the latest
-  reply has ended, in the thread's status line when that reply is still open. The status line
-  no longer repeats a count the footer above it shows.
 
 - Tool calls in a reply (issue #80): a run of calls, the calls between two pieces of text, is two
   task cards in place of one card per call. The first holds the counts of what ended (`Ran 2 shell
@@ -1334,8 +1332,8 @@ All notable changes to this project are documented here. The format follows
   of a tool's title. The same holds for `This reply ended before an answer: …`, after a
   restart of the daemon or a closed session. A notice written just before the line stays in
   the reply, a card that closes after it moves under it, and no other line of the daemon's
-  moves. The running list is no footer: a turn cut while a subagent works closes with
-  `⏳ 1 agent` still showing, and ends with the line too. A reply that ends with its footer is
+  moves. A turn cut while a subagent works ends with the line too, and the list of what
+  still runs is taken off its reply. A reply that ends with its footer is
   unchanged: a line of the daemon's stays where it was written. Not covered: a process lost
   while no turn is active writes no line at all; a reply cut short after text Claude wrote
   past its last call still rings with the start of that text.
@@ -1770,9 +1768,8 @@ First release.
   subagent's calls update its line. Claude Code's report of a finished task is a reply of its
   own that opens with Claude Code's line for the task's end (`✓ Agent "review" finished ·
   3m 59s`).
-- A footer on the channel's latest reply: bypass, git branch, model, effort level, context,
-  session tokens, the 5-hour and weekly limits, and the tasks still running (`⏳ 1 shell ·
-  1 agent`). The effort level is the one Claude Code reports to a `Stop` hook. `!status` lists
+- A footer under the app's last reply at rest between two messages of yours: bypass, git
+  branch, model, effort level, context, session tokens, and the 5-hour and weekly limits. The effort level is the one Claude Code reports to a `Stop` hook. `!status` lists
   the same values one per line, or says why Claude Code cannot start.
 - Approvals with Approve and Deny buttons; a decided request is removed and the tool's line
   records the call. A clarifying question is one line with Answer and Skip; Answer opens a form

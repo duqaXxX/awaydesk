@@ -93,13 +93,13 @@ describe("ThreadPlaces", () => {
     const early = joined(below, null);
     below.ownerPosted("1760000002.000001");
     early.lastAt = positionOf("1760000001.000001");
-    below.moved(early);
+    below.moved();
     assert.equal(below.last(early), false, "the mark is below the message");
     const above = new ThreadPlaces();
     const late = joined(above, null);
     above.ownerPosted("1760000001.000001");
     late.lastAt = positionOf("1760000002.000001");
-    above.moved(late);
+    above.moved();
     assert.equal(above.last(late), true, "the mark is above the message");
   });
 
@@ -228,7 +228,7 @@ describe("ThreadPlaces", () => {
     places.ended(upper);
     places.ended(lower);
     upper.lastAt = positionOf("1760000003.000001"); // its ending was posted below the lower one
-    places.moved(upper);
+    places.moved();
     assert.equal(footerOf(upper), "upper");
     assert.equal(footerOf(lower), null);
   });
@@ -273,6 +273,25 @@ describe("ThreadPlaces", () => {
     places.ended(lower);
     assert.equal(places.holds(upper), false);
     assert.equal(places.holds(lower), true);
+  });
+
+  test("the holder of the list pins its stretch, so the footer it shows outlives the owner's message", () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001", "F");
+    upper.resting = true;
+    places.ended(upper);
+    const lower = joined(places, "1760000002.000001"); // ended, with no footer of its own
+    lower.resting = true;
+    places.showRunning({ title: "1 shell still running", lines: ["sleep"] });
+    places.ended(lower);
+    assert.equal(footerOf(lower), "F", "the lower reply shows the stretch's footer");
+    places.ownerPosted("1760000003.000001");
+    assert.equal(places.holds(upper), true, "its footer is still shown by the holder below it");
+    places.place();
+    assert.equal(footerOf(lower), "F", "the stretch keeps its footer");
+    places.showRunning(null);
+    assert.equal(places.holds(upper), false);
+    assert.equal(places.holds(lower), false);
   });
 
   test("a closed thread lets go of the reply that holds the list", () => {

@@ -102,7 +102,7 @@ export class ThreadPlaces {
   }
 
   /** A reply got its first message, or its last message moved. */
-  moved(_reply: Placed): void {
+  moved(): void {
     this.prune();
     this.place();
   }
@@ -216,7 +216,10 @@ export class ThreadPlaces {
     return at;
   }
 
-  /** Lets go of the ended replies that an owner message or a closed thread seals. */
+  /**
+   * Lets go of the replies a closed thread or an owner message seals (`sealed`). The holder of the
+   * list stays while it holds it, unless its thread closed.
+   */
   private release(): void {
     const top = this.marks.length === 0 ? null : Math.max(...this.marks);
     let gone = false;
@@ -240,11 +243,12 @@ export class ThreadPlaces {
   }
 
   /**
-   * Whether an ended reply is let go of: its thread closed, or an owner message sits below it and
-   * no reply of its stretch, above it or below, is still to end. A stretch is let go of as a
-   * whole: the reply still to end takes the stretch's footer from its holder, or gives it back,
-   * and a holder already gone is invisible to `tails`. A reply with no message yet counts in no
-   * stretch.
+   * Whether a reply is let go of: its thread closed, or an owner message sits below it and no
+   * reply of its stretch, above it or below, is still to end. The holder of the list counts as
+   * still to end while it holds it: it stays, and may show the footer of a reply above it, which
+   * `tails` could not find once that reply is gone. A stretch is let go of as a whole: the reply
+   * still to end takes the stretch's footer from its holder, or gives it back. A reply with no
+   * message yet counts in no stretch.
    */
   private sealed(reply: Placed, top: number | null): boolean {
     const at = reply.lastAt;
@@ -253,7 +257,13 @@ export class ThreadPlaces {
     const prev = Math.max(Number.NEGATIVE_INFINITY, ...this.marks.filter((mark) => mark < at));
     const next = Math.min(...this.marks.filter((mark) => mark > at));
     for (const other of this.replies) {
-      if (other === reply || this.done.has(other) || other.lastAt === null) continue;
+      if (
+        other === reply ||
+        (this.done.has(other) && other !== this.holder) ||
+        other.lastAt === null
+      ) {
+        continue;
+      }
       if (other.lastAt > prev && other.lastAt < next) return false;
     }
     return true;
