@@ -1853,12 +1853,13 @@ export class ThreadSession {
 
   /**
    * What opens a report of the agent's own turn (the end of each task it reports), and the
-   * reply that started the first of those tasks (the report renders there), if it is still
-   * tracked. Null when it is not (a restart or an idle close dropped it, or it already ended: a
-   * notification later than INJECTED_TURN_WAIT let `expireUnreported` end it first): the report
-   * then gets a reply of its own, as it always has, rather than an edit of a reply that ended
-   * and will not notify again. The text is null for a report the agent named the task of
-   * (`report_started`) that renders in that task's reply with no end line to open it.
+   * reply of the first of those tasks (then of the task the agent named) that is still tracked,
+   * not ended and the last thing in the thread: the report renders there. Null when none is (a
+   * restart or an idle close dropped it, it already ended because a notification later than
+   * INJECTED_TURN_WAIT let `expireUnreported` end it first, or something sits below it): the
+   * report then gets a reply of its own at the bottom, rather than an edit of a reply that
+   * ended and will not notify again or one the owner has scrolled past. The text is null for a
+   * report the agent named the task of (`report_started`) that renders in that task's reply with no end line to open it.
    */
   private openingTarget(): readonly [text: string | null, target: TurnRenderer | null] {
     const lines = this.ended;
@@ -1867,9 +1868,21 @@ export class ThreadSession {
     // hand-back can come before its task's end, or after an end that came inside a turn.
     const reported = this.reportOf;
     this.reportOf = null;
-    const first = lines[0]?.[0] ?? reported;
-    let target = first === null ? null : (this.taskReplies.get(first) ?? this.showing(first));
-    if (target?.closedOut) target = null;
+    // The report belongs at the bottom of the thread: only a reply that is still the last thing
+    // in it takes the report in; one with a message of the owner's or of another reply below
+    // it would hide the report above them (issue #295).
+    const candidates = [
+      ...lines.map(([taskId]) => taskId),
+      ...(reported === null ? [] : [reported]),
+    ];
+    let target: TurnRenderer | null = null;
+    for (const taskId of candidates) {
+      const reply = this.taskReplies.get(taskId) ?? this.showing(taskId);
+      if (reply !== null && !reply.closedOut && this.reply(reply).last) {
+        target = reply;
+        break;
+      }
+    }
     const ends = lines.map(([, line]) => line).join("\n");
     // In the reply that started the task the report needs no line to say what it is about:
     // the task's card is there. Anywhere else the notice says it, as it always has.
@@ -1969,7 +1982,7 @@ export class ThreadSession {
         // Catches `target` (nothing more coming for it either, when `held` was empty) and any
         // other reply a joint report turn left stranded, since a report only ever renders into
         // the first of the tasks it covers.
-        await this.sweepClosedOut(live(signal));
+        await this.sweepClosedOut(live(signal), { unreported: true });
         await this.reactDoneIfIdle(live(signal));
       } finally {
         // (sync) Whatever the sweep did: a notification that arrived during its own writes is
@@ -2381,14 +2394,22 @@ export class ThreadSession {
    * or report just ended, and a currently active one is skipped outright, whatever it reads:
    * its own turn has not closed it yet, so nothing here is its call to make.
    */
-  private async sweepClosedOut(signal?: AbortSignal): Promise<void> {
+  private async sweepClosedOut(
+    signal?: AbortSignal,
+    options: { readonly unreported?: boolean } = {},
+  ): Promise<void> {
     const active = this.active?.renderer ?? null;
     for (const renderer of new Set(this.taskReplies.values())) {
       if (this.injectedExpected || !this.settled.isSet) {
         return; // a notification arrived meanwhile: its report may render into this reply
       }
       if (renderer !== active && !this.stillOwed(renderer)) {
-        this.trackLanding(await renderer.closeOut(signal), this.reply(renderer));
+        const reply = this.reply(renderer);
+        // Read before the close: closing it out changes what the thread shows below it.
+        if (options.unreported && !renderer.closedOut && reply.overtaken) {
+          logger.info(`a reply ended with no report under it in ${this.where}`);
+        }
+        this.trackLanding(await renderer.closeOut(signal), reply);
       }
     }
   }
@@ -2400,7 +2421,7 @@ export class ThreadSession {
   private async expireUnreported(taskId: string, signal: AbortSignal): Promise<void> {
     await this.deps.clock.sleep(INJECTED_TURN_WAIT, signal);
     this.unreported.delete(taskId);
-    await this.sweepClosedOut(signal);
+    await this.sweepClosedOut(signal, { unreported: true });
     await this.reactDoneIfIdle(signal);
   }
 

@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The report of a background task renders into the reply that started the task only while that
+  reply is the last thing in the thread; with a message of the owner's or another reply's below
+  it, the report opens a reply of its own at the bottom (#295). A reply left overtaken that ends
+  with no report under it, because the task's notification never came, is logged at INFO.
+
 - A reply that has another reply's message below it ends in the message it is in: its footer goes
   under that message by edit, or on the stream's stop, and no ending is posted, which would have
   landed below the other reply. Such a reply opens no continuation message either. The Slack

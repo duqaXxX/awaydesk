@@ -1537,7 +1537,9 @@ test("running counts follow the latest reply", async (t) => {
   assert.deepEqual(h.slack.callsTo("chat.delete"), []);
   assert.equal(runningBlock(at(h.slack.messageBlocks(), -1)), "⏳ 1 shell");
   h.clients[0]?.inject([...notice, ...injected]);
-  await h.until(() => isReport(h.bodies()[0] ?? ""));
+  // The first reply is no longer the last thing in the thread: the report opens a reply of its
+  // own at the bottom (issue #295).
+  await h.until(() => h.bodies().some(isReport));
   // the task has ended: no reply's footer shows a running count any more. The second reply
   // already stopped, so this update of it debounces like any other change to a finished reply:
   // `until` gives it the room to land.
@@ -1557,12 +1559,14 @@ test("two prompts in a row each reply ends with its own stop", async (t) => {
   assert.deepEqual([h.slack.streamTs.length, h.slack.callsTo("chat.stopStream").length], [2, 1]);
   assert.ok(at(h.slack.messageBlocks(), -1).some((block) => block.type === "divider"));
   h.clients[0]?.inject([...notice, ...injected]);
-  await h.until(() => h.slack.callsTo("chat.stopStream").length === 2);
-  // the first reply stops now, once its task has fully ended, with a footer of its own: no
-  // longer the latest, it still says how its last turn ended. The second's stop is untouched.
-  const last = h.slack.callsTo("chat.stopStream").at(-1);
-  assert.ok(blocksOf(last).some((block) => block.type === "divider"));
-  assert.equal(h.slack.pushes(), 2);
+  // The first reply is no longer the last thing in the thread: the report opens a third reply of
+  // its own at the bottom (issue #295), and the first reply stops in place, once its task has
+  // fully ended, with a footer of its own: no longer the latest, it still says how its last turn
+  // ended. The second's stop is untouched.
+  await h.until(() => h.slack.callsTo("chat.stopStream").length === 3);
+  assert.ok(isReport(at(h.bodies(), -1)));
+  assert.ok(at(h.slack.messageBlocks(), 0).some((block) => block.type === "divider"));
+  assert.equal(h.slack.pushes(), 3);
 });
 
 test("two prompts tasks ending together each reply ends", async (t) => {

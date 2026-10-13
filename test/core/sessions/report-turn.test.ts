@@ -165,3 +165,16 @@ test("a continued agent frame never starts a turn", async (t) => {
   // the owner's turn alone has a reply
   assert.equal(h.slack.callsTo("chat.startStream").length, 1);
 });
+
+test("a report turn after a restart renders into the one reply that is the last thing (case 1)", async (t) => {
+  // The daemon never saw the `Agent` call, so the report names no task it tracks; the shell of
+  // the continued turn is shown in the reply of that turn, which nothing sits below. Before the
+  // report went to the bottom it opened a reply of its own in the middle of the thread.
+  const [h] = await playTheContinuedAgent(t, { restarted: true });
+  const texts = h.replies();
+  assert.equal(texts.length, 2, texts.join("\n---\n"));
+  const [continued, answered] = texts as [string, string];
+  assert.ok(continued.startsWith("SENT") && continued.includes("finished"), continued);
+  assert.equal(answered, "KIWI");
+  assert.equal(h.slack.callsTo("chat.postMessage").length, 0);
+});
