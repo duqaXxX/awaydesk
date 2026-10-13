@@ -93,6 +93,17 @@ describe("ThreadPlaces", () => {
     assert.equal(places.last(older), false);
   });
 
+  test("a reply let go of is still overtaken by one that wrote below it", () => {
+    const places = new ThreadPlaces();
+    const first = joined(places, "1760000001.000001");
+    places.ended(first);
+    places.ownerPosted("1760000002.000001"); // lets it go
+    assert.equal(places.holds(first), false);
+    joined(places, "1760000003.000001");
+    assert.equal(places.overtaken(first), true);
+    assert.equal(places.last(first), false);
+  });
+
   test("an ended reply with no owner message below it is kept", () => {
     const places = new ThreadPlaces();
     const first = joined(places, "1760000001.000001");

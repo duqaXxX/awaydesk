@@ -4388,3 +4388,28 @@ test("a message is created in a thread by one reply at a time", async () => {
   assert.equal(sink.overtaken, true);
   assert.equal(other.overtaken, false);
 });
+
+test("an edit that waits for the update budget does not hold another reply's new message back", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const budget = new AsyncEvent();
+  let drained = false;
+  const limiter: Limiter = {
+    async acquire() {
+      if (drained) await budget.wait();
+    },
+    async refund() {},
+  };
+  const sink = await longReply(slack, { places, limiter });
+  drained = true;
+  const closing = sink.closeOutFormatted("footer"); // the ending is posted, its edit waits
+  await settled();
+  assert.equal(slack.callsTo("chat.postMessage").length, 1, "the ending is posted");
+  const other = reply(slack, { places });
+  await other.text("Another turn.");
+  await settled();
+  assert.equal(slack.callsTo("chat.startStream").length, 2, "the other stream does not wait");
+  drained = false;
+  budget.set();
+  assert.equal(await soon(closing), true);
+});

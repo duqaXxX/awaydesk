@@ -1576,7 +1576,7 @@ export class ReplySink implements Sink {
    * and not toward an update's, so what the post left out of its span reaches the same message
    * and no further one is opened for it.
    */
-  private async postStep(message: Message, split = false): Promise<Step> {
+  private async postStep(message: Message, split = false, created?: () => void): Promise<Step> {
     let [blocks, overflow] = this.blocks(message, null, true);
     const footer = this.footerOf(message);
     blocks = [...blocks, ...footer];
@@ -1603,13 +1603,14 @@ export class ReplySink implements Sink {
           `elements ${elements}, cards ${cards}`,
       );
       if (split && tooManyBlocks(error) && ReplySink.tighten(message, blocks)) {
-        return this.postStep(message, true);
+        return this.postStep(message, true, created);
       }
       if (unknownOutcome(error)) {
         const ts = await this.adopt(attempted, false, take(plainWords(banner), ADOPT_WORDS));
         if (ts !== null) {
           message.ts = ts;
           this.places.moved(this);
+          created?.();
           message.shown = blocks;
           message.footer = footer;
           this.retrack();
@@ -1627,6 +1628,9 @@ export class ReplySink implements Sink {
     }
     message.ts = String(posted.ts);
     this.places.moved(this);
+    // The message sits where it sits: the edit that follows waits for the budget without
+    // holding the thread's other replies back.
+    created?.();
     message.shown = blocks;
     message.footer = footer;
     this.retrack();
@@ -1929,7 +1933,7 @@ export class ReplySink implements Sink {
       let step: Step;
       if (message.ts === null) {
         // A message is created with the thread's places held, after the decision that it may be.
-        const release = await this.places.lock.acquire();
+        const free = await this.creating();
         try {
           if (this.messages.length > 1 && this.places.overtaken(this)) {
             // A continuation planned before another reply wrote below, not yet posted: it
@@ -1941,9 +1945,9 @@ export class ReplySink implements Sink {
           step =
             message.mode === "stream"
               ? await this.streamStep(message)
-              : await this.postStep(message, true);
+              : await this.postStep(message, true, free);
         } finally {
-          release();
+          free();
         }
       } else if (message.streaming) {
         step = await this.streamStep(message);
@@ -2007,21 +2011,38 @@ export class ReplySink implements Sink {
       if (result === "stopped") return true;
     }
     // Everything below may create a message, and is decided with the thread's places held.
-    const release = await this.places.lock.acquire();
+    const free = await this.creating();
     try {
-      return await this.endCreating(message);
+      return await this.endCreating(message, free);
     } finally {
-      release();
+      free();
     }
   }
 
+  /**
+   * Takes the thread's places lock, for the decision to create a message and the call that
+   * creates it. Returns the release, which may be called more than once: the creator calls it as
+   * soon as the message's `ts` is set, and the caller's `finally` calls it again. Edits never
+   * hold it, since an edit does not change where a message sits.
+   */
+  private async creating(): Promise<() => void> {
+    const release = await this.places.lock.acquire();
+    let held = true;
+    return () => {
+      if (!held) return;
+      held = false;
+      release();
+    };
+  }
+
   /** The part of `end` that posts: the ending, or the closing message. */
-  private async endCreating(message: Message): Promise<boolean> {
+  private async endCreating(message: Message, free: () => void): Promise<boolean> {
     const owed = this.endMode === null || (this.endMode === "post" && this.closing === null);
     if (owed && this.places.overtaken(this)) {
       // Another reply has a message below this one: the ending is not posted (it would land
       // under that reply), and the footer goes under this message by a silent edit.
       this.endMode = "inline";
+      free();
       return (await this.updateStep(message, null))[0];
     }
     if (this.endMode === null) {
@@ -2034,7 +2055,7 @@ export class ReplySink implements Sink {
         this.messages.push(ending);
         this.endMode = "moved"; // the footer goes under it, in the same post
         try {
-          await this.postStep(ending);
+          await this.postStep(ending, false, free);
         } finally {
           if (ending.ts === null) {
             // Not posted: as if never tried, so the next pass posts it before it shortens
@@ -2043,6 +2064,7 @@ export class ReplySink implements Sink {
             this.endMode = null;
           }
         }
+        free();
         if (this.endMode === null) return false;
         // its stream said more than its span
         message.exact = false;
@@ -2054,12 +2076,13 @@ export class ReplySink implements Sink {
         // message after it would ring again with nothing to show. The footer, if there is
         // one, goes under it by a silent edit.
         this.endMode = "moved";
+        free();
         return (await this.updateStep(message, null))[0];
       }
     }
     this.endMode = "post";
     this.bodyLanded = true; // every message is written: only the closing message is owed
-    return this.writeClosing();
+    return this.writeClosing(free);
   }
 
   /** Logs once that an overtaken reply shows less than it said. */
@@ -2091,7 +2114,7 @@ export class ReplySink implements Sink {
    * a line of the daemon's. With no footer either it holds one zero-width space: the known case
    * is a turn that ended well, text alone, whose footer could not be built.
    */
-  private async writeClosing(): Promise<boolean> {
+  private async writeClosing(created?: () => void): Promise<boolean> {
     let blocks = this.closingBlocks();
     if (blocks.length === 0) blocks = [contextBlock(ZERO_WIDTH_SPACE)];
     const attempted = this.clock.time();
@@ -2108,8 +2131,10 @@ export class ReplySink implements Sink {
         });
         this.closing = String(posted.ts);
         this.places.moved(this);
+        created?.();
       } else if (!isDeepStrictEqual(blocks, this.closingShown)) {
         // An edit never notifies (measured 2026-09-27): the text stays as posted.
+        created?.();
         await this.limiter.acquire();
         this.wrote = true;
         await this.slack.chat.update({

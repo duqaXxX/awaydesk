@@ -410,3 +410,19 @@ test("a reply opened and silent keeps the thread's places when another is let go
   assert.equal(newest.overtaken, true, "the silent reply wrote below it, in the same places");
   assert.equal(silent.overtaken, false);
 });
+
+test("a thread keeps no reply the places let go of", async () => {
+  const { chat } = made();
+  const thread = chat.thread({ channel: CHANNEL, thread: THREAD });
+  const opened = () => (thread as unknown as { opened: unknown[] }).opened.length;
+  for (const [i, ts] of ["1790000000.900001", "1790000000.900002"].entries()) {
+    const reply = thread.openReply(() => {});
+    await reply.text(`answer ${i}`);
+    await reply.finish([]);
+    assert.equal(await reply.closeOut(null), true);
+    chat.ownerPosted(CHANNEL, THREAD, ts); // seals it
+  }
+  assert.equal(opened(), 1, "the first was dropped when the second opened");
+  thread.openReply(() => {});
+  assert.equal(opened(), 1, "only the reply still held");
+});

@@ -52,6 +52,11 @@ export class ThreadPlaces {
     this.replies.add(reply);
   }
 
+  /** Whether the reply is registered and not let go of. */
+  holds(reply: Placed): boolean {
+    return this.replies.has(reply);
+  }
+
   /** Whether any reply is registered. */
   get held(): boolean {
     return this.replies.size > 0;
@@ -91,9 +96,9 @@ export class ThreadPlaces {
     return isLast(reply.lastAt, this.others(reply), this.marks);
   }
 
-  /** Whether another reply has a message below the reply. */
+  /** Whether another reply has a message below the reply; a reply let go of keeps its answer. */
   overtaken(reply: Placed): boolean {
-    if (!this.replies.has(reply) || reply.lastAt === null) return false;
+    if (reply.lastAt === null) return false;
     return isOvertaken(reply.lastAt, this.others(reply));
   }
 

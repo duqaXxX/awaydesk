@@ -261,12 +261,6 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   app.event("message", async ({ event, body }) => {
     const message = event as unknown as Payload;
     const envelope = body as unknown as Payload;
-    console.error(
-      "DBG1",
-      JSON.stringify(Object.keys(message)),
-      isWrittenMessage(message),
-      isPromptMessage(message),
-    );
     if (!isWrittenMessage(message)) return;
     const [user, team] = messageActor(message, envelope);
     const channel = text(message.channel);

@@ -406,6 +406,12 @@ export class SlackThread implements ThreadChat {
         finalRetrySeconds: this.options.finalRetrySeconds,
       }),
     });
+    // A reply the places let go of needs no letting go at close, and must not stay reachable.
+    this.opened.splice(
+      0,
+      this.opened.length,
+      ...this.opened.filter(([held, old]) => held.holds(old)),
+    );
     this.opened.push([places, reply]);
     return reply;
   }
