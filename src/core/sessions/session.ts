@@ -190,8 +190,6 @@ export class ThreadSession {
   private readonly taskReplies = new Map<string, TurnRenderer>();
   /** The reply each renderer writes, as the session holds it. */
   private readonly replyOf = new WeakMap<TurnRenderer, Reply>();
-  /** A report's own reply, and the reply that was the thread's latest when it opened. */
-  private readonly above = new WeakMap<Reply, Reply>();
   /** The thread's newest reply: the only one that shows what is still running. */
   private latest: Reply | null = null;
   // Replies whose end did not land: no checkmark until the one retry does, a cross if it
@@ -1971,7 +1969,7 @@ export class ThreadSession {
     const [text, target] = this.openingTarget();
     try {
       if (held.length > 0) {
-        const renderer = target ?? this.newRenderer(this.newReportReply());
+        const renderer = target ?? this.newRenderer(this.newReply());
         await this.standalone(held, text, renderer, signal);
       }
     } catch (error) {
@@ -2132,10 +2130,7 @@ export class ThreadSession {
    * still gets the repair's notice.
    */
   private trackLanding(landed: boolean, reply: Reply): void {
-    if (landed) {
-      this.footerMoved(reply);
-      return;
-    }
+    if (landed) return;
     this.unlanded.add(reply);
     if (this.closedFlag) return; // `close` settles every unlanded reply itself
     this.awaitLanding(reply).catch(() => {});
@@ -2146,7 +2141,6 @@ export class ThreadSession {
     this.unlanded.delete(reply);
     if (this.closedFlag) return;
     if (landed) {
-      this.footerMoved(reply);
       await this.reactDoneIfIdle();
     } else {
       // ❌ shown, but `state.json` keeps ⏳ or ✋: the answer never reached the chat.
@@ -2248,7 +2242,7 @@ export class ThreadSession {
       // follows for it, but only a reply that is still tracked, not ended and the last thing in
       // the thread (`openingTarget`); otherwise it gets a reply of its own at the bottom.
       const [text, target] = this.openingTarget();
-      renderer = target ?? this.newRenderer(this.newReportReply());
+      renderer = target ?? this.newRenderer(this.newReply());
       opening = text;
     } else {
       this.reportOf = null; // the prompt's own turn: what was named is not the next turn
@@ -2311,8 +2305,6 @@ export class ThreadSession {
     }
     // Before the close, so the reply's last write already carries the list.
     this.showRunning();
-    // A report that ends with no footer of its own leaves the one above it where it is.
-    if (footer === null) this.above.delete(this.reply(renderer));
     await renderer.close(footer, options.signal);
     // The reply ends at once unless a task this renderer started outlives this very turn;
     // `force` is a stop, an error or a restart, which never waits for one.
@@ -2511,29 +2503,6 @@ export class ThreadSession {
       previous.setLatest(false);
     }
     return reply;
-  }
-
-  /**
-   * `newReply` for a report of a background task whose own reply has ended: the report comes
-   * right under the thread's latest reply, with no message of the owner's between them, so once
-   * it ends with a footer that reply gives its own up (`footerMoved`), whichever turn it was:
-   * the one that started the task or a later one of the owner's (decided by the owner,
-   * 2026-10-12: two replies of the daemon's in a row show one footer, the last). An owner's new
-   * prompt takes no footer away.
-   */
-  private newReportReply(): Reply {
-    const previous = this.latest;
-    const reply = this.newReply();
-    if (previous !== null) this.above.set(reply, previous);
-    return reply;
-  }
-
-  /** The end of `reply` is in the chat: the reply above a report gives up its footer. */
-  private footerMoved(reply: Reply): void {
-    const above = this.above.get(reply);
-    if (above === undefined) return;
-    this.above.delete(reply);
-    above.withdrawFooter();
   }
 
   /**

@@ -180,8 +180,7 @@ started, whichever comes first. Slack closes a stream 5 minutes after `chat.star
   ended and no second closing message is posted. A footer assigned to it later is drawn under its
   last body message. A delete that Slack refuses is logged, leaves the footer where it is and is
   tried once more after `sinks.FINAL_RETRY_SECONDS`; `message_not_found` counts as deleted. A
-  write after the end that fails is tried once more the same way. `ReplySink.withdrawFooter` does
-  nothing.
+  write after the end that fails is tried once more the same way.
 
 ### Message limits and continuation
 
@@ -219,7 +218,7 @@ every turn and after `ThreadSession.expireInjectedTurn`, ends every other reply 
 turn Claude Code starts on its own to report a background task renders into the reply of the
 first of the ended tasks (then of the task the agent named) whose reply is still tracked, not
 ended and the last thing in the thread (`ThreadSession.openingTarget`, `Reply.last`). When none
-is, the report gets a reply of its own at the bottom (`ThreadSession.newReportReply`), and the
+is, the report gets a reply of its own at the bottom (`ThreadSession.newReply`), and the
 footer goes to the lowest reply of the stretch (see "One footer between two owner messages"). A reply that ends with
 another reply below it (`Reply.overtaken`) because no report came is logged at INFO. An owner's next prompt takes no
 footer away.

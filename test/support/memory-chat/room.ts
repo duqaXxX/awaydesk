@@ -19,7 +19,7 @@ import {
   type OwnerRequest,
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
-import type { ChatContext } from "../../../src/core/port.ts";
+import { type ChatContext, type Tail, type TailEntry, tails } from "../../../src/core/port.ts";
 
 /** The owner of a memory chat unless a test names another. */
 export const OWNER = "alice";
@@ -129,6 +129,18 @@ function shown(message: StoredMessage): ShownMessage {
   return { id, author, kind, text, pressable, unfinished, topLevel };
 }
 
+/** A reply the room places the footer of: the same rule as Slack's, over this room's counter. */
+export interface Placed {
+  /** The message it writes into; null while it has none. */
+  readonly message: StoredMessage | null;
+  /** Its end has landed. */
+  readonly resting: boolean;
+  /** The footer its turn left, formatted; null when that turn had none. */
+  readonly ownFooter: string | null;
+  /** What it shows under its message from now on. */
+  assign(footer: string | null): void;
+}
+
 /** What a memory chat holds, and the test's side of it. */
 export class Room {
   readonly owner: string;
@@ -141,6 +153,7 @@ export class Room {
   readonly #requests = new Map<string, OpenRequest>();
   readonly #lists = new Map<MessageId, OpenList>();
   readonly #strays: string[] = [];
+  readonly #placed = new Set<Placed>();
   #lookupFails = false;
 
   constructor(owner: string) {
@@ -281,6 +294,51 @@ export class Room {
     };
   }
 
+  /** A reply whose footer the room places. */
+  join(reply: Placed): void {
+    this.#placed.add(reply);
+  }
+
+  /**
+   * Hands every reply of the thread its footer, with `tails` of the core: one per stretch between
+   * two owner messages, on its lowest ended reply. A reply never moves, so only its text changes.
+   */
+  place(ref: ThreadRef): void {
+    for (const [reply, tail] of this.#tails(ref, null)) reply.assign(tail.footer);
+  }
+
+  /** The footer `subject` would show if its end had landed now: what its end writes at once. */
+  footerIf(ref: ThreadRef, subject: Placed): string | null {
+    return this.#tails(ref, subject).get(subject)?.footer ?? null;
+  }
+
+  #tails(ref: ThreadRef, subject: Placed | null): Map<Placed, Tail<string>> {
+    const entries: TailEntry<Placed, string>[] = [];
+    for (const reply of this.#placed) {
+      const message = reply.message;
+      if (message === null && reply !== subject) continue;
+      if (message !== null && (message.deleted || refOf(message).thread !== ref.thread)) continue;
+      if (message !== null && message.channel !== ref.channel) continue;
+      entries.push({
+        key: reply,
+        at: message?.position ?? Number.POSITIVE_INFINITY,
+        resting: reply.resting || reply === subject,
+        footer: reply.ownFooter,
+      });
+    }
+    const marks = this.#messages
+      .filter(
+        (m) =>
+          !m.deleted &&
+          m.kind === "message" &&
+          m.author === this.owner &&
+          m.channel === ref.channel &&
+          m.thread === ref.thread,
+      )
+      .map((m) => m.position);
+    return tails(entries, marks);
+  }
+
   message(id: MessageId): StoredMessage | null {
     return this.#messages.find((m) => m.id === id && !m.deleted) ?? null;
   }
@@ -373,6 +431,7 @@ export class Room {
     }
     const message = this.write(channel, thread, user, text, "message");
     const sent: Sent = { id: message.id, ref: refOf(message), topLevel: message.topLevel };
+    if (user === this.owner) this.place(sent.ref);
     // The owner check is this path's own: a message of somebody else is in the chat and nowhere else.
     if (user === this.owner && this.#inbound !== null) {
       await this.#inbound.message({

@@ -717,9 +717,6 @@ export class ReplySink implements Sink {
     if (moved && this.messages.at(-1)?.streaming !== true) this.changed();
   }
 
-  /** The footer is the places' to give: where it sits decides, and nothing withdraws it. */
-  withdrawFooter(): void {}
-
   /**
    * End the reply's body: what was written is sent now, not at the next debounce. A card still
    * in progress is a task that outlives the turn: `task` keeps updating it after this. The

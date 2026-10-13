@@ -29,7 +29,7 @@ import {
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
 import { isLast, isOvertaken } from "../../../src/core/port.ts";
-import { DAEMON, type MessageKind, type Room, type StoredMessage } from "./room.ts";
+import { DAEMON, type MessageKind, type Placed, type Room, type StoredMessage } from "./room.ts";
 
 const CAPABILITIES: ChatCapabilities = {
   nativeStreaming: false,
@@ -67,7 +67,7 @@ type Segment =
  * calls shows its folded words, or goes when they are empty. `closeOut` adds the footer, then
  * (on the thread's latest reply) the counts of what still runs.
  */
-class MemoryReply implements Reply {
+class MemoryReply implements Reply, Placed {
   readonly #room: Room;
   readonly #ref: ThreadRef;
   readonly #onOpen: OpenMessageChange;
@@ -76,6 +76,8 @@ class MemoryReply implements Reply {
   #finished = false;
   #closed = false;
   #footer: string | null = null;
+  /** The footer the room placed here: the reply's own, or the one of a reply above it. */
+  #shown: string | null = null;
   #running = "";
   #latest = true;
   #lost = false;
@@ -87,9 +89,28 @@ class MemoryReply implements Reply {
     this.#room = room;
     this.#ref = ref;
     this.#onOpen = onOpen;
+    room.join(this);
     this.#landing = new Promise((resolve) => {
       this.#resolveLanding = resolve;
     });
+  }
+
+  get message(): StoredMessage | null {
+    return this.#message;
+  }
+
+  get resting(): boolean {
+    return this.#landed;
+  }
+
+  get ownFooter(): string | null {
+    return this.#footer;
+  }
+
+  assign(footer: string | null): void {
+    if (footer === this.#shown) return;
+    this.#shown = footer;
+    if (this.#closed) this.#write();
   }
 
   get footerShown(): boolean {
@@ -132,12 +153,16 @@ class MemoryReply implements Reply {
     if (this.#closed) return this.#landed;
     this.#closed = true;
     this.#footer = footer === null ? null : footerLine(footer);
+    // What the end writes is what the places would give it once it landed: no footer is written
+    // where the next pass takes it off.
+    this.#shown = this.#room.footerIf(this.#ref, this);
     this.#write();
     this.#landed = !this.#lost;
     if (this.#landed && this.#message !== null) {
       this.#message.unfinished = false;
       this.#onOpen(this.#message.id, null);
     }
+    if (this.#landed) this.#room.place(this.#ref);
     this.#resolveLanding(this.#landed);
     return this.#landed;
   }
@@ -161,12 +186,6 @@ class MemoryReply implements Reply {
     if (this.#closed) this.#write();
   }
 
-  withdrawFooter(): void {
-    if (!this.#closed || this.#footer === null) return;
-    this.#footer = null;
-    this.#write();
-  }
-
   #render(): string {
     const lines = this.#segments.flatMap((segment) => {
       if (segment.kind === "text") return [segment.text.trim()];
@@ -177,7 +196,7 @@ class MemoryReply implements Reply {
       return [`[${status}] ${title}`, ...shown];
     });
     if (this.#closed) {
-      lines.push(this.#footer ?? "");
+      lines.push(this.#shown ?? "");
       if (this.#latest) lines.push(this.#running);
     }
     return lines.filter((line) => line !== "").join("\n");

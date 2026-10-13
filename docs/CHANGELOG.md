@@ -11,10 +11,14 @@ All notable changes to this project are documented here. The format follows
   messages of the owner, one footer, under the lowest reply whose end has landed. A reply that
   gives its footer up takes it off by a silent edit, and a closing message that held the footer
   alone is deleted (`chat.delete`; one that fails is tried once more after
-  `FINAL_RETRY_SECONDS`, and `message_not_found` counts as deleted). `Reply.withdrawFooter` does
-  nothing in the provider from now on. The thread's places live while a thread object that opened
-  a reply in them is open, so a reply let go of by an owner message is still found by the next one
-  (#295).
+  `FINAL_RETRY_SECONDS`, and `message_not_found` counts as deleted). The thread's
+  places live while a thread object that opened a reply in them is open, so a reply let go of by
+  an owner message is still found by the next one (#295).
+
+- The chat seam's `Reply.withdrawFooter` is gone, and so are `ThreadSession.newReportReply` and the
+  bookkeeping behind it: the session no longer takes a footer off the reply above a report, the
+  chat provider places it by position. The memory chat follows the same rule as Slack, with its
+  own message counter, and the chat conformance suite checks it on both providers (#295).
 
 - The report of a background task renders into the reply that started the task only while that
   reply is the last thing in the thread; with a message of the owner's or another reply's below
