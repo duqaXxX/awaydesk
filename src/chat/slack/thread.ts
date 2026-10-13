@@ -415,7 +415,8 @@ export class SlackThread implements ThreadChat {
 
   openReply(onOpenMessage: OpenMessageChange): Reply {
     const { identity } = this.options;
-    const places = (this.places ??= this.lease.take());
+    this.places ??= this.lease.take();
+    const places = this.places;
     const reply = new ReplySink(this.options.replies, {
       channel: this.channel,
       threadTs: this.threadTs,
