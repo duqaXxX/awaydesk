@@ -694,15 +694,14 @@ test("the thread status goes while an approval waits and comes back after it", a
   assert.ok(statuses(h).slice(waiting).includes(texts.THREAD_WORKING_STATUS));
 });
 
-test("a task that outlives its turn is counted by the thread status", async (t) => {
+test("a task that outlives its turn is not counted by the thread status", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harness(t, [{ turns: [first] }]);
   const session = h.session();
   await (await session.submit("start it")).done.wait();
-  const still = `${session.runningKinds} still running`;
-  await h.until(() => lines(h).at(-1) === still); // the turn ended: the prompt is back
-  assert.equal(statuses(h).at(-1), `has ${session.runningKinds} still running`);
+  await h.until(() => lines(h).at(-1) === ""); // the turn ended: nobody is owed an answer
   assert.ok(lines(h)[0] === texts.THREAD_WORKING && session.runningKinds !== "");
+  assert.ok(!statuses(h).join().includes("still running"));
   // The count is a state of the thread, never a line of the reply's stream.
   const told = h.slack.apiCalls.flatMap((call) => (call.args.chunks ?? []) as JsonObject[]);
   assert.ok(!JSON.stringify(told).includes("still running"));
@@ -710,11 +709,15 @@ test("a task that outlives its turn is counted by the thread status", async (t) 
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
   assert.deepEqual(openStreams(h), []);
   assert.equal(h.slack.pushes(), 1);
+  const before = lines(h).length;
   h.clients[0]?.inject([...notice, ...injected]);
   await h.until(() => h.slack.callsTo("chat.postMessage").length > 0);
-  // The report turn says `Working…` again, and the end of everything clears the status.
-  await h.until(() => lines(h).at(-1) === "");
-  assert.ok(lines(h).slice(lines(h).indexOf(still)).includes(texts.THREAD_WORKING));
+  // The report turn is the agent's own: the line stays as it was.
+  assert.ok(
+    lines(h)
+      .slice(before)
+      .every((line) => line === ""),
+  );
   assert.equal(h.slack.pushes(), 2); // the stop at the end of the turn, and the ending
 });
 
@@ -728,17 +731,15 @@ test("stop clears the thread status", async (t) => {
   await h.until(() => statuses(h).at(-1) === ""); // while the interrupt still winds down
 });
 
-test("a later reply that ended counts the task in its footer not in the status", async (t) => {
+test("a later reply that ended counts the task in its footer, the status says nothing", async (t) => {
   const [first] = splitBackground();
   const h = harness(t, [{ turns: [first, sdkMessages("tools")] }]);
   const session = h.session();
   await (await session.submit("start it")).done.wait();
-  const still = `${session.runningKinds} still running`;
-  await h.until(() => lines(h).at(-1) === still); // the only reply is open: no footer yet
+  await h.until(() => lines(h).at(-1) === ""); // the only reply is open: no footer yet
   await (await session.submit("list the files")).done.wait();
   await h.until(() => h.slack.callsTo("chat.stopStream").length === 1);
-  // The thread's last reply has ended: its footer says what still runs, and a status line
-  // under that footer would say it twice.
+  // The thread's last reply has ended: its footer says what still runs, the status line never.
   await h.until(() => lines(h).at(-1) === "");
   const [, second] = h.slack.streamTs;
   const last = h.slack.messages.get(second ?? "")?.blocks.at(-1);

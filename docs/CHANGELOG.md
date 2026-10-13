@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The thread's status line says `Working…` only while a message of the owner's has no finished
+  answer: being submitted, queued, taken, sent and not yet started, or its turn running. A turn
+  the agent starts on its own to report a task shows nothing, and the line never counts what still
+  runs (`1 shell still running` is gone from it; the footer counts). `Compacting conversation…`
+  still shows while any turn compacts. `Reply.footerShown` and `texts.STILL_RUNNING_STATUS` are
+  gone (#295).
+
 - A reply whose turn ends with background work still running rests: its stream is stopped at the
   end of the turn, with the footer under it (the stop is a push, and replaces the one the 280
   second stop made), and its message then changes by edit. A report that renders into it grows it

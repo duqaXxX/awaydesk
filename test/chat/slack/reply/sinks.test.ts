@@ -712,18 +712,15 @@ test("the ending follows the running counts by edits", async () => {
   assert.ok(slack.postedTs.length === 1 && slack.pushes() === 2); // an edit never pushes
 });
 
-test("a reply says its footer shows only once its end has landed", async () => {
+test("a reply whose end was refused lands it on the retry", async () => {
   const slack = new FakeSlack();
   const sink = reply(slack, { finalRetrySeconds: 0.02 });
   await sink.text("Done.");
   await sink.finish([], null);
-  assert.equal(sink.footerShown, false);
   slack.responses["chat.stopStream"] = [rejected("ratelimited"), { ok: true }];
   assert.equal(await sink.closeOutFormatted("footer"), false);
-  assert.equal(sink.footerShown, false); // no footer on Slack yet: the status line still counts
   await passed(0.02);
   assert.equal(await soon(sink.waitLanded()), true);
-  assert.equal(sink.footerShown, true);
 });
 
 test("the closing message text skips the daemon s own lines", async () => {
@@ -4241,7 +4238,6 @@ test("a reply overtaken after its stream stopped ends by one edit, with no post"
     { type: "divider" },
     contextBlock("main · ctx 6%"),
   ]);
-  assert.equal(sink.footerShown, true);
 });
 
 test("a reply with only an owner message below it still posts its ending", async () => {
@@ -4296,7 +4292,6 @@ test("an overtaken reply whose new content would overflow posts nothing", async 
     { type: "divider" },
     contextBlock("main · ctx 6%"),
   ]);
-  assert.equal(sink.footerShown, true, "the footer landed under the cut message");
 });
 
 test("an older reply does not post its ending below a newer one that was let go of", async () => {

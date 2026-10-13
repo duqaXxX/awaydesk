@@ -617,7 +617,6 @@ export function chatConformance(
         const reply = s.provider.thread(s.ref).openReply(() => {});
         await reply.settle();
         assert.equal(s.rig.read(s.ref).length, before);
-        assert.equal(reply.footerShown, false);
       });
 
       check("carries text, a task line and a footer to its end", async (s) => {
@@ -633,9 +632,7 @@ export function chatConformance(
           "the task line is shown while the reply runs",
         );
         await reply.finish([], FOOTER);
-        assert.equal(reply.footerShown, false, "the footer is not there before the end");
         assert.equal(await reply.closeOut(), true, "the end landed");
-        assert.equal(reply.footerShown, true);
         assert.equal(await reply.waitLanded(), true);
         assert.equal(await reply.settle(), true);
         const shown = s.rig.read(s.ref).filter((m) => m.text.includes("The build is finished"));
@@ -659,14 +656,12 @@ export function chatConformance(
         const shown = () => s.rig.read(s.ref).filter((m) => m.text.includes("Started a command"));
         assert.equal(shown().length, 1);
         assert.match(shown()[0]?.text ?? "", /model-a/, "the footer shows under the waiting reply");
-        assert.equal(reply.footerShown, false, "and the reply has not ended");
         await reply.text("\n\nThe command ended");
         await reply.finish([], FOOTER);
         await reply.settle();
         await s.rig.settle();
         assert.match(shown()[0]?.text ?? "", /The command ended/, "its report grows it");
         assert.equal(await reply.closeOut(), true);
-        assert.equal(reply.footerShown, true);
         // A provider may post the ending as a message of its own: the footer shows once.
         const all = s.rig.read(s.ref).filter((m) => /model-a/.test(m.text));
         assert.equal(all.length, 1, "the thread says the footer once");
@@ -677,7 +672,6 @@ export function chatConformance(
         await reply.text("An answer with no footer");
         await reply.finish([], null);
         assert.equal(await reply.closeOut(), true);
-        assert.equal(reply.footerShown, true);
       });
 
       check("shows what still runs after the footer, of the latest reply alone", async (s) => {
@@ -836,7 +830,6 @@ export function chatConformance(
         s.rig.refuseWrites();
         await reply.finish([], FOOTER);
         assert.equal(await reply.closeOut(), false);
-        assert.equal(reply.footerShown, false);
       });
 
       check("lets endReply end one a stop left unfinished", async (s) => {

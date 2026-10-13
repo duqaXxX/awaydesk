@@ -292,21 +292,19 @@ export const VERSION_PENDING = "started, version shown after the first turn";
 export const STATUS_BACKGROUND = "Background: `{counts}`";
 export const STATUS_WORKING = "Working in: `{directory}`";
 export const RUNNING = "⏳ {counts}";
-// Slack's status line under a thread's last message (issues #83 and #95). A client shows the
-// loading message: `THREAD_WORKING` while a prompt is on its way or a turn runs, and
-// `STILL_RUNNING` once the turn has ended and a task it started still runs, the words the
-// terminal ends such a turn with (`· 1 shell still running`, Claude Code 2.1.287, read
-// 2026-10-02), with no hourglass: an emoji draws large and grey in a status line (seen on
-// desktop, 2026-10-02). `THREAD_WORKING_STATUS` and
-// `STILL_RUNNING_STATUS` say the same after the app's name, which is what a
-// client that draws `<app name> <status>` shows (measured 2026-10-02, desktop and iOS).
+// Slack's status line under a thread's last message (issues #83 and #295). A client shows the
+// loading message: `THREAD_WORKING` while a prompt of the owner's is owed its answer.
+// `STILL_RUNNING` is the terminal's words for a task that outlives its turn (`· 1 shell still
+// running`, Claude Code 2.1.287, read 2026-10-02), with no hourglass: an emoji draws large and
+// grey in a status line (seen on desktop, 2026-10-02). `THREAD_WORKING_STATUS` says the same
+// after the app's name, which is what a client that draws `<app name> <status>` shows
+// (measured 2026-10-02, desktop and iOS).
 export const THREAD_WORKING = "Working…";
 // The terminal's words while it compacts (`Compacting conversation`, read in the CLI 2.1.292).
 export const THREAD_COMPACTING = "Compacting conversation…";
 export const THREAD_COMPACTING_STATUS = "is compacting the conversation…";
 export const STILL_RUNNING = "{counts} still running";
 export const THREAD_WORKING_STATUS = "is working…";
-export const STILL_RUNNING_STATUS = "has {counts} still running";
 export const ACTIVITY_BUSY = "running a turn, {queued} queued";
 // `!status` sent to the channel (top-level, or a thread that holds no session): the channel's
 // folder, then one line per live session, each with a link to its thread.

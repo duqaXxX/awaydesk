@@ -148,10 +148,8 @@ test("a reply is written in the thread to the owner and names its open message",
   assert.equal(start?.recipient_team_id, TEAM);
   assert.equal(start?.recipient_user_id, OWNER);
   assert.deepEqual(changes, [[null, replies.streamTs[0]]]); // what a crash would leave unfinished
-  assert.equal(reply.footerShown, false);
   assert.equal(await reply.closeOut(), true);
   assert.deepEqual(changes.at(-1), [replies.streamTs[0], null]);
-  assert.equal(reply.footerShown, true);
   assert.deepEqual(slack.streamTs, []); // the client made for replies wrote it, and no other
 });
 

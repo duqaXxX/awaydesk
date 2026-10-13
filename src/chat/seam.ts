@@ -164,11 +164,6 @@ export interface Reply extends ReplySink {
   setRunning(counts: string): void;
   /** Whether this is the thread's latest reply: an older one drops the counts, keeps its footer. */
   setLatest(latest: boolean): void;
-  /**
-   * Whether the reply's end has landed in the chat: its footer is then what says the running
-   * counts, and the thread's activity line does not repeat them.
-   */
-  readonly footerShown: boolean;
   /** Whether nothing of the owner's and no other reply sits below this reply in the thread. */
   readonly last: boolean;
   /** Whether another reply has a message below this one: it then ends where it is, by edit. */

@@ -744,11 +744,10 @@ as it does in the terminal: that reply opens with Claude Code's own line for the
 as `✓ Agent "review" finished · 3m 59s`. While tasks run, the footer counts them, such as
 `⏳ 1 shell · 1 agent`.
 
-From the moment you send a message until its turn ends, Slack shows `Working…` under the
-thread's last message. When the turn has ended and a command or an agent it started still
-runs, the same line reads `1 shell still running` and follows the count; the reply gets its
-footer once that task and its report have ended. If you sent another message meanwhile and its
-reply has ended, that reply's footer says it instead (`⏳ 1 shell`), until the command ends.
+From the moment you send a message until its answer has ended, Slack shows `Working…` under the
+thread's last message. A turn Claude Code starts on its own to report a task shows no line, and
+the line never counts what still runs: the footer does (`⏳ 1 shell`), until the command ends.
+The reply gets its footer once that task and its report have ended.
 The line goes while an approval or a question waits for you. Slack's clients draw it, and the
 iOS app can show none for a thread that Slack on desktop already has open: with desktop closed,
 or with the thread opened on iOS first, it shows on both (seen on 2026-10-04, five runs read by
@@ -939,7 +938,7 @@ earlier manifest lacks it: add `file_change` under **Event Subscriptions**, **Su
 events**, and save. Without it a clip waits 5 minutes and is dropped, since nothing tells the
 app that its transcript is ready.
 
-The line under a thread (`Working…`, `1 shell still running`) is Slack's thread status
+The line under a thread (`Working…`) is Slack's thread status
 (`assistant.threads.setStatus`), which Slack's reference lists under `chat:write`. When Slack
 refuses it, the refusal is logged and the line is skipped.
 

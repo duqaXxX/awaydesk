@@ -663,14 +663,6 @@ export class ReplySink implements Sink {
     if (this.closedOut) this.changed();
   }
 
-  /**
-   * Whether the reply's end has landed on Slack: its footer is then what says the running
-   * counts, and no status line under it repeats them.
-   */
-  get footerShown(): boolean {
-    return this.ended && this.messages.length > 0;
-  }
-
   /** The position of the reply's last message in its thread, null while it has none. */
   get lastAt(): number | null {
     // A closing message that was deleted still marks where the reply sat: a reply never moves up.

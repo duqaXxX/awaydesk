@@ -115,10 +115,6 @@ class MemoryReply implements Reply, Placed {
     if (this.#drawsFooter) this.#write();
   }
 
-  get footerShown(): boolean {
-    return this.#landed && this.#message !== null;
-  }
-
   // A reply is one message that never moves, so it ends where it is whatever sits below it.
   get last(): boolean {
     if (this.#message === null) return false;

@@ -397,19 +397,19 @@ export class ThreadSession {
 
   /**
    * What the thread's activity line says, empty for nothing, and the same after the app's
-   * name. `Working…` while a prompt is on its way to the agent or a turn runs (issue #83),
-   * `Compacting conversation…` while that turn compacts, in the terminal's words (issue #169).
-   * Once the turn has ended, what it left running (`1 shell still running`, issue #95): a count
-   * that changes cannot live in a reply, whose stream only grows. Nothing while an approval, a
-   * question or a hold waits on the owner, while `!stop` winds a turn down, and once the
-   * session is closed.
+   * name. `Working…` while a prompt of the owner's is owed its answer (`promptOwed`), however
+   * long its turn takes (issue #83), `Compacting conversation…` while any turn compacts, in the
+   * terminal's words (issue #169). A turn the agent starts to report a task owes nobody an
+   * answer and says nothing, and the line never counts what still runs: the footer does (issue
+   * #295). Nothing while an approval, a question or a hold waits on the owner, while `!stop`
+   * winds a turn down, and once the session is closed. A restart waiting on tasks says which.
    */
   private threadLine(): readonly [text: string, afterName: string] {
     if (this.closedFlag || this.waitingForOwner || this.interrupting) return ["", ""];
-    if (this.busy || this.taken !== null || !this.queue.empty) {
-      if (this.compacting) return [texts.THREAD_COMPACTING, texts.THREAD_COMPACTING_STATUS];
-      return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
+    if (this.compacting && (this.busy || this.promptOwed())) {
+      return [texts.THREAD_COMPACTING, texts.THREAD_COMPACTING_STATUS];
     }
+    if (this.promptOwed()) return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
     const held = this.draining ? this.runningKindsOf({ awaitedOnly: true }) : "";
     if (held) {
       // A stop that only background tasks hold: said here whatever the footer shows, since
@@ -420,16 +420,23 @@ export class ThreadSession {
         texts.fill(texts.RESTART_WAITS_STATUS, { counts: held }),
       ];
     }
-    const kinds = this.runningKindsOf();
-    if (!kinds || (this.latest?.footerShown ?? false)) {
-      // Nothing runs, or the end of the thread's last reply is in the chat: its footer counts
-      // them, and a second line under a footer would say the same twice.
-      return ["", ""];
-    }
-    return [
-      texts.fill(texts.STILL_RUNNING, { counts: kinds }),
-      texts.fill(texts.STILL_RUNNING_STATUS, { counts: kinds }),
-    ];
+    return ["", ""];
+  }
+
+  /**
+   * A prompt of the owner's has no finished answer: it is being submitted, queued, taken by the
+   * worker, sent and not yet started, or its turn runs. A prompt leaves `sent` when its turn
+   * starts, in the step that sets `active`, so neither alone covers it; `active.turn` is null for
+   * a turn the agent started itself.
+   */
+  private promptOwed(): boolean {
+    return (
+      this.pendingSubmits > 0 ||
+      !this.queue.empty ||
+      this.taken !== null ||
+      this.sent.length > 0 ||
+      this.active?.turn != null
+    );
   }
 
   /**
