@@ -147,7 +147,8 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   banner is still the start of the text. When there is no such text to move, the line itself is the
   ending that moves, with whatever follows it, and is the banner. A process lost while no turn is
   active is told by what the session still owed: a reply that waited for a background task of its
-  own gets the same line, then ends as above, and the root shows ❌; a session with nothing running
+  own gets the same line, which counts as text since it rested, so its ending is posted as above,
+  and the root shows ❌; a session with nothing running
   and nothing waiting gets no line and keeps the reaction it had, since its last reply ended well
   and the next message connects a new process. The sink keeps it as a part of its own
   (`ReplySink.text` with `ending`, fed by `TurnRenderer.feedEnding`), so a notice written just
@@ -167,8 +168,8 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   repeat the old text as the newest in the thread. A task's end line or a card update is not such
   text; a report's text is. A reply with another reply below it opens no continuation either:
   what does not fit the message is cut, as a card's text is, and a warning is logged once. A reply
-  that is still writing its turn when the owner writes, or that rested and then got a report,
-  posts its ending as above.
+  that is still writing its turn when the owner writes posts its ending, unless it then rests and
+  gets no text before it ends; one that rested and then got a report posts its ending as above.
   `SlackChat` keeps one `ThreadPlaces` (`reply/places.ts`) per channel and thread, shared by every
   `SlackThread` of it and in memory only. A `SlackThread` takes it at its first reply and gives it
   back at its close; it lives while one is open, and after the last give-back while a reply is

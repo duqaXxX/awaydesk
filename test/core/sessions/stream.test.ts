@@ -191,6 +191,22 @@ test("a process lost while a task runs says so in the reply that waits for it", 
   assert.ok(h.slack.streamTs.length === 1 && h.slack.pushes() === 2);
 });
 
+test("a process lost under a command of the owner's says so in a message at the bottom", async (t) => {
+  const [first] = splitBackground();
+  const h = harness(t, [{ turns: [first] }]);
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
+  await session.status(); // a message of the owner's below the waiting reply
+  const created = h.slack.createdTs.length;
+  const pushes = h.slack.pushes();
+  h.clients[0]?.inject([END_OF_STREAM]);
+  await h.until(() => h.reactions().at(-1) === Status.ERROR);
+  assert.equal(h.slack.createdTs.length, created + 1, "the line is a new message at the bottom");
+  assert.match(h.slack.messageTexts().at(-1) ?? "", /Claude Code reported an error/);
+  assert.equal(h.slack.pushes(), pushes + 1);
+});
+
 test("a process lost after its task was reported changes nothing in the thread", async (t) => {
   // The reply of a task that ended and was reported is still tracked while the process lives:
   // it has closed with its footer, so it waits for nothing and is left as it is.

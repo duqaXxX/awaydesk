@@ -12,8 +12,9 @@ All notable changes to this project are documented here. The format follows
   no text of Claude's was written to it since it rested: its footer goes under that message, or on
   the stream's stop. A task's end line or a card update is not such text; a report's text is. A
   reply that has another reply below it opens no continuation message either. A reply still
-  writing its turn when the owner writes, and one that rested and then received a report, post
-  their ending as before (#295).
+  writing its turn when the owner writes posts its ending, unless it then rests and receives no
+  text before it ends; one that rested and then received a report, or the line of a lost process,
+  posts its ending as before (#295).
 
 - The report of a background task renders into the reply that started the task only while that
   reply is the last thing in the thread; with a message of the owner's or another reply's below
@@ -1647,11 +1648,11 @@ All notable changes to this project are documented here. The format follows
 - A skill that runs in a forked context, typed as a command (`!review`), showed nothing but
   `Claude is writing…` while it worked, then its line once it had ended. Its task starts before
   the turn's first message and was held until then; the owner's turn now starts at a task that
-  no call started, so its line (`⏳ /review`) shows while it works. Its agent's calls are not
+  no call started, so its line (`/review`) shows as a card in progress while it works. Its agent's calls are not
   streamed by Claude Code in this case, so the line carries no call count. The new
   `skill-fork-command` stream in `tests/fixtures/sdk/` records it. A task started by a call
   inside a background subagent now goes to the reply that holds that subagent. An agent the
-  command starts inside it shows on the command's line (`⏳ /review · 1 call`, then `⎿ Run the tests`)
+  command starts inside it shows on the command's line (`/review · 1 call`, then `⎿ Run the tests`)
   instead of a second running line.
 - D6 minimum: a Resume click or `!resume <id or name>` that names a session already open in
   another thread of any channel is refused, with a new text, instead of resuming it a second
@@ -1725,8 +1726,8 @@ All notable changes to this project are documented here. The format follows
   What a running line is doing now (a subagent's latest call, a command's latest agent,
   `Running in background`) shows on a line below it, indented under `⎿` as in the terminal,
   instead of after a `·` on the same line.
-- Every line of something still running (a call, a subagent, a task, a skill) is marked `⏳`,
-  as the footer marks running tasks, in place of `…`, which did not read as running.
+- Every line of something still running (a call, a subagent, a task, a skill) is a card in
+  progress, in place of `…`, which did not read as running.
 
 ### Added
 

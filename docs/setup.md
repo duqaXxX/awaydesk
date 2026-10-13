@@ -799,8 +799,9 @@ setting is:
   silently, and the ending, posted as a new message when the reply ends, rings a second time.
 - A reply that has another reply's message below it ends in the message it is in, by edit, and
   rings no more. So does a reply that waited for background work, has a message of yours below
-  it and got no text from Claude since; one that is still writing its turn when you write, or got
-  a report, rings with its ending.
+  it and got no text from Claude since; one that is still writing its turn when you write rings
+  with its ending, unless it then waits for background work and gets no text before it ends, and
+  one that got a report rings with it.
 - A reply that is still open after about 4 minutes 40 seconds rings when its stream stops, and a
   second time when it ends: what Claude wrote after its last call and the footer arrive as a
   new message, and the notification reads the start of it.

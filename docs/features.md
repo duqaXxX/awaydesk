@@ -155,7 +155,8 @@ So, inside a thread:
 - A reply that has another reply's message below it ends in the message it is in, by edit, with no
   new post and no ring. So does a reply that rested for background work, has a message of the
   owner's below it and got no text of Claude's since; one still writing its turn when the owner
-  writes, or that got a report, posts its ending.
+  writes posts its ending, unless it then rests and gets no text before it ends, and one that got
+  a report posts it.
 - A reply still open 280 seconds after it started stops its stream then (Slack would close it at
   300 seconds), which rings, and goes on in the same message by `chat.update`, silently. A reply
   that rested has stopped its stream already. Its end

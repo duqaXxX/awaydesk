@@ -5029,6 +5029,24 @@ test("a rested reply that received the agent's words since posts its ending", as
   assert.equal(slack.callsTo("chat.postMessage").length, 1);
 });
 
+test("the words of an earlier rest do not make the ending post after a later one", async () => {
+  const slack = new FakeSlack();
+  slack.tsStep = 10;
+  const places = new ThreadPlaces();
+  const [sink] = await finishedReply(slack, 0, { places });
+  sink.rest();
+  await settled();
+  await sink.text("\n\nThe first report."); // grows the message by edit
+  await sink.finishFormatted([], "footer");
+  sink.rest(); // it still owes a second task
+  await settled();
+  places.ownerPosted(slack.ownerTs());
+  const pushes = slack.pushes();
+  assert.equal(await sink.closeOutFormatted("footer"), true);
+  assert.deepEqual(slack.callsTo("chat.postMessage"), []);
+  assert.equal(slack.pushes(), pushes);
+});
+
 test("a reply still writing its turn when the owner writes posts its ending", async () => {
   const slack = new FakeSlack();
   slack.tsStep = 10;
@@ -5111,6 +5129,20 @@ test("a refused rest stop is tried again after the retry pause, with no other ch
   await settled();
   assert.equal(slack.callsTo("chat.stopStream").length, 2);
   assert.equal(slack.messages.get(slack.streamTs[0] ?? "")?.streaming, false);
+});
+
+test("a retry whose stop and whose append both fail is logged once", async () => {
+  const slack = new FakeSlack();
+  const logger = new Recorded();
+  const [sink] = await finishedReply(slack, 0, { finalRetrySeconds: 0.05, logger });
+  slack.responses["chat.stopStream"] = networkDown();
+  slack.responses["chat.appendStream"] = networkDown();
+  sink.rest();
+  await settled();
+  await sink.text(" More."); // an append waits for the retry too
+  await passed(0.2);
+  await settled();
+  assert.equal(logger.lines.filter((line) => line.message.includes("tried twice")).length, 1);
 });
 
 test("a rest stop refused twice is logged as given up", async () => {

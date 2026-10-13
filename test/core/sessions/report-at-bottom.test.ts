@@ -123,6 +123,7 @@ test("a reply with a command of the owner's below it ends where it is when the n
   const h = harnessFor(t)({ turns: [first] });
   const session = h.session();
   await (await session.submit("start it")).done.wait();
+  await h.until(() => h.slack.callsTo("chat.stopStream").length > 0); // the rest's stop landed
   await session.status(); // a message of the owner's below the waiting reply, no reply of its own
   const before = h.slack.createdTs.length;
   const posts = h.slack.callsTo("chat.postMessage").length;

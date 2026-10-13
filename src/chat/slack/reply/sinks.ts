@@ -501,6 +501,8 @@ export class ReplySink implements Sink {
   private settling = false;
   /** The retry of a write after the end is running its pass. */
   private retrying = false;
+  /** The retry in flight already logged that it gave up. */
+  private gaveUpLogged = false;
   /** The cut of an overtaken reply was logged: once is enough. */
   private cutWarned = false;
   // Resolves once the reply is known to have ended on Slack (true) or its one retry failed too
@@ -625,7 +627,9 @@ export class ReplySink implements Sink {
     const ending = options.ending ?? false;
     const notice = (options.notice ?? false) || ending;
     if (!blank(markdown)) this.fold.text();
-    if (this.restRequested && !notice && !blank(markdown)) this.reportedSinceRest = true;
+    // The line a lost process writes (a notice that is an ending) is new text, and the last.
+    if (this.restRequested && (!notice || ending) && !blank(markdown))
+      this.reportedSinceRest = true;
     const last = this.parts.at(-1);
     if (last instanceof Text && last.notice === notice && last.ending === ending) {
       last.text += markdown;
@@ -754,6 +758,8 @@ export class ReplySink implements Sink {
   rest(): void {
     const first = !this.restRequested;
     this.restRequested = true;
+    // "Since it rested" is measured from the latest rest: an earlier report is old text.
+    this.reportedSinceRest = false;
     // The reply may already be at rest (its stream gone): the placement says what it shows.
     this.places.place();
     // Called again while the stream is still open, the stop is tried again: it failed before.
@@ -2270,6 +2276,7 @@ export class ReplySink implements Sink {
         await this.clock.sleep(this.finalRetrySeconds, signal);
         // Shielded like the final write: a pass given up after Slack took it would lose its result.
         this.retrying = true;
+        this.gaveUpLogged = false;
         if (!(await this.flush())) this.warnGaveUp();
       } finally {
         this.retrying = false;
@@ -2281,6 +2288,9 @@ export class ReplySink implements Sink {
 
   /** The retry of a write after the end failed too: the next change of the reply writes it. */
   private warnGaveUp(): void {
+    // Once per retry: its stop and its append may both fail.
+    if (this.gaveUpLogged) return;
+    this.gaveUpLogged = true;
     this.logger.warning(
       "could not bring a reply's footer to the thread once it rested or ended, tried twice: " +
         "the next change of the reply writes it",
