@@ -1,17 +1,34 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { type Placed, positionOf, ThreadPlaces } from "../../../../src/chat/slack/reply/places.ts";
+import type { Tail } from "../../../../src/core/port.ts";
 
 interface Reply extends Placed {
   lastAt: number | null;
+  resting: boolean;
+  ownFooter: string | null;
+  /** The tails handed to it, in order. */
+  assigned: Tail<string>[];
 }
 
-function reply(ts: string | null): Reply {
-  return { lastAt: ts === null ? null : positionOf(ts) };
+function reply(ts: string | null, ownFooter: string | null = null): Reply {
+  const made: Reply = {
+    lastAt: ts === null ? null : positionOf(ts),
+    resting: false,
+    ownFooter,
+    assigned: [],
+    assign: (tail) => made.assigned.push(tail),
+  };
+  return made;
 }
 
-function joined(places: ThreadPlaces, ts: string | null): Reply {
-  const made = reply(ts);
+/** The footer a reply was last handed. */
+function footerOf(reply: Reply): string | null {
+  return reply.assigned.at(-1)?.footer ?? null;
+}
+
+function joined(places: ThreadPlaces, ts: string | null, footer: string | null = null): Reply {
+  const made = reply(ts, footer);
   places.join(made);
   return made;
 }
@@ -127,5 +144,83 @@ describe("ThreadPlaces", () => {
     places.closed(second);
     assert.equal(places.held, false);
     assert.deepEqual(left, [1, 1]);
+  });
+
+  test("the lowest resting reply of a stretch is handed the footer, and the others none", () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001", "upper");
+    const lower = joined(places, "1760000002.000001", "lower");
+    upper.resting = true;
+    places.ended(upper);
+    assert.equal(footerOf(upper), "upper");
+    lower.resting = true;
+    places.ended(lower);
+    assert.equal(footerOf(upper), null);
+    assert.equal(footerOf(lower), "lower");
+  });
+
+  test("an owner message cuts the thread into stretches of one footer each", () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001", "upper");
+    places.ownerPosted("1760000002.000001");
+    const lower = joined(places, "1760000003.000001", "lower");
+    upper.resting = true;
+    lower.resting = true;
+    places.ended(upper);
+    places.ended(lower);
+    assert.equal(footerOf(lower), "lower");
+    assert.equal(places.holds(upper), false, "let go of, with the footer it was handed");
+    assert.equal(footerOf(upper), "upper");
+  });
+
+  test("an ended reply stays while a reply above the next owner message is still to end", () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001", "upper");
+    const lower = joined(places, "1760000002.000001", "lower");
+    upper.resting = true;
+    places.ended(upper);
+    places.ownerPosted("1760000003.000001");
+    assert.equal(places.holds(upper), true, "the lower reply may still take its footer");
+    lower.resting = true;
+    places.ended(lower);
+    assert.equal(footerOf(upper), null, "it was told before it was let go of");
+    assert.equal(places.holds(upper), false);
+    assert.equal(places.holds(lower), false);
+  });
+
+  test("a reply with no message yet does not keep an ended one", () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001", "upper");
+    joined(places, null);
+    upper.resting = true;
+    places.ended(upper);
+    places.ownerPosted("1760000002.000001");
+    assert.equal(places.holds(upper), false, "it will land below the owner message");
+  });
+
+  test("tailIf is the tail a reply would be handed if it rested now", () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001", "upper");
+    const lower = joined(places, "1760000002.000001", "lower");
+    lower.resting = true;
+    places.ended(lower);
+    assert.equal(places.tailIf(upper).footer, null, "the lower one holds the stretch's footer");
+    assert.equal(places.tailIf(lower).footer, "lower");
+    const bare = joined(places, null, "bare");
+    assert.equal(places.tailIf(bare).footer, "bare", "unplaced, it lands below everything");
+  });
+
+  test("a reply that moved is placed again", () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001", "upper");
+    const lower = joined(places, "1760000002.000001", "lower");
+    upper.resting = true;
+    lower.resting = true;
+    places.ended(upper);
+    places.ended(lower);
+    upper.lastAt = positionOf("1760000003.000001"); // its ending was posted below the lower one
+    places.moved(upper);
+    assert.equal(footerOf(upper), "upper");
+    assert.equal(footerOf(lower), null);
   });
 });

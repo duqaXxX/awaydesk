@@ -31,6 +31,7 @@ import {
 import {
   footerWrites,
   inside,
+  isReport,
   nestedBackgroundEndingMidTurn,
   pending,
   splitBackground,
@@ -737,4 +738,69 @@ test("closing a session clears the thread status", async (t) => {
   await h.until(() => statuses(h).length > 0);
   await session.close();
   assert.equal(statuses(h).at(-1), "");
+});
+
+/** The footer each message of the thread shows, by creation: null when it shows none. */
+function footersOf(h: Harness): Array<string | null> {
+  return h.slack.createdTs.map((ts) => {
+    const blocks = h.slack.messages.get(ts)?.blocks ?? [];
+    const [divider, context] = blocks.slice(-2);
+    if (divider?.type !== "divider" || context?.type !== "context") return null;
+    const element = Array.isArray(context.elements) ? context.elements[0] : null;
+    return typeof element === "object" && element !== null && !Array.isArray(element)
+      ? String(element.text)
+      : null;
+  });
+}
+
+test("a thread with an owner prompt between its replies shows one footer per stretch, under the last reply of each", async (t) => {
+  // The recorded background run, with a prompt answered while the command runs: the report goes
+  // to the bottom, in the stretch of the prompt's reply.
+  const [first, notice, injected] = splitBackground();
+  const h = harness(t, [{ turns: [first, sdkMessages("foreground")] }]);
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await (await session.submit("and now?")).done.wait();
+  h.clients[0]?.inject([...notice, ...injected]);
+  await h.until(() => h.replies().some(isReport));
+  await h.idle();
+  await h.sleep(5);
+  const texts = h.replies();
+  assert.equal(texts.findIndex(isReport), 2, texts.join("\n---\n"));
+  // [the first reply] | owner | [the answer, the report]
+  assert.deepEqual(
+    footersOf(h).map((footer) => footer !== null),
+    [true, false, true],
+  );
+});
+
+test("a report that starts while the owner's prompt has no message yet leaves one footer in the stretch below it", async (t) => {
+  // Task 3's carried sequence: the reply H waits on a task, the notification arrives, the owner's
+  // message is told to the places and submitted (its reply has no message yet), then the report
+  // turn starts: H is no longer last, so the report opens a reply below the owner's message, and
+  // the prompt's reply writes below it. The thread reads H, owner, report, prompt's reply.
+  const [first, notice, injected] = splitBackground();
+  const h = harness(t, [{ turns: [first, sdkMessages("foreground")] }]);
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  h.clients[0]?.inject(notice);
+  await h.idle();
+  const prompt = session.submit("and now?");
+  h.clients[0]?.inject(injected);
+  await h.idle();
+  await (await prompt).done.wait();
+  await h.idle();
+  await h.sleep(5);
+  const texts = h.replies();
+  assert.equal(texts.findIndex(isReport), 1, texts.join("\n---\n"));
+  const footers = footersOf(h);
+  assert.deepEqual(
+    footers.map((footer) => footer !== null),
+    [true, false, true],
+    "one footer for the first stretch and one under the prompt's reply",
+  );
+  assert.ok(
+    footers.every((footer) => !footer?.includes("⏳")),
+    "no count of running tasks in the middle of the thread",
+  );
 });

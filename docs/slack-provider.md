@@ -153,10 +153,14 @@ started, whichever comes first. Slack closes a stream 5 minutes after `chat.star
   either: what does not fit the message is cut, as a card's text is, and a warning is logged once.
   An owner message below the reply does not change this; its ending is posted as above.
   `SlackChat` keeps one `ThreadPlaces` (`reply/places.ts`) per channel and thread, shared by every
-  `SlackThread` of it and in memory only. A `ReplySink` registers with it when it is built and
+  `SlackThread` of it and in memory only. A `SlackThread` takes it at its first reply and gives it
+  back at its close; it lives while one is open, and after the last give-back while a reply is
+  registered with it, so a reply let go of by an owner message is still found by the next one. A
+  `ReplySink` registers with it when it is built and
   tells it where its last message moved; the listener tells it the `ts` of every message the owner
   wrote in the thread (`SlackChat.ownerPosted`), also one the prompt filter drops. A reply is let
-  go of once its end has landed and an owner message sits below it, or the `SlackThread` that
+  go of once its end has landed and an owner message sits below it with no reply of its stretch
+  still to end (that reply may take the stretch's footer), or the `SlackThread` that
   opened it closed; the highest position of a reply let go of stays in the places, so the answers
   do not change when it goes. A `SlackThread` lets go only of the replies it opened. The places
   hold a lock for the creation of a message of any reply of the thread (a stream's start, a
@@ -164,6 +168,20 @@ started, whichever comes first. Slack closes a stream 5 minutes after `chat.star
   two replies cannot each decide on the other's absence. A restart forgets the places: the
   messages written before it are unknown and a footer they show stays where it is. A continuation
   planned before the reply was overtaken and not yet posted is dropped.
+- **One footer between two owner messages.** The footer is placed by position
+  (`ThreadPlaces.place`, from `tails` of the core): in each stretch of a thread between two
+  messages of the owner, the lowest reply whose end has landed shows the footer, and every reply
+  above it in the stretch shows none. The footer is the latest one a turn of the stretch left, so
+  a lower reply whose turn had none shows the upper one's line. A reply writes its end with the
+  footer it would be handed (`ThreadPlaces.tailIf`); once the end has landed the places hand it
+  the footer (`ReplySink.assign`), and a change is written by a silent edit, or by the stop of a
+  stream that is still open. A reply that gives its footer up while its last message is a closing
+  message that held the footer alone has that message deleted with `chat.delete`; the reply stays
+  ended and no second closing message is posted. A footer assigned to it later is drawn under its
+  last body message. A delete that Slack refuses is logged, leaves the footer where it is and is
+  tried once more after `sinks.FINAL_RETRY_SECONDS`; `message_not_found` counts as deleted. A
+  write after the end that fails is tried once more the same way. `ReplySink.withdrawFooter` does
+  nothing.
 
 ### Message limits and continuation
 
@@ -201,8 +219,8 @@ every turn and after `ThreadSession.expireInjectedTurn`, ends every other reply 
 turn Claude Code starts on its own to report a background task renders into the reply of the
 first of the ended tasks (then of the task the agent named) whose reply is still tracked, not
 ended and the last thing in the thread (`ThreadSession.openingTarget`, `Reply.last`). When none
-is, the report gets a reply of its own at the bottom, and the reply above it gives its footer up
-once the report has ended with one (`ThreadSession.newReportReply`). A reply that ends with
+is, the report gets a reply of its own at the bottom (`ThreadSession.newReportReply`), and the
+footer goes to the lowest reply of the stretch (see "One footer between two owner messages"). A reply that ends with
 another reply below it (`Reply.overtaken`) because no report came is logged at INFO. An owner's next prompt takes no
 footer away.
 
@@ -245,15 +263,10 @@ estimate of what Slack stores, so a refusal remains possible; it is logged with 
 knew and no content. When Slack refuses an update of any message for its content, the change is
 dropped and the message shows less than the model: unless a later update of it passes, the reply's
 end counts as not landed and the root shows ❌. The update that only folds the cards of a stream sent
-all of its span is the exception, since nothing of the reply is missing. Every reply that has ended
-keeps its footer, the record of how its last turn ended; only the thread's latest reply adds the
-counts of what still runs to it (`Reply.setLatest`). One reply gives its footer up
-(`Reply.withdrawFooter`): the one right above a report of a background task that has a reply of its
-own, once that report has ended with a footer. Two replies of the daemon's in a row, with no
-message of the owner's between them, show one footer, the last; the reply above is the thread's
-latest when the report opens, whether or not it is the one that started the task. `ReplySink.withdrawFooter` takes it out by an edit, which does not notify, where the footer
-shares its message with the reply's content; a closing message that is the footer alone keeps it,
-since the edit would leave it empty. A card left `in_progress` in a stopped message
+all of its span is the exception, since nothing of the reply is missing. Each stretch of the thread between two owner
+messages shows one footer, on its lowest reply that has ended (see "One footer between two owner
+messages"); only the thread's latest reply adds the counts of what still runs to it
+(`Reply.setLatest`). A card left `in_progress` in a stopped message
 is stored as an error until it is updated (measured: "Open card stored as error"), so every end
 closes its cards first.
 

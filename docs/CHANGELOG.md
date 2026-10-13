@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The Slack provider places the reply footer by position: in each stretch of a thread between two
+  messages of the owner, one footer, under the lowest reply whose end has landed. A reply that
+  gives its footer up takes it off by a silent edit, and a closing message that held the footer
+  alone is deleted (`chat.delete`; one that fails is tried once more after
+  `FINAL_RETRY_SECONDS`, and `message_not_found` counts as deleted). `Reply.withdrawFooter` does
+  nothing in the provider from now on. The thread's places live while a thread object that opened
+  a reply in them is open, so a reply let go of by an owner message is still found by the next one
+  (#295).
+
 - The report of a background task renders into the reply that started the task only while that
   reply is the last thing in the thread; with a message of the owner's or another reply's below
   it, the report opens a reply of its own at the bottom (#295). A reply left overtaken that ends

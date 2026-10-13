@@ -47,7 +47,7 @@
 import { isDeepStrictEqual } from "node:util";
 import type { WebClient } from "@slack/web-api";
 import { type Clock, systemClock } from "../../../clock.ts";
-import { cancellable, Fold, Mutex, shownPreview } from "../../../core/port.ts";
+import { cancellable, Fold, Mutex, shownPreview, type Tail } from "../../../core/port.ts";
 import { blank, strip } from "../../../text.ts";
 import type { FooterFields, ReplySink as Sink, TaskUpdate } from "../../seam.ts";
 import { formatFooter } from "../footer.ts";
@@ -104,6 +104,11 @@ import type { Limiter } from "./limiter.ts";
 import { bannerText, markdownBlocks, markdownCut, plainWords } from "./markdown.ts";
 import { positionOf, ThreadPlaces } from "./places.ts";
 import { Task } from "./tasks.ts";
+
+/** What `chat.delete` answers for a message that is not there: it counts as deleted. */
+const MESSAGE_NOT_FOUND = "message_not_found";
+
+const isDivider = (block: Block): boolean => block.type === "divider";
 
 export const DEBOUNCE_SECONDS = 1.0;
 // The final write has no next rewrite to fix it: one that fails for any reason but its content
@@ -460,6 +465,11 @@ export class ReplySink implements Sink {
   private readonly lock = new Mutex();
   private finished = false;
   private footer: string | null = null;
+  /**
+   * What the thread's places last handed this reply to show under its last message. Read once
+   * the end has landed; before, `tail` asks the places what it would be.
+   */
+  private assigned: Tail<string> = { footer: null, running: false };
   private running = "";
   private latest = true;
   /** Whether closeOut has run; a second call is a no-op. */
@@ -477,6 +487,10 @@ export class ReplySink implements Sink {
   /** The ts of the closing message, once posted. */
   private closing: string | null = null;
   private closingShown: Block[] = [];
+  /** The closing message was deleted: the footer, if one is assigned again, goes under the body. */
+  private closingGone = false;
+  /** One more try of a write after the end, when a pass failed (the final write's retry). */
+  private tailRetry: Task<void> | null = null;
   /** The cut of an overtaken reply was logged: once is enough. */
   private cutWarned = false;
   // Resolves once the reply is known to have ended on Slack (true) or its one retry failed too
@@ -574,7 +588,11 @@ export class ReplySink implements Sink {
    * still running.
    */
   private settleOpenReply(): void {
-    this.ended = true;
+    if (!this.ended) {
+      // What the end wrote is what it shows now: the places only hand over a change of it.
+      this.assigned = this.places.tailIf(this);
+      this.ended = true;
+    }
     this.places.ended(this);
     this.retrack();
   }
@@ -646,7 +664,8 @@ export class ReplySink implements Sink {
 
   /** The position of the reply's last message in its thread, null while it has none. */
   get lastAt(): number | null {
-    const ts = this.closing ?? this.messages.findLast((message) => message.ts !== null)?.ts ?? null;
+    const closing = this.closingGone ? null : this.closing;
+    const ts = closing ?? this.messages.findLast((message) => message.ts !== null)?.ts ?? null;
     return ts === null ? null : positionOf(ts);
   }
 
@@ -670,19 +689,29 @@ export class ReplySink implements Sink {
     if (this.closedOut) this.changed();
   }
 
-  /**
-   * Take the footer back from a reply that has ended: the reply under it, a report of a
-   * background task, ended with one. Written by a silent edit, as the counts are. Only where
-   * the footer shares its message with the reply's own content ("inline" on the stream's stop,
-   * "moved" under the reply's ending): a closing message that is the footer alone would be left
-   * empty, so that one keeps it.
-   */
-  withdrawFooter(): void {
-    if (!this.closedOut || this.footer === null) return;
-    if (this.endMode !== "inline" && this.endMode !== "moved") return;
-    this.footer = null;
-    this.changed();
+  /** Its end has landed on Slack: it is an entry of the thread's tails. */
+  get resting(): boolean {
+    return this.ended;
   }
+
+  /** The footer its turn left, formatted; null when that turn had none. */
+  get ownFooter(): string | null {
+    return this.footer;
+  }
+
+  /**
+   * What this reply shows under its last message from now on, as the thread's places worked it
+   * out. A change is written unless the last message is a stream, which the reply's end stops.
+   * The running list of the tail is not drawn yet.
+   */
+  assign(tail: Tail<string>): void {
+    const moved = tail.footer !== this.assigned.footer;
+    this.assigned = tail;
+    if (moved && this.messages.at(-1)?.streaming !== true) this.changed();
+  }
+
+  /** The footer is the places' to give: where it sits decides, and nothing withdraws it. */
+  withdrawFooter(): void {}
 
   /**
    * End the reply's body: what was written is sent now, not at the next debounce. A card still
@@ -720,6 +749,7 @@ export class ReplySink implements Sink {
     if (this.closedOut) return this.landedValue === true;
     this.closedOut = true;
     this.footer = footer;
+    this.places.place();
     // The end is its own task, shielded from the caller: a caller that stops waiting while Slack
     // takes the write (a timer, a turn starting, a shutdown) must not leave `landed` unresolved
     // with no retry, which no later `closeOut` could repair.
@@ -788,6 +818,7 @@ export class ReplySink implements Sink {
       await cancellable(this.ending.settled(), signal);
     }
     this.retry?.cancel();
+    this.tailRetry?.cancel();
     const ok = await cancellable(this.flush(), signal);
     if (this.closedOut && this.landedValue === null) this.resolve(ok);
     return ok || this.landedValue === true;
@@ -816,7 +847,12 @@ export class ReplySink implements Sink {
         // Shielded: `finish` cancels a pending write, and a write given up after Slack took it
         // would lose the message's ts. `finish` waits for the lock instead.
         const ok = await this.flush();
-        if (signal.aborted || !ok) return;
+        if (signal.aborted) return;
+        if (!ok) {
+          // A write after the end that failed is tried once more: no later change may come.
+          if (this.landedValue === true) this.retryLater();
+          return;
+        }
         if (this.version === version) return;
         // The reply changed again while that call wrote or waited its turn, in a way it never
         // saw: another debounce, then flush again, so it still catches up rather than waiting
@@ -880,7 +916,7 @@ export class ReplySink implements Sink {
    * runs; empty when there is nothing to show.
    */
   private closingBlocks(): Block[] {
-    const lastLine = [this.footer, this.latest ? this.running : ""]
+    const lastLine = [this.tail().footer, this.latest ? this.running : ""]
       .filter((piece) => piece)
       .join(" · ");
     if (!lastLine) return [];
@@ -894,11 +930,16 @@ export class ReplySink implements Sink {
   private footerOf(message: Message): Block[] {
     if (
       message === this.messages.at(-1) &&
-      (this.endMode === "inline" || this.endMode === "moved")
+      (this.endMode === "inline" || this.endMode === "moved" || this.closingGone)
     ) {
       return this.closingBlocks();
     }
     return [];
+  }
+
+  /** What the reply shows under its last message: assigned once it rests, else what it would be. */
+  private tail(): Tail<string> {
+    return this.ended ? this.assigned : this.places.tailIf(this);
   }
 
   /**
@@ -2085,6 +2126,48 @@ export class ReplySink implements Sink {
     return this.writeClosing(free);
   }
 
+  /**
+   * Delete the closing message that held the footer alone. The reply stays ended: a delete that
+   * fails leaves the footer where it is, is logged, and is tried once more after
+   * `finalRetrySeconds`. A message Slack no longer has counts as deleted.
+   */
+  private async deleteClosing(ts: string, created?: () => void): Promise<boolean> {
+    created?.(); // a delete creates nothing: another reply may create meanwhile
+    try {
+      await this.limiter.acquire();
+      this.wrote = true;
+      await this.slack.chat.delete({ channel: this.channel, ts });
+    } catch (error) {
+      if (describe(error) !== MESSAGE_NOT_FOUND) {
+        this.logger.warning(`could not delete a reply's closing message: ${describe(error)}`);
+        this.retryLater();
+        return true;
+      }
+    }
+    this.closingGone = true;
+    this.closingShown = [];
+    this.places.moved(this);
+    return true;
+  }
+
+  /**
+   * One more try after `finalRetrySeconds` of a write that follows the end: the final write has
+   * no next rewrite to fix it. A try in flight is not followed by another.
+   */
+  private retryLater(): void {
+    if (this.tailRetry !== null) return;
+    const task = new Task<void>(async (signal) => {
+      try {
+        await this.clock.sleep(this.finalRetrySeconds, signal);
+        // Shielded like the final write: a pass given up after Slack took it would lose its result.
+        await this.flush();
+      } finally {
+        if (this.tailRetry === task) this.tailRetry = null;
+      }
+    });
+    this.tailRetry = task;
+  }
+
   /** Logs once that an overtaken reply shows less than it said. */
   private warnCut(): void {
     if (this.cutWarned) return;
@@ -2115,7 +2198,13 @@ export class ReplySink implements Sink {
    * is a turn that ended well, text alone, whose footer could not be built.
    */
   private async writeClosing(created?: () => void): Promise<boolean> {
+    // Deleted: the footer, if one is assigned again, is drawn under the body (`footerOf`).
+    if (this.closingGone) return true;
     let blocks = this.closingBlocks();
+    // A footer that is no longer assigned leaves the message with nothing: it goes.
+    if (blocks.length === 0 && this.closing !== null && this.closingShown.some(isDivider)) {
+      return this.deleteClosing(this.closing, created);
+    }
     if (blocks.length === 0) blocks = [contextBlock(ZERO_WIDTH_SPACE)];
     const attempted = this.clock.time();
     try {

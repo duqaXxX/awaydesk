@@ -351,4 +351,8 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
 
 chatConformance("the memory chat", memoryRig);
 
-chatConformance("the Slack provider", slackRig);
+chatConformance("the Slack provider", slackRig, {
+  skip: {
+    withdrawFooter: "the footer is placed by position: it is given up when a reply sits below",
+  },
+});

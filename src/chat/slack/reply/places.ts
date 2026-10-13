@@ -1,11 +1,18 @@
 /**
  * Where the messages of one thread sit, as far as the daemon saw them: the owner's, and the last
- * message of each reply. Kept in memory only (a restart forgets it), and decided by `isLast` and
- * `isOvertaken` of the core. A reply the places let go of leaves its position behind in `floor`,
- * so that the answers do not change when it goes.
+ * message of each reply. Kept in memory only (a restart forgets it), and decided by `isLast`,
+ * `isOvertaken` and `tails` of the core. A reply the places let go of leaves its position behind
+ * in `floor`, so that the answers do not change when it goes, and keeps showing what it showed.
  */
 
-import { isLast, isOvertaken, Mutex } from "../../../core/port.ts";
+import {
+  isLast,
+  isOvertaken,
+  Mutex,
+  type Tail,
+  type TailEntry,
+  tails,
+} from "../../../core/port.ts";
 
 /**
  * A Slack `ts` as an integer of microseconds: exact below 2^53, ordered as the thread is. Null
@@ -22,6 +29,12 @@ export function positionOf(ts: string): number | null {
 export interface Placed {
   /** The position of its last message, null while it has none. */
   readonly lastAt: number | null;
+  /** Its end has landed: its last message can be rewritten. */
+  readonly resting: boolean;
+  /** The footer its turn left, formatted; null when that turn had none. */
+  readonly ownFooter: string | null;
+  /** What it shows under its last message from now on. */
+  assign(tail: Tail<string>): void;
 }
 
 export class ThreadPlaces {
@@ -67,6 +80,7 @@ export class ThreadPlaces {
     const at = positionOf(ts);
     if (at === null) return;
     this.marks.push(at);
+    this.place();
     this.release();
     this.prune();
   }
@@ -74,13 +88,51 @@ export class ThreadPlaces {
   /** A reply got its first message, or its last message moved. */
   moved(_reply: Placed): void {
     this.prune();
+    this.place();
   }
 
-  /** The reply's end has landed: it is let go of once an owner message sits below it. */
+  /**
+   * The reply's end has landed: it is let go of once an owner message sits below it and no reply
+   * of its stretch is still to end. Every reply is handed its tail first, so that the one that
+   * gives its footer up is told before it can be let go of.
+   */
   ended(reply: Placed): void {
     if (!this.replies.has(reply)) return;
     this.done.add(reply);
+    this.place();
     this.release();
+  }
+
+  /**
+   * Work out every reply's tail with `tails` of the core and hand each its own. Sync: a reply
+   * whose tail did not change does nothing. Called whenever a reply's position, its resting or
+   * its own footer changes.
+   */
+  place(): void {
+    const result = this.tailsWith(null);
+    for (const reply of [...this.replies]) {
+      reply.assign(result.get(reply) ?? { footer: null, running: false });
+    }
+  }
+
+  /**
+   * The tail the reply would be handed if its end had landed now: what its end writes while it
+   * is still on the way, so that a footer is not written where the next pass takes it off.
+   */
+  tailIf(reply: Placed): Tail<string> {
+    return this.tailsWith(reply).get(reply) ?? { footer: reply.ownFooter, running: false };
+  }
+
+  /** The tails of the registered replies; `subject` counts as resting, and as the lowest if unplaced. */
+  private tailsWith(subject: Placed | null): Map<Placed, Tail<string>> {
+    const entries: TailEntry<Placed, string>[] = [];
+    for (const reply of this.replies) {
+      const resting = reply.resting || reply === subject;
+      // A reply whose first message is not written yet lands below everything.
+      const at = reply.lastAt ?? (reply === subject ? Number.POSITIVE_INFINITY : null);
+      if (at !== null) entries.push({ key: reply, at, resting, footer: reply.ownFooter });
+    }
+    return tails(entries, this.marks);
   }
 
   /** The thread object that opened the reply closed: the reply is let go of once its end landed. */
@@ -114,10 +166,9 @@ export class ThreadPlaces {
   private release(): void {
     const top = this.marks.length === 0 ? null : Math.max(...this.marks);
     let gone = false;
-    for (const reply of this.done) {
+    for (const reply of [...this.done]) {
+      if (!this.sealed(reply, top)) continue;
       const at = reply.lastAt;
-      const sealed = this.shut.has(reply) || at === null || (top !== null && top > at);
-      if (!sealed) continue;
       if (at !== null) this.floor = Math.max(this.floor ?? at, at);
       this.done.delete(reply);
       this.shut.delete(reply);
@@ -125,6 +176,23 @@ export class ThreadPlaces {
       gone = true;
     }
     if (gone && this.replies.size === 0) this.onEmpty();
+  }
+
+  /**
+   * Whether an ended reply is let go of: its thread closed, or an owner message sits below it
+   * and no reply of its stretch (one with a message above that owner message, or without a
+   * message yet) is still to end, since that one takes the stretch's footer from it.
+   */
+  private sealed(reply: Placed, top: number | null): boolean {
+    const at = reply.lastAt;
+    if (this.shut.has(reply) || at === null) return true;
+    if (top === null || top <= at) return false;
+    const next = Math.min(...this.marks.filter((mark) => mark > at));
+    for (const other of this.replies) {
+      if (other === reply || this.done.has(other) || other.lastAt === null) continue;
+      if (other.lastAt > at && other.lastAt < next) return false;
+    }
+    return true;
   }
 
   /** Keeps the marks not below the lowest placed reply, and always the highest. */

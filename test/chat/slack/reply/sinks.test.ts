@@ -71,6 +71,7 @@ import {
   rejected,
   TEAM,
   THREAD,
+  timedOut,
 } from "../../../support/fake-slack.ts";
 import { golden, type Json, type JsonObject, sdkRecords } from "../../../support/fixtures.ts";
 import { NAMES } from "../../../support/names.ts";
@@ -4412,4 +4413,254 @@ test("an edit that waits for the update budget does not hold another reply's new
   drained = false;
   budget.set();
   assert.equal(await soon(closing), true);
+});
+
+// ---- the footer by position: one under the last reply between two owner messages
+// Hand-driven: no recording holds replies of one thread ending out of turn.
+
+/** What each message of the thread shows as its footer, by creation; null for none or deleted. */
+function footerTexts(slack: FakeSlack): Array<string | null> {
+  return slack.createdTs.map((ts) => {
+    const message = slack.messages.get(ts);
+    const blocks = message?.blocks ?? [];
+    const [divider, context] = blocks.slice(-2);
+    if (message?.deleted || divider?.type !== "divider" || context?.type !== "context") return null;
+    return str(get(context, "elements", 0, "text"));
+  });
+}
+
+/** A reply that says one line and ends with `footer`, its write landed. */
+async function ended(sink: ReplySink, line: string, footer: string | null): Promise<void> {
+  if (line !== "") await sink.text(line);
+  await sink.finish([]);
+  assert.equal(await soon(sink.closeOutFormatted(footer)), true);
+  await settled();
+}
+
+/** A reply of text alone whose stream stopped at 280 s: its end is a closing message. */
+async function closingReply(
+  slack: FakeSlack,
+  places: ThreadPlaces,
+  footer: string,
+  options: ReplyOptions = {},
+) {
+  const clock = new FakeClock();
+  const sink = reply(slack, { ...options, places, clock });
+  await sink.text("Only words.");
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  await sink.finish([]);
+  assert.equal(await soon(sink.closeOutFormatted(footer)), true);
+  await settled();
+  return sink;
+}
+
+test("two replies of a stretch show one footer: the lower taking it, the upper gives it up by one edit", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const upper = reply(slack, { places });
+  await upper.text("Upper.");
+  await settled();
+  const lower = reply(slack, { places });
+  await lower.text("Lower.");
+  await settled();
+  await ended(upper, "", "upper footer"); // overtaken: it ends where it is
+  assert.deepEqual(footerTexts(slack), ["upper footer", null]);
+  const updates = slack.callsTo("chat.update").length;
+  await ended(lower, "", "lower footer");
+  assert.deepEqual(footerTexts(slack), [null, "lower footer"]);
+  assert.equal(slack.callsTo("chat.update").length, updates + 1, "one edit took it off");
+  assert.equal(slack.pushes(), 2, "each stop notified once, the edit did not");
+});
+
+test("the upper reply that ends after the lower one shows no footer", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const upper = reply(slack, { places });
+  await upper.text("Upper.");
+  await settled();
+  const lower = reply(slack, { places });
+  await lower.text("Lower.");
+  await settled();
+  await ended(lower, "", "lower footer");
+  await ended(upper, "", "upper footer");
+  assert.deepEqual(footerTexts(slack), [null, "lower footer"]);
+  assert.equal(slack.callsTo("chat.postMessage").length, 0);
+});
+
+test("an owner message between two replies leaves both a footer", async () => {
+  const slack = new FakeSlack();
+  slack.tsStep = 10;
+  const places = new ThreadPlaces();
+  const upper = reply(slack, { places });
+  await upper.text("Upper.");
+  await settled();
+  places.ownerPosted(slack.ownerTs());
+  const lower = reply(slack, { places });
+  await lower.text("Lower.");
+  await settled();
+  await ended(upper, "", "upper footer");
+  await ended(lower, "", "lower footer");
+  assert.deepEqual(footerTexts(slack), ["upper footer", "lower footer"]);
+});
+
+test("a lower reply with no footer of its own shows the upper one's, and the upper none", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const upper = reply(slack, { places });
+  await upper.text("Upper.");
+  await settled();
+  const lower = reply(slack, { places });
+  await lower.text("Lower.");
+  await settled();
+  await ended(upper, "", "upper footer");
+  await ended(lower, "", null);
+  assert.deepEqual(footerTexts(slack), [null, "upper footer"]);
+});
+
+test("a reply that ends in place between two reports leaves one footer, on the second report", async () => {
+  // Ruling R6 of #295, case 2: the reply waits on a task, the first report goes below it, the
+  // reply ends where it is, then a second report goes below.
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const waiting = reply(slack, { places });
+  await waiting.text("Started a task.");
+  await settled();
+  const first = reply(slack, { places });
+  await first.text("First report.");
+  await settled();
+  await ended(first, "", "first footer");
+  await ended(waiting, "", "waiting footer");
+  assert.deepEqual(footerTexts(slack), [null, "first footer"]);
+  const second = reply(slack, { places });
+  await second.text("Second report.");
+  await settled();
+  await ended(second, "", "second footer");
+  assert.deepEqual(footerTexts(slack), [null, null, "second footer"]);
+});
+
+test("an owner message that lands while the lower reply still writes does not keep the upper footer", async () => {
+  // The upper reply is let go of by an owner message only when no reply of its stretch is
+  // still to end: the report below it (above the message) takes the footer when it does.
+  const slack = new FakeSlack();
+  slack.tsStep = 10;
+  const places = new ThreadPlaces();
+  const upper = reply(slack, { places });
+  await upper.text("Upper.");
+  await settled();
+  const report = reply(slack, { places });
+  await report.text("Report.");
+  await settled();
+  await ended(upper, "", "upper footer");
+  places.ownerPosted(slack.ownerTs()); // the report is still writing, above this message
+  assert.equal(places.holds(upper), true, "its stretch is not over");
+  await ended(report, "", "report footer");
+  assert.deepEqual(footerTexts(slack), [null, "report footer"]);
+  assert.equal(places.holds(upper), false, "now it is let go of");
+});
+
+test("a closing message that held the footer alone is deleted once the footer moves below", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const upper = await closingReply(slack, places, "upper footer");
+  assert.equal(slack.callsTo("chat.postMessage").length, 1, "the closing message");
+  const [body, closing] = slack.createdTs;
+  const lower = reply(slack, { places });
+  await ended(lower, "Lower.", "lower footer");
+  assert.equal(slack.messages.get(closing ?? "")?.deleted, true);
+  assert.equal(slack.callsTo("chat.delete").length, 1);
+  assert.equal(slack.callsTo("chat.postMessage").length, 1, "no second closing message");
+  assert.equal(footerTexts(slack)[slack.createdTs.indexOf(body ?? "")], null);
+  assert.equal(await upper.waitLanded(), true);
+  // More changes to the upper reply post nothing either.
+  await upper.text(" And more.");
+  await settled();
+  assert.equal(slack.callsTo("chat.postMessage").length, 1);
+});
+
+/** Places that hand nothing out by themselves: the test hands the tails. */
+class HandPlaced extends ThreadPlaces {
+  override place(): void {}
+}
+
+test("a footer assigned later to a reply whose closing message went is drawn under its body", async () => {
+  const slack = new FakeSlack();
+  const upper = await closingReply(slack, new HandPlaced(), "upper footer");
+  upper.assign({ footer: null, running: false });
+  await settled();
+  assert.equal(slack.callsTo("chat.delete").length, 1);
+  assert.equal(footerTexts(slack)[0], null);
+  upper.assign({ footer: "back", running: false });
+  await settled();
+  assert.equal(footerTexts(slack)[0], "back");
+  assert.equal(slack.callsTo("chat.postMessage").length, 1, "still no second closing message");
+  assert.equal(slack.callsTo("chat.delete").length, 1);
+});
+
+test("a closing message whose delete fails keeps its footer and is deleted once more later", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const logger = new Recorded();
+  await closingReply(slack, places, "upper footer", { logger, finalRetrySeconds: 0.02 });
+  const closing = slack.createdTs[1] ?? "";
+  slack.responses["chat.delete"] = [rejected("internal_error"), { ok: true }];
+  await ended(reply(slack, { places }), "Lower.", "lower footer");
+  assert.equal(slack.messages.get(closing)?.deleted, false, "kept");
+  assert.equal(footerTexts(slack)[1], "upper footer");
+  assert.equal(logger.lines.filter((line) => line.level === "WARNING").length, 1);
+  await passed(0.02);
+  await settled();
+  assert.equal(slack.messages.get(closing)?.deleted, true);
+  assert.equal(slack.callsTo("chat.delete").length, 2);
+});
+
+test("a closing message already gone counts as deleted", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const logger = new Recorded();
+  await closingReply(slack, places, "upper footer", { logger });
+  slack.responses["chat.delete"] = rejected("message_not_found");
+  await ended(reply(slack, { places }), "Lower.", "lower footer");
+  assert.equal(slack.callsTo("chat.delete").length, 1);
+  assert.equal(logger.lines.filter((line) => line.level === "WARNING").length, 0);
+  assert.equal(slack.callsTo("chat.postMessage").length, 1);
+});
+
+test("a footer taken off by a write of unknown outcome is taken off again by the next pass", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const upper = await longReply(slack, { places, finalRetrySeconds: 0.02 });
+  assert.equal(await soon(upper.closeOutFormatted("upper footer")), true);
+  const lower = reply(slack, { places });
+  await lower.text("Lower.");
+  await settled();
+  const ending = 1; // the upper reply's ending was posted, with its footer
+  assert.equal(footerTexts(slack)[ending], "upper footer");
+  slack.responses["chat.update"] = [timedOut(), { ok: true }];
+  await ended(lower, "", "lower footer");
+  assert.equal(footerTexts(slack)[ending], "upper footer", "the edit may or may not have landed");
+  await passed(0.02);
+  await settled();
+  assert.equal(footerTexts(slack)[ending], null);
+  assert.equal(footerTexts(slack).at(-1), "lower footer");
+});
+
+test("an ending that goes by an edit of unknown outcome is not reported landed before it is rewritten", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  const sink = await longReply(slack, { places, finalRetrySeconds: 0.02 });
+  const other = reply(slack, { places });
+  await other.text("Another turn.");
+  await settled();
+  slack.responses["chat.update"] = [timedOut(), { ok: true }];
+  assert.equal(await soon(sink.closeOutFormatted("upper footer")), false, "outcome unknown");
+  let landed: boolean | null = null;
+  void sink.waitLanded().then((value) => {
+    landed = value;
+  });
+  await settled();
+  assert.equal(landed, null, "not landed before the rewrite");
+  await passed(0.02);
+  assert.equal(await soon(sink.waitLanded()), true);
+  assert.equal(footerTexts(slack)[0], "upper footer");
 });
