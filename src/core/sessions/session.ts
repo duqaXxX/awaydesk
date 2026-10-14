@@ -44,6 +44,7 @@
 import { basename } from "node:path";
 import type {
   AgentSession,
+  AgentState,
   CommandInfo,
   ContextUsage,
   ModelInfo,
@@ -255,6 +256,8 @@ export class ThreadSession {
   private expiry: Task | null = null;
   /** The agent said it is compacting the conversation and has not said it ended. */
   private compacting = false;
+  /** What the agent last said it is doing (`state_changed`); null before it said anything. */
+  private agentState: AgentState | null = null;
   // Armed while idle with nothing pending; any turn, task event, approval or question cancels
   // it, and being idle with nothing pending again (re)starts it.
   private idleExpiry: Task | null = null;
@@ -419,11 +422,15 @@ export class ThreadSession {
   /**
    * What the thread's activity line says, empty for nothing, and the same after the app's
    * name. `Working…` while a prompt of the owner's is owed its answer (`promptOwed`), however
-   * long its turn takes (issue #83), `Compacting conversation…` while any turn compacts, in the
-   * terminal's words (issue #169). A turn the agent starts to report a task owes nobody an
-   * answer and says nothing, and the line never counts what still runs: the list under the
-   * thread's last reply does (issue #295). Nothing while an approval, a question or a hold waits on the owner, while `!stop`
-   * winds a turn down, and once the session is closed. A restart waiting on tasks says which.
+   * long its turn takes (issue #83), and while the agent says it works (`state_changed`): a
+   * turn it starts to report a task, from before that turn's first event, and the wait for a
+   * subagent it left in the background (issue #301). With neither the line nor the list of
+   * what still runs under the thread's last reply, the session has ended. An agent that
+   * declares no state shows the line for the owner's prompts alone. `Compacting conversation…`
+   * while any turn compacts, in the terminal's words (issue #169). The line never counts what
+   * still runs: the list does (issue #295). Nothing while an approval, a question or a hold
+   * waits on the owner, while `!stop` winds a turn down, and once the session is closed. A
+   * restart waiting on tasks says which.
    */
   private threadLine(): readonly [text: string, afterName: string] {
     if (this.closedFlag || this.waitingForOwner || this.interrupting) return ["", ""];
@@ -434,13 +441,15 @@ export class ThreadSession {
     const held = this.draining ? this.runningKindsOf({ awaitedOnly: true }) : "";
     if (held) {
       // A stop that only background tasks hold: said here whatever the list shows, since
-      // `!stop` is what ends the wait.
+      // `!stop` is what ends the wait. It comes before the agent's own word, which says
+      // `working` all through a subagent left in the background.
       const them = held.startsWith("1 ") && !held.includes(" · ") ? "it" : "them";
       return [
         texts.fill(texts.RESTART_WAITS, { counts: held, them }),
         texts.fill(texts.RESTART_WAITS_STATUS, { counts: held }),
       ];
     }
+    if (this.agentState === "working") return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
     return ["", ""];
   }
 
@@ -1099,6 +1108,11 @@ export class ThreadSession {
     if (client === null) return held ? null : false;
     const tasks = this.background ? this.runningTaskIds() : [];
     if (!this.busy && tasks.length === 0) return held ? null : false;
+    // What the agent said it was doing is void once the owner stops it. It says `idle` only
+    // after an interrupted turn's result (recorded 2026-10-14), and no recording holds what it
+    // says after a task stopped with no turn running. Its next word counts again.
+    this.agentState = null;
+    this.showThreadStatus();
     if (this.busy) {
       // A denial `denyAll` triggers below resolves `askOwner`'s own wait, whose `finally`
       // would otherwise race this method's own closing ✅ back to working; this flag makes it
@@ -1591,6 +1605,8 @@ export class ThreadSession {
         return declared.compaction ? null : "compaction";
       case "report_started":
         return declared.backgroundTasks ? null : "backgroundTasks";
+      case "state_changed":
+        return declared.declaredState ? null : "declaredState";
       case "limits_changed":
         return declared.usageLimits ? null : "usageLimits";
       case "task_started": {
@@ -1624,6 +1640,12 @@ export class ThreadSession {
         return;
       case "prompt_taken":
         this.acknowledge(event.promptId);
+        return;
+      case "state_changed":
+        if (event.state !== this.agentState) {
+          this.agentState = event.state;
+          this.showThreadStatus();
+        }
         return;
       case "report_started":
         // Said with no turn running, right before the turn it names. Inside a running turn it
@@ -2851,6 +2873,7 @@ export class ThreadSession {
     this.notificationWaits = false;
     this.interrupting = false; // whatever it was waiting on, this ends it
     this.compacting = false; // the process that was compacting is gone
+    this.agentState = null; // and it will never say that it rests
     this.showThreadStatus();
     // The replies still waiting for a task of theirs, when no turn is active: a process lost
     // then leaves them the only place that can say so (issue #202). `taskReplies` also keeps

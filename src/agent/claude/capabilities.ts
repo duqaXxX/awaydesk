@@ -16,6 +16,8 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   subagents: true,
   backgroundTasks: true,
   compaction: true,
+  // `session_state_changed`, which a session emits when asked to (`SESSION_SIGNALS`).
+  declaredState: true,
   questions: true,
   usageLimits: true,
   models: true,

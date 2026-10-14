@@ -1,0 +1,180 @@
+{
+ "recording": "session-state-agent",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "**Agent**(Run sleep 15)\n⎿ Backgrounded agent",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nlaunched",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": [],
+     "footer": "footer"
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "a04b29a98c245a875"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01A4furTtJv1qPZ8McHZzJzU",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "Wait 15 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01A4furTtJv1qPZ8McHZzJzU",
+      "name": "Bash",
+      "output": "Wait 15 seconds",
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "Wait 15 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01A4furTtJv1qPZ8McHZzJzU",
+      "name": "Bash",
+      "output": "(Bash completed with no output)",
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "Wait 15 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a04b29a98c245a875",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "a04b29a98c245a875"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-a04b29a98c245a875",
+      "name": "task",
+      "output": "ok",
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "a04b29a98c245a875"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "done",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": [],
+     "footer": "footer"
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": [],
+     "footer": "footer"
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "**Agent**(Run sleep 15)\n⎿ Backgrounded agent",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nlaunched",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\ndone",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": [],
+    "footer": "footer"
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

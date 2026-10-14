@@ -181,6 +181,13 @@ test("a session starts with the defaults of an interactive one", LIMIT, async (t
   for (const [name, value] of own) assert.equal(env[name], value, name);
 });
 
+// What the daemon reads from the stream is asked for whatever the owner's file says.
+test("a session is asked to say its state, over the owner's variables", LIMIT, async (t) => {
+  const asked = "CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS";
+  const { query } = await started(t, {}, { variables: { [asked]: "0" } });
+  assert.equal(query.options.env?.[asked], "1");
+});
+
 test("a variable the daemon's environment sets wins over a default", LIMIT, async (t) => {
   const before = process.env.CLAUDE_CODE_FORK_SUBAGENT;
   process.env.CLAUDE_CODE_FORK_SUBAGENT = "0";

@@ -31,6 +31,9 @@ export interface PermissionModes {
   readonly bypass: PermissionMode | null;
 }
 
+/** What an agent says it is doing (`state_changed`), for one that declares `declaredState`. */
+export type AgentState = "working" | "waiting" | "idle";
+
 /**
  * What differs between back ends and the core adapts to. A capability is here because the core
  * reads it: without one the feature it names is not offered (`!help` and `!guide` leave it
@@ -51,6 +54,11 @@ export interface Capabilities {
   readonly backgroundTasks: boolean;
   /** The agent compacts a conversation (`compaction_started`, `compacted`). */
   readonly compaction: boolean;
+  /**
+   * The agent says whether it works, rests or waits for the owner (`state_changed`). Without it
+   * the core knows a turn of the agent's own only from that turn's first event.
+   */
+  readonly declaredState: boolean;
   /**
    * The agent asks the owner questions (`RequestHandler.question`). The core offers nothing of
    * its own for a question, so the only thing that reads this is `!guide`, which names the
@@ -313,6 +321,12 @@ export type SessionEvent =
       readonly durationMs: number | null;
       readonly callId: string | null;
     }
+  /**
+   * What the agent says it is doing, in its own judgement: `working` from before a turn's first
+   * event to after its last, and through whatever it waits for by itself between two turns;
+   * `waiting` while a request sits with the owner; `idle` once nothing of its own is left.
+   */
+  | { readonly type: "state_changed"; readonly state: AgentState }
   /** The agent is compacting the conversation. Not repeated while it lasts. */
   | { readonly type: "compaction_started" }
   /** It no longer is. */

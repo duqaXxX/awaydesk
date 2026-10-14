@@ -7,6 +7,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The thread's status line says `Working…` whenever Claude Code says it is working, and no
+  longer for the owner's prompts alone (issue #301): in a turn it starts by itself to report a
+  task, from the task's end, and all through a subagent left in the background. Sessions start
+  with `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS=1`, and the `session_state_changed` records cross
+  the agent seam as the event `state_changed` (`working`, `waiting`, `idle`), behind the new
+  capability `declaredState`. Recorded on 2026-10-14 on Claude Code 2.1.296: `running` comes
+  0.07 seconds after a background command's notification and about a second before the report
+  turn's first event; a background subagent gets one `idle`, after its report. In the transcripts
+  of the daemon's sessions of the ten days before, 18 of 56 report turns on Opus took more than
+  10 seconds from the notification to their first text or call, with nothing in the thread to
+  tell them from a session that had ended. Not seen in Slack yet: the line under a reply at
+  rest for the length of a long subagent.
 - A task's end line is drawn small and grey, as the count of a run of calls is (the owner's
   choice, 2026-10-14; the terminal writes it as text behind a coloured dot). The chat seam's
   `ReplySink.text` takes `aside` for such a line; the Slack provider draws it as a `context`

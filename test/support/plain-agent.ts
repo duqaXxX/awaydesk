@@ -71,6 +71,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   subagents: false,
   backgroundTasks: false,
   compaction: false,
+  declaredState: false,
   questions: true,
   usageLimits: false,
   models: false,

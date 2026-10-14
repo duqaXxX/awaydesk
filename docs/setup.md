@@ -763,9 +763,12 @@ last reply lists them: a title such as `1 agent · 1 shell still running` and a 
 six, then `+N more`.
 
 From the moment you send a message until its answer has ended, Slack shows `Working…` under the
-thread's last message. A turn Claude Code starts on its own to report a task shows no line, and
-the line never counts what still runs: the card above the footer does (`1 shell still running`),
-until the command ends.
+thread's last message. It also shows whenever Claude Code says it is working: in a turn it
+starts on its own to report a task, from the moment the task ends, and all through a subagent
+it left in the background. A command left in the background does not keep it: the line goes
+when the answer is in and comes back for the report. So a thread with neither `Working…` nor
+the card of what still runs has ended. The line never counts what still runs: the card above
+the footer does (`1 shell still running`), until the command ends.
 The line goes while an approval or a question waits for you. Slack's clients draw it, and the
 iOS app can show none for a thread that Slack on desktop already has open: with desktop closed,
 or with the thread opened on iOS first, it shows on both (seen on 2026-10-04, five runs read by

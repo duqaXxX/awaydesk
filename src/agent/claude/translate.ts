@@ -15,6 +15,7 @@
 import { strip } from "../../text.ts";
 import { isRecord, records } from "../../values.ts";
 import type {
+  AgentState,
   DiffHunk,
   FileChange,
   ModelTokens,
@@ -326,6 +327,22 @@ function status(memory: Memory, record: WireRecord): SessionEvent[] {
   return events;
 }
 
+// `running` comes 0.5 seconds after a prompt and 0.07 seconds after the notification of a
+// background command, about a second before the turn's `message_start`; `idle` right after a
+// turn's result, an interrupted one too, and only after the report of a background subagent,
+// with none in between (recorded 2026-10-14, CLI 2.1.296: `session-state-shell`,
+// `session-state-agent`, `session-state-approval`).
+const AGENT_STATES: ReadonlyMap<string, AgentState> = new Map([
+  ["running", "working"],
+  ["requires_action", "waiting"],
+  ["idle", "idle"],
+]);
+
+function sessionState(_memory: Memory, record: WireRecord): SessionEvent[] {
+  const state = AGENT_STATES.get(string(record.state) ?? "");
+  return state === undefined ? [] : [{ type: "state_changed", state }];
+}
+
 function compactBoundary(_memory: Memory, record: WireRecord): SessionEvent[] {
   const metadata = isRecord(record.compact_metadata) ? record.compact_metadata : {};
   return [
@@ -458,6 +475,7 @@ const HANDLERS = {
   "stream_event:message_stop": messageStop,
   "system:compact_boundary": compactBoundary,
   "system:init": init,
+  "system:session_state_changed": sessionState,
   "system:status": status,
   "system:task_notification": taskNotification,
   "system:task_progress": taskProgress,

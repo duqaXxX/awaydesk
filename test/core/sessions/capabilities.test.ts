@@ -14,7 +14,14 @@ import type { Capabilities, ListedSession, SessionEvent } from "../../../src/age
 import { BypassUnavailable, DirectoryUntrusted } from "../../../src/core/sessions/errors.ts";
 import { DEFAULT } from "../../../src/core/setup.ts";
 import { CHANNEL, THREAD } from "../../support/fake-slack.ts";
-import { event, type Harness, harnessFor, type Item, sdkMessages } from "../../support/sessions.ts";
+import {
+  event,
+  type Harness,
+  harnessFor,
+  type Item,
+  isResult,
+  sdkMessages,
+} from "../../support/sessions.ts";
 import { inside, logged, play, said, send, splitBackground, statusLines } from "./helpers.ts";
 
 /** The agent of `h` with `capabilities` changed, before its first session starts. */
@@ -337,6 +344,20 @@ test("compaction off: a compaction is neither announced nor shown", async (t) =>
   assert.ok(warnings.some((line) => line.includes("compaction")));
 });
 
+test("declared state off: what the agent says of its state changes no line", async (t) => {
+  const items = sdkMessages("session-state-agent");
+  const first = items.findIndex(isResult);
+  const h = harnessFor(t)({ turns: [items.slice(0, first + 1)] });
+  lacking(h, { declaredState: false });
+  const warnings = logged(t, "warning");
+  await (await h.session().submit("launch it")).done.wait();
+  await h.until(() => statusLines(h).at(-1) === "");
+  await h.sleep(0.05);
+  // The subagent still runs and the agent said `working`: the line is the owner's prompt's alone.
+  assert.equal(statusLines(h).at(-1), "");
+  assert.ok(warnings.some((line) => line.includes("declaredState")));
+});
+
 test("bypass with no bypass mode: the word is refused and nothing is stored", async (t) => {
   const h = harnessFor(t)({});
   lacking(h, {
@@ -377,6 +398,7 @@ test("an agent that declares no optional capability runs a whole turn", async (t
     subagents: false,
     backgroundTasks: false,
     compaction: false,
+    declaredState: false,
     questions: false,
     usageLimits: false,
     models: false,

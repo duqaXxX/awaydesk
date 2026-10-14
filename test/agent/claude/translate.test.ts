@@ -582,14 +582,34 @@ test("a failed edit changed no file", () => {
   );
 });
 
-test("only the three calls that wrote a file carry a change, in every recording", () => {
+// Recorded 2026-10-14 on Claude Code 2.1.296 with `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS=1`.
+test("what Claude Code says of its state crosses as working, waiting and idle", () => {
+  const states = (name: string) => of(events(name), "state_changed").map((event) => event.state);
+  // A background command: idle while it runs, working again for the report.
+  assert.deepEqual(states("session-state-shell"), ["working", "idle", "working", "idle"]);
+  // A background subagent: no idle before its report has ended.
+  assert.deepEqual(states("session-state-agent"), ["working", "idle"]);
+  assert.deepEqual(states("session-state-approval"), ["working", "waiting", "working", "idle"]);
+});
+
+test("a state Claude Code has no recorded word for gives no event", () => {
+  const record = { type: "system", subtype: "session_state_changed", state: "constructor" };
+  assert.deepEqual(new Translator().translate(record), []);
+});
+
+test("only the four calls that wrote a file carry a change, in every recording", () => {
   const changed: string[] = [];
   for (const name of sdkRecordings()) {
     for (const event of of(events(name), "call_ended")) {
       if (event.fileChange !== null) changed.push(`${name}: ${event.fileChange.kind}`);
     }
   }
-  assert.deepEqual(changed, ["edit-write: created", "edit-write: edited", "edit-write: edited"]);
+  assert.deepEqual(changed, [
+    "edit-write: created",
+    "edit-write: edited",
+    "edit-write: edited",
+    "session-state-approval: created",
+  ]);
 });
 
 const EDIT = {

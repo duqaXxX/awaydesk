@@ -14,6 +14,7 @@ test("the Claude back end declares what the core adapts to", () => {
     subagents: true,
     backgroundTasks: true,
     compaction: true,
+    declaredState: true,
     questions: true,
     usageLimits: true,
     models: true,

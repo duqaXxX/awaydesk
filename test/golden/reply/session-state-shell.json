@@ -1,0 +1,183 @@
+{
+ "recording": "session-state-shell",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01EW2531ZDptrHYYHXJxmz55",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "Wait 25 seconds in background"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01EW2531ZDptrHYYHXJxmz55",
+      "name": "Bash",
+      "output": "Command running in background with ID: barbmqsk1. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/barbmqsk1.output. You will be notified when it completes. To check interim outpu…",
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "Wait 25 seconds in background"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "started",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": [],
+     "footer": "footer"
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "barbmqsk1"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-barbmqsk1",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "barbmqsk1"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-barbmqsk1",
+      "name": "task",
+      "output": "Background command \"Wait 25 seconds in background\" completed (exit code 0)",
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "barbmqsk1"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "finished",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": [],
+     "footer": "footer"
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": [],
+     "footer": "footer"
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01EW2531ZDptrHYYHXJxmz55",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "Wait 25 seconds in background"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01EW2531ZDptrHYYHXJxmz55",
+     "name": "Bash",
+     "output": "Command running in background with ID: barbmqsk1. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/barbmqsk1.output. You will be notified when it completes. To check interim outpu…",
+     "preview": null,
+     "status": "complete",
+     "task": false,
+     "title": "Wait 25 seconds in background"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "started",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nfinished",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": [],
+    "footer": "footer"
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

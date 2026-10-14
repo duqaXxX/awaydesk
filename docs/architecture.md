@@ -221,6 +221,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `subagents` | an event that runs under a call of its own, or a task that is a subagent's, is ignored, with a warning in the log |
 | `backgroundTasks` | a task that outlives its turn, and the turn the agent starts to report it, are ignored; the session tracks and waits for none |
 | `compaction` | the compaction events are ignored |
+| `declaredState` | a `state_changed` event is ignored, with a warning in the log; the thread's activity line says `Working…` for the owner's prompts alone, so a turn the agent starts by itself shows none |
 | `questions` | `!guide` leaves out the sentence about the question form and titles its approvals section "Approvals"; no other code of the core reads it, and the conformance suite runs its question checks only for a back end that declares it |
 | `usageLimits` | `AgentBackend.usageLimits` is absent and the footer shows no limit |
 | `models` | `AgentInfo.models` is ignored: the setup has no Model select and `AgentSession.setModel` is never called |
@@ -1027,7 +1028,10 @@ closed when the start returns (`ThreadSession.connect`).
   `CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR=100`. `env` replaces the environment the process
   inherits, so it holds those two, then the daemon's own environment, then the variables of
   Claude Code the owner's file sets (`VARIABLES` in `src/agent/claude/module.ts`): a later one
-  wins. The session the usage probe starts gets none of this. The SDK
+  wins. Last comes `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS=1`, which nothing overrides: Claude
+  Code then writes a `session_state_changed` record at each change between `running`, `idle`
+  and `requires_action`, and the back end passes it on as `state_changed` (`working`, `idle`,
+  `waiting`). The session the usage probe starts gets none of this. The SDK
   runs Claude Code in its non-interactive mode, which treats the two servers built into Claude Code
   differently from the terminal (measured: "Built-in servers"). Computer use is offered in an
   interactive session only and is never there. The Chrome integration is connected only when Claude
@@ -1183,9 +1187,11 @@ closed when the start returns (`ThreadSession.connect`).
   that declares `activityLine` only), which the Slack provider keeps as one `ThreadStatus` (in `status`): Slack's status line under the thread's
   last message (`assistant.threads.setStatus`), which says `ThreadSession.threadLine`. `Working…`
   while a prompt of the owner's is owed its answer: being submitted, queued, taken, sent and not
-  yet started, or its turn running (`ThreadSession.promptOwed`). A turn the agent starts to report
-  a task owes nobody an answer, so it says nothing, and the line never counts what still runs:
-  the list under the last reply at rest does. `Compacting conversation…` from the event `compaction_started` to
+  yet started, or its turn running (`ThreadSession.promptOwed`), and while the agent says it
+  works (the event `state_changed`, for an agent that declares `declaredState`): a turn it
+  starts to report a task, from before that turn's first event, and the wait for a subagent
+  left in the background. The last state is forgotten when the agent's process is lost. The
+  line never counts what still runs: the list under the last reply at rest does. `Compacting conversation…` from the event `compaction_started` to
   `compaction_ended`, a report turn included: Claude Code
   opens a compaction with a `status` system record that says `compacting`, repeats it while it
   lasts, and ends it with the `status` record that carries `compact_result`, and the back end says
