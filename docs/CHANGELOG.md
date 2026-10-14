@@ -10,8 +10,9 @@ All notable changes to this project are documented here. The format follows
 - The footer shows once, under the reply of the session's latest work, when the session has ended
   everything it was doing (no turn, no prompt waiting, no background task, no report expected, no
   approval or question open), and at a forced end (`!stop`, a restart, a lost process, an error,
-  also a turn cut short, which had none). It comes right after the checkmark, by an edit that does
-  not notify; no reply's end carries it, so a reply that rests for background work shows none, and
+  also a turn cut short, which had none). It is read while the checkmark is set and drawn by an
+  edit that does not notify, and a `Working…` that showed when the turn ended stays until then, so
+  the thread's bottom never goes blank between the two; no reply's end carries it, so a reply that rests for background work shows none, and
   a footer drawn earlier stays where it is. A closing message that would hold the footer alone is
   posted with it once the session has ended, and that post is the reply's second notification,
   unless anything was written in the thread since the reply ended: the footer then goes under the

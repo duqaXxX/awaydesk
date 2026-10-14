@@ -761,8 +761,8 @@ that ends while a turn runs has that line in the turn's reply. While tasks run, 
 last reply lists them: a title such as `1 agent · 1 shell still running` and a line per task, up to
 six, then `+N more`.
 
-From the moment you send a message until its answer has ended, Slack shows `Working…` under the
-thread's last message. It also shows whenever Claude Code says it is working: in a turn it
+From the moment you send a message until its answer has ended and its footer shows, Slack shows
+`Working…` under the thread's last message. It also shows whenever Claude Code says it is working: in a turn it
 starts on its own to report a task, from the moment the task ends, and all through a subagent
 it left in the background. A command left in the background does not keep it: the line goes
 when the answer is in and comes back for the report. So a thread with neither `Working…` nor

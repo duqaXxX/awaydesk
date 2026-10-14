@@ -262,6 +262,8 @@ export class ThreadSession {
   private compacting = false;
   /** What the agent last said it is doing (`state_changed`); null before it said anything. */
   private agentState: AgentState | null = null;
+  /** A turn that ended under `Working…`, not stopped, whose end, ✅ and footer are being drawn. */
+  private turnEnding = false;
   // Armed while idle with nothing pending; any turn, task event, approval or question cancels
   // it, and being idle with nothing pending again (re)starts it.
   private idleExpiry: Task | null = null;
@@ -428,8 +430,10 @@ export class ThreadSession {
    * name. `Working…` while a prompt of the owner's is owed its answer (`promptOwed`), however
    * long its turn takes (issue #83), and while the agent says it works (`state_changed`): a
    * turn it starts to report a task, from before that turn's first event, and the wait for a
-   * subagent it left in the background (issue #301). With neither the line nor the list of
-   * what still runs under the thread's last reply, the session has ended. An agent that
+   * subagent it left in the background (issue #301), and from a turn's end until its ✅ and
+   * footer are drawn (`turnEnding`), so the line gives way to the footer. With neither the
+   * line nor the list of what still runs under the thread's last reply, the session has
+   * ended. An agent that
    * declares no state shows the line for the owner's prompts alone. `Compacting conversation…`
    * while any turn compacts, in the terminal's words (issue #169). The line never counts what
    * still runs: the list does (issue #295). Nothing while an approval, a question or a hold
@@ -441,7 +445,9 @@ export class ThreadSession {
     if (this.compacting && (this.busy || this.promptOwed())) {
       return [texts.THREAD_COMPACTING, texts.THREAD_COMPACTING_STATUS];
     }
-    if (this.promptOwed()) return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
+    if (this.promptOwed() || this.turnEnding) {
+      return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
+    }
     const held = this.draining ? this.runningKindsOf({ awaitedOnly: true }) : "";
     if (held) {
       // A stop that only background tasks hold: said here whatever the list shows, since
@@ -1872,23 +1878,33 @@ export class ThreadSession {
       // drain that saw this thread idle meanwhile would exit before the reply's end, leaving
       // its stream open (#25).
       let turnStopped = false;
+      // A `Working…` that shows stays until the footer is drawn, so the thread's bottom never
+      // goes blank between the two; a line that shows something else, or nothing, is not turned
+      // into it, and a stop clears it at once, as `interrupting` already does.
+      this.turnEnding = this.threadLine()[0] === texts.THREAD_WORKING;
       try {
-        turnStopped = await this.finish(active, event, signal);
-      } finally {
-        // A turn cut before its reply closed stays the active one, for `abandon` to end.
-        if (!active.cut) {
-          this.active = null;
-          this.compacting = false;
-          this.showThreadStatus(); // whichever way it ended, `!stop` included
-          // An end told after this turn had begun is reported in a turn to come, which
-          // nothing waits for yet: the turn's start cancelled the wait.
-          if (this.ended.length > 0) this.notified();
+        try {
+          turnStopped = await this.finish(active, event, signal);
+        } finally {
+          if (turnStopped) this.turnEnding = false;
+          // A turn cut before its reply closed stays the active one, for `abandon` to end.
+          if (!active.cut) {
+            this.active = null;
+            this.compacting = false;
+            this.showThreadStatus(); // whichever way it ended, `!stop` included
+            // An end told after this turn had begun is reported in a turn to come, which
+            // nothing waits for yet: the turn's start cancelled the wait.
+            if (this.ended.length > 0) this.notified();
+          }
         }
+        // Checked only now, with the turn no longer active: `finish` alone still reads busy.
+        // `!stop` already reacted ✅ itself; the stop's end is the session's end all the same.
+        if (!turnStopped) await this.reactDoneIfIdle(signal);
+        else await this.showFooterIfEnded(signal);
+      } finally {
+        this.turnEnding = false;
+        this.showThreadStatus();
       }
-      // Checked only now, with the turn no longer active: `finish` alone still reads busy.
-      // `!stop` already reacted ✅ itself; the stop's end is the session's end all the same.
-      if (!turnStopped) await this.reactDoneIfIdle(signal);
-      else await this.showFooterIfEnded(signal);
     }
   }
 
@@ -2201,20 +2217,21 @@ export class ThreadSession {
    * no-op while another prompt, a running task or an unreported one still keeps the session
    * going, or while `errorStanding` says a ❌ from `abandon` already stands: that lasts until
    * new work starts (a submit or a report turn shows ⏳ again, both clearing it), not until
-   * some unrelated task's own sweep decides the session reads idle again. The footer follows
-   * (`showFooterIfEnded`).
+   * some unrelated task's own sweep decides the session reads idle again. The footer is read
+   * and drawn beside it (`showFooterIfEnded`).
    */
   private async reactDoneIfIdle(signal?: AbortSignal): Promise<void> {
     this.showThreadStatus();
+    let done: Promise<unknown> = Promise.resolve();
     if (this.sessionEnded() && !this.errorStanding) {
       this.noteStatus("done");
-      if (this.reacts) await this.thread.showStatus("done", signal);
+      if (this.reacts) done = this.thread.showStatus("done", signal);
     } else {
       logger.info(`no done reaction in ${this.where}, held by: ${this.doneHeldBy().join(", ")}`);
     }
-    // After the checkmark, which never waits on the agent the footer asks; and not held back
+    // Beside the checkmark, which never waits on the agent the footer asks; and not held back
     // by an error: an error ends the session too, and its footer says how it stood.
-    await this.showFooterIfEnded(signal);
+    await Promise.all([done, this.showFooterIfEnded(signal)]);
   }
 
   /**

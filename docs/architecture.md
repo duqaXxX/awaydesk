@@ -1210,7 +1210,10 @@ closed when the start returns (`ThreadSession.connect`).
   yet started, or its turn running (`ThreadSession.promptOwed`), and while the agent says it
   works (the event `state_changed`, for an agent that declares `declaredState`): a turn it
   starts to report a task, from before that turn's first event, and the wait for a subagent
-  left in the background. The last state is forgotten when the agent's process is lost. The
+  left in the background. A turn that ends under `Working…` keeps it, a stop excepted, until
+  its ✅ and footer are drawn (`ThreadSession.turnEnding`), which `reactDoneIfIdle` draws side
+  by side, so the line gives way to the footer with nothing blank between them. The last state
+  is forgotten when the agent's process is lost. The
   line never counts what still runs: the list under the last reply at rest does. `Compacting conversation…` from the event `compaction_started` to
   `compaction_ended`, a report turn included: Claude Code
   opens a compaction with a `status` system record that says `compacting`, repeats it while it

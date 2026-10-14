@@ -92,6 +92,20 @@ test("case 1: a prompt with no background work ends, then an edit adds the foote
   assert.ok(stop !== -1 && footer > stop, "the stream stops first, the footer follows");
 });
 
+test("case 1: Working stays until the footer is drawn, so the thread's bottom never goes blank", async (t) => {
+  const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
+  await (await h.session().submit("list the files")).done.wait();
+  await settled(h);
+  const footer = h.slack.apiCalls.findIndex(
+    (call) =>
+      call.method === "chat.update" && JSON.stringify(call.args.blocks).includes('"divider"'),
+  );
+  const cleared = h.slack.apiCalls.findIndex(
+    (call) => call.method === "assistant.threads.setStatus" && call.args.status === "",
+  );
+  assert.ok(footer !== -1 && cleared > footer, `cleared at ${cleared}, footer at ${footer}`);
+});
+
 test("case 2: a reply that waits on a command shows no footer; the report's end shows one", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harnessFor(t)({ turns: [first] });
