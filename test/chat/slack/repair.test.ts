@@ -315,14 +315,27 @@ test("a message up to slacks cap less one still gets the stopped line", async ()
   assert.deepEqual(blocks, [...body, STOPPED_BLOCK]);
 });
 
-test("a message at the cap puts the line in its last context block", async () => {
+test("a message at the cap puts the line in its footer", async () => {
   const footer = { type: "context", elements: [{ type: "mrkdwn", text: "main · 12% ctx" }] };
-  const body = [...content(49), footer];
+  const body = [...content(48), { type: "divider" }, footer];
   const [blocks] = await repairedBlocks(body);
   assert.deepEqual(blocks.slice(0, 49), body.slice(0, 49));
   assert.equal(blocks.length, 50); // no content block lost
   const last = blocks.at(-1) as { elements: { text: string }[] };
   assert.equal(last.elements[0]?.text, `main · 12% ctx · ${texts.STOPPED_BEFORE_ANSWER}`);
+});
+
+test("a message at the cap whose last context block is no footer is left as it is", async () => {
+  // A reply that rests has no footer: a context block at its end is a line of the daemon's own.
+  const notice = {
+    type: "context",
+    elements: [{ type: "mrkdwn", text: "a line of the daemon's" }],
+  };
+  const body = [...content(49), notice];
+  const [blocks, slack] = await repairedBlocks(body);
+  assert.deepEqual(blocks, body);
+  const [update] = slack.callsTo("chat.update");
+  assert.equal(update?.text, texts.STOPPED_BEFORE_ANSWER);
 });
 
 test("a message at the cap with no context block loses no content", async () => {

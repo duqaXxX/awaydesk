@@ -158,6 +158,10 @@ export class ThreadSession {
   // never mistaken for idle-and-done. What the chat shows cannot serve this alone: it only
   // changes once the chat has answered, which a quick turn can easily outrun.
   private errorStanding = false;
+  // The reply the session's latest work wrote into (a turn, a report, a standalone update), while
+  // the footer of its end is owed: cleared only once the chat says the footer landed under it.
+  // A prompt that could not start wrote no work, and is never named here.
+  private footerOwedTo: Reply | null = null;
   private client: AgentSession | null = null;
   private reader: Task | null = null;
   private worker: Task | null = null;
@@ -1507,6 +1511,9 @@ export class ThreadSession {
           );
           this.idleTimerCheck(); // the session stays alive; may need arming again
         }
+        // The prompt that held the session's end back is gone: the footer an earlier end owes
+        // is drawn now, on the reply of that work (a prompt that never started is never named).
+        await this.showFooterIfEnded(signal);
       }
     }
   }
@@ -1773,8 +1780,9 @@ export class ThreadSession {
         this.trackLanding(await holder.closeOut(signal), this.reply(holder));
         this.showThreadStatus(); // the task's end may change what the line says
         // `!stop` already reacted ✅ itself; skipped so a stopped task's end does not show it
-        // a second time.
-        if (!stopped) await this.reactDoneIfIdle(signal);
+        // a second time. The footer is the stop's end all the same.
+        if (stopped) await this.showFooterIfEnded(signal);
+        else await this.reactDoneIfIdle(signal);
       }
       return;
     }
@@ -1878,7 +1886,9 @@ export class ThreadSession {
         }
       }
       // Checked only now, with the turn no longer active: `finish` alone still reads busy.
+      // `!stop` already reacted ✅ itself; the stop's end is the session's end all the same.
       if (!turnStopped) await this.reactDoneIfIdle(signal);
+      else await this.showFooterIfEnded(signal);
     }
   }
 
@@ -2191,16 +2201,64 @@ export class ThreadSession {
    * no-op while another prompt, a running task or an unreported one still keeps the session
    * going, or while `errorStanding` says a ❌ from `abandon` already stands: that lasts until
    * new work starts (a submit or a report turn shows ⏳ again, both clearing it), not until
-   * some unrelated task's own sweep decides the session reads idle again.
+   * some unrelated task's own sweep decides the session reads idle again. The footer follows
+   * (`showFooterIfEnded`).
    */
   private async reactDoneIfIdle(signal?: AbortSignal): Promise<void> {
     this.showThreadStatus();
-    if (!this.waitingForOwner && this.idle && !this.errorStanding && this.unlanded.size === 0) {
+    if (this.sessionEnded() && !this.errorStanding) {
       this.noteStatus("done");
       if (this.reacts) await this.thread.showStatus("done", signal);
-      return;
+    } else {
+      logger.info(`no done reaction in ${this.where}, held by: ${this.doneHeldBy().join(", ")}`);
     }
-    logger.info(`no done reaction in ${this.where}, held by: ${this.doneHeldBy().join(", ")}`);
+    // After the checkmark, which never waits on the agent the footer asks; and not held back
+    // by an error: an error ends the session too, and its footer says how it stood.
+    await this.showFooterIfEnded(signal);
+  }
+
+  /**
+   * Whether the session has ended everything it was doing: nobody to answer, nothing running,
+   * owed, queued or expected, and every reply's end landed. The one definition behind the
+   * checkmark and the footer.
+   */
+  private sessionEnded(): boolean {
+    return !this.waitingForOwner && this.unlanded.size === 0 && this.quiet({ awaitedOnly: false });
+  }
+
+  /**
+   * The footer, once the session has ended everything it was doing (`sessionEnded`): under the
+   * reply its latest work wrote into, by an edit. Owed until the chat says it landed there; work
+   * that starts while it is read owes its own, on its own reply, and this one is not drawn.
+   * `live` false leaves the agent unasked (see `readFooter`).
+   */
+  private async showFooterIfEnded(
+    signal?: AbortSignal,
+    options: { readonly live?: boolean } = {},
+  ): Promise<void> {
+    const reply = this.footerOwedTo;
+    if (reply === null || !this.sessionEnded()) return;
+    const footer = await this.readFooter(signal, options.live ?? true);
+    if (footer === null || this.footerOwedTo !== reply || !this.sessionEnded()) return;
+    if (await reply.showFooter(footer, signal)) {
+      if (this.footerOwedTo === reply) this.footerOwedTo = null;
+    }
+  }
+
+  /**
+   * The footer as the session stands now; null when it would say nothing or cannot be read.
+   * `live` false leaves the agent unasked (a forced end: its process is lost, closing or busy
+   * with a turn that was cut, and would not answer).
+   */
+  private async readFooter(signal?: AbortSignal, live = true): Promise<FooterFields | null> {
+    try {
+      return await cancellable(this.footer(this.sessionTokens, live), signal);
+    } catch (error) {
+      if (error instanceof Cancelled) throw error;
+      // the end still lands, with no footer
+      logger.warning(`could not build the footer in ${this.where}: ${errorName(error)}`);
+      return null;
+    }
   }
 
   /**
@@ -2248,10 +2306,13 @@ export class ThreadSession {
     if (landed) {
       await this.reactDoneIfIdle();
     } else {
-      // ❌ shown, but `state.json` keeps ⏳ or ✋: the answer never reached the chat.
+      // ❌ shown, but `state.json` keeps ⏳ or ✋: the answer never reached the chat. Its reply
+      // takes no footer (`Reply.showFooter`).
       this.errorStanding = true;
       this.noteCrossOverStatus();
       if (this.reacts) this.thread.showStatus("error").catch(() => {});
+      // It no longer holds the session's end back: a later reply may have ended meanwhile.
+      await this.showFooterIfEnded();
     }
   }
 
@@ -2374,6 +2435,7 @@ export class ThreadSession {
       unanswered: null,
     };
     this.active = active;
+    this.footerOwedTo = this.reply(renderer);
     if (opening !== null) await renderer.feedOpening(opening, openingAside);
     const ahead = this.endedAhead;
     this.endedAhead = [];
@@ -2400,14 +2462,14 @@ export class ThreadSession {
     renderer: TurnRenderer,
     signal?: AbortSignal,
   ): Promise<void> {
+    this.footerOwedTo = this.reply(renderer);
     if (text !== null) await renderer.feedOpening(text, aside);
     for (const event of events) await renderer.feed(event);
-    await this.closeReply(renderer, null, { signal });
+    await this.closeReply(renderer, { signal });
   }
 
   private async closeReply(
     renderer: TurnRenderer,
-    footer: FooterFields | null,
     options: { readonly force?: boolean; readonly signal?: AbortSignal } = {},
   ): Promise<void> {
     for (const taskId of renderer.runningTasks) this.taskReplies.set(taskId, renderer);
@@ -2422,13 +2484,14 @@ export class ThreadSession {
     }
     // Before the close, so the reply's last write already carries the list.
     this.showRunning();
-    await renderer.close(footer, options.signal);
+    await renderer.close(options.signal);
     // The reply ends at once unless a task this renderer started outlives this very turn;
     // `force` is a stop, an error or a restart, which never waits for one.
     if (options.force || !this.stillOwed(renderer)) {
       this.trackLanding(await renderer.closeOut(options.signal), this.reply(renderer));
     } else {
-      // Still owed a report: the reply rests, its stream stopped, so that the footer shows.
+      // Still owed a report: the reply rests, its stream stopped with no footer, so that the
+      // list of what still runs shows under it.
       this.reply(renderer).rest();
     }
   }
@@ -2717,15 +2780,6 @@ export class ThreadSession {
       // Kept for `!status`, even when this result reports none (`/usage`, `/clear`): the two
       // lines never disagree.
       this.sessionTokens = sessionTokens(result.tokens);
-      let footer: FooterFields | null;
-      try {
-        footer = await cancellable(this.footer(this.sessionTokens), signal);
-      } catch (error) {
-        if (error instanceof Cancelled) throw error;
-        // the reply still ends, with no footer
-        logger.warning(`could not build the footer in ${this.where}: ${errorName(error)}`);
-        footer = null;
-      }
       stopped = result.ending === "interrupted";
       this.interrupting = false; // this turn's own tail, whichever way it ended
       if (released.length > 0) {
@@ -2735,9 +2789,8 @@ export class ThreadSession {
       // What a restart dropped meanwhile is said where the running turn ends.
       await this.feedEndNotes(active.renderer);
       // `!stop` cut this turn short, the owner's own or a report's: its reply ends like any
-      // other, the footer on its stream's stop, and never waits on a task it may still owe
-      // (`force`: `!stop` never does).
-      await this.closeReply(active.renderer, footer, { force: stopped, signal });
+      // other, and never waits on a task it may still owe (`force`: `!stop` never does).
+      await this.closeReply(active.renderer, { force: stopped, signal });
     } catch (error) {
       active.cut = this.cutBeforeClose(active, error);
       if (active.cut) {
@@ -2901,7 +2954,7 @@ export class ThreadSession {
           if (!whole) await active.renderer.feedEnding(line);
           if (dropped.length > 0) await active.renderer.feedError(notSent(dropped, because));
           await this.feedEndNotes(active.renderer);
-          await this.closeReply(active.renderer, null, { force: true });
+          await this.closeReply(active.renderer, { force: true });
         } catch {
           // the tasks' replies below still end, and the waiters are still released
         }
@@ -2917,12 +2970,14 @@ export class ThreadSession {
       this.settled.set();
       this.stopTailEnded();
     }
+    // A forced end is an end: the footer reads what it can, under the reply of the latest work.
+    await this.showFooterIfEnded(undefined, { live: false }).catch(() => {});
     return endedWell;
   }
 
   /** The reply's footer, or null when it would say nothing. */
-  private async footer(tokens: number | null): Promise<FooterFields | null> {
-    const data = await this.footerData(tokens);
+  private async footer(tokens: number | null, live = true): Promise<FooterFields | null> {
+    const data = await this.footerData(tokens, live);
     const says =
       data.bypass ||
       (data.folder !== null && basename(data.folder) !== "") ||
@@ -2934,9 +2989,9 @@ export class ThreadSession {
    * The footer's values from what the session knows now and `tokens`: the one source for both
    * the footer and `!status`, so the two never disagree.
    */
-  private async footerData(tokens: number | null): Promise<FooterFields> {
+  private async footerData(tokens: number | null, live = true): Promise<FooterFields> {
     let context: ContextUsage = { model: null, percentage: null };
-    if (this.client !== null) {
+    if (live && this.client !== null) {
       try {
         context = await this.client.contextUsage();
       } catch (error) {
@@ -3098,7 +3153,7 @@ export class ThreadSession {
   ): Promise<void> {
     try {
       await turn.sink.text(text, { notice: true });
-      await turn.sink.finish([], null);
+      await turn.sink.finish([]);
       this.trackLanding(await turn.sink.closeOut(), turn.sink);
       if (options.error) this.reactError();
     } finally {

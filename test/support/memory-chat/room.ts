@@ -130,23 +130,14 @@ function shown(message: StoredMessage): ShownMessage {
   return { id, author, kind, text, pressable, unfinished, topLevel };
 }
 
-/** What a reply shows under its message: the footer, and the list of what still runs. */
-export interface Shown {
-  readonly footer: string | null;
-  /** Only the reply that holds the thread's list has one. */
-  readonly list: RunningList | null;
-}
-
-/** A reply the room places the footer of: the same rule as Slack's, over this room's counter. */
+/** A reply the room places the list of: the same rule as Slack's, over this room's counter. */
 export interface Placed {
   /** The message it writes into; null while it has none. */
   readonly message: StoredMessage | null;
-  /** It rests (`rest` was called after `finish`) or its end has landed: it can hold the footer. */
+  /** It rests (`rest` was called after `finish`) or its end has landed: it can hold the list. */
   readonly resting: boolean;
-  /** The footer its turn left, formatted; null when that turn had none. */
-  readonly ownFooter: string | null;
-  /** What it shows under its message from now on. */
-  assign(shown: Shown): void;
+  /** The list of what still runs it shows under its message from now on; only one reply has it. */
+  assign(list: RunningList | null): void;
 }
 
 /** What a memory chat holds, and the test's side of it. */
@@ -303,18 +294,17 @@ export class Room {
     };
   }
 
-  /** A reply whose footer the room places. */
+  /** A reply whose list and footer the room places. */
   join(reply: Placed): void {
     this.#placed.add(reply);
   }
 
   /**
-   * Hands every reply of the thread its footer, with `tails` of the core: one per stretch between
-   * two owner messages, on its lowest ended reply, and the list of what still runs to the lowest
-   * of them all. A reply never moves, so only its text changes.
+   * Hands every reply of the thread the list of what still runs when it holds it, with `tails` of
+   * the core: the lowest resting reply. A reply never moves, so only its text changes.
    */
   place(ref: ThreadRef): void {
-    for (const [reply, tail] of this.#tails(ref, null)) reply.assign(this.#shown(ref, tail));
+    for (const [reply, tail] of this.#tails(ref, null)) reply.assign(this.#listOf(ref, tail));
   }
 
   /** What still runs in the thread changed; null for nothing. */
@@ -325,18 +315,17 @@ export class Room {
   }
 
   /** What `subject` would show if its end had landed now: what its end writes at once. */
-  shownIf(ref: ThreadRef, subject: Placed): Shown {
+  listIf(ref: ThreadRef, subject: Placed): RunningList | null {
     const tail = this.#tails(ref, subject).get(subject);
-    return tail === undefined ? { footer: null, list: null } : this.#shown(ref, tail);
+    return tail === undefined ? null : this.#listOf(ref, tail);
   }
 
-  #shown(ref: ThreadRef, tail: Tail<string>): Shown {
-    const list = tail.running ? (this.#running.get(key(ref.channel, ref.thread)) ?? null) : null;
-    return { footer: tail.footer, list };
+  #listOf(ref: ThreadRef, tail: Tail): RunningList | null {
+    return tail.running ? (this.#running.get(key(ref.channel, ref.thread)) ?? null) : null;
   }
 
-  #tails(ref: ThreadRef, subject: Placed | null): Map<Placed, Tail<string>> {
-    const entries: TailEntry<Placed, string>[] = [];
+  #tails(ref: ThreadRef, subject: Placed | null): Map<Placed, Tail> {
+    const entries: TailEntry<Placed>[] = [];
     for (const reply of this.#placed) {
       const message = reply.message;
       if (message === null && reply !== subject) continue;
@@ -346,20 +335,9 @@ export class Room {
         key: reply,
         at: message?.position ?? Number.POSITIVE_INFINITY,
         resting: reply.resting || reply === subject,
-        footer: reply.ownFooter,
       });
     }
-    const marks = this.#messages
-      .filter(
-        (m) =>
-          !m.deleted &&
-          m.kind === "message" &&
-          m.author === this.owner &&
-          m.channel === ref.channel &&
-          m.thread === ref.thread,
-      )
-      .map((m) => m.position);
-    return tails(entries, marks);
+    return tails(entries);
   }
 
   message(id: MessageId): StoredMessage | null {

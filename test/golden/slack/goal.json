@@ -1,8 +1,12 @@
 {
- "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
  "final": {
   "message_blocks": [
    [
+    {
+     "text": "Goal set: Reply with the single word tick once in each turn, until you have said it three times in total. Never use a tool.\n\nAcknowledged. I'll reply with \"tick\" once per turn until I've said it three times.\n\ntick\n\ntick\n\ntick",
+     "type": "markdown"
+    },
     {
      "type": "divider"
     },
@@ -187,7 +191,19 @@
   {
    "after_sink_call": 12,
    "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 12,
+   "args": {
     "blocks": [
+     {
+      "text": "Goal set: Reply with the single word tick once in each turn, until you have said it three times in total. Never use a tool.\n\nAcknowledged. I'll reply with \"tick\" once per turn until I've said it three times.\n\ntick\n\ntick\n\ntick",
+      "type": "markdown"
+     },
      {
       "type": "divider"
      },
@@ -202,9 +218,10 @@
      }
     ],
     "channel": "C000CHAN",
+    "text": "Goal set: Reply with the single word tick once in each turn, until you have said it three times in total. Never use a tool.",
     "ts": "1790000000.000001"
    },
-   "method": "chat.stopStream"
+   "method": "chat.update"
   }
  ]
 }

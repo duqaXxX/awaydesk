@@ -1,8 +1,12 @@
 {
- "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
  "final": {
   "message_blocks": [
    [
+    {
+     "text": "API Error: 400 Synthetic invalid request.",
+     "type": "markdown"
+    },
     {
      "type": "divider"
     },
@@ -47,7 +51,19 @@
   {
    "after_sink_call": 2,
    "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 2,
+   "args": {
     "blocks": [
+     {
+      "text": "API Error: 400 Synthetic invalid request.",
+      "type": "markdown"
+     },
      {
       "type": "divider"
      },
@@ -62,9 +78,10 @@
      }
     ],
     "channel": "C000CHAN",
+    "text": "API Error: 400 Synthetic invalid request.",
     "ts": "1790000000.000001"
    },
-   "method": "chat.stopStream"
+   "method": "chat.update"
   }
  ]
 }

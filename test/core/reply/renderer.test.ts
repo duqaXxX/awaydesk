@@ -39,15 +39,13 @@ import {
 
 const ALLOWED = new Set(["pending", "in_progress", "complete", "error"]);
 
-class RecordingSink implements Sink<string> {
+class RecordingSink implements Sink {
   texts: string[] = [];
   tasks: TaskUpdate[] = [];
   finished: readonly TaskUpdate[] | null = null;
   notices: string[] = [];
   endings: string[] = [];
-  closedOut: boolean | string | null = false;
-  /** The footer the last `finish` was given. */
-  footer: string | null = null;
+  closedOut = false;
 
   async text(
     markdown: string,
@@ -62,13 +60,12 @@ class RecordingSink implements Sink<string> {
     this.tasks.push(update);
   }
 
-  async finish(closing: readonly TaskUpdate[], footer: string | null): Promise<void> {
+  async finish(closing: readonly TaskUpdate[]): Promise<void> {
     this.finished = closing;
-    this.footer = footer;
   }
 
   async closeOut(): Promise<boolean> {
-    this.closedOut = this.footer;
+    this.closedOut = true;
     return true;
   }
 
@@ -81,14 +78,11 @@ class RecordingSink implements Sink<string> {
   }
 }
 
-async function render(
-  events: readonly SessionEvent[],
-  footer: string | null = "footer",
-): Promise<[RecordingSink, TurnRenderer<string>]> {
+async function render(events: readonly SessionEvent[]): Promise<[RecordingSink, TurnRenderer]> {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES);
+  const renderer = new TurnRenderer(sink, NAMES);
   for (const event of events) await renderer.feed(event);
-  await renderer.close(footer);
+  await renderer.close();
   await renderer.closeOut();
   return [sink, renderer];
 }
@@ -118,7 +112,7 @@ test("tools turn streams text and one line per tool", async () => {
   const last = finals(sink.tasks);
   assert.ok(tools.every((id) => last.get(id)?.status === "complete"));
   assert.deepEqual(sink.finished, []);
-  assert.equal(sink.closedOut, "footer");
+  assert.equal(sink.closedOut, true);
   assert.ok(renderer.result !== null);
 });
 
@@ -614,7 +608,7 @@ test("task title uses the first string argument", () => {
 
 test("feed error appends to the reply", async () => {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES);
+  const renderer = new TurnRenderer(sink, NAMES);
   await renderer.feedError("Claude Code reported an error: `ProcessError`");
   assert.deepEqual(sink.texts, ["\n\nClaude Code reported an error: `ProcessError`"]);
   assert.deepEqual(sink.notices, sink.texts);
@@ -623,7 +617,7 @@ test("feed error appends to the reply", async () => {
 
 test("feed ending marks the line on how the reply ended", async () => {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES);
+  const renderer = new TurnRenderer(sink, NAMES);
   await renderer.feedEnding("Claude Code reported an error: `ProcessError`");
   assert.deepEqual(sink.endings, ["\n\nClaude Code reported an error: `ProcessError`"]);
   assert.deepEqual(sink.notices, sink.endings);
@@ -631,7 +625,7 @@ test("feed ending marks the line on how the reply ended", async () => {
 
 test("feed notice opens the reply", async () => {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES);
+  const renderer = new TurnRenderer(sink, NAMES);
   await renderer.feedNotice("The previous session could not be resumed.");
   assert.deepEqual(sink.texts, ["The previous session could not be resumed.\n\n"]);
 });
@@ -688,7 +682,7 @@ test("a silent turn that was stopped says so", async () => {
 
 test("a notice does not hide a local command s result", async () => {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES);
+  const renderer = new TurnRenderer(sink, NAMES);
   await renderer.feedNotice("The previous session could not be resumed.");
   for (const event of recordedEvents("usage")) await renderer.feed(event);
   assert.ok(renderer.result?.finalText);
@@ -723,7 +717,7 @@ test("tool and task lines carry their name and kind", async () => {
 
 test("the daemon s own lines are notices and claude s words are not", async () => {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES);
+  const renderer = new TurnRenderer(sink, NAMES);
   await renderer.feedNotice("The previous session could not be resumed.");
   await renderer.feedError("The process exited.");
   for (const event of recordedEvents("tools")) await renderer.feed(event);
@@ -1149,7 +1143,7 @@ test("a note fed into a written reply is a paragraph of its own, and text follow
   // A report turn's opening line, fed into the reply that started the task: the note ends with
   // its own break, so the words after it add none.
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES);
+  const renderer = new TurnRenderer(sink, NAMES);
   for (const event of translated(blockEvents(["one"]))) await renderer.feed(event);
   await renderer.feedNotice('✓ Agent "Scan" finished');
   for (const event of translated(blockEvents(["two"]))) await renderer.feed(event);
@@ -1186,7 +1180,7 @@ test("a card keeps the last ten lines of what runs under it and counts them all"
     }),
   );
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES);
+  const renderer = new TurnRenderer(sink, NAMES);
   for (const event of [agent, ...inner]) await renderer.feed(event);
   const card = sink.tasks.at(-1);
   assert.deepEqual(ids(sink.tasks), new Set(["toolu_agent"]));
@@ -1198,22 +1192,10 @@ test("a card keeps the last ten lines of what runs under it and counts them all"
   assert.equal(card?.task, true);
 });
 
-test("a reply closed again with no footer ends with the footer it had", async () => {
-  // A report turn closes the reply of the turn that started the task, and passes no footer.
-  const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES);
-  await renderer.close("footer");
-  assert.equal(renderer.closedOut, false);
-  await renderer.close(null);
-  assert.equal(await renderer.closeOut(), true);
-  assert.equal(sink.closedOut, "footer");
-  assert.equal(renderer.closedOut, true);
-});
-
 test("a reply keeps the answers of a question it holds the line of, and shows them at its end", async () => {
   const events = recordedEvents("ask-answered");
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES);
+  const renderer = new TurnRenderer(sink, NAMES);
   const questions = [{ text: "Which color do you prefer?" }];
   const answers = { "Which color do you prefer?": "Blue" };
   assert.equal(renderer.answered("toolu_unseen", questions, answers), false);
@@ -1268,9 +1250,9 @@ async function renderOrdered(
   streaming: boolean,
 ): Promise<OrderedSink> {
   const sink = new OrderedSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES, null, streaming);
+  const renderer = new TurnRenderer(sink, NAMES, null, streaming);
   for (const event of events) await renderer.feed(event);
-  await renderer.close("footer");
+  await renderer.close();
   await renderer.closeOut();
   return sink;
 }
@@ -1303,7 +1285,7 @@ test("without native streaming a text of several pieces is one write", async () 
 
 test("without native streaming a text waits for its end, and a notice does not reorder it", async () => {
   const sink = new OrderedSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES, null, false);
+  const renderer = new TurnRenderer(sink, NAMES, null, false);
   await renderer.feed({ type: "text_started" });
   await renderer.feed({ type: "text_delta", text: "Hello " });
   await renderer.feed({ type: "text_delta", text: "there" });
@@ -1317,10 +1299,10 @@ test("without native streaming a text waits for its end, and a notice does not r
 
 test("without native streaming the last text is handed over when the reply closes", async () => {
   const sink = new OrderedSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES, null, false);
+  const renderer = new TurnRenderer(sink, NAMES, null, false);
   await renderer.feed({ type: "text_started" });
   await renderer.feed({ type: "text_delta", text: "done" });
-  await renderer.close(null);
+  await renderer.close();
   assert.deepEqual(sink.log, [["text", "done"]]);
   assert.notEqual(sink.finished, null);
 });

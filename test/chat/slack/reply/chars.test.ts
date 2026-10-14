@@ -439,10 +439,12 @@ async function replay(ops: Op[]): Promise<FakeSlack> {
         await clock.advance(op[1]);
         break;
       case "finish":
-        await sink.finish([], null);
+        await sink.finish([]);
         break;
       case "close":
-        await sink.closeOutFormatted(op[1]);
+        // The footer is not part of the end (2026-10-14): `pythonWithoutFooter` takes it out of
+        // what Python's end wrote.
+        await sink.closeOut();
         break;
     }
   }
@@ -450,10 +452,29 @@ async function replay(ops: Op[]): Promise<FakeSlack> {
   return slack;
 }
 
+/**
+ * Python's calls as they read since the footer left the reply's end (2026-10-14): a call that
+ * ended on the footer (its divider, then its context) carries neither, and a closing message
+ * that held the footer alone is posted with the session's footer, which this replay does not
+ * draw. Every cut point stays Python's.
+ */
+function pythonWithoutFooter(name: string, ops: Op[]): [string, number[]][] | undefined {
+  const calls = PYTHON[name];
+  const close = ops.find((op) => op[0] === "close");
+  const footer = close?.[0] === "close" ? close[1] : null;
+  if (calls === undefined || footer === null) return calls;
+  return calls.flatMap(([method, carried]): [string, number[]][] => {
+    if (carried.at(-2) !== 0 || carried.at(-1) !== points(footer)) return [[method, carried]];
+    const kept = carried.slice(0, -2);
+    // A post's first size is its text: with no block left, it waits for the session's footer.
+    return method === "postMessage" && kept.length === 1 ? [] : [[method, kept]];
+  });
+}
+
 for (const [name, ops] of Object.entries(SCENARIOS)) {
   test(`a reply full of characters past U+FFFF is cut where python cut it [${name}]`, async () => {
     const slack = await replay(ops);
     const made = slack.apiCalls.map((call) => [call.method.replace("chat.", ""), sizes(call.args)]);
-    assert.deepEqual(made, PYTHON[name]);
+    assert.deepEqual(made, pythonWithoutFooter(name, ops));
   });
 }

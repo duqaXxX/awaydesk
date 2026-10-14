@@ -115,41 +115,53 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
 (280 seconds) after it started, whichever comes first. Slack closes a stream 5 minutes after
 `chat.startStream` (measured: "Stream lifetime"), and the daemon stops it a little earlier itself.
 
-- **The reply ends first.** `ReplySink.closeOut` stops the stream with `chat.stopStream`, passing
-  the footer `ReplySink.finish` was given, a divider and a context block, as `blocks` at the
-  message's bottom (Slack renders them below the stream, buttons included). The stop is the one
-  notification.
+- **The reply ends first.** `ReplySink.closeOut` stops the stream with `chat.stopStream`, with no
+  footer: the footer is the session's, and comes once the session has ended (see "The footer,
+  once"). The stop is the one notification.
 - **The reply rests first.** A turn that ends with a background task still running or still to be
   reported leaves its reply waiting. `ThreadSession.closeReply` then calls `Reply.rest`: the next
-  pass stops the stream with the same footer blocks at its bottom (the stop is the one
-  notification, and creates no message, so it takes no lock of the thread's places), and the
+  pass stops the stream with no footer (the stop is the one notification, and creates no
+  message, so it takes no lock of the thread's places), and the
   message goes on by `chat.update`, silently, as after the 280 seconds. A running card is rewritten
   in the same pass. The reply counts as at rest from then on (`finish` ran, `rest` was
-  called and its last message is no stream; `rest` itself triggers the placement), so the thread's
-  footer shows under it before it ends. The report grows the message by
-  edit, `finish` runs again with the footer of the report turn, and the reply rests again or ends
-  as below: the ending is posted with the footer and cut out of the message it grew in. A stop that
+  called and its last message is no stream; `rest` itself triggers the placement), so the list of
+  what still runs can show under it. The session has not ended, so the reply shows no footer.
+  The report grows the message by edit, `finish` runs again, and the reply rests again or ends as
+  below: the ending is posted and cut out of the message it grew in. A stop that
   fails leaves the stream open, text given meanwhile goes on to it, and the next pass tries again, which a try after `FINAL_RETRY_SECONDS` starts when nothing else changes.
-  A reply that only finished, with no `rest` and no landed end, is not at rest: it shows no footer
-  and takes none from the reply above, since its end follows at once and may fail.
+  A reply that only finished, with no `rest` and no landed end, is not at rest: its end follows
+  at once and may fail.
 - **280 seconds pass first.** `ReplySink.expire` stops the stream (Slack pushes on the stop, the
   first notification) and the same message keeps growing with `chat.update`, which never notifies
   (measured: "Update after stop is silent"). Each update writes the whole message from the
   renderer's model as `markdown` blocks and `task_card` blocks (a run of calls keeps its card
   until the body ends), with a short `text`, since a `chat.update` whose `text` is long fails
   `msg_too_long`. The end posts the reply's ending as a new message, the second notification
-  (`ReplySink.end`): the text Claude wrote after its last call, whole, with whatever follows it, and
-  the footer under it. Its `text`, the banner, is the first paragraph of that text as plain text
+  (`ReplySink.end`): the text Claude wrote after its last call, whole, with whatever follows it.
+  Its `text`, the banner, is the first paragraph of that text as plain text
   (`markdown.bannerText`), so the notification says how the work ended, the stream's own stop having
   said how it began. The ending is a whole part of the renderer's model, never a cut inside one
   (`ReplySink.endingCursor`), so no list or heading is split. It is posted first, then a silent
   update takes it out of the message it grew in: a failed post leaves the reply as it was, a failed
   update leaves the text twice, and in both cases the end has not landed and the one retry follows.
   When the message holds no such text, or nothing of the answer would stay before it (an answer that
-  is text alone), nothing is moved and the new message is the footer alone
-  (`ReplySink.writeClosing`), its banner the start of Claude's answer, never a line of the daemon's.
-  A turn cut short gets no footer (the Claude Code process was lost, another error ended it, or the
-  daemon restarted or closed the session), and `ThreadSession.abandon` writes a line on how the
+  is text alone), nothing is moved and the end posts nothing yet: its closing message
+  (`ReplySink.writeClosing`) is posted with the session's footer, all it holds, once the session
+  has ended, and that post is the notification. Its banner is the start of Claude's answer, never a
+  line of the daemon's. The end counts as landed once the body is written. When anything was
+  written in the thread since the end (a message of the owner's, a line of the daemon's such as
+  `Stopped.`, another reply), nothing is posted and the footer goes under the body by an edit:
+  the places learn the position of the notices, requests and lines the thread object posts
+  (`ThreadPlaces.posted`, `ThreadPlaces.newestAt`). A file `!open` uploads into the thread is not
+  among them: `files.uploadV2` names no message, and the owner's `!open` before it already
+  counts. A reply whose closing message was put off and
+  that does not hold the session's latest work never posts it, and its end does not notify: the
+  end of the session notifies on the reply that does. When the footer cannot be built, the
+  closing message is not posted either.
+  A turn cut short (the Claude Code process was lost, another error ended it, or the
+  daemon restarted or closed the session) gets the footer like any end of the session, drawn after
+  its replies have ended with what can be read of the session, and the agent is not asked for the
+  context usage then (`ThreadSession.showFooterIfEnded`). `ThreadSession.abandon` writes a line on how the
   reply ended (`Claude Code reported an error: …`, `This reply ended before an answer: …`). When
   Claude wrote text after its last call, that line follows the text into the new message, whose
   banner is still the start of the text. When there is no such text to move, the line itself is the
@@ -161,19 +173,16 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   and the next message connects a new process. The sink keeps it as a part of its own
   (`ReplySink.text` with `ending`, fed by `TurnRenderer.feedEnding`), so a notice written just
   before it stays in the reply, and a card that closes after it moves under it. No other line of the
-  daemon's moves. A footer goes under the line: a report turn cut short renders into a reply that
-  already has the footer of its first turn. When a full message pushed the line, or the note under it, into a
+  daemon's moves. When a full message pushed the line, or the note under it, into a
   continuation, that message rang when it was posted and is the ending as it stands
   (`ReplySink.opensOnEnding`): no closing message follows. A line that does not fit the room left in
-  a message is cut there, as any text is, and the continuation then rings with the rest of it. The
-  new message shows empty in one known case: a turn that ended well with an answer of text alone,
-  whose footer could not be built.
+  a message is cut there, as any text is, and the continuation then rings with the rest of it.
 - **Something sits below.** A reply ends where it is when another reply's message sits below its
   last message (`Reply.overtaken`), or when it rested, a message of the owner's sits below it and
-  no text of Claude's was written to it since it rested (`ReplySink.leftBehind`): the footer goes
-  under that message by a silent edit (`ReplySink.end`), or on the stream's stop while it is still
-  a stream, and nothing is posted, since a new message would land under the other reply, or
-  repeat the old text as the newest in the thread. A task's end line or a card update is not such
+  no text of Claude's was written to it since it rested (`ReplySink.leftBehind`): it ends in that
+  message by a silent edit (`ReplySink.end`), or on the stream's stop while it is still a stream,
+  and nothing is posted, since a new message would land under the other reply, or repeat the old
+  text as the newest in the thread. A task's end line or a card update is not such
   text; a report's text is. A reply with another reply below it opens no continuation either:
   what does not fit the message is cut, as a card's text is, and a warning is logged once. A reply
   that is still writing its turn when the owner writes posts its ending, unless it then rests and
@@ -185,28 +194,27 @@ The stream stays open until the reply ends, or the reply rests, or until `sinks.
   `ReplySink` registers with it when it is built and
   tells it where its last message moved; the listener tells it the `ts` of every message the owner
   wrote in the thread (`SlackChat.ownerPosted`), also one the prompt filter drops. A reply is let
-  go of once its end has landed and an owner message sits below it with no reply of its stretch
-  still to end, above it or below (that reply may take the stretch's footer, so a stretch is let
-  go of as a whole), or the `SlackThread` that opened it closed, its end landed or not; the highest position of a reply let go of stays in the places, so the answers
-  do not change when it goes. A `SlackThread` lets go only of the replies it opened. The places
+  go of once its end has landed and an owner message sits below it, or the `SlackThread` that
+  opened it closed, its end landed or not; the highest position of a reply let go of stays in the
+  places, so the answers do not change when it goes. A `SlackThread` lets go only of the replies
+  it opened. The places
   hold a lock for the creation of a message of any reply of the thread (a stream's start, a
   continuation, an ending, a closing message) and for the end's decision to create one, so that
   two replies cannot each decide on the other's absence. A restart forgets the places: the
   messages written before it are unknown and a footer they show stays where it is. A continuation
   planned before the reply was overtaken and not yet posted is dropped.
-- **One footer between two owner messages.** The footer is placed by position
-  (`ThreadPlaces.place`, from `tails` of the core): in each stretch of a thread between two
-  messages of the owner, the lowest reply that is at rest or whose end has landed shows the footer, and every reply
-  above it in the stretch shows none. The footer is the latest one a turn of the stretch left, so
-  a lower reply whose turn had none shows the upper one's line. A reply writes its end with the
-  footer it would be handed (`ThreadPlaces.tailIf`); once the reply rests or its end has landed the places hand it
-  the footer (`ReplySink.assign`), and a change is written by a silent edit, or by the stop of a
-  stream that is still open. A reply that gives its footer up while its last message is a closing
-  message that held the footer alone has that message deleted with `chat.delete`; the reply stays
-  ended and no second closing message is posted. A footer assigned to it later is drawn under its
-  last body message. A delete that Slack refuses is logged, leaves the footer where it is and is
-  tried once more after `sinks.FINAL_RETRY_SECONDS`; `message_not_found` counts as deleted. A
-  write after the end that fails is tried once more the same way.
+- **The footer, once.** The session decides it and names the reply it goes under: the one its
+  latest work wrote into (`ThreadSession.showFooterIfEnded`, once the session has ended
+  everything, and at a forced end). `ReplySink.showFooter` writes it at once and answers whether
+  it landed; a reply keeps the first footer drawn on it. It goes under the reply's last message by a silent edit, or, when the end put its
+  closing message off, it is all that message holds, in the post that notifies (see "280 seconds
+  pass first"). A reply whose end did not land takes none. A footer stays on its reply: a later
+  end of the session draws its own under a newer reply. A closing message that held only the list
+  is deleted with `chat.delete` when the list leaves it; the reply stays ended and no second
+  closing message is posted. A footer drawn on such a reply later goes under its last body
+  message. A delete that Slack refuses is logged, leaves the card where it is and is tried once
+  more after `sinks.FINAL_RETRY_SECONDS`; `message_not_found` counts as deleted. A write after the
+  end that fails is tried once more the same way.
 
 ### Message limits and continuation
 
@@ -244,10 +252,10 @@ every turn and after `ThreadSession.expireInjectedTurn`, ends every other reply 
 turn Claude Code starts on its own to report a background task renders into the reply of the
 first of the ended tasks (then of the task the agent named) whose reply is still tracked, not
 ended and the last thing in the thread (`ThreadSession.openingTarget`, `Reply.last`). When none
-is, the report gets a reply of its own at the bottom (`ThreadSession.newReply`), and the
-footer goes to the lowest reply of the stretch (see "One footer between two owner messages"). A reply that ends with a
-message of the owner's or another reply below it (`Reply.last`) because no report came is logged at INFO. An owner's next prompt takes no
-footer away.
+is, the report gets a reply of its own at the bottom (`ThreadSession.newReply`), and the footer
+of the session's end goes under it, the reply that holds the latest work (see "The footer,
+once"). A reply that ends with a message of the owner's or another reply below it (`Reply.last`)
+because no report came is logged at INFO.
 
 A background subagent can hand its report back before, or without, a turn of that kind (measured
 2026-10-10 on Claude Code 2.1.294 and 2.1.296 with the owner's setting sources loaded, recorded in
@@ -271,12 +279,13 @@ What happens to a prompt the owner sends while a turn runs, and how a turn takes
 ### A reply cut short
 
 `!stop`, a restart, an error that cuts a turn, an idle close and `SessionGone` end the reply through
-the same path, at once: the stream stops with the footer and, for `!stop`, the stopped command's
-card, and that stop is the notification (`ThreadSession.stopTaskReplies` for the tasks' replies). A
+the same path, at once: the stream stops and, for `!stop`, the stopped command's card, and that
+stop is the notification (`ThreadSession.stopTaskReplies` for the tasks' replies). The footer
+follows by an edit, on the reply the stop or the error ended, once everything has ended. A
 stream whose last append has an unknown outcome (a reset, a timeout) is told nothing more: it is
 stopped and the message goes on by `chat.update` from the model. An append Slack refuses as too long
-(`msg_too_long`) would be refused again, so `ReplySink.streamStep` stops the stream at once, without
-the footer, and writes the message by `chat.update`; the end then posts the reply's ending, as for a
+(`msg_too_long`) would be refused again, so `ReplySink.streamStep` stops the stream at once and
+writes the message by `chat.update`; the end then posts the reply's ending, as for a
 reply past `sinks.STREAM_SECONDS`. The text of a message's cards counts toward the cap of a streamed
 message, by a formula Slack does not document (measured: "Card text cap"). Slack adds the `details`
 and the `output` of every `task_update` to what the card holds, so a stream is sent only the lines a
@@ -288,18 +297,18 @@ estimate of what Slack stores, so a refusal remains possible; it is logged with 
 knew and no content. When Slack refuses an update of any message for its content, the change is
 dropped and the message shows less than the model: unless a later update of it passes, the reply's
 end counts as not landed and the root shows ❌. The update that only folds the cards of a stream sent
-all of its span is the exception, since nothing of the reply is missing. Each stretch of the thread between two owner
-messages shows one footer, on its lowest reply at rest (see "One footer between two owner
-messages"); the list of what still runs sits above that footer on the lowest reply at rest of
-the whole thread (see "The list of what still runs"). A card left `in_progress` in a stopped message
+all of its span is the exception, since nothing of the reply is missing. The thread shows the
+footer of each end of the session once, under the reply that held the session's latest work then
+(see "The footer, once"); the list of what still runs sits on the lowest reply at rest of the
+whole thread (see "The list of what still runs"). A card left `in_progress` in a stopped message
 is stored as an error until it is updated (measured: "Open card stored as error"), so every end
 closes its cards first.
 
 ### The list of what still runs
 
 While a subagent or a background command runs, one `task_card` lists it, above the footer's
-divider, in the thread's last reply at rest: the lowest reply of the whole thread (not of a
-stretch) whose turn has ended and whose last message is no stream (`tails` of the core, applied
+divider if the reply has one, in the thread's last reply at rest: the lowest reply of the whole
+thread whose turn has ended and whose last message is no stream (`tails` of the core, applied
 by `ThreadPlaces.place`). A newer reply that is still a stream does not take it; one that rests
 does, and the older one is edited without it. `ThreadChat.showRunning` hands the list over and
 the reply that holds it writes it with its next pass, on a reply at rest or one whose end has
@@ -309,15 +318,15 @@ status: "in_progress" }` with the title the core made (`2 agents · 1 shell stil
 then `+N more`. The `block_id` is the same for the card's whole life, and no tool call's id has
 that form. Taking the list off a reply is an edit too, and no write of it notifies.
 
-A stream's stop carries the footer alone; the edit that follows adds the card, since no stop with
-a `task_card` in its `blocks` was measured. A message that shows the list stays among the open
+A stream's stop carries no card; the edit that follows adds it, since no stop with a `task_card`
+in its `blocks` was measured. A message that shows the list stays among the open
 replies (`ReplySink.keepsOpen`), and `repair.endReply` removes the block whose `block_id` or
 `task_id` is `running-list`, where it closes a left-over card as an error; on a message that only
 the list kept open it writes no note. `ThreadPlaces` does not let go of the
 reply that holds the list while it does, so that the list can always be taken off it; the close
 of the thread settles every reply that ever held it, let go of or not. A reply takes the list only
 from what the places assigned it once it rests, so the ending of a reply whose end is still on its
-way carries the footer alone and never a second card. A write of the card that failed, or whose
+way never carries a second card. A write of the card that failed, or whose
 answer was lost, is written again: the message's shown blocks are forgotten, and a reply at rest
 tries once more after `FINAL_RETRY_SECONDS`. When a continuation is written, the message before it
 is rewritten in the same pass, so that neither the footer nor the card is in two messages. After a

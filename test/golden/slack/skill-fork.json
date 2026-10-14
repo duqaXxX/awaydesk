@@ -1,8 +1,18 @@
 {
- "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
  "final": {
   "message_blocks": [
    [
+    {
+     "status": "complete",
+     "task_id": "fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
+     "title": "Skill: list-files · 2 calls",
+     "type": "task_card"
+    },
+    {
+     "text": "I've run the list-files skill. The result shows that the working directory `/home/dev/project/.claude/skills/list-files` contains only a `SKILL.md` file. There is no `notes.txt` file in that location.\n\nIf you'd like to list the files in the primary working directory or any other specific directory, please let me know!",
+     "type": "markdown"
+    },
     {
      "type": "divider"
     },
@@ -20,7 +30,6 @@
   "message_cards": [
    [
     {
-     "details": "List files in the skill directory\nRead: /home/dev/project/.claude/skills/list-files/notes.txt",
      "id": "fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
      "status": "complete",
      "title": "Skill: list-files · 2 calls"
@@ -610,7 +619,25 @@
   {
    "after_sink_call": 42,
    "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 42,
+   "args": {
     "blocks": [
+     {
+      "status": "complete",
+      "task_id": "fold:toolu_015nYaxg1PDzv98FXiMfWDbC",
+      "title": "Skill: list-files · 2 calls",
+      "type": "task_card"
+     },
+     {
+      "text": "I've run the list-files skill. The result shows that the working directory `/home/dev/project/.claude/skills/list-files` contains only a `SKILL.md` file. There is no `notes.txt` file in that location.\n\nIf you'd like to list the files in the primary working directory or any other specific directory, please let me know!",
+      "type": "markdown"
+     },
      {
       "type": "divider"
      },
@@ -625,9 +652,10 @@
      }
     ],
     "channel": "C000CHAN",
+    "text": "I've run the list-files skill. The result shows that the working directory /home/dev/project/.claude/skills/list-files contains only a SKILL.md file. There is no notes.txt file in that location.",
     "ts": "1790000000.000001"
    },
-   "method": "chat.stopStream"
+   "method": "chat.update"
   }
  ]
 }

@@ -107,8 +107,7 @@
     },
     {
      "call": "finish",
-     "closing": [],
-     "footer": "footer"
+     "closing": []
     },
     {
      "call": "close_out"
@@ -224,8 +223,7 @@
    },
    {
     "call": "finish",
-    "closing": [],
-    "footer": "footer"
+    "closing": []
    },
    {
     "call": "close_out"

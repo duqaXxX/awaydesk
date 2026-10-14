@@ -740,12 +740,11 @@ lines of text, as in the terminal, with its type in bold: `mechanical(review)`, 
 `2 background agents launched`, with what each does under it. A subagent has no card, and what it
 does shows nowhere in the reply. An Edit or a Write shows once it has ended, as
 one collapsed block titled with the call (`Update(notes.txt)`) that opens on its diff or on the
-new file's first lines. When the reply ends, a divider and the footer close the same message, and
-each of those cards gives way to its line of counts, in grey (`Ran 2 shell commands, read 1 file`). A reply still
+new file's first lines. When the reply ends, each of those cards gives way to its line of counts, in grey (`Ran 2 shell commands, read 1 file`). A reply still
 running 280 seconds after it started stops being a stream (Slack closes streams at 5 minutes) and
 goes on in the same message, updated instead of streamed; what Claude wrote after its last call
-then arrives in a new message, with the footer under it. A turn that ends with a background command
-or agent still running stops the stream at once, with the footer under it, and the report that
+then arrives in a new message. A turn that ends with a background command
+or agent still running stops the stream at once, with no footer, and the report that
 follows grows the same message by edit; the reply ends, with a new message that holds what Claude
 wrote after its last call, once the task and its report are done. A reply longer than one Slack message (12,000 characters or 50 cards) continues in the next one; the text inside collapsed diffs counts toward the 12,000 only while the message is a stream or a post, not once it is edited.
 
@@ -758,7 +757,7 @@ Messages sent to a thread while its turn is running wait their turn; each gets i
 a background task finishes while nothing runs, Claude Code starts a turn of its own to report it,
 as it does in the terminal: that reply opens with Claude Code's own line for the task's end, such
 as `✓ Agent "review" finished · 3m 59s`, or `✗ Agent "review" failed: ` and the reason. An agent
-that ends while a turn runs has that line in the turn's reply. While tasks run, a card above the footer of the thread's
+that ends while a turn runs has that line in the turn's reply. While tasks run, a card under the thread's
 last reply lists them: a title such as `1 agent · 1 shell still running` and a line per task, up to
 six, then `+N more`.
 
@@ -767,8 +766,8 @@ thread's last message. It also shows whenever Claude Code says it is working: in
 starts on its own to report a task, from the moment the task ends, and all through a subagent
 it left in the background. A command left in the background does not keep it: the line goes
 when the answer is in and comes back for the report. So a thread with neither `Working…` nor
-the card of what still runs has ended. The line never counts what still runs: the card above
-the footer does (`1 shell still running`), until the command ends.
+the card of what still runs has ended. The line never counts what still runs: the card
+does (`1 shell still running`), until the command ends.
 The line goes while an approval or a question waits for you. Slack's clients draw it, and the
 iOS app can show none for a thread that Slack on desktop already has open: with desktop closed,
 or with the thread opened on iOS first, it shows on both (seen on 2026-10-04, five runs read by
@@ -780,10 +779,17 @@ it is restarting, a refused attachment, an error) shows small and grey, as the f
 reads apart from Claude's replies. `!help`, `!guide`, `!status` and the answer to a resume show at
 full size.
 
-A reply carries a footer, which says how the session stood when its turn ended. Between two of
-your messages one footer shows, under the app's last reply at rest; a message of yours takes no
-footer away from the replies above it, and a reply that has none of its own shows the one the reply
-above it had:
+The footer says how the session stood when it ended. It shows once, under the reply of the
+session's latest work, when the session has ended everything it was doing: no turn running, no
+message of yours waiting for its answer, no background command or agent running, no report
+expected, no approval or question open. It also shows when `!stop`, a restart, a lost process or
+an error ends the session, with whatever can be read then. It comes a moment after the reply
+ends, with ✅ on the root, by an edit that does not ring. A reply that waits for background work
+shows the card of what still runs and no footer; a footer shown before stays where it is when
+later work ends under it with a footer of its own. The footer sits on a reply, never on one of
+the daemon's own lines: after `!stop` it stays on the reply the stop ended, with `Stopped.` below
+it; a prompt that could not start has none. After a forced end it has no model or context share.
+A thread with `Working…` or the card at its bottom has not ended; the footer says it has:
 
 ```
 ⚡ bypass · claude-opus-5-5 · effort medium · my-project · main · (+42,-10) · 10.2M tok · ctx 15% · 5h 16% ↻ 43m · 7d 46% ↻ 3d 4h
@@ -823,8 +829,11 @@ setting is:
   with its ending, unless it then waits for background work and gets no text before it ends, and
   one that got a report rings with it.
 - A reply that is still open after about 4 minutes 40 seconds rings when its stream stops, and a
-  second time when it ends: what Claude wrote after its last call and the footer arrive as a
-  new message, and the notification reads the start of it.
+  second time when it ends: what Claude wrote after its last call arrives as a new message, and
+  the notification reads the start of it. When Claude wrote nothing after its last call, the
+  second message holds the footer alone and comes once the session has ended; it does not come
+  when something was written below the reply meanwhile, such as `Stopped.`, or when a later
+  reply ends the session.
 - An approval request and a question ring.
 - A reply that fails outright rings once, as any reply ending does.
 - A restart ends the reply as any reply ending does, so it rings once. A `!stop` typed in the

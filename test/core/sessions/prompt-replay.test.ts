@@ -11,7 +11,9 @@
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
 import type { PromptContent } from "../../../src/agent/seam.ts";
+import { TurnRenderer } from "../../../src/core/reply/renderer.ts";
 import type { ThreadSession } from "../../../src/core/sessions/session.ts";
+import { cancellable } from "../../../src/core/sessions/tasks.ts";
 import { type Turn, takenNote } from "../../../src/core/sessions/turn.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { AsyncEvent } from "../../support/fake-clock.ts";
@@ -367,21 +369,30 @@ test("a prompt taken into a turn whose end a close cut is said to be taken, not 
 
 // Issue #263, from the review of its first commit: what else a close can cut in that window.
 
-/** Hold the footer's first read, so the reader stays inside `finish`. */
-function holdFooter(h: Harness): { reading: () => boolean; release: () => void } {
-  const client = h.clients[0];
-  assert.ok(client !== undefined);
+/**
+ * Hold the close of the turn's reply, so the reader stays inside `finish` before the reply's end
+ * is asked for: the footer is read only by an end that ends the session, and these ends do not.
+ * The wait gives way to the reader's cancel, as the footer's read did.
+ */
+function holdFooter(t: TestContext): { reading: () => boolean; release: () => void } {
   let reading = false;
   let release: () => void = () => {};
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const original = client.contextUsage.bind(client);
-  client.contextUsage = async () => {
-    reading = true;
-    await held;
-    return original();
-  };
+  const original = TurnRenderer.prototype.close;
+  t.mock.method(
+    TurnRenderer.prototype,
+    "close",
+    async function (this: TurnRenderer, signal?: AbortSignal) {
+      // only the turn's own close waits: the close's `abandon` closes the reply again
+      if (!reading) {
+        reading = true;
+        await cancellable(held, signal);
+      }
+      return original.call(this, signal);
+    },
+  );
   return { reading: () => reading, release };
 }
 
@@ -390,7 +401,7 @@ test("a close that cuts a turn's end while an earlier reply's command still runs
   await firstTurn(h, session, c);
   assert.equal(session.runningKinds, "1 shell"); // the first turn left its command running
   const prompt = await send(h, session, PROMPT);
-  const hold = holdFooter(h);
+  const hold = holdFooter(t);
   play(h, c.own);
   await h.until(() => hold.reading());
   // The command belongs to the earlier reply, not to the turn being ended.
@@ -405,7 +416,7 @@ test("a prompt whose turn a report's result ended is said not to be sent when a 
   const { c, h, session } = crossed(t);
   await firstTurn(h, session, c);
   const prompt = await send(h, session, PROMPT);
-  const hold = holdFooter(h);
+  const hold = holdFooter(t);
   // The report turn with no notification before it: the turn's start takes the owner's prompt.
   h.clients[0]?.inject(c.report);
   await h.until(() => hold.reading());

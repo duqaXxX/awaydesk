@@ -72,6 +72,8 @@ export interface Inside {
   runningTaskIds(): string[];
   runningList(): { title: string; lines: string[] } | null;
   showRunning(): void;
+  feedEndNotes(renderer: TurnRenderer): Promise<void>;
+  readonly footerOwed: boolean;
 }
 
 export function inside(session: ThreadSession): Inside {

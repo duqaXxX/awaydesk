@@ -69,7 +69,8 @@ may find a seam that needs a change: open an issue before writing one.
 written against its seam and `src/core/port.ts` alone and declares few capabilities, and the
 scenario under `test/scenario/` runs the daemon with the two selected by name. The memory chat
 shows the part of a chat that the port carries: it keeps the order of its own messages and asks
-`tails`, `isLast` and `isOvertaken` which reply shows the footer and the list of what still runs.
+`tails`, `isLast` and `isOvertaken` which reply shows the list of what still runs and which reply
+is last or overtaken. The footer goes under the reply the session names.
 
 Two tests refuse what a module must not do, by layer, so that they hold for a module that is not
 there yet. `test/imports.test.ts` fails when the core imports a module, when a module imports

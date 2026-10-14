@@ -9,7 +9,7 @@
  * whole, and a call's result arrives as its text and as what it did to a file.
  */
 import type { Question, SessionEvent } from "../../agent/seam.ts";
-import type { FooterFields, Preview, ReplySink, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
+import type { Preview, ReplySink, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
 import { blank } from "../../text.ts";
 import { formatTokens } from "../footer.ts";
 import * as texts from "../texts.ts";
@@ -27,18 +27,8 @@ import { BACKGROUND, oneLine, STOPPED, splitLines, TITLE_LIMIT } from "./words.t
 export const OUTPUT_LIMIT = 200;
 export const CHILD_LINES = 10;
 
-/**
- * The reply the renderer writes: the chat seam's `ReplySink`, generic in the footer. The
- * renderer keeps the footer a turn's end decided and hands it to `finish`, without ever reading
- * it.
- */
-export type Sink<Footer = FooterFields> = Omit<ReplySink, "finish"> & {
-  finish(
-    closing: readonly TaskUpdate[],
-    footer: Footer | null,
-    signal?: AbortSignal,
-  ): Promise<void>;
-};
+/** The reply the renderer writes: the chat seam's `ReplySink`. The footer is not its concern. */
+export type Sink = ReplySink;
 
 type EventOf<T extends SessionEvent["type"]> = Extract<SessionEvent, { type: T }>;
 export type TaskStarted = EventOf<"task_started">;
@@ -106,8 +96,8 @@ export function terminalStatus(status: string): [status: TaskStatus, output: str
   return ["complete", null];
 }
 
-export class TurnRenderer<Footer = FooterFields> {
-  readonly #sink: Sink<Footer>;
+export class TurnRenderer {
+  readonly #sink: Sink;
   /** The session's folder, which previews name paths from. */
   readonly #cwd: string | null;
   /** The names the texts that name the agent or the chat take. */
@@ -177,12 +167,9 @@ export class TurnRenderer<Footer = FooterFields> {
   authFailed = false;
   /** The category of the last message the agent wrote itself about a failure, if any. */
   error: string | null = null;
-  // The reply's footer, as decided by the turn(s) that have closed it so far (a report turn
-  // can close it again): `closeOut` ends the reply with it once nothing is owed.
-  #footer: Footer | null = null;
   #closedOut = false;
 
-  constructor(sink: Sink<Footer>, names: texts.Names, cwd: string | null = null, streaming = true) {
+  constructor(sink: Sink, names: texts.Names, cwd: string | null = null, streaming = true) {
     this.#sink = sink;
     this.#names = names;
     this.#cwd = cwd;
@@ -360,7 +347,7 @@ export class TurnRenderer<Footer = FooterFields> {
    * coming, which can be after more than one call here (a background task's own report turn
    * closes the same reply again).
    */
-  async close(footer: Footer | null, signal?: AbortSignal): Promise<void> {
+  async close(signal?: AbortSignal): Promise<void> {
     const interrupted = this.result !== null && this.result.ending === "interrupted";
     await this.#handOver();
     await this.#writeLaunches();
@@ -389,10 +376,7 @@ export class TurnRenderer<Footer = FooterFields> {
       }
     }
     for (const entry of closing) this.#lines.set(entry.id, entry);
-    // Only ever moves forward: a report turn passes none, and must not erase what an earlier
-    // close already decided for a still-deferred end.
-    this.#footer = footer ?? this.#footer;
-    await this.#sink.finish(closing, this.#footer, signal);
+    await this.#sink.finish(closing, signal);
   }
 
   /** Whether this reply has already ended. */
@@ -401,8 +385,8 @@ export class TurnRenderer<Footer = FooterFields> {
   }
 
   /**
-   * End the reply, with the footer `close` last decided; call after `close`. True when it ended
-   * in the chat. A second call is a no-op of the sink's.
+   * End the reply; call after `close`. True when it ended in the chat. A second call is a no-op
+   * of the sink's.
    */
   async closeOut(signal?: AbortSignal): Promise<boolean> {
     await this.#handOver();
@@ -410,7 +394,7 @@ export class TurnRenderer<Footer = FooterFields> {
     return this.#sink.closeOut(signal);
   }
 
-  get sink(): Sink<Footer> {
+  get sink(): Sink {
     return this.#sink;
   }
 

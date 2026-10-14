@@ -32,14 +32,7 @@ import {
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
 import { isLast, isOvertaken } from "../../../src/core/port.ts";
-import {
-  DAEMON,
-  type MessageKind,
-  type Placed,
-  type Room,
-  type Shown,
-  type StoredMessage,
-} from "./room.ts";
+import { DAEMON, type MessageKind, type Placed, type Room, type StoredMessage } from "./room.ts";
 
 const CAPABILITIES: ChatCapabilities = {
   nativeStreaming: false,
@@ -87,9 +80,10 @@ class MemoryReply implements Reply, Placed {
   #finished = false;
   #rested = false;
   #closed = false;
+  /** The session's footer, once it is drawn under this reply; it stays for good. */
   #footer: string | null = null;
-  /** What the room placed here: the footer, the reply's own or a reply above's, and the list. */
-  #shown: Shown = { footer: null, list: null };
+  /** The list of what still runs the room placed here. */
+  #list: RunningList | null = null;
   #lost = false;
   #landed = false;
   readonly #landing: Promise<boolean>;
@@ -113,14 +107,18 @@ class MemoryReply implements Reply, Placed {
     return this.#finished && (this.#rested || this.#landed);
   }
 
-  get ownFooter(): string | null {
-    return this.#footer;
+  assign(list: RunningList | null): void {
+    if (isDeepStrictEqual(list, this.#list)) return;
+    this.#list = list;
+    if (this.#drawsFooter) this.#write();
   }
 
-  assign(shown: Shown): void {
-    if (isDeepStrictEqual(shown, this.#shown)) return;
-    this.#shown = shown;
-    if (this.#drawsFooter) this.#write();
+  async showFooter(footer: FooterFields): Promise<boolean> {
+    // An end that did not land has no message the footer is known to sit under.
+    if (!this.#landed) return false;
+    this.#footer ??= footerLine(footer);
+    this.#write();
+    return !this.#lost;
   }
 
   // A reply is one message that never moves, so it ends where it is whatever sits below it.
@@ -149,13 +147,11 @@ class MemoryReply implements Reply, Placed {
     this.#write();
   }
 
-  async finish(closing: readonly TaskUpdate[], footer: FooterFields | null): Promise<void> {
+  async finish(closing: readonly TaskUpdate[]): Promise<void> {
     for (const update of closing) await this.task(update);
     this.#finished = true;
-    this.#footer = footer === null ? null : footerLine(footer);
-    // What the reply writes is what the places would give it: no footer is written where the
-    // next pass takes it off.
-    this.#shown = this.#room.shownIf(this.#ref, this);
+    // What the reply writes is what the places would give it.
+    this.#list = this.#room.listIf(this.#ref, this);
     this.#write();
     this.#room.place(this.#ref);
   }
@@ -163,12 +159,12 @@ class MemoryReply implements Reply, Placed {
   rest(): void {
     if (this.#rested) return;
     this.#rested = true;
-    this.#shown = this.#room.shownIf(this.#ref, this);
+    this.#list = this.#room.listIf(this.#ref, this);
     this.#write();
     this.#room.place(this.#ref);
   }
 
-  /** The footer shows once the reply waits (`rest`) or ended; a reply that only finished ends at once. */
+  /** The list shows once the reply waits (`rest`) or ended; a reply that only finished ends at once. */
   get #drawsFooter(): boolean {
     return this.#finished && (this.#rested || this.#closed);
   }
@@ -176,7 +172,7 @@ class MemoryReply implements Reply, Placed {
   async closeOut(): Promise<boolean> {
     if (this.#closed) return this.#landed;
     this.#closed = true;
-    this.#shown = this.#room.shownIf(this.#ref, this);
+    this.#list = this.#room.listIf(this.#ref, this);
     this.#write();
     this.#landed = !this.#lost;
     if (this.#landed && this.#message !== null) {
@@ -207,9 +203,9 @@ class MemoryReply implements Reply, Placed {
       return [`[${status}] ${title}`, ...shown];
     });
     if (this.#drawsFooter) {
-      const { footer, list } = this.#shown;
+      const list = this.#list;
       if (list !== null) lines.push(list.title, ...list.lines.map((line) => `- ${line}`));
-      lines.push(footer ?? "");
+      lines.push(this.#footer ?? "");
     }
     return lines.filter((line) => line !== "").join("\n");
   }

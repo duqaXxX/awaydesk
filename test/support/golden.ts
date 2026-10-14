@@ -22,7 +22,8 @@ import type { Json, JsonObject } from "./fixtures.ts";
 import { NAMES } from "./names.ts";
 import { recordedEvents, splitTurns } from "./replay.ts";
 
-// The renderer never reads a footer, so any string stands for the one a session hands it.
+// The footer a session draws once it has ended everything: any string stands for it, since the
+// renderer never sees it and the sink only places it.
 const FOOTER = "footer";
 
 // Nothing in the replay waits on a timer, and the Slack write budget never delays one.
@@ -30,19 +31,20 @@ const DISCIPLINE =
   "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. " +
   "After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the " +
   "debounced write (one flush per sink call, so the debounce never merges two calls); finish " +
-  "and close_out flush by themselves. The fake clock never advances, so the 280-second stream " +
+  "and close_out flush by themselves. After close_out the session's footer is drawn, as at the " +
+  "end of a session whose last reply this is. The fake clock never advances, so the 280-second stream " +
   "deadline never fires, and the UpdateLimiter has a budget no recording can spend.";
 
 type SinkCall =
   | { call: "text"; markdown: string; notice: boolean; ending: boolean }
   | { call: "task"; update: TaskUpdate }
-  | { call: "finish"; closing: readonly TaskUpdate[]; footer: string | null }
+  | { call: "finish"; closing: readonly TaskUpdate[] }
   | { call: "close_out" }
   | { call: "wait_landed" }
   | { call: "settle" };
 
 /** Every call the renderer makes on its sink, as the plain objects the golden files hold. */
-class RecordingSink implements Sink<string> {
+class RecordingSink implements Sink {
   calls: SinkCall[] = [];
 
   async text(
@@ -61,8 +63,8 @@ class RecordingSink implements Sink<string> {
     this.calls.push({ call: "task", update });
   }
 
-  async finish(closing: readonly TaskUpdate[], footer: string | null): Promise<void> {
-    this.calls.push({ call: "finish", closing, footer });
+  async finish(closing: readonly TaskUpdate[]): Promise<void> {
+    this.calls.push({ call: "finish", closing });
   }
 
   async closeOut(): Promise<boolean> {
@@ -84,9 +86,9 @@ class RecordingSink implements Sink<string> {
 /** One renderer fed `events`, then closed as a finished turn is. */
 async function replayReply(events: readonly SessionEvent[]): Promise<unknown> {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer<string>(sink, NAMES);
+  const renderer = new TurnRenderer(sink, NAMES);
   for (const event of events) await renderer.feed(event);
-  await renderer.close(FOOTER);
+  await renderer.close();
   await renderer.closeOut();
   return {
     calls: sink.calls,
@@ -184,13 +186,11 @@ export async function slackGolden(name: string, reply: JsonObject): Promise<Json
         await sink.settle();
         break;
       case "finish":
-        await sink.finishFormatted(
-          list(call.closing, "closing").map(taskUpdate),
-          optional(call.footer, "footer"),
-        );
+        await sink.finish(list(call.closing, "closing").map(taskUpdate));
         break;
       case "close_out":
         await sink.closeOut();
+        await sink.showFooterFormatted(FOOTER);
         break;
       case "wait_landed":
         await sink.waitLanded();

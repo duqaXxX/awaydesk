@@ -220,6 +220,7 @@ export class SlackChat implements ChatProvider {
   private leaseOf(channel: string, thread: string): ThreadLease {
     const key = threadKey(channel, thread);
     return {
+      peek: () => this.places.get(key)?.places,
       take: () => {
         const known = this.places.get(key);
         if (known !== undefined) {
@@ -361,6 +362,8 @@ const drawnSetups = new WeakMap<SlackChatOptions, Map<string, SetupDraw>>();
 interface ThreadLease {
   take(): ThreadPlaces;
   give(): void;
+  /** The thread's places when some thread object holds them, without taking them. */
+  peek(): ThreadPlaces | undefined;
 }
 
 export class SlackThread implements ThreadChat {
@@ -475,11 +478,19 @@ export class SlackThread implements ThreadChat {
     this.onWritten();
   }
 
+  /**
+   * A message of the app's own posted in the thread outside a reply: the places learn where it
+   * sits, so that no reply posts its closing message below it later. Null for an ephemeral one.
+   */
+  private postedOwn(ts: unknown): void {
+    if (typeof ts === "string" && ts !== "") (this.places ?? this.lease.peek())?.posted(ts);
+  }
+
   async notice(text: string): Promise<void> {
     // mrkdwn reads `&`, `<` and `>` as markup, and a notice can quote the owner's own message.
     const shown = mrkdwnEscape(text);
     try {
-      await this.slack.chat.postMessage({
+      const posted = await this.slack.chat.postMessage({
         channel: this.channel,
         thread_ts: this.threadTs,
         text: shown,
@@ -487,6 +498,7 @@ export class SlackThread implements ThreadChat {
         unfurl_links: false,
         unfurl_media: false,
       });
+      this.postedOwn(posted.ts);
       this.line.wrote(); // a post of the app's clears the thread's status
     } catch (error) {
       logger.error(`could not post in ${this.channel}/${this.threadTs}: ${describe(error)}`);
@@ -529,6 +541,7 @@ export class SlackThread implements ThreadChat {
     }
     // The message is the only handle on its buttons: one Slack did not name cannot be removed.
     if (typeof ts !== "string" || ts === "") throw new ChatError("no_ts");
+    this.postedOwn(ts);
     return ts;
   }
 
@@ -602,9 +615,11 @@ export class SlackThread implements ThreadChat {
   async tell(text: string, options: { readonly stays?: boolean } = {}): Promise<void> {
     if (this.stopped.aborted) return;
     try {
-      await deliverNotice(this.slack, this.options.identity.ownerUserId, this.place, text, {
-        ephemeral: !options.stays,
-      });
+      this.postedOwn(
+        await deliverNotice(this.slack, this.options.identity.ownerUserId, this.place, text, {
+          ephemeral: !options.stays,
+        }),
+      );
       // Slack clears a thread's status line when the app replies: the session's is set
       // again, so `Working…` does not go for a minute after the answer to a word.
       this.written();
@@ -616,14 +631,16 @@ export class SlackThread implements ThreadChat {
   async say(markdown: string, options: { readonly ownerOnly?: boolean } = {}): Promise<void> {
     for (const chunk of split(markdown)) {
       if (this.stopped.aborted) return;
-      await crossing(() =>
-        deliver(
-          this.slack,
-          this.options.identity.ownerUserId,
-          this.place,
-          chunk,
-          [{ type: "markdown", text: chunk }],
-          { ephemeral: options.ownerOnly ?? false },
+      this.postedOwn(
+        await crossing(() =>
+          deliver(
+            this.slack,
+            this.options.identity.ownerUserId,
+            this.place,
+            chunk,
+            [{ type: "markdown", text: chunk }],
+            { ephemeral: options.ownerOnly ?? false },
+          ),
         ),
       );
       this.written();

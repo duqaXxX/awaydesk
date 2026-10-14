@@ -7,6 +7,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The footer shows once, under the reply of the session's latest work, when the session has ended
+  everything it was doing (no turn, no prompt waiting, no background task, no report expected, no
+  approval or question open), and at a forced end (`!stop`, a restart, a lost process, an error,
+  also a turn cut short, which had none). It comes right after the checkmark, by an edit that does
+  not notify; no reply's end carries it, so a reply that rests for background work shows none, and
+  a footer drawn earlier stays where it is. A closing message that would hold the footer alone is
+  posted with it once the session has ended, and that post is the reply's second notification,
+  unless anything was written in the thread since the reply ended: the footer then goes under the
+  reply by an edit. `ThreadPlaces` learns where the app's own posts outside a reply sit.
+  `ReplySink.finish` and `ReplySink.closeOut` take no footer, and `Reply.showFooter` is new. The
+  footer goes on a reply, never on a line of the daemon's own, and a prompt that could not start
+  gets none. A forced end's footer has no model or context share, and one that waits for a report
+  that never comes shows after `INJECTED_TURN_WAIT`. The footer per stretch between two messages
+  of the owner, the footer handed from one reply to another and the deletion of a closing message
+  that held the footer alone are gone.
 - The thread's status line says `Working…` whenever Claude Code says it is working, and no
   longer for the owner's prompts alone (issue #301): in a turn it starts by itself to report a
   task, from the task's end, and all through a subagent left in the background. Sessions start

@@ -137,11 +137,14 @@ function saysStopped(blocks: Block[], note: string): boolean {
 }
 
 /**
- * The blocks with the stopped line added to the text of the last context block; unchanged when
- * the message has none: the edit's own `text` says it.
+ * The blocks with the stopped line added to the text of the footer: the context block that ends
+ * the message under a divider. A message that rests has no footer, and a context block that is
+ * not one (a line of the daemon's own) is not rewritten: the blocks are then unchanged, and the
+ * edit's own `text` says the stop.
  */
 function sayStoppedInTheFooter(blocks: Block[], note: string): Block[] {
-  const index = blocks.findLastIndex((block) => block.type === "context");
+  const index = blocks.length - 1;
+  if (blocks[index]?.type !== "context" || blocks[index - 1]?.type !== "divider") return blocks;
   const last = blocks[index];
   if (last === undefined) return blocks;
   const elements = records(last.elements);

@@ -1,29 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import {
-  type Placed,
-  positionOf,
-  type Shown,
-  ThreadPlaces,
-} from "../../../../src/chat/slack/reply/places.ts";
+import type { RunningList } from "../../../../src/chat/seam.ts";
+import { type Placed, positionOf, ThreadPlaces } from "../../../../src/chat/slack/reply/places.ts";
 
 interface Reply extends Placed {
   lastAt: number | null;
   resting: boolean;
-  ownFooter: string | null;
-  /** The tails handed to it, in order. */
-  assigned: Shown[];
+  /** The lists handed to it, in order. */
+  assigned: (RunningList | null)[];
   /** How many times it was told to settle. */
   settled: number;
 }
 
-function reply(ts: string | null, ownFooter: string | null = null): Reply {
+function reply(ts: string | null): Reply {
   const made: Reply = {
     lastAt: ts === null ? null : positionOf(ts),
     resting: false,
-    ownFooter,
     assigned: [],
-    assign: (shown) => made.assigned.push(shown),
+    assign: (list) => made.assigned.push(list),
     settled: 0,
     settle: async () => {
       made.settled += 1;
@@ -33,13 +27,8 @@ function reply(ts: string | null, ownFooter: string | null = null): Reply {
   return made;
 }
 
-/** The footer a reply was last handed. */
-function footerOf(reply: Reply): string | null {
-  return reply.assigned.at(-1)?.footer ?? null;
-}
-
-function joined(places: ThreadPlaces, ts: string | null, footer: string | null = null): Reply {
-  const made = reply(ts, footer);
+function joined(places: ThreadPlaces, ts: string | null): Reply {
+  const made = reply(ts);
   places.join(made);
   return made;
 }
@@ -155,82 +144,14 @@ describe("ThreadPlaces", () => {
     assert.deepEqual(left, [1, 1]);
   });
 
-  test("the lowest resting reply of a stretch is handed the footer, and the others none", () => {
-    const places = new ThreadPlaces();
-    const upper = joined(places, "1760000001.000001", "upper");
-    const lower = joined(places, "1760000002.000001", "lower");
-    upper.resting = true;
-    places.ended(upper);
-    assert.equal(footerOf(upper), "upper");
-    lower.resting = true;
-    places.ended(lower);
-    assert.equal(footerOf(upper), null);
-    assert.equal(footerOf(lower), "lower");
-  });
-
-  test("an owner message cuts the thread into stretches of one footer each", () => {
-    const places = new ThreadPlaces();
-    const upper = joined(places, "1760000001.000001", "upper");
-    places.ownerPosted("1760000002.000001");
-    const lower = joined(places, "1760000003.000001", "lower");
-    upper.resting = true;
-    lower.resting = true;
-    places.ended(upper);
-    places.ended(lower);
-    assert.equal(footerOf(lower), "lower");
-    assert.equal(places.holds(upper), false, "let go of, with the footer it was handed");
-    assert.equal(footerOf(upper), "upper");
-  });
-
-  test("an ended reply stays while a reply above the next owner message is still to end", () => {
-    const places = new ThreadPlaces();
-    const upper = joined(places, "1760000001.000001", "upper");
-    const lower = joined(places, "1760000002.000001", "lower");
-    upper.resting = true;
-    places.ended(upper);
-    places.ownerPosted("1760000003.000001");
-    assert.equal(places.holds(upper), true, "the lower reply may still take its footer");
-    lower.resting = true;
-    places.ended(lower);
-    assert.equal(footerOf(upper), null, "it was told before it was let go of");
-    assert.equal(places.holds(upper), false);
-    assert.equal(places.holds(lower), false);
-  });
-
   test("a reply with no message yet does not keep an ended one", () => {
     const places = new ThreadPlaces();
-    const upper = joined(places, "1760000001.000001", "upper");
+    const upper = joined(places, "1760000001.000001");
     joined(places, null);
     upper.resting = true;
     places.ended(upper);
     places.ownerPosted("1760000002.000001");
     assert.equal(places.holds(upper), false, "it will land below the owner message");
-  });
-
-  test("tailIf is the tail a reply would be handed if it rested now", () => {
-    const places = new ThreadPlaces();
-    const upper = joined(places, "1760000001.000001", "upper");
-    const lower = joined(places, "1760000002.000001", "lower");
-    lower.resting = true;
-    places.ended(lower);
-    assert.equal(places.tailIf(upper).footer, null, "the lower one holds the stretch's footer");
-    assert.equal(places.tailIf(lower).footer, "lower");
-    const bare = joined(places, null, "bare");
-    assert.equal(places.tailIf(bare).footer, "bare", "unplaced, it lands below everything");
-  });
-
-  test("a reply that moved is placed again", () => {
-    const places = new ThreadPlaces();
-    const upper = joined(places, "1760000001.000001", "upper");
-    const lower = joined(places, "1760000002.000001", "lower");
-    upper.resting = true;
-    lower.resting = true;
-    places.ended(upper);
-    places.ended(lower);
-    upper.lastAt = positionOf("1760000003.000001"); // its ending was posted below the lower one
-    places.moved();
-    assert.equal(footerOf(upper), "upper");
-    assert.equal(footerOf(lower), null);
   });
 
   test("the list is handed to the lowest resting reply, and to no other", () => {
@@ -240,13 +161,13 @@ describe("ThreadPlaces", () => {
     const running = { title: "1 shell still running", lines: ["sleep"] };
     upper.resting = true;
     places.showRunning(running);
-    assert.deepEqual(upper.assigned.at(-1)?.list, running);
+    assert.deepEqual(upper.assigned.at(-1), running);
     lower.resting = true;
     places.place();
-    assert.equal(upper.assigned.at(-1)?.list, null);
-    assert.deepEqual(lower.assigned.at(-1)?.list, running);
+    assert.equal(upper.assigned.at(-1), null);
+    assert.deepEqual(lower.assigned.at(-1), running);
     places.showRunning(null);
-    assert.equal(lower.assigned.at(-1)?.list, null);
+    assert.equal(lower.assigned.at(-1), null);
   });
 
   test("the reply that holds the list is not let go of while it does", () => {
@@ -275,25 +196,6 @@ describe("ThreadPlaces", () => {
     assert.equal(places.holds(lower), true);
   });
 
-  test("the holder of the list pins its stretch, so the footer it shows outlives the owner's message", () => {
-    const places = new ThreadPlaces();
-    const upper = joined(places, "1760000001.000001", "F");
-    upper.resting = true;
-    places.ended(upper);
-    const lower = joined(places, "1760000002.000001"); // ended, with no footer of its own
-    lower.resting = true;
-    places.showRunning({ title: "1 shell still running", lines: ["sleep"] });
-    places.ended(lower);
-    assert.equal(footerOf(lower), "F", "the lower reply shows the stretch's footer");
-    places.ownerPosted("1760000003.000001");
-    assert.equal(places.holds(upper), true, "its footer is still shown by the holder below it");
-    places.place();
-    assert.equal(footerOf(lower), "F", "the stretch keeps its footer");
-    places.showRunning(null);
-    assert.equal(places.holds(upper), false);
-    assert.equal(places.holds(lower), false);
-  });
-
   test("a closed thread lets go of the reply that holds the list", () => {
     const places = new ThreadPlaces();
     const reply = joined(places, "1760000001.000001");
@@ -317,6 +219,31 @@ describe("ThreadPlaces", () => {
     assert.equal(upper.settled, 1);
     await places.settleListed();
     assert.equal(upper.settled, 1, "once");
+  });
+
+  test("the newest message counts the owner's, the app's own posts and every reply", () => {
+    const places = new ThreadPlaces();
+    assert.equal(places.newestAt, null);
+    const upper = joined(places, "1760000001.000001");
+    assert.equal(places.newestAt, upper.lastAt);
+    places.posted("1760000002.000001"); // a notice of the daemon's
+    assert.equal(places.newestAt, positionOf("1760000002.000001"));
+    places.ownerPosted("1760000003.000001");
+    assert.equal(places.newestAt, positionOf("1760000003.000001"));
+    const lower = joined(places, "1760000004.000001");
+    assert.equal(places.newestAt, lower.lastAt);
+    places.posted("1760000000.000001"); // an older post never lowers it
+    assert.equal(places.newestAt, lower.lastAt);
+  });
+
+  test("the newest message stays when the replies are let go of", () => {
+    const places = new ThreadPlaces();
+    const only = joined(places, "1760000001.000001");
+    only.resting = true;
+    places.ended(only);
+    places.ownerPosted("1760000002.000001"); // lets it go
+    assert.equal(places.holds(only), false);
+    assert.equal(places.newestAt, positionOf("1760000002.000001"));
   });
 
   test("the reply the list moved down from is settled by the close, let go of or not", async () => {

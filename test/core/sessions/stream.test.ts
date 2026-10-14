@@ -14,6 +14,7 @@ import { bannerText } from "../../../src/chat/slack/reply/markdown.ts";
 import { STREAM_SECONDS } from "../../../src/chat/slack/reply/sinks.ts";
 import { Status } from "../../../src/chat/slack/reply/status.ts";
 import { APPROVE } from "../../../src/core/requests.ts";
+import { INJECTED_TURN_WAIT } from "../../../src/core/sessions/constants.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { AsyncEvent, CHANNEL, FakeSlack, networkDown, THREAD } from "../../support/fake-slack.ts";
 import type { JsonObject } from "../../support/fixtures.ts";
@@ -62,6 +63,16 @@ function writes(h: Harness): string[] {
     .filter((method) => [...WRITES, "chat.update"].includes(method));
 }
 
+/** Whether each message of the thread, in the order they were made, shows a footer now. */
+function footers(h: Harness): boolean[] {
+  return h.slack.createdTs.map(
+    (ts) => h.slack.messages.get(ts)?.blocks.some((block) => block.type === "divider") ?? false,
+  );
+}
+
+const hasDivider = (args: JsonObject | undefined): boolean =>
+  blocksOf(args).some((block) => block.type === "divider");
+
 function openStreams(h: Harness): string[] {
   return [...h.slack.messages].filter(([, message]) => message.streaming).map(([ts]) => ts);
 }
@@ -82,7 +93,7 @@ function thread(h: Harness) {
   return stored;
 }
 
-test("a turn is one stream that stops with the footer", async (t) => {
+test("a turn is one stream that stops, and the footer follows by an edit", async (t) => {
   const h = harness(t, [{ turns: [sdkMessages("tools")] }]);
   const turn = await h.session().submit("list the files");
   await turn.done.wait();
@@ -92,8 +103,9 @@ test("a turn is one stream that stops with the footer", async (t) => {
   assert.ok(start?.thread_ts === THREAD && start.recipient_user_id === "U000ALICE");
   const [stop, ...moreStops] = h.slack.callsTo("chat.stopStream");
   assert.equal(moreStops.length, 0);
-  assert.deepEqual(blocksOf(stop)[0], { type: "divider" });
-  assert.equal(blocksOf(stop).at(-1)?.type, "context");
+  assert.ok(!hasDivider(stop)); // the end carries no footer
+  await h.idle();
+  assert.deepEqual(footers(h), [true]); // the session has ended: its footer, by an edit
   assert.equal(h.slack.pushes(), 1);
   assert.deepEqual(openStreams(h), []);
 });
@@ -140,36 +152,41 @@ test("a tool first turn and its cards read as the recorded turn", async (t) => {
   assert.deepEqual(h.slack.messageCards(), [[]]);
 });
 
-test("a reply whose turn left a task running rests with its footer, and its report grows it", async (t) => {
+test("a reply whose turn left a task running rests with no footer, and its report grows it", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harness(t, [{ turns: [first] }]);
   await (await h.session().submit("start it")).done.wait();
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
-  // The stream stopped at the end of the turn, with the footer under it: one push.
+  // The stream stopped at the end of the turn, with no footer: the session has not ended. One push.
   assert.equal(h.slack.streamTs.length, 1);
   assert.deepEqual(openStreams(h), []);
-  assert.ok(h.slack.messageBlocks()[0]?.some((block) => block.type === "divider"));
+  assert.ok(!h.slack.messageBlocks()[0]?.some((block) => block.type === "divider"));
   assert.equal(h.slack.pushes(), 1);
   h.clients[0]?.inject([...notice, ...injected]);
   await h.until(() => h.slack.callsTo("chat.postMessage").length > 0);
   await h.until(() => h.reactions().at(-1) === Status.DONE);
+  await h.idle();
   const summary = systemRecord(notice, "task_notification").summary;
   const writes = h.slack.apiCalls.filter((call) =>
     ["chat.update", "chat.postMessage"].includes(call.method),
   );
   const dividers = (call: (typeof writes)[number]) =>
     (call.args.blocks as Array<{ type?: string }>).some((block) => block.type === "divider");
-  // The report grew the first message by edit, the footer still under it ...
+  // The report grew the first message by edit, with no footer under it ...
   const grown = writes.findIndex((call) =>
     JSON.stringify(call.args.blocks).includes(JSON.stringify(summary).slice(1, -1)),
   );
   assert.equal(writes[grown]?.method, "chat.update");
-  assert.ok(dividers(writes[grown] as (typeof writes)[number]));
-  // ... then the ending is posted with the footer and cut out of the first message.
+  assert.ok(!dividers(writes[grown] as (typeof writes)[number]));
+  // ... then the ending is posted, with none either, and cut out of the first message ...
   const posted = writes.findIndex((call) => call.method === "chat.postMessage");
-  assert.ok(posted > grown && dividers(writes[posted] as (typeof writes)[number]));
-  const cut = writes.at(-1);
+  assert.ok(posted > grown && !dividers(writes[posted] as (typeof writes)[number]));
+  const cut = writes[posted + 1];
   assert.ok(cut?.method === "chat.update" && !dividers(cut));
+  // ... and the session's footer goes under the ending by an edit.
+  const footer = writes.at(-1);
+  assert.ok(footer?.method === "chat.update" && dividers(footer));
+  assert.equal(footer.args.ts, h.slack.postedTs[0]);
   assert.equal(h.slack.streamTs.length, 1);
   assert.equal(h.slack.pushes(), 2);
 });
@@ -253,7 +270,7 @@ test("a process lost while the session is idle changes nothing in the thread", a
   assert.equal(h.clients.length, 2);
 });
 
-test("a reply that outlives the stream ends with its last words and the footer", async (t) => {
+test("a reply that outlives the stream ends with its last words, the footer under them", async (t) => {
   const ask = canUseToolCall("Bash", { command: "ls" });
   const h = harness(t, [{ turns: [withAsk(ask)] }]);
   const turn = await h.session().submit("list the files");
@@ -264,8 +281,10 @@ test("a reply that outlives the stream ends with its last words and the footer",
   approve(h);
   await turn.done.wait();
   const ending = h.slack.callsTo("chat.postMessage").at(-1);
-  assert.equal(blocksOf(ending).at(-1)?.type, "context"); // the footer
-  assert.equal(blocksOf(ending)[0]?.type, "markdown"); // under the answer's last paragraph
+  assert.ok(!hasDivider(ending)); // the post that notifies carries no footer
+  assert.equal(blocksOf(ending)[0]?.type, "markdown"); // the answer's last paragraph
+  await h.idle();
+  assert.equal(footers(h).at(-1), true); // the footer, under it by an edit
   const lastWords = String(blocksOf(ending)[0]?.text);
   assert.equal(ending?.text, Array.from(bannerText(lastWords)).slice(0, BANNER_LIMIT).join(""));
   assert.ok(!h.slack.streamTexts()[0]?.includes(lastWords)); // moved, not shown twice
@@ -274,7 +293,7 @@ test("a reply that outlives the stream ends with its last words and the footer",
 
 // `!stop` ends like any other end, and a restart with queued messages says so once.
 
-test("stop ends the stream with the footer and shows the checkmark", async (t) => {
+test("stop ends the stream, shows the checkmark, and the footer follows", async (t) => {
   const h = harness(t, [
     { turns: [[canUseToolCall("Bash", { command: "rm -rf build" }), ...sdkMessages("interrupt")]] },
   ]);
@@ -286,9 +305,14 @@ test("stop ends the stream with the footer and shows the checkmark", async (t) =
   assert.ok(h.slack.streamTs.length === 1 && openStreams(h).length === 0);
   const [stop, ...more] = h.slack.callsTo("chat.stopStream");
   assert.equal(more.length, 0);
-  assert.equal(blocksOf(stop).at(-1)?.type, "context"); // a normal end: the footer, one push
+  assert.ok(!hasDivider(stop)); // a normal end, one push
   assert.equal(h.slack.pushes(), 2); // the approval request (deleted by the stop), and the reply
   await h.until(() => h.reactions().at(-1) === Status.DONE);
+  await h.idle();
+  // The stop's end is the session's: its footer, by an edit, on the reply (the approval request
+  // posted before it was deleted).
+  const reply = h.slack.messages.get(h.slack.streamTs[0] ?? "");
+  assert.ok(reply?.blocks.some((block) => block.type === "divider"));
 });
 
 test("a restart with queued messages ends the running reply with one note", async (t) => {
@@ -310,7 +334,8 @@ test("a restart with queued messages ends the running reply with one note", asyn
   assert.equal(h.slack.streamTs.length, 1); // the dropped messages get no reply of their own
   assert.equal(h.slack.pushes(), 2); // the approval request, and this one end
   // the reply that says it is the thread's latest: the footer is under it
-  assert.ok(blocksOf(h.slack.callsTo("chat.stopStream").at(-1)).some((b) => b.type === "divider"));
+  await h.idle();
+  assert.equal(footers(h).at(-1), true);
   assert.ok(h.reactions().includes(Status.ERROR)); // a dropped message reacts ❌
 });
 
@@ -408,7 +433,9 @@ test("an error that cuts a turn while its subagent works says so in the message 
   assert.equal(more.length, 0);
   assert.ok(String(closing?.text).startsWith("Claude Code reported an error"));
   assert.ok(String(blocksOf(closing)[0]?.text).startsWith("Claude Code reported an error"));
-  await h.until(() => h.slack.messageBlocks().at(-1)?.length === 1); // the list went with the process
+  // The list went with the process; the footer an error end gets is under the line.
+  await h.until(() => !JSON.stringify(h.slack.messageBlocks().at(-1)).includes("still running"));
+  await h.idle();
   const [block] = h.slack.messageBlocks().at(-1) ?? [];
   assert.equal(block?.type, "markdown");
   assert.ok(String(block?.text).startsWith("Claude Code reported an error"));
@@ -461,8 +488,10 @@ test("a reply that rests ends whole with the checkmark when its report arrives",
   assert.deepEqual(openStreams(h), []);
   assert.equal(thread(h).status, null);
   assert.deepEqual(thread(h).openReplies, []);
-  // the footer is in the ending, posted for the report
-  assert.equal(blocksOf(h.slack.callsTo("chat.postMessage").at(-1)).at(-1)?.type, "context");
+  // the footer is under the ending posted for the report, added by an edit
+  await h.idle();
+  assert.ok(!hasDivider(h.slack.callsTo("chat.postMessage").at(-1)));
+  assert.equal(footers(h).at(-1), true);
 });
 
 test("a reply whose stream slack stopped is not ended while its turn is still active", async (t) => {
@@ -590,19 +619,27 @@ test("a crossed owner query is answered in the reply it landed in", async (t) =>
   await owner.done.wait();
   assert.ok(h.slack.streamTs.length === 1 && h.slack.postedTs.length === 0);
   assert.deepEqual(openStreams(h), []);
-  // the reply that carried the answer ends with the footer, as the discarded owner reply never
-  // wrote a message
+  // The report the guess expected may still come: the stop carries no footer, and the wait for
+  // it running out lets the session end, with the footer under the reply that carried the answer.
   const [stop, ...more] = h.slack.callsTo("chat.stopStream");
   assert.equal(more.length, 0);
-  assert.ok(blocksOf(stop).some((block) => block.type === "divider"));
+  assert.ok(!blocksOf(stop).some((block) => block.type === "divider"));
+  await h.idle();
+  await h.clock.advance(INJECTED_TURN_WAIT);
+  await h.until(() => session.idle);
+  await h.sleep(3);
+  assert.deepEqual(
+    h.slack.messageBlocks().map((message) => message.some((block) => block.type === "divider")),
+    [true],
+  );
 });
 
-test("a crossed owner query puts the footer under the reply that carried its answer", async (t) => {
+test("a crossed owner query leaves the footer off while the task it crossed still runs", async (t) => {
   // The report turn that answers the owner's prompt crossed it. The reply that started a task
   // has the owner's message below it, so the answer opens a reply of its own at the bottom (it is
   // not the last thing in the thread, so it takes no report). The owner turn's own reply is
-  // never written, so the footer that belongs under the answer sits under the reply that
-  // carried it.
+  // never written, so the answer sits in the reply that carried it. The command still runs: the
+  // session has not ended, and no reply shows a footer.
   const [first] = splitBackground();
   const taskId = String(systemRecord(first, "task_started").task_id);
   const h = harness(t, [{ turns: [first] }]);
@@ -619,16 +656,14 @@ test("a crossed owner query puts the footer under the reply that carried its ans
   h.clients[0]?.inject(splitTurns(sdkMessages("tools"))[0] ?? []);
   await owner.done.wait();
   assert.ok(h.replies().at(-1)?.startsWith("✓ the task ended"));
-  const blocks = h.slack.messageBlocks();
-  // One footer, under the reply that carried the answer; the reply above, which the owner's
-  // message sits under, shows none.
+  await h.idle();
+  await h.sleep(3);
   assert.deepEqual(
-    blocks.map((message) => message.filter((block) => block.type === "divider").length),
-    [0, 1],
+    h.slack
+      .messageBlocks()
+      .map((message) => message.filter((block) => block.type === "divider").length),
+    [0, 0],
   );
-  const footer = blocks.at(-1)?.at(-1) as JsonObject | undefined;
-  assert.equal(footer?.type, "context");
-  assert.match(JSON.stringify(footer), /claude-haiku/);
 });
 
 test("a close leaves no task waiting on a reply it could not end", async (t) => {
@@ -804,7 +839,7 @@ function footersOf(h: Harness): Array<string | null> {
   });
 }
 
-test("a thread with an owner prompt between its replies shows one footer per stretch, under the last reply of each", async (t) => {
+test("a thread with an owner prompt between its replies shows one footer, under the last message", async (t) => {
   // The recorded background run, with a prompt answered while the command runs: the report goes
   // to the bottom, in the stretch of the prompt's reply.
   // The scheduled write itself is pinned by the sink tests: here the core's own calls cause
@@ -820,14 +855,14 @@ test("a thread with an owner prompt between its replies shows one footer per str
   await h.sleep(5);
   const texts = h.replies();
   assert.equal(texts.findIndex(isReport), 2, texts.join("\n---\n"));
-  // [the first reply] | owner | [the answer, the report]
+  // [the first reply] | owner | [the answer, the report]: the session ends with the report
   assert.deepEqual(
     footersOf(h).map((footer) => footer !== null),
-    [true, false, true],
+    [false, false, true],
   );
 });
 
-test("a report that starts while the owner's prompt has no message yet leaves one footer in the stretch below it", async (t) => {
+test("a report that starts while the owner's prompt has no message yet leaves one footer, under the prompt's reply", async (t) => {
   // Task 3's carried sequence: the reply H waits on a task, the notification arrives, the owner's
   // message is told to the places and submitted (its reply has no message yet), then the report
   // turn starts: H is no longer last, so the report opens a reply below the owner's message, and
@@ -849,7 +884,7 @@ test("a report that starts while the owner's prompt has no message yet leaves on
   const footers = footersOf(h);
   assert.deepEqual(
     footers.map((footer) => footer !== null),
-    [true, false, true],
-    "one footer for the first stretch and one under the prompt's reply",
+    [false, false, true],
+    "one footer, under the prompt's reply",
   );
 });
