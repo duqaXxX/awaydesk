@@ -1153,6 +1153,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `node probe/main.ts --latest` probed nothing on macOS and exited 0. The worktree it starts the
+  probe in sits under the tmpdir, a `/var` that links to `/private/var`, and the entry point
+  compared `process.argv[1]` with the module's own path, which differ there. It now runs on
+  `import.meta.main`, as `src/main.ts` does.
 - A report of a background task that comes after its reply has ended no longer leaves two footers
   a few lines apart. The report gets a reply of its own, under `Background task update`, and once
   it has ended the reply above it shows no footer: replies of the daemon's with no message of the

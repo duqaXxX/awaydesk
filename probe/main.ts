@@ -16,7 +16,6 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
   broken,
@@ -270,6 +269,9 @@ async function main(): Promise<number> {
   return values.latest ? onLatest(values.force) : run(values.certificate, values.force);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// `import.meta.main`, as in `src/main.ts`: `--latest` starts this file in a worktree under
+// macOS's tmpdir, a `/var` that links to `/private/var`, where `process.argv[1]` and the module's
+// own path differ and a comparison of the two would skip `main` and exit 0.
+if (import.meta.main) {
   process.exit(await main());
 }
