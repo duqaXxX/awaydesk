@@ -77,15 +77,17 @@ was not run.
 The rows on commands were measured on 2026-10-09 with Claude Code 2.1.292 and again on
 2026-10-10 with 2.1.294, and sent
 again by the release probe on every new SDK (see [CONTRIBUTING.md](../CONTRIBUTING.md)); the
-pinned SDK bundles Claude Code 2.1.296. Claude
+pinned SDK bundles Claude Code 2.1.300. Claude
 Code's commands reference lists 119 built-in commands; a session started through the SDK is
 offered 50 of them. Twenty-two of the others were each sent as awaydesk sends a command:
 the nineteen of the table, `/status`, `/help` and `/chrome`. Each got the answer quoted above,
 at no cost in tokens. All twenty-two were sent again through the TypeScript SDK 0.3.296 (Claude
-Code 2.1.296) on 2026-10-12, with the same answer.
+Code 2.1.296) on 2026-10-12, with the same answer, and the nineteen of the table through 0.3.300
+(Claude Code 2.1.300) on 2026-10-14.
 Computer use was absent from the session's servers although it was switched on for the folder,
 on the Python SDK 0.2.164 (Claude Code 2.1.292, 2026-10-09) and again on the TypeScript SDK
-0.3.296 (Claude Code 2.1.296, 2026-10-12). The same session started with `--chrome` listed
+0.3.296 (Claude Code 2.1.296, 2026-10-12) and 0.3.300 (Claude Code 2.1.300, 2026-10-14). The
+same session started with `--chrome` listed
 Claude in Chrome as connected, which is a different server.
 
 For some rows the SDK has a way of its own, which awaydesk does not use: a program can

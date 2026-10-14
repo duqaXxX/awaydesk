@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.300, which bundles Claude Code 2.1.300 (issue
+  #307). The release probe certified it on 2026-10-14: the SDK surface table holds and the 24
+  claims hold. The release offers one command the recorded `server-info.json` does not list,
+  `/plugin-authoring` (issue #225).
 - The footer shows once, under the reply of the session's latest work, when the session has ended
   everything it was doing (no turn, no prompt waiting, no background task, no report expected, no
   approval or question open), and at a forced end (`!stop`, a restart, a lost process, an error,
