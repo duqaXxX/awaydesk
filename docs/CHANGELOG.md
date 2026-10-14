@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.300, which bundles Claude Code 2.1.300 (issue
+  #307). The release probe certified it on 2026-10-14: the SDK surface table holds and the 24
+  claims hold. The release offers one command the recorded `server-info.json` does not list,
+  `/plugin-authoring` (issue #225).
 - The footer shows once, under the reply of the session's latest work, when the session has ended
   everything it was doing (no turn, no prompt waiting, no background task, no report expected, no
   approval or question open), and at a forced end (`!stop`, a restart, a lost process, an error,
@@ -1153,6 +1157,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `node probe/main.ts --latest` probed nothing on macOS and exited 0. The worktree it starts the
+  probe in sits under the tmpdir, a `/var` that links to `/private/var`, and the entry point
+  compared `process.argv[1]` with the module's own path, which differ there. It now runs on
+  `import.meta.main`, as `src/main.ts` does.
 - A report of a background task that comes after its reply has ended no longer leaves two footers
   a few lines apart. The report gets a reply of its own, under `Background task update`, and once
   it has ended the reply above it shows no footer: replies of the daemon's with no message of the

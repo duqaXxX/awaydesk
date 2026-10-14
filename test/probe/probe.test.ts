@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -174,6 +175,19 @@ test("a certificate file of another shape is refused", () => {
   assert.deepEqual(certified(path), { "0.2.160": entry });
   writeFileSync(path, JSON.stringify({ "0.2.160": { cli: "2.1.283" } }));
   assert.throws(() => certified(path));
+});
+
+test("the probe runs when started through a symlink, as `--latest` starts it under macOS's tmpdir", () => {
+  // `/var` on macOS links to `/private/var`: a guard comparing `process.argv[1]` with the
+  // module's own path skipped `main`, and the run in the worktree exited 0 having done nothing.
+  const link = join(mkdtempSync(join(tmpdir(), "awaydesk-probe-test-")), "probe");
+  symlinkSync(join(ROOT, "probe"), link);
+  // An unknown option is refused by `main` alone: a run that never reached it exits 0.
+  const run = spawnSync(process.execPath, [join(link, "main.ts"), "--no-such-option"], {
+    encoding: "utf8",
+  });
+  assert.notEqual(run.status, 0);
+  assert.match(run.stderr, /no-such-option/);
 });
 
 // --- The commands of a release (probe/commands.ts) ---------------------------------------------
