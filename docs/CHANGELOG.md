@@ -7,6 +7,34 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The footer shows once, under the reply of the session's latest work, when the session has ended
+  everything it was doing (no turn, no prompt waiting, no background task, no report expected, no
+  approval or question open), and at a forced end (`!stop`, a restart, a lost process, an error,
+  also a turn cut short, which had none). It is read while the checkmark is set and drawn by an
+  edit that does not notify, and a `Working…` that showed when the turn ended stays until then, so
+  the thread's bottom never goes blank between the two; no reply's end carries it, so a reply that rests for background work shows none, and
+  a footer drawn earlier stays where it is. A closing message that would hold the footer alone is
+  posted with it once the session has ended, and that post is the reply's second notification,
+  unless anything was written in the thread since the reply ended: the footer then goes under the
+  reply by an edit. `ThreadPlaces` learns where the app's own posts outside a reply sit.
+  `ReplySink.finish` and `ReplySink.closeOut` take no footer, and `Reply.showFooter` is new. The
+  footer goes on a reply, never on a line of the daemon's own, and a prompt that could not start
+  gets none. A forced end's footer has no model or context share, and one that waits for a report
+  that never comes shows after `INJECTED_TURN_WAIT`. The footer per stretch between two messages
+  of the owner, the footer handed from one reply to another and the deletion of a closing message
+  that held the footer alone are gone.
+- The thread's status line says `Working…` whenever Claude Code says it is working, and no
+  longer for the owner's prompts alone (issue #301): in a turn it starts by itself to report a
+  task, from the task's end, and all through a subagent left in the background. Sessions start
+  with `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS=1`, and the `session_state_changed` records cross
+  the agent seam as the event `state_changed` (`working`, `waiting`, `idle`), behind the new
+  capability `declaredState`. Recorded on 2026-10-14 on Claude Code 2.1.296: `running` comes
+  0.07 seconds after a background command's notification and about a second before the report
+  turn's first event; a background subagent gets one `idle`, after its report. In the transcripts
+  of the daemon's sessions of the ten days before, 18 of 56 report turns on Opus took more than
+  10 seconds from the notification to their first text or call, with nothing in the thread to
+  tell them from a session that had ended. Not seen in Slack yet: the line under a reply at
+  rest for the length of a long subagent.
 - A task's end line is drawn small and grey, as the count of a run of calls is (the owner's
   choice, 2026-10-14; the terminal writes it as text behind a coloured dot). The chat seam's
   `ReplySink.text` takes `aside` for such a line; the Slack provider draws it as a `context`

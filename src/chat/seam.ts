@@ -102,14 +102,10 @@ export interface ReplySink {
   ): Promise<void>;
   task(update: TaskUpdate): Promise<void>;
   /**
-   * The turn's own part has ended; `closing` are the lines still open, closed; `footer` is what
-   * the thread says under its last reply from now on, null when the turn has none.
+   * The turn's own part has ended; `closing` are the lines still open, closed. The reply stays
+   * open: `rest` or `closeOut` follows.
    */
-  finish(
-    closing: readonly TaskUpdate[],
-    footer: FooterFields | null,
-    signal?: AbortSignal,
-  ): Promise<void>;
+  finish(closing: readonly TaskUpdate[], signal?: AbortSignal): Promise<void>;
   /** Ends the reply. False when the end did not land. */
   closeOut(signal?: AbortSignal): Promise<boolean>;
   waitLanded(signal?: AbortSignal): Promise<boolean>;
@@ -162,14 +158,20 @@ export interface RunningList {
 export interface Reply extends ReplySink {
   /**
    * The reply waits for work its turn started: from now on it changes by rewriting its message,
-   * so that what the thread shows under its last reply can be drawn there. Takes effect with the
-   * next write.
+   * so that the list of what still runs can be drawn under its last message. Its stream stops with
+   * no footer. Takes effect with the next write.
    */
   rest(): void;
   /** Whether nothing of the owner's and no other reply sits below this reply in the thread. */
   readonly last: boolean;
   /** Whether another reply has a message below this one: it then ends where it is, by edit. */
   readonly overtaken: boolean;
+  /**
+   * The session has ended everything it was doing: `footer` is drawn under this reply's last
+   * message, by an edit, which notifies nobody, and stays there. Written at once; true when it
+   * landed, false when it did not or when the reply's end never landed (no footer for it then).
+   */
+  showFooter(footer: FooterFields, signal?: AbortSignal): Promise<boolean>;
 }
 
 /**

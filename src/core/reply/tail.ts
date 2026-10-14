@@ -1,52 +1,33 @@
 /**
- * Where a thread's footer and its list of what still runs are drawn. A pure function of the order
- * of the messages, so a provider can ask it again after every change.
+ * Where a thread's list of what still runs is drawn. A pure function of the order of the
+ * messages, so a provider can ask it again after every change. The footer is not placed here: the
+ * session decides it, once, and a provider draws it under the app's last message.
  */
 
 /** One reply that has a message in the thread, as the thread's order sees it. */
-export interface TailEntry<K, F> {
+export interface TailEntry<K> {
   readonly key: K;
   /** Where its last message sits: a larger number is lower in the thread. */
   readonly at: number;
   /** Its turn has ended and its last message can be rewritten. */
   readonly resting: boolean;
-  /** The footer its last ended turn left; null when that turn had none. */
-  readonly footer: F | null;
 }
 
 /** What a reply shows under its last message. */
-export interface Tail<F> {
-  readonly footer: F | null;
+export interface Tail {
   /** Whether the list of what still runs is drawn here. */
   readonly running: boolean;
 }
 
-/**
- * For each entry, what it shows. `ownerMarks` are the positions of the owner's messages: they cut
- * the thread into stretches, and each stretch keeps one footer, on its lowest resting reply.
- */
-export function tails<K, F>(
-  entries: readonly TailEntry<K, F>[],
-  ownerMarks: readonly number[],
-): Map<K, Tail<F>> {
-  const stretchOf = (at: number) => ownerMarks.filter((mark) => mark < at).length;
-  const resting = entries.filter((entry) => entry.resting).sort((a, b) => a.at - b.at);
-  const lowest = resting.at(-1);
-  const result = new Map<K, Tail<F>>();
-  for (const entry of entries) result.set(entry.key, { footer: null, running: false });
-  const stretches = new Map<number, TailEntry<K, F>[]>();
-  for (const entry of resting) {
-    const stretch = stretchOf(entry.at);
-    stretches.set(stretch, [...(stretches.get(stretch) ?? []), entry]);
-  }
-  for (const members of stretches.values()) {
-    const holder = members[members.length - 1] as TailEntry<K, F>;
-    // The holder is the lowest resting reply, but the footer is the latest one a turn left: a
-    // lower reply with none must not blank the stretch.
-    const source = members.findLast((member) => member.footer !== null);
-    result.set(holder.key, { footer: source?.footer ?? null, running: holder === lowest });
-  }
-  return result;
+/** For each entry, what it shows: the list goes to the lowest resting reply of the thread. */
+export function tails<K>(entries: readonly TailEntry<K>[]): Map<K, Tail> {
+  const lowest = entries
+    .filter((entry) => entry.resting)
+    .reduce<TailEntry<K> | undefined>(
+      (found, entry) => (found === undefined || entry.at > found.at ? entry : found),
+      undefined,
+    );
+  return new Map(entries.map((entry) => [entry.key, { running: entry === lowest }]));
 }
 
 /** Nothing of the owner's and no other reply sits below `at`. */

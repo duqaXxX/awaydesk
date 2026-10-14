@@ -634,9 +634,10 @@ export function chatConformance(
           s.rig.read(s.ref).some((m) => m.text.includes("Read notes.txt")),
           "the task line is shown while the reply runs",
         );
-        await reply.finish([], FOOTER);
+        await reply.finish([]);
         assert.equal(await reply.closeOut(), true, "the end landed");
         assert.equal(await reply.waitLanded(), true);
+        assert.equal(await reply.showFooter(FOOTER), true, "the session's footer landed");
         assert.equal(await reply.settle(), true);
         const shown = s.rig.read(s.ref).filter((m) => m.text.includes("The build is finished"));
         assert.equal(shown.length, 1, "the reply is one message");
@@ -649,32 +650,42 @@ export function chatConformance(
         assert.equal(dropped?.[1], null);
       });
 
-      check("a reply at rest shows the footer before it ends", async (s) => {
-        const reply = s.provider.thread(s.ref).openReply(() => {});
-        await reply.text("Started a command");
-        await reply.finish([], FOOTER);
-        reply.rest();
-        await reply.settle();
-        await s.rig.settle();
-        const shown = () => s.rig.read(s.ref).filter((m) => m.text.includes("Started a command"));
-        assert.equal(shown().length, 1);
-        assert.match(shown()[0]?.text ?? "", /model-a/, "the footer shows under the waiting reply");
-        await reply.text("\n\nThe command ended");
-        await reply.finish([], FOOTER);
-        await reply.settle();
-        await s.rig.settle();
-        assert.match(shown()[0]?.text ?? "", /The command ended/, "its report grows it");
-        assert.equal(await reply.closeOut(), true);
-        // A provider may post the ending as a message of its own: the footer shows once.
-        const all = s.rig.read(s.ref).filter((m) => /model-a/.test(m.text));
-        assert.equal(all.length, 1, "the thread says the footer once");
-      });
+      check(
+        "a reply at rest shows no footer; the session's footer goes under its report",
+        async (s) => {
+          const reply = s.provider.thread(s.ref).openReply(() => {});
+          await reply.text("Started a command");
+          await reply.finish([]);
+          reply.rest();
+          await reply.settle();
+          await s.rig.settle();
+          const shown = () => s.rig.read(s.ref).filter((m) => m.text.includes("Started a command"));
+          assert.equal(shown().length, 1);
+          assert.doesNotMatch(shown()[0]?.text ?? "", /model-a/, "the session has not ended");
+          await reply.text("\n\nThe command ended");
+          await reply.finish([]);
+          await reply.settle();
+          await s.rig.settle();
+          assert.match(shown()[0]?.text ?? "", /The command ended/, "its report grows it");
+          assert.doesNotMatch(shown()[0]?.text ?? "", /model-a/);
+          assert.equal(await reply.closeOut(), true);
+          await s.rig.settle();
+          assert.ok(!s.rig.read(s.ref).some((m) => /model-a/.test(m.text)), "its end has none");
+          assert.equal(await reply.showFooter(FOOTER), true);
+          await s.rig.settle();
+          // A provider may post the ending as a message of its own: the footer shows once.
+          const all = s.rig.read(s.ref).filter((m) => /model-a/.test(m.text));
+          assert.equal(all.length, 1, "the thread says the footer once");
+        },
+      );
 
       check("closes out with no footer", async (s) => {
         const reply = s.provider.thread(s.ref).openReply(() => {});
         await reply.text("An answer with no footer");
-        await reply.finish([], null);
+        await reply.finish([]);
         assert.equal(await reply.closeOut(), true);
+        await s.rig.settle();
+        assert.ok(!s.rig.read(s.ref).some((m) => /model-a/.test(m.text)));
       });
 
       check(
@@ -686,8 +697,9 @@ export function chatConformance(
           const holders = () => s.rig.read(s.ref).filter((m) => m.text.includes(title));
           const first = thread.openReply(() => {});
           await first.text("First reply");
-          await first.finish([], FOOTER);
+          await first.finish([]);
           await first.closeOut();
+          await first.showFooter(FOOTER);
           thread.showRunning(running);
           await first.settle();
           await s.rig.settle();
@@ -704,7 +716,7 @@ export function chatConformance(
           assert.equal(holders().length, 1);
           assert.match(holders()[0]?.text ?? "", /First reply/);
           // Once it rests, the list is under it and the first reply shows none.
-          await second.finish([], FOOTER);
+          await second.finish([]);
           await second.closeOut();
           await second.settle();
           await first.settle();
@@ -719,7 +731,7 @@ export function chatConformance(
         const title = "1 shell still running";
         const reply = thread.openReply(() => {});
         await reply.text("Started a command");
-        await reply.finish([], FOOTER);
+        await reply.finish([]);
         await reply.closeOut();
         thread.showRunning({ title, lines: ["Sleep for 5 seconds"] });
         await reply.settle();
@@ -759,7 +771,7 @@ export function chatConformance(
       check("an ended reply with the owner below it is not last", async (s) => {
         const reply = s.provider.thread(s.ref).openReply(() => {});
         await reply.text("The answer");
-        await reply.finish([], FOOTER);
+        await reply.finish([]);
         assert.equal(await reply.closeOut(), true);
         await reply.settle();
         await s.rig.settle();
@@ -769,24 +781,33 @@ export function chatConformance(
         assert.equal(reply.overtaken, false);
       });
 
-      check("a reply with another reply below it ends where it is", async (s) => {
-        const first = s.provider.thread(s.ref).openReply(() => {});
-        await first.text("The first answer");
-        await first.settle();
-        const second = s.provider.thread(s.ref).openReply(() => {});
-        await second.text("The second answer");
-        await second.settle();
-        await s.rig.settle();
-        assert.equal(first.overtaken, true);
-        const messages = s.rig.read(s.ref).length;
-        await first.finish([], FOOTER);
-        assert.equal(await first.closeOut(), true, "the end landed");
-        await s.rig.settle();
-        const shown = s.rig.read(s.ref).filter((m) => m.text.includes("The first answer"));
-        assert.equal(shown.length, 1);
-        assert.match(shown[0]?.text ?? "", /model-a/, "the footer is under it");
-        assert.equal(s.rig.read(s.ref).length, messages, "nothing was posted for the end");
-      });
+      check(
+        "a reply with another reply below it ends where it is, by an edit, with no footer",
+        async (s) => {
+          const first = s.provider.thread(s.ref).openReply(() => {});
+          await first.text("The first answer");
+          await first.settle();
+          const second = s.provider.thread(s.ref).openReply(() => {});
+          await second.text("The second answer");
+          await second.settle();
+          await s.rig.settle();
+          assert.equal(first.overtaken, true);
+          const messages = s.rig.read(s.ref).length;
+          await first.finish([]);
+          assert.equal(await first.closeOut(), true, "the end landed");
+          await s.rig.settle();
+          assert.equal(s.rig.read(s.ref).length, messages, "nothing was posted for the end");
+          await second.finish([]);
+          assert.equal(await second.closeOut(), true);
+          assert.equal(await second.showFooter(FOOTER), true);
+          await first.settle();
+          await second.settle();
+          await s.rig.settle();
+          const shown = footers(s);
+          assert.equal(shown.length, 1, "one footer in the thread");
+          assert.ok((shown[0]?.index ?? -1) >= where(s, "The second answer"), "under the newest");
+        },
+      );
 
       /** Texts of the thread's messages that show the footer. */
       const footers = (s: Started) =>
@@ -797,44 +818,46 @@ export function chatConformance(
       const where = (s: Started, words: string) =>
         s.rig.read(s.ref).findIndex((m) => m.text.includes(words));
 
-      check("between two owner messages one footer shows, under the last reply", async (s) => {
-        const first = s.provider.thread(s.ref).openReply(() => {});
+      check("the session's footer is drawn once, under the reply it is drawn on", async (s) => {
+        const thread = s.provider.thread(s.ref);
+        const first = thread.openReply(() => {});
         await first.text("The first answer");
         await first.settle();
-        const second = s.provider.thread(s.ref).openReply(() => {});
+        const second = thread.openReply(() => {});
         await second.text("The second answer");
         await second.settle();
-        await first.finish([], FOOTER);
+        await first.finish([]);
         assert.equal(await first.closeOut(), true);
-        await second.finish([], FOOTER);
+        await second.finish([]);
         assert.equal(await second.closeOut(), true);
+        await s.rig.settle();
+        assert.equal(footers(s).length, 0, "an end shows none");
+        assert.equal(await second.showFooter(FOOTER), true);
+        assert.equal(await second.showFooter(FOOTER), true, "drawn again, it stays one");
         await first.settle();
         await second.settle();
         await s.rig.settle();
         const shown = footers(s);
-        assert.equal(shown.length, 1, "one footer in the stretch");
-        assert.ok((shown[0]?.index ?? -1) >= where(s, "The second answer"), "under the last reply");
-        assert.equal(
-          s.rig.read(s.ref)[where(s, "The first answer")]?.text.includes("model-a"),
-          false,
-          "the reply above shows none",
-        );
+        assert.equal(shown.length, 1, "one footer in the thread");
+        assert.ok((shown[0]?.index ?? -1) >= where(s, "The second answer"), "under that reply");
       });
 
-      check("an owner message keeps the footer above it", async (s) => {
+      check("a footer drawn earlier stays above the owner's later message", async (s) => {
         const first = s.provider.thread(s.ref).openReply(() => {});
         await first.text("The first answer");
-        await first.finish([], FOOTER);
+        await first.finish([]);
         assert.equal(await first.closeOut(), true);
+        assert.equal(await first.showFooter(FOOTER), true);
         await first.settle();
         await s.rig.owner.says(s.ref.channel, "and one more thing", { thread: s.ref.thread });
         const second = s.provider.thread(s.ref).openReply(() => {});
         await second.text("The second answer");
-        await second.finish([], FOOTER);
+        await second.finish([]);
         assert.equal(await second.closeOut(), true);
+        assert.equal(await second.showFooter(FOOTER), true);
         await second.settle();
         await s.rig.settle();
-        assert.equal(footers(s).length, 2, "each stretch keeps its footer");
+        assert.equal(footers(s).length, 2, "each footer drawn keeps its place");
         assert.ok(
           footers(s).some(
             (m) =>
@@ -844,32 +867,18 @@ export function chatConformance(
         );
       });
 
-      check("a reply that ends with no footer of its own takes the one above it", async (s) => {
-        const first = s.provider.thread(s.ref).openReply(() => {});
-        await first.text("The first answer");
-        await first.settle();
-        const second = s.provider.thread(s.ref).openReply(() => {});
-        await second.text("The second answer");
-        await second.settle();
-        await first.finish([], FOOTER);
-        assert.equal(await first.closeOut(), true);
-        await second.finish([], null);
-        assert.equal(await second.closeOut(), true);
-        await first.settle();
-        await second.settle();
-        await s.rig.settle();
-        const shown = footers(s);
-        assert.equal(shown.length, 1, "the footer is shown once");
-        assert.ok((shown[0]?.index ?? -1) >= where(s, "The second answer"), "under the last reply");
-      });
-
       check("reports an end that did not land", async (s) => {
         const reply = s.provider.thread(s.ref).openReply(() => {});
         await reply.text("This one is refused");
         await reply.settle();
         s.rig.refuseWrites();
-        await reply.finish([], FOOTER);
+        await reply.finish([]);
         assert.equal(await reply.closeOut(), false);
+        assert.equal(
+          await reply.showFooter(FOOTER),
+          false,
+          "no footer for an end that did not land",
+        );
       });
 
       check("lets endReply end one a stop left unfinished", async (s) => {
@@ -909,7 +918,7 @@ export function chatConformance(
         await reply.text("Half of the answer");
         await s.rig.settle();
         assert.ok(s.rig.read(s.ref).some((m) => m.text.includes("Half of the answer")));
-        await reply.finish([], null);
+        await reply.finish([]);
         await reply.closeOut();
       });
     });

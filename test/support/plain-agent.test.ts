@@ -88,7 +88,12 @@ test("the plain agent declares what the plan's table lists", () => {
     bypass: null,
   });
   const lacks = ["subagents", "backgroundTasks", "compaction", "usageLimits", "models"] as const;
-  for (const capability of [...lacks, "promptDuringTurn", "folderTrust"] as const) {
+  for (const capability of [
+    ...lacks,
+    "promptDuringTurn",
+    "folderTrust",
+    "declaredState",
+  ] as const) {
     assert.equal(agent.capabilities[capability], false, capability);
   }
   for (const capability of ["questions", "commands", "sessionListing"] as const) {

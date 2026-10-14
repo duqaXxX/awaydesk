@@ -194,6 +194,13 @@ const TERMINAL_DEFAULTS: Readonly<Record<string, string>> = {
   CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR: "100",
 };
 
+// What the daemon asks a session to say on its stream (environment variables page, read
+// 2026-10-14): `session_state_changed` records, which carry whether Claude Code is running,
+// idle or waiting for an answer. Off by default, in the terminal too.
+const SESSION_SIGNALS: Readonly<Record<string, string>> = {
+  CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS: "1",
+};
+
 // A level outside what `CAPABILITIES` declares, or a mode Claude Code does not take, is refused
 // (the seam's contract).
 function effortOf(level: string): EffortLevel {
@@ -259,8 +266,9 @@ export class ClaudeSession implements AgentSession {
         allowDangerouslySkipPermissions: true,
         systemPrompt: SYSTEM_PROMPT,
         // `env` replaces the environment the process would inherit, so the daemon's own is
-        // passed on: over the terminal's defaults, and under what the owner's file sets.
-        env: { ...TERMINAL_DEFAULTS, ...process.env, ...variables },
+        // passed on: over the terminal's defaults, and under what the owner's file sets. What
+        // the daemon reads from the stream is not the owner's to turn off.
+        env: { ...TERMINAL_DEFAULTS, ...process.env, ...variables, ...SESSION_SIGNALS },
       }),
       extraArgs,
       canUseTool: async (toolName, input, context) => {

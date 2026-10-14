@@ -44,6 +44,7 @@
 import { basename } from "node:path";
 import type {
   AgentSession,
+  AgentState,
   CommandInfo,
   ContextUsage,
   ModelInfo,
@@ -157,6 +158,10 @@ export class ThreadSession {
   // never mistaken for idle-and-done. What the chat shows cannot serve this alone: it only
   // changes once the chat has answered, which a quick turn can easily outrun.
   private errorStanding = false;
+  // The reply the session's latest work wrote into (a turn, a report, a standalone update), while
+  // the footer of its end is owed: cleared only once the chat says the footer landed under it.
+  // A prompt that could not start wrote no work, and is never named here.
+  private footerOwedTo: Reply | null = null;
   private client: AgentSession | null = null;
   private reader: Task | null = null;
   private worker: Task | null = null;
@@ -255,6 +260,10 @@ export class ThreadSession {
   private expiry: Task | null = null;
   /** The agent said it is compacting the conversation and has not said it ended. */
   private compacting = false;
+  /** What the agent last said it is doing (`state_changed`); null before it said anything. */
+  private agentState: AgentState | null = null;
+  /** A turn that ended under `Working…`, not stopped, whose end, ✅ and footer are being drawn. */
+  private turnEnding = false;
   // Armed while idle with nothing pending; any turn, task event, approval or question cancels
   // it, and being idle with nothing pending again (re)starts it.
   private idleExpiry: Task | null = null;
@@ -419,28 +428,38 @@ export class ThreadSession {
   /**
    * What the thread's activity line says, empty for nothing, and the same after the app's
    * name. `Working…` while a prompt of the owner's is owed its answer (`promptOwed`), however
-   * long its turn takes (issue #83), `Compacting conversation…` while any turn compacts, in the
-   * terminal's words (issue #169). A turn the agent starts to report a task owes nobody an
-   * answer and says nothing, and the line never counts what still runs: the list under the
-   * thread's last reply does (issue #295). Nothing while an approval, a question or a hold waits on the owner, while `!stop`
-   * winds a turn down, and once the session is closed. A restart waiting on tasks says which.
+   * long its turn takes (issue #83), and while the agent says it works (`state_changed`): a
+   * turn it starts to report a task, from before that turn's first event, and the wait for a
+   * subagent it left in the background (issue #301), and from a turn's end until its ✅ and
+   * footer are drawn (`turnEnding`), so the line gives way to the footer. With neither the
+   * line nor the list of what still runs under the thread's last reply, the session has
+   * ended. An agent that
+   * declares no state shows the line for the owner's prompts alone. `Compacting conversation…`
+   * while any turn compacts, in the terminal's words (issue #169). The line never counts what
+   * still runs: the list does (issue #295). Nothing while an approval, a question or a hold
+   * waits on the owner, while `!stop` winds a turn down, and once the session is closed. A
+   * restart waiting on tasks says which.
    */
   private threadLine(): readonly [text: string, afterName: string] {
     if (this.closedFlag || this.waitingForOwner || this.interrupting) return ["", ""];
     if (this.compacting && (this.busy || this.promptOwed())) {
       return [texts.THREAD_COMPACTING, texts.THREAD_COMPACTING_STATUS];
     }
-    if (this.promptOwed()) return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
+    if (this.promptOwed() || this.turnEnding) {
+      return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
+    }
     const held = this.draining ? this.runningKindsOf({ awaitedOnly: true }) : "";
     if (held) {
       // A stop that only background tasks hold: said here whatever the list shows, since
-      // `!stop` is what ends the wait.
+      // `!stop` is what ends the wait. It comes before the agent's own word, which says
+      // `working` all through a subagent left in the background.
       const them = held.startsWith("1 ") && !held.includes(" · ") ? "it" : "them";
       return [
         texts.fill(texts.RESTART_WAITS, { counts: held, them }),
         texts.fill(texts.RESTART_WAITS_STATUS, { counts: held }),
       ];
     }
+    if (this.agentState === "working") return [texts.THREAD_WORKING, texts.THREAD_WORKING_STATUS];
     return ["", ""];
   }
 
@@ -1099,6 +1118,11 @@ export class ThreadSession {
     if (client === null) return held ? null : false;
     const tasks = this.background ? this.runningTaskIds() : [];
     if (!this.busy && tasks.length === 0) return held ? null : false;
+    // What the agent said it was doing is void once the owner stops it. It says `idle` only
+    // after an interrupted turn's result (recorded 2026-10-14), and no recording holds what it
+    // says after a task stopped with no turn running. Its next word counts again.
+    this.agentState = null;
+    this.showThreadStatus();
     if (this.busy) {
       // A denial `denyAll` triggers below resolves `askOwner`'s own wait, whose `finally`
       // would otherwise race this method's own closing ✅ back to working; this flag makes it
@@ -1493,6 +1517,9 @@ export class ThreadSession {
           );
           this.idleTimerCheck(); // the session stays alive; may need arming again
         }
+        // The prompt that held the session's end back is gone: the footer an earlier end owes
+        // is drawn now, on the reply of that work (a prompt that never started is never named).
+        await this.showFooterIfEnded(signal);
       }
     }
   }
@@ -1591,6 +1618,8 @@ export class ThreadSession {
         return declared.compaction ? null : "compaction";
       case "report_started":
         return declared.backgroundTasks ? null : "backgroundTasks";
+      case "state_changed":
+        return declared.declaredState ? null : "declaredState";
       case "limits_changed":
         return declared.usageLimits ? null : "usageLimits";
       case "task_started": {
@@ -1624,6 +1653,12 @@ export class ThreadSession {
         return;
       case "prompt_taken":
         this.acknowledge(event.promptId);
+        return;
+      case "state_changed":
+        if (event.state !== this.agentState) {
+          this.agentState = event.state;
+          this.showThreadStatus();
+        }
         return;
       case "report_started":
         // Said with no turn running, right before the turn it names. Inside a running turn it
@@ -1751,8 +1786,9 @@ export class ThreadSession {
         this.trackLanding(await holder.closeOut(signal), this.reply(holder));
         this.showThreadStatus(); // the task's end may change what the line says
         // `!stop` already reacted ✅ itself; skipped so a stopped task's end does not show it
-        // a second time.
-        if (!stopped) await this.reactDoneIfIdle(signal);
+        // a second time. The footer is the stop's end all the same.
+        if (stopped) await this.showFooterIfEnded(signal);
+        else await this.reactDoneIfIdle(signal);
       }
       return;
     }
@@ -1842,21 +1878,33 @@ export class ThreadSession {
       // drain that saw this thread idle meanwhile would exit before the reply's end, leaving
       // its stream open (#25).
       let turnStopped = false;
+      // A `Working…` that shows stays until the footer is drawn, so the thread's bottom never
+      // goes blank between the two; a line that shows something else, or nothing, is not turned
+      // into it, and a stop clears it at once, as `interrupting` already does.
+      this.turnEnding = this.threadLine()[0] === texts.THREAD_WORKING;
       try {
-        turnStopped = await this.finish(active, event, signal);
-      } finally {
-        // A turn cut before its reply closed stays the active one, for `abandon` to end.
-        if (!active.cut) {
-          this.active = null;
-          this.compacting = false;
-          this.showThreadStatus(); // whichever way it ended, `!stop` included
-          // An end told after this turn had begun is reported in a turn to come, which
-          // nothing waits for yet: the turn's start cancelled the wait.
-          if (this.ended.length > 0) this.notified();
+        try {
+          turnStopped = await this.finish(active, event, signal);
+        } finally {
+          if (turnStopped) this.turnEnding = false;
+          // A turn cut before its reply closed stays the active one, for `abandon` to end.
+          if (!active.cut) {
+            this.active = null;
+            this.compacting = false;
+            this.showThreadStatus(); // whichever way it ended, `!stop` included
+            // An end told after this turn had begun is reported in a turn to come, which
+            // nothing waits for yet: the turn's start cancelled the wait.
+            if (this.ended.length > 0) this.notified();
+          }
         }
+        // Checked only now, with the turn no longer active: `finish` alone still reads busy.
+        // `!stop` already reacted ✅ itself; the stop's end is the session's end all the same.
+        if (!turnStopped) await this.reactDoneIfIdle(signal);
+        else await this.showFooterIfEnded(signal);
+      } finally {
+        this.turnEnding = false;
+        this.showThreadStatus();
       }
-      // Checked only now, with the turn no longer active: `finish` alone still reads busy.
-      if (!turnStopped) await this.reactDoneIfIdle(signal);
     }
   }
 
@@ -2169,16 +2217,65 @@ export class ThreadSession {
    * no-op while another prompt, a running task or an unreported one still keeps the session
    * going, or while `errorStanding` says a ❌ from `abandon` already stands: that lasts until
    * new work starts (a submit or a report turn shows ⏳ again, both clearing it), not until
-   * some unrelated task's own sweep decides the session reads idle again.
+   * some unrelated task's own sweep decides the session reads idle again. The footer is read
+   * and drawn beside it (`showFooterIfEnded`).
    */
   private async reactDoneIfIdle(signal?: AbortSignal): Promise<void> {
     this.showThreadStatus();
-    if (!this.waitingForOwner && this.idle && !this.errorStanding && this.unlanded.size === 0) {
+    let done: Promise<unknown> = Promise.resolve();
+    if (this.sessionEnded() && !this.errorStanding) {
       this.noteStatus("done");
-      if (this.reacts) await this.thread.showStatus("done", signal);
-      return;
+      if (this.reacts) done = this.thread.showStatus("done", signal);
+    } else {
+      logger.info(`no done reaction in ${this.where}, held by: ${this.doneHeldBy().join(", ")}`);
     }
-    logger.info(`no done reaction in ${this.where}, held by: ${this.doneHeldBy().join(", ")}`);
+    // Beside the checkmark, which never waits on the agent the footer asks; and not held back
+    // by an error: an error ends the session too, and its footer says how it stood.
+    await Promise.all([done, this.showFooterIfEnded(signal)]);
+  }
+
+  /**
+   * Whether the session has ended everything it was doing: nobody to answer, nothing running,
+   * owed, queued or expected, and every reply's end landed. The one definition behind the
+   * checkmark and the footer.
+   */
+  private sessionEnded(): boolean {
+    return !this.waitingForOwner && this.unlanded.size === 0 && this.quiet({ awaitedOnly: false });
+  }
+
+  /**
+   * The footer, once the session has ended everything it was doing (`sessionEnded`): under the
+   * reply its latest work wrote into, by an edit. Owed until the chat says it landed there; work
+   * that starts while it is read owes its own, on its own reply, and this one is not drawn.
+   * `live` false leaves the agent unasked (see `readFooter`).
+   */
+  private async showFooterIfEnded(
+    signal?: AbortSignal,
+    options: { readonly live?: boolean } = {},
+  ): Promise<void> {
+    const reply = this.footerOwedTo;
+    if (reply === null || !this.sessionEnded()) return;
+    const footer = await this.readFooter(signal, options.live ?? true);
+    if (footer === null || this.footerOwedTo !== reply || !this.sessionEnded()) return;
+    if (await reply.showFooter(footer, signal)) {
+      if (this.footerOwedTo === reply) this.footerOwedTo = null;
+    }
+  }
+
+  /**
+   * The footer as the session stands now; null when it would say nothing or cannot be read.
+   * `live` false leaves the agent unasked (a forced end: its process is lost, closing or busy
+   * with a turn that was cut, and would not answer).
+   */
+  private async readFooter(signal?: AbortSignal, live = true): Promise<FooterFields | null> {
+    try {
+      return await cancellable(this.footer(this.sessionTokens, live), signal);
+    } catch (error) {
+      if (error instanceof Cancelled) throw error;
+      // the end still lands, with no footer
+      logger.warning(`could not build the footer in ${this.where}: ${errorName(error)}`);
+      return null;
+    }
   }
 
   /**
@@ -2226,10 +2323,13 @@ export class ThreadSession {
     if (landed) {
       await this.reactDoneIfIdle();
     } else {
-      // ❌ shown, but `state.json` keeps ⏳ or ✋: the answer never reached the chat.
+      // ❌ shown, but `state.json` keeps ⏳ or ✋: the answer never reached the chat. Its reply
+      // takes no footer (`Reply.showFooter`).
       this.errorStanding = true;
       this.noteCrossOverStatus();
       if (this.reacts) this.thread.showStatus("error").catch(() => {});
+      // It no longer holds the session's end back: a later reply may have ended meanwhile.
+      await this.showFooterIfEnded();
     }
   }
 
@@ -2352,6 +2452,7 @@ export class ThreadSession {
       unanswered: null,
     };
     this.active = active;
+    this.footerOwedTo = this.reply(renderer);
     if (opening !== null) await renderer.feedOpening(opening, openingAside);
     const ahead = this.endedAhead;
     this.endedAhead = [];
@@ -2378,14 +2479,14 @@ export class ThreadSession {
     renderer: TurnRenderer,
     signal?: AbortSignal,
   ): Promise<void> {
+    this.footerOwedTo = this.reply(renderer);
     if (text !== null) await renderer.feedOpening(text, aside);
     for (const event of events) await renderer.feed(event);
-    await this.closeReply(renderer, null, { signal });
+    await this.closeReply(renderer, { signal });
   }
 
   private async closeReply(
     renderer: TurnRenderer,
-    footer: FooterFields | null,
     options: { readonly force?: boolean; readonly signal?: AbortSignal } = {},
   ): Promise<void> {
     for (const taskId of renderer.runningTasks) this.taskReplies.set(taskId, renderer);
@@ -2400,13 +2501,14 @@ export class ThreadSession {
     }
     // Before the close, so the reply's last write already carries the list.
     this.showRunning();
-    await renderer.close(footer, options.signal);
+    await renderer.close(options.signal);
     // The reply ends at once unless a task this renderer started outlives this very turn;
     // `force` is a stop, an error or a restart, which never waits for one.
     if (options.force || !this.stillOwed(renderer)) {
       this.trackLanding(await renderer.closeOut(options.signal), this.reply(renderer));
     } else {
-      // Still owed a report: the reply rests, its stream stopped, so that the footer shows.
+      // Still owed a report: the reply rests, its stream stopped with no footer, so that the
+      // list of what still runs shows under it.
       this.reply(renderer).rest();
     }
   }
@@ -2695,15 +2797,6 @@ export class ThreadSession {
       // Kept for `!status`, even when this result reports none (`/usage`, `/clear`): the two
       // lines never disagree.
       this.sessionTokens = sessionTokens(result.tokens);
-      let footer: FooterFields | null;
-      try {
-        footer = await cancellable(this.footer(this.sessionTokens), signal);
-      } catch (error) {
-        if (error instanceof Cancelled) throw error;
-        // the reply still ends, with no footer
-        logger.warning(`could not build the footer in ${this.where}: ${errorName(error)}`);
-        footer = null;
-      }
       stopped = result.ending === "interrupted";
       this.interrupting = false; // this turn's own tail, whichever way it ended
       if (released.length > 0) {
@@ -2713,9 +2806,8 @@ export class ThreadSession {
       // What a restart dropped meanwhile is said where the running turn ends.
       await this.feedEndNotes(active.renderer);
       // `!stop` cut this turn short, the owner's own or a report's: its reply ends like any
-      // other, the footer on its stream's stop, and never waits on a task it may still owe
-      // (`force`: `!stop` never does).
-      await this.closeReply(active.renderer, footer, { force: stopped, signal });
+      // other, and never waits on a task it may still owe (`force`: `!stop` never does).
+      await this.closeReply(active.renderer, { force: stopped, signal });
     } catch (error) {
       active.cut = this.cutBeforeClose(active, error);
       if (active.cut) {
@@ -2851,6 +2943,7 @@ export class ThreadSession {
     this.notificationWaits = false;
     this.interrupting = false; // whatever it was waiting on, this ends it
     this.compacting = false; // the process that was compacting is gone
+    this.agentState = null; // and it will never say that it rests
     this.showThreadStatus();
     // The replies still waiting for a task of theirs, when no turn is active: a process lost
     // then leaves them the only place that can say so (issue #202). `taskReplies` also keeps
@@ -2878,7 +2971,7 @@ export class ThreadSession {
           if (!whole) await active.renderer.feedEnding(line);
           if (dropped.length > 0) await active.renderer.feedError(notSent(dropped, because));
           await this.feedEndNotes(active.renderer);
-          await this.closeReply(active.renderer, null, { force: true });
+          await this.closeReply(active.renderer, { force: true });
         } catch {
           // the tasks' replies below still end, and the waiters are still released
         }
@@ -2894,12 +2987,14 @@ export class ThreadSession {
       this.settled.set();
       this.stopTailEnded();
     }
+    // A forced end is an end: the footer reads what it can, under the reply of the latest work.
+    await this.showFooterIfEnded(undefined, { live: false }).catch(() => {});
     return endedWell;
   }
 
   /** The reply's footer, or null when it would say nothing. */
-  private async footer(tokens: number | null): Promise<FooterFields | null> {
-    const data = await this.footerData(tokens);
+  private async footer(tokens: number | null, live = true): Promise<FooterFields | null> {
+    const data = await this.footerData(tokens, live);
     const says =
       data.bypass ||
       (data.folder !== null && basename(data.folder) !== "") ||
@@ -2911,9 +3006,9 @@ export class ThreadSession {
    * The footer's values from what the session knows now and `tokens`: the one source for both
    * the footer and `!status`, so the two never disagree.
    */
-  private async footerData(tokens: number | null): Promise<FooterFields> {
+  private async footerData(tokens: number | null, live = true): Promise<FooterFields> {
     let context: ContextUsage = { model: null, percentage: null };
-    if (this.client !== null) {
+    if (live && this.client !== null) {
       try {
         context = await this.client.contextUsage();
       } catch (error) {
@@ -3075,7 +3170,7 @@ export class ThreadSession {
   ): Promise<void> {
     try {
       await turn.sink.text(text, { notice: true });
-      await turn.sink.finish([], null);
+      await turn.sink.finish([]);
       this.trackLanding(await turn.sink.closeOut(), turn.sink);
       if (options.error) this.reactError();
     } finally {

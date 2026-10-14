@@ -53,7 +53,7 @@ npm install -g "./$(npm pack --silent)"
   starts.
 - Approve and Deny buttons for whatever Claude Code asks permission for, and a form for Claude's
   questions.
-- One footer between two of your messages, under the last reply: branch and lines changed, model, effort, context used, usage limits.
+- One footer under the last reply once the session has ended everything: branch and lines changed, model, effort, context used, usage limits.
 - Claude Code's own commands with `!` in place of `/`, such as `!compact` or `!model opus`.
 - Images and files attached to a message reach Claude.
 - A Home tab that lists your sessions by channel, the last used first.

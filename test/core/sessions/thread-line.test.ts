@@ -1,11 +1,12 @@
 /**
- * The status line under a thread (issues #83 and #295): `Working…` while a prompt of the owner's
- * is owed its answer, `Compacting conversation…` while any turn compacts, nothing otherwise. A
- * turn the agent starts on its own to report a task owes nobody an answer, and the line never
- * counts what still runs (the footer does). Replayed from `tools`, `background`,
- * `subagent-handback`, `prompt-replay-before-notification` and `auto-compact-report-turn`, over
- * the real Slack provider on the fake Slack; the lines are the loading messages of
- * `assistant.threads.setStatus`, `""` where it was cleared.
+ * The status line under a thread (issues #83, #295 and #301): `Working…` while a prompt of the
+ * owner's is owed its answer and while the agent says it works, `Compacting conversation…` while
+ * any turn compacts, nothing otherwise. The line never counts what still runs (the list does).
+ * Replayed over the real Slack provider on the fake Slack; the lines are the loading messages of
+ * `assistant.threads.setStatus`, `""` where it was cleared. `session-state-shell` and
+ * `session-state-agent` carry what Claude Code says of its own state; `tools`, `background`,
+ * `subagent-handback`, `prompt-replay-before-notification` and `auto-compact-report-turn` were recorded before the
+ * daemon asked for it, and stand for an agent that says nothing.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -14,6 +15,7 @@ import { INJECTED_TURN_WAIT } from "../../../src/core/sessions/constants.ts";
 import { CHANNEL, THREAD } from "../../support/fake-slack.ts";
 import {
   canUseToolCall,
+  END_OF_STREAM,
   harnessFor,
   type Item,
   isResult,
@@ -108,8 +110,9 @@ test("an owner prompt sent while a background task runs shows Working", async (t
 });
 
 // Case 8 of #295: the turns of this recording that report a subagent and a command are the
-// agent's own, with no prompt behind them.
-test("a report turn of a hand-back changes nothing", async (t) => {
+// agent's own, with no prompt behind them. It was recorded before the daemon asked Claude Code
+// for its state, so it stands for an agent that says nothing of it.
+test("a report turn of a hand-back changes nothing when the agent says no state", async (t) => {
   const items = sdkMessages("subagent-handback");
   const results = items.flatMap((item, index) => (isResult(item) ? [index] : []));
   const [first, , third] = results as [number, number, number, number];
@@ -131,6 +134,89 @@ test("a report turn of a hand-back changes nothing", async (t) => {
     [],
     "no line but a clear came with the report turns",
   );
+  assert.equal(statusLines(h).at(-1), "");
+});
+
+/** Where the agent says `state` for the `nth` time in a recording. */
+function stateAt(items: readonly Item[], state: string, nth: number): number {
+  const found = items.flatMap((item, index) =>
+    isSystem(item, "session_state_changed") && recordOf(item)?.state === state ? [index] : [],
+  );
+  return at(found, nth);
+}
+
+// Issue #301, recorded 2026-10-14: a background command ends, and Claude Code says it is running
+// again 0.07 seconds after the notification, about a second before the report turn's first
+// event. Until then the thread looked as it does once everything has ended.
+test("a report turn shows Working from the task's end, before its first event", async (t) => {
+  const items = sdkMessages("session-state-shell");
+  const rests = stateAt(items, "idle", 0);
+  const resumes = stateAt(items, "running", 1);
+  const h = harnessFor(t)({ turns: [items.slice(0, rests + 1)] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await h.until(() => statusLines(h).at(-1) === "");
+  await h.sleep(0.05);
+  assert.ok(session.runningKinds !== "", "the command still runs");
+  assert.equal(statusLines(h).at(-1), "", "the agent rests while its command runs");
+  const before = statusLines(h).length;
+  h.clients[0]?.inject(items.slice(rests + 1, resumes + 1));
+  await h.until(() => statusLines(h).at(-1) === WORKING);
+  assert.equal(inside(session).active, null, "no turn has started yet");
+  h.clients[0]?.inject(items.slice(resumes + 1));
+  await h.until(() => statusLines(h).at(-1) === "");
+  await h.idle();
+  assertSteady(statusLines(h).slice(before));
+  assert.equal(statusLines(h).at(-1), "");
+});
+
+// Claude Code says `idle` once for a subagent left in the background: after its report, with
+// none at the end of the turn that launched it (recorded 2026-10-14).
+test("a subagent left in the background keeps Working until its report has ended", async (t) => {
+  const items = sdkMessages("session-state-agent");
+  const first = items.findIndex(isResult);
+  const h = harnessFor(t)({ turns: [items.slice(0, first + 1)] });
+  const session = h.session();
+  await (await session.submit("launch it")).done.wait();
+  await h.sleep(0.05);
+  assert.ok(session.runningKinds !== "", "the subagent still runs");
+  assert.equal(statusLines(h).at(-1), WORKING);
+  h.clients[0]?.inject(items.slice(first + 1));
+  await h.until(() => statusLines(h).at(-1) === "");
+  await h.idle();
+  const lines = statusLines(h);
+  assert.equal(lines.indexOf(""), lines.length - 1, "cleared once, at the end");
+  assertSteady(lines);
+});
+
+// No recording holds what Claude Code says after a task is stopped with no turn running: the
+// owner's stop does not wait for it.
+test("a stop of a subagent left in the background clears the line at once", async (t) => {
+  const items = sdkMessages("session-state-agent");
+  const first = items.findIndex(isResult);
+  const h = harnessFor(t)({ turns: [items.slice(0, first + 1)] });
+  const session = h.session();
+  await (await session.submit("launch it")).done.wait();
+  await h.sleep(0.05);
+  assert.equal(statusLines(h).at(-1), WORKING);
+  assert.equal(await session.stop(), true);
+  assert.equal(h.clients[0]?.stoppedTasks.length, 1);
+  await h.until(() => statusLines(h).at(-1) === "");
+  await h.sleep(0.05);
+  assert.equal(statusLines(h).at(-1), "");
+});
+
+// A lost process never says that it rests.
+test("a process lost while the agent says it works clears the line", async (t) => {
+  const items = sdkMessages("session-state-agent");
+  const first = items.findIndex(isResult);
+  const h = harnessFor(t)({ turns: [items.slice(0, first + 1)] });
+  await (await h.session().submit("launch it")).done.wait();
+  await h.sleep(0.05);
+  assert.equal(statusLines(h).at(-1), WORKING);
+  h.clients[0]?.inject([END_OF_STREAM]);
+  await h.until(() => statusLines(h).at(-1) === "");
+  await h.sleep(0.05);
   assert.equal(statusLines(h).at(-1), "");
 });
 

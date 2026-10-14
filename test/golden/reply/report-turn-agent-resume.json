@@ -17,8 +17,7 @@
     },
     {
      "call": "finish",
-     "closing": [],
-     "footer": "footer"
+     "closing": []
     },
     {
      "call": "close_out"
@@ -69,8 +68,7 @@
     },
     {
      "call": "finish",
-     "closing": [],
-     "footer": "footer"
+     "closing": []
     },
     {
      "call": "close_out"
@@ -162,8 +160,7 @@
        "task": true,
        "title": "SendMessage: a0d6caecc437a1298"
       }
-     ],
-     "footer": "footer"
+     ]
     },
     {
      "call": "close_out"
@@ -310,8 +307,7 @@
     },
     {
      "call": "finish",
-     "closing": [],
-     "footer": "footer"
+     "closing": []
     },
     {
      "call": "close_out"
@@ -330,8 +326,7 @@
     },
     {
      "call": "finish",
-     "closing": [],
-     "footer": "footer"
+     "closing": []
     },
     {
      "call": "close_out"
@@ -537,8 +532,7 @@
    },
    {
     "call": "finish",
-    "closing": [],
-    "footer": "footer"
+    "closing": []
    },
    {
     "call": "close_out"

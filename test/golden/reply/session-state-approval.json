@@ -1,0 +1,104 @@
+{
+ "recording": "session-state-approval",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01AjEWFfmc2WpgadcvgwEfyn",
+      "name": "Write",
+      "output": "File created successfully at: /home/dev/project/notes.txt (file state is current in your context — no need to Read it back)",
+      "preview": {
+       "body": "1 hello",
+       "language": "",
+       "plain": false,
+       "summary": "Wrote 1 line to /home/dev/project/notes.txt",
+       "title": "Write(/home/dev/project/notes.txt)"
+      },
+      "status": "complete",
+      "task": false,
+      "title": "Write: /home/dev/project/notes.txt"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "written",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01AjEWFfmc2WpgadcvgwEfyn",
+     "name": "Write",
+     "output": "File created successfully at: /home/dev/project/notes.txt (file state is current in your context — no need to Read it back)",
+     "preview": {
+      "body": "1 hello",
+      "language": "",
+      "plain": false,
+      "summary": "Wrote 1 line to /home/dev/project/notes.txt",
+      "title": "Write(/home/dev/project/notes.txt)"
+     },
+     "status": "complete",
+     "task": false,
+     "title": "Write: /home/dev/project/notes.txt"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "written",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

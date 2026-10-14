@@ -71,7 +71,9 @@ test("a reply is one message: text and task lines in order, what runs, then the 
   assert.deepEqual(chat.texts(channel, ref.thread).slice(1), [
     "First words\n[complete] Read a.txt (again)\nMore words\n[complete] Read b.txt\n[complete] Read c.txt",
   ]);
-  await reply.finish([], {
+  await reply.finish([]);
+  await reply.closeOut();
+  await reply.showFooter({
     bypass: true,
     model: "model-a",
     effort: null,
@@ -83,7 +85,6 @@ test("a reply is one message: text and task lines in order, what runs, then the 
     sessionLimit: null,
     weekLimit: null,
   });
-  await reply.closeOut();
   provider.thread(ref).showRunning({ title: "1 shell still running", lines: ["Sleep"] });
   assert.deepEqual(chat.texts(channel, ref.thread).slice(1), [
     "First words\n[complete] Read a.txt (again)\nMore words\nRead 1 file\n1 shell still running\n- Sleep\nbypass · model-a · /work · +3 -1 · 12% context",
@@ -125,7 +126,7 @@ test("a thread that is not there takes no message", async () => {
   await assert.rejects(chat.as(OWNER).says(channel, "hi", { thread: "nothing" }), /no thread/);
 });
 
-test("a reply that only finished does not take the footer from the reply above", async () => {
+test("the footer goes under the reply it is drawn on, and a footer drawn before stays", async () => {
   const { chat, provider, channel } = await built();
   const sent = await chat.as(OWNER).says(channel, "hello");
   const thread = provider.thread(sent.ref);
@@ -143,24 +144,26 @@ test("a reply that only finished does not take the footer from the reply above",
   };
   const upper = thread.openReply(() => {});
   await upper.text("Upper");
-  await upper.finish([], footer);
+  await upper.finish([]);
   await upper.closeOut();
   const lower = thread.openReply(() => {});
   await lower.text("Lower");
-  // its end has not landed (and no rest was asked): the footer stays above
-  await lower.finish([], footer);
-  const shown = chat.texts(channel, sent.ref.thread);
-  assert.ok(shown.some((text) => text.startsWith("Upper") && text.includes("model-a")));
-  assert.ok(!shown.some((text) => text.startsWith("Lower") && text.includes("model-a")));
-  lower.rest();
-  assert.ok(
+  await lower.finish([]);
+  await lower.closeOut();
+  const withFooter = () =>
     chat
       .texts(channel, sent.ref.thread)
-      .some((t) => t.startsWith("Lower") && t.includes("model-a")),
-  );
-  assert.ok(
-    !chat
-      .texts(channel, sent.ref.thread)
-      .some((t) => t.startsWith("Upper") && t.includes("model-a")),
-  );
+      .filter((text) => text.includes("model-a"))
+      .map((text) => text.split("\n")[0]);
+  assert.deepEqual(withFooter(), [], "an end shows none");
+  // the session ends: the footer goes under the reply it names, and nowhere else
+  assert.equal(await lower.showFooter(footer), true);
+  assert.deepEqual(withFooter(), ["Lower"]);
+  // a footer drawn earlier stays when a later end draws another under a newer reply
+  const newest = thread.openReply(() => {});
+  await newest.text("Newest");
+  await newest.finish([]);
+  await newest.closeOut();
+  assert.equal(await newest.showFooter(footer), true);
+  assert.deepEqual(withFooter(), ["Lower", "Newest"]);
 });

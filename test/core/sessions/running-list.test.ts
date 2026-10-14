@@ -42,10 +42,11 @@ function holders(blocks: readonly (readonly JsonObject[])[]): number[] {
 
 const answer = sdkMessages("foreground");
 
-test("a reply that waits on a command shows the list above its footer, and the end removes it", async (t) => {
+test("a reply that waits on a command shows the list and no footer, and the end removes it; the end of the session draws the footer", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harnessFor(t)({ turns: [first] });
-  await (await h.session().submit("start it")).done.wait();
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
   await h.until(() => holders(h.slack.messageBlocks()).length === 1);
   const blocks = h.slack.messageBlocks().at(-1) ?? [];
   const list = card(blocks);
@@ -54,14 +55,15 @@ test("a reply that waits on a command shows the list above its footer, and the e
   assert.equal(list?.title, "1 shell still running");
   assert.equal(list?.status, "in_progress");
   assert.deepEqual(linesOf(list), ["Sleep for 5 seconds then print done"]);
-  // Above the footer's divider, which is the message's last two blocks.
-  assert.deepEqual(
-    blocks.slice(-3).map((block) => block.type),
-    ["task_card", "divider", "context"],
-  );
+  // The session has not ended: the list is the message's last block and no footer sits below it.
+  assert.equal(blocks.at(-1)?.type, "task_card");
+  assert.ok(!blocks.some((block) => block.type === "divider"));
   assert.ok(!JSON.stringify(h.slack.messageBlocks()).includes("⏳"));
   h.clients[0]?.inject([...notice, ...injected]);
   await h.until(() => holders(h.slack.messageBlocks()).length === 0);
+  await h.until(() => session.idle);
+  await h.sleep(3);
+  assert.equal(h.slack.messageBlocks().at(-1)?.at(-2)?.type, "divider");
   assert.ok(!JSON.stringify(h.slack.messageBlocks()).includes("⏳"));
 });
 
@@ -171,9 +173,9 @@ test("a reply written below takes the list once it rests, and the first loses it
   );
   await h.until(() => holders(h.slack.messageBlocks())[0] === 1);
   assert.deepEqual(holders(h.slack.messageBlocks()), [1]);
-  // The first reply keeps its footer, with the list taken off by an edit.
+  // The first reply carries no footer, with the list taken off by an edit: B's command still runs.
   const firstBlocks = h.slack.messageBlocks()[0] ?? [];
-  assert.equal(firstBlocks.at(-2)?.type, "divider");
+  assert.ok(!firstBlocks.some((block) => block.type === "divider"));
   assert.ok(!JSON.stringify(h.slack.messageBlocks()).includes("⏳"));
 });
 
@@ -225,11 +227,10 @@ test("a report turn opened below the owner's message: the list sits under the pr
   assert.deepEqual(linesOf(list), ["Sleep for 5 seconds then print done"]);
   assert.equal(card(h.slack.messageBlocks()[report] ?? []), null, "the report shows none");
   assert.ok(!JSON.stringify(h.slack.messageBlocks()).includes("⏳"));
-  // One footer to a stretch between two owner messages, and never two in a row: the first two
-  // replies keep theirs, the report none, and the prompt's reply the last.
+  // B still runs: the session has not ended, and no reply shows a footer.
   assert.deepEqual(
     h.slack.messageBlocks().map((blocks) => blocks.filter((b) => b.type === "divider").length),
-    [1, 1, 0, 1],
+    [0, 0, 0, 0],
   );
 });
 

@@ -302,7 +302,8 @@ export const STATUS_WORKING = "Working in: `{directory}`";
 // The count `!status` adds to a session's row.
 export const RUNNING = "⏳ {counts}";
 // Slack's status line under a thread's last message (issues #83 and #295). A client shows the
-// loading message: `THREAD_WORKING` while a prompt of the owner's is owed its answer.
+// loading message: `THREAD_WORKING` while a prompt of the owner's is owed its answer and while
+// the agent says it works (issue #301).
 // `STILL_RUNNING` is the terminal's words for a task that outlives its turn (`· 1 shell still
 // running`, Claude Code 2.1.287, read 2026-10-02), and the title of the list of what still runs,
 // with no hourglass: an emoji draws large and grey in a status line (seen on desktop,

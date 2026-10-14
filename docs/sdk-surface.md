@@ -171,6 +171,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKSessionInfo` | `lastModified` | field | info.ts: listedSession | reference | none |
 | `SDKSessionInfo` | `sessionId` | field | info.ts: listedSession | reference | none |
 | `SDKSessionInfo` | `summary` | field | info.ts: listedSession | reference | none |
+| `SDKSessionStateChangedMessage` | `state` | field | translate.ts: sessionState | package | none |
 | `SDKStatusMessage` | `compact_result` | field | translate.ts: status | package | none |
 | `SDKStatusMessage` | `permissionMode` | field | translate.ts: status | reference | none |
 | `SDKStatusMessage` | `status` | field | translate.ts: status | reference | P22 |
@@ -288,6 +289,10 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKResultMessage.terminal_reason` | `"aborted_streaming"` | value | translate.ts: INTERRUPTED | reference | none |
 | `SDKResultMessage.terminal_reason` | `"aborted_tools"` | value | translate.ts: INTERRUPTED | reference | none |
 | `SDKResultMessage.type` | `"result"` | value | translate.ts: HANDLERS; session.ts: ClaudeSession.#pump | reference | none |
+| `SDKSessionStateChangedMessage.state` | `"idle"` | value | translate.ts: AGENT_STATES | package | none |
+| `SDKSessionStateChangedMessage.state` | `"requires_action"` | value | translate.ts: AGENT_STATES | package | none |
+| `SDKSessionStateChangedMessage.state` | `"running"` | value | translate.ts: AGENT_STATES | package | none |
+| `SDKSessionStateChangedMessage.subtype` | `"session_state_changed"` | value | translate.ts: HANDLERS | package | none |
 | `SDKStatusMessage.status` | `"compacting"` | value | translate.ts: status | reference | P22 |
 | `SDKStatusMessage.subtype` | `"status"` | value | translate.ts: HANDLERS | reference | none |
 | `SDKSystemMessage.subtype` | `"init"` | value | translate.ts: HANDLERS | reference | P1 |
@@ -349,7 +354,6 @@ union, none of which any recording carries.
 - `SDKPermissionDeniedMessage`
 - `SDKPluginInstallMessage`
 - `SDKPromptSuggestionMessage`
-- `SDKSessionStateChangedMessage`
 - `SDKToolUseSummaryMessage`
 - `SDKWorkerShuttingDownMessage`
 

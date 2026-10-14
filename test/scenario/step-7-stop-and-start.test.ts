@@ -5,7 +5,7 @@
  * a new message in it resumes the session.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { test } from "node:test";
 import * as texts from "../../src/core/texts.ts";
 import { fill } from "../../src/core/texts.ts";
@@ -28,7 +28,9 @@ test("a stop with a turn running ends the reply where it stood and says what was
   assert.equal(await world.stop("SIGINT"), 0);
 
   // What the stop left: the reply ended where it stood, with the line that says so, and under it
-  // the count of the messages that were queued, each by its start.
+  // the count of the messages that were queued, each by its start, then the footer: a stop is an
+  // end, and the footer says what could be read of the session.
+  const footer = `full · ${realpathSync(world.folder)}`;
   const left = [
     "first",
     "Model: default · Effort: full · Bypass: off",
@@ -37,7 +39,7 @@ test("a stop with a turn running ends the reply where it stood and says what was
       "",
       STOPPED_REPLY,
       "",
-      `${fill(texts.NOT_SENT_MANY, { count: 2, because: texts.BECAUSE_SHUTDOWN })}\n- "queued one"\n- "queued two"`,
+      `${fill(texts.NOT_SENT_MANY, { count: 2, because: texts.BECAUSE_SHUTDOWN })}\n- "queued one"\n- "queued two"\n${footer}`,
     ].join("\n"),
     "queued one",
     "queued two",
@@ -77,7 +79,7 @@ test("a request that was waiting is gone after the stop and after the start", as
   const left = [
     "remove x",
     "Model: default · Effort: full · Bypass: off",
-    `Removing.\n[complete] Shell: rm x\n${STOPPED_REPLY}`,
+    `Removing.\n[complete] Shell: rm x\n${STOPPED_REPLY}\nfull · ${realpathSync(world.folder)}`,
   ];
   assert.deepEqual(world.chat.requests(), []);
   assert.deepEqual(world.shown(thread), left);

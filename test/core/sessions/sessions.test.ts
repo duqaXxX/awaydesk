@@ -172,7 +172,10 @@ test("a turn replies in the thread and records the session", async (t) => {
   assert.equal(thread(h).sessionId, recordOf(result)?.session_id);
   const [stop, ...more] = h.slack.callsTo("chat.stopStream");
   assert.equal(more.length, 0);
-  assert.equal(blocksOf(stop).at(-1)?.type, "context"); // the footer closes the reply
+  assert.ok(!blocksOf(stop).some((block) => block.type === "divider")); // the end carries none
+  await h.idle();
+  // The session has ended: the footer closes the reply, by an edit.
+  assert.equal(blocksOf(h.slack.callsTo("chat.update").at(-1)).at(-1)?.type, "context");
 });
 
 test("the client is launched as the design says", async (t) => {
@@ -921,17 +924,23 @@ test("a report turn s writes debounce like any other reply", async (t) => {
   assert.ok(updates <= 3, `${updates} chat.update calls for one report turn (no debounce)`);
 });
 
-test("an owner answer behind a wrong guess keeps its footer", async (t) => {
+test("an owner answer behind a wrong guess takes the footer once the report wait is over", async (t) => {
   const [first, notice] = splitBackground();
   const h = harnessFor(t)({ turns: [first] });
-  await (await h.session().submit("start it")).done.wait();
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
   h.clients[0]?.inject(notice); // the session now expects Claude Code's own turn
   await h.sleep(0.05);
   h.clients[0]?.inject(sdkMessages("tools")); // but the result says a person asked for it
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
-  // the answer joins the reply that waited for the task, which ends with the footer
+  // the answer joins the reply that waited for the task, which ends: the report is still
+  // expected, so the session has not ended and the stop carries no footer
   const stop = h.slack.callsTo("chat.stopStream").at(-1);
-  assert.ok(blocksOf(stop).some((block) => block.type === "divider"));
+  assert.ok(!blocksOf(stop).some((block) => block.type === "divider"));
+  await h.clock.advance(INJECTED_TURN_WAIT);
+  await h.until(() => session.idle);
+  await h.sleep(3);
+  assert.deepEqual(footers(h), [false, true], "under the app's last message");
 });
 
 // A background agent's end, as the SDK delivered it (recorded 2026-09-24): its summary is the
@@ -1065,9 +1074,9 @@ function footers(h: Harness): boolean[] {
   );
 }
 
-test("a report in a reply of its own takes the footer from the reply above it", async (t) => {
-  // The reply that started the task has ended, with its footer, when the report comes: the
-  // report's reply ends with a footer too, right under it. The thread says how it stands once.
+test("a report in a reply of its own gets the footer of its end and the reply above keeps its own", async (t) => {
+  // The reply that started the task ended, with its footer, when the wait for the report ran
+  // out: the session had ended. The report starts new work, and its reply ends with a footer too.
   const [first, notice, injected] = splitBackground();
   const ended = notice.filter(notNotification);
   const notification = notice.filter((item) => !notNotification(item));
@@ -1081,20 +1090,20 @@ test("a report in a reply of its own takes the footer from the reply above it", 
   await h.clock.advance(INJECTED_TURN_WAIT);
   await h.until(() => a.closedOut, 1.0);
   await h.idle();
-  assert.deepEqual(footers(h), [true]); // the first reply ended with its footer
+  await h.sleep(3); // the footer is an edit, which waits its debounce
+  assert.deepEqual(footers(h), [true]); // the session ended: the first reply has its footer
   const pushes = h.slack.pushes();
   h.clients[0]?.inject([...notification, ...injected]);
   await h.until(() => h.replies().some(isReport));
   await h.until(() => !session.busy);
   await h.idle();
   await h.sleep(3); // the edit waits its debounce, as every change to an ended reply does
-  assert.deepEqual(footers(h), [false, true]);
-  // The report's own end rang once; the provider's edit that takes the footer off the reply
-  // above it does not.
+  assert.deepEqual(footers(h), [true, true]);
+  // The report's own end rang once; the footer of the first reply stayed where it was.
   assert.equal(h.slack.pushes(), pushes + 1);
 });
 
-test("replies with no owner message between them show one footer, under the last", async (t) => {
+test("each end of the whole session keeps its footer, whatever sits between the replies", async (t) => {
   // The reply above the report is here an owner's turn that did not start the task; the task's
   // own reply has the owner's prompt below it.
   const [first, notice, injected] = splitBackground();
@@ -1118,31 +1127,23 @@ test("replies with no owner message between them show one footer, under the last
   await h.until(() => !session.busy);
   await h.idle();
   await h.sleep(3);
-  // The task's own reply keeps its footer: the owner's second prompt sits between it and the
-  // reply above the report.
-  assert.deepEqual(footers(h), [true, false, true]);
+  // Each end of the session drew its footer where the app's last message was then.
+  assert.deepEqual(footers(h), [true, true, true]);
 });
 
-test("a close flushes the pending footer edit", async (t) => {
-  const [first, notice, injected] = splitBackground();
-  const ended = notice.filter(notNotification);
-  const notification = notice.filter((item) => !notNotification(item));
+test("a lost process ends the reply, then draws the footer by an edit written at once", async (t) => {
+  // A lost process ends the replies first and draws the footer after, by an edit.
+  const [first] = splitBackground();
   const h = harnessFor(t)({ turns: [first] });
   const session = h.session();
   await (await session.submit("start it")).done.wait();
-  const a = inside(session).taskReplies.get("bny2rux7d");
-  assert.ok(a !== undefined);
-  h.clients[0]?.inject(ended);
+  h.clients[0]?.inject([END_OF_STREAM]);
+  await h.until(() => inside(session).client === null);
+  await h.until(() => session.idle);
   await h.idle();
-  await h.clock.advance(INJECTED_TURN_WAIT);
-  await h.until(() => a.closedOut, 1.0);
-  h.clients[0]?.inject([...notification, ...injected]);
-  await h.until(() => h.replies().some(isReport));
-  await h.until(() => !session.busy);
-  await h.idle();
-  assert.deepEqual(footers(h), [true, true]); // the edit still waits its debounce
+  assert.deepEqual(footers(h), [true]); // written at once, no debounce for a close to flush
   await session.close();
-  assert.deepEqual(footers(h), [false, true]);
+  assert.deepEqual(footers(h), [true]);
 });
 
 test("an owner's next prompt leaves the footer of the reply above it", async (t) => {
@@ -1150,6 +1151,7 @@ test("an owner's next prompt leaves the footer of the reply above it", async (t)
   const h = harnessFor(t)({ turns: [tools, tools] });
   const session = h.session();
   await (await session.submit("first")).done.wait();
+  await h.idle(); // the session ends: the footer is drawn before the next prompt
   await (await session.submit("second")).done.wait();
   await h.idle();
   assert.deepEqual(footers(h), [true, true]);
@@ -1555,10 +1557,10 @@ test("two prompts in a row each reply ends with its own stop", async (t) => {
   // The first reply's stream stays open for its background task: nothing has stopped yet.
   assert.deepEqual([h.slack.streamTs.length, h.slack.callsTo("chat.stopStream").length], [1, 0]);
   await (await session.submit("next")).done.wait();
-  // the second reply has nothing of its own pending: its stream stops right away, the footer
-  // on the stop.
+  // the second reply has nothing of its own pending: its stream stops right away, with no
+  // footer, since the first command still runs
   assert.deepEqual([h.slack.streamTs.length, h.slack.callsTo("chat.stopStream").length], [2, 1]);
-  assert.ok(at(h.slack.messageBlocks(), -1).some((block) => block.type === "divider"));
+  assert.ok(!at(h.slack.messageBlocks(), -1).some((block) => block.type === "divider"));
   h.clients[0]?.inject([...notice, ...injected]);
   // The first reply is no longer the last thing in the thread: the report opens a third reply of
   // its own at the bottom (issue #295), and the first reply stops in place, once its task has
@@ -1566,7 +1568,9 @@ test("two prompts in a row each reply ends with its own stop", async (t) => {
   // ended. The second's stop is untouched.
   await h.until(() => h.slack.callsTo("chat.stopStream").length === 3);
   assert.ok(isReport(at(h.bodies(), -1)));
-  assert.ok(at(h.slack.messageBlocks(), 0).some((block) => block.type === "divider"));
+  await h.until(() => session.idle);
+  await h.sleep(3);
+  assert.deepEqual(footers(h), [false, false, true], "the session ended with the report");
   assert.equal(h.slack.pushes(), 3);
 });
 
@@ -1734,8 +1738,8 @@ test("a shutdown during an active turn with a background task ends both replies"
 });
 
 test("an idle close ends a reply that still waited for its task", async (t) => {
-  // An idle close (like a restart or SessionGone) stops the still-open stream at once, with its
-  // footer.
+  // An idle close (like a restart or SessionGone) stops the still-open stream at once and puts
+  // the footer under it, which the close flushes.
   const [first] = splitBackground();
   const h = harnessFor(t)({ turns: [first] });
   const session = h.session();
@@ -1744,7 +1748,8 @@ test("an idle close ends a reply that still waited for its task", async (t) => {
   await session.close(texts.ENDED_IDLE);
   const [stop, ...more] = h.slack.callsTo("chat.stopStream");
   assert.equal(more.length, 0);
-  assert.ok(blocksOf(stop).some((block) => block.type === "divider"));
+  assert.ok(!blocksOf(stop).some((block) => block.type === "divider"));
+  assert.deepEqual(footers(h), [true]);
   assert.deepEqual(h.slack.postedTs, []);
 });
 
@@ -1989,7 +1994,9 @@ test("the footer follows an effort set from slack", async (t) => {
   const h = harnessFor(t)({ turns: [effortTurn, sdkMessages("tools")] });
   const session = h.session();
   await (await session.submit("/effort high")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   await (await session.submit("next")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(statuses(h).at(-1)?.includes("*effort* high"));
 });
 
@@ -2006,6 +2013,7 @@ test("the footer shows the effort claude code reports", async (t) => {
   mkdirSync(join(h.tmpPath, ".claude"));
   writeFileSync(join(h.tmpPath, ".claude", "settings.json"), '{"effortLevel": "high"}');
   await (await h.session().submit("list the files")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(statuses(h).at(-1)?.includes("*effort* medium"));
 });
 
@@ -2013,6 +2021,7 @@ test("the footer leaves out the effort until claude code reports it", async (t) 
   // A local command's turn (`/usage`) runs no Stop hook: the level is not known yet.
   const h = harnessFor(t)({ turns: [sdkMessages("usage")] });
   await (await h.session().submit("/usage")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(statuses(h).length > 0 && !statuses(h).at(-1)?.includes("effort"));
 });
 
@@ -2021,6 +2030,7 @@ test("the footer says default when claude code reports no effort", async (t) => 
   const { effort: _effort, ...hookInput } = sdkJson("stop-hook") as JsonObject;
   const h = harnessFor(t)({ turns: [withStopHook(sdkMessages("tools"), hookInput)] });
   await (await h.session().submit("list the files")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(statuses(h).at(-1)?.includes("*effort* default"));
 });
 
@@ -2035,9 +2045,11 @@ test("an effort set before a restart is not carried over", async (t) => {
     { turns: [withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject)] },
   );
   await (await h.session().submit("/effort low")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(statuses(h).at(-1)?.includes("*effort* low"));
   await h.restart();
   await (await h.session().submit("next")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(statuses(h).at(-1)?.includes("*effort* medium"));
 });
 
@@ -2085,6 +2097,7 @@ test("a usage entry without a token count still gets a footer", async (t) => {
   const h = harnessFor(t)({ turns: [[...messages.slice(0, -1), trimmed]] });
   const turn = await h.session().submit("list the files");
   await turn.done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(statuses(h).at(-1)?.includes("1.5k *tok*"));
 });
 
@@ -2167,11 +2180,13 @@ test("bypass from the folder s own settings shows and turns off", async (t) => {
   const h = harnessFor(t)({ turns: [sdkMessages("tools"), sdkMessages("tools")], info });
   const session = h.session();
   await (await session.submit("list the files")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(statuses(h).at(-1)?.startsWith("⚡ bypass"));
   await session.setBypass(false);
   assert.equal(h.clients[0]?.modes.at(-1), "default");
   assert.ok((await session.status()).includes("Mode: `default`"));
   await (await session.submit("again")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(!statuses(h).at(-1)?.startsWith("⚡ bypass"));
 });
 
@@ -2221,11 +2236,13 @@ test("bypass off returns an auto thread to auto", async (t) => {
   const session = h.session();
   await session.setBypass(true);
   await (await session.submit("list the files")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(statuses(h).at(-1)?.startsWith("⚡ bypass"));
   await session.setBypass(false);
   assert.deepEqual(h.clients[0]?.modes, ["bypassPermissions", "auto"]);
   assert.ok((await session.status()).includes("Mode: `auto`"));
   await (await session.submit("again")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(!statuses(h).at(-1)?.startsWith("⚡ bypass"));
 });
 
@@ -2365,6 +2382,7 @@ test("open returns none when the channel is unbound", (t) => {
 test("the footer names the bound folder", async (t) => {
   const h = harnessFor(t)({ turns: [sdkMessages("tools")] });
   await (await h.session().submit("list the files")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   const folder = basename(h.tmpPath);
   assert.ok(statuses(h).at(-1)?.startsWith("claude-haiku-4-5-20251001 · "));
   assert.ok(statuses(h).at(-1)?.includes(` · ${folder} · `));
@@ -2384,6 +2402,7 @@ test("the footer follows the folder the session works in", GIT_LAYOUT, async (t)
   const h = make({ turns: [withStopHook(sdkMessages("tools"), moved)] });
   const session = h.session();
   await (await session.submit("list the files")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.match(
     statuses(h).at(-1) ?? "",
     new RegExp(
@@ -2414,6 +2433,7 @@ test("a tool s hook moves the branch when no stop hook runs", GIT_LAYOUT, async 
   const h = make({ turns: [turn] });
   const session = h.session();
   await (await session.submit("list the files")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(
     statuses(h)
       .at(-1)
@@ -2445,6 +2465,7 @@ test("a restarted client starts again in the bound folder", GIT_LAYOUT, async (t
   const h = make({ turns: [withStopHook(sdkMessages("tools"), moved)] }, { turns: [] });
   const session = h.session();
   await (await session.submit("list the files")).done.wait();
+  await h.idle(); // the footer is drawn once the session has ended
   assert.ok(statuses(h).at(-1)?.includes("feature-x"));
   await h.restart();
   const text = await h.session().status();
@@ -2861,26 +2882,28 @@ test("a stop waits for the reply s final write", async (t) => {
   const h = harnessFor(t)({ turns: [running] });
   const turn = await h.session().submit("first");
   await h.until(() => h.clients.length > 0 && h.clients[0]?.queries.join() === "first");
-  const footerRead = new AsyncEvent();
+  await h.until(() => h.slack.streamTs.length > 0);
   const client = at(h.clients, 0);
-  const original = client.contextUsage.bind(client);
-  client.contextUsage = async () => {
-    await footerRead.wait();
-    return original();
-  };
+  // Slack holds the stream's stop: the reply's end is on its way.
+  const stopping = new AsyncEvent();
+  h.slack.gateMethod = "chat.stopStream";
+  h.slack.gate = stopping;
   const drain = startDrain(h);
   client.inject([result]);
+  await h.slack.gated.wait();
   await polled(h);
-  assert.ok(!drain.done()); // the footer is still being read: the reply is not final yet
-  footerRead.set();
+  assert.ok(!drain.done()); // the reply's end is still being written: it is not final yet
+  h.slack.gate = null;
+  stopping.set();
   await drainEnds(h, drain);
   assert.ok(turn.done.isSet);
-  assert.equal(h.slack.callsTo("chat.stopStream").length, 1); // the reply has ended, footer and all
+  assert.equal(h.slack.callsTo("chat.stopStream").length, 1); // the reply has ended
+  assert.deepEqual(footerWrites(h), ["chat.update"]); // and the session's footer was drawn
 });
 
 /**
  * A tools turn whose reply is open, closed by `session.close()` (a stop that does not drain)
- * either while the turn runs or inside the turn's end, with the footer's first value held. The
+ * either while the turn runs or once it has ended, with the footer's read held. The
  * stream's stops and the reply's last text are what the owner sees.
  */
 async function closedAround(t: TestContext, ending: boolean) {
@@ -2902,7 +2925,7 @@ async function closedAround(t: TestContext, ending: boolean) {
   await h.until(() => h.slack.streamTs.length > 0);
   if (ending) {
     client.inject([result]);
-    await h.until(() => reading); // the reader is inside `finish`, waiting for the footer
+    await h.until(() => reading); // the turn has ended, and the session's footer is being read
   }
   await session.close();
   footerRead.set();
@@ -3245,8 +3268,9 @@ test("a stop whose interrupt is refused still stops the background tasks", async
 });
 
 test("a stop of a background task ends the reply like any other end", async (t) => {
-  // `!stop` (S2): the task's own end lets the reply's stream stop, with the footer, as a
-  // normal end does. Nothing is posted, and the ✅ is the stop's own.
+  // `!stop` (S2): the task's own end lets the reply's stream stop, as a normal end does, and the
+  // stop has ended the session: the footer follows by an edit. Nothing is posted, and the ✅ is
+  // the stop's own.
   const [first, notice] = splitBackground();
   const h = harnessFor(t)({ turns: [first] });
   const session = h.session();
@@ -3256,11 +3280,9 @@ test("a stop of a background task ends the reply like any other end", async (t) 
   assert.deepEqual(h.slack.callsTo("chat.stopStream"), []); // the task has not ended yet
   h.clients[0]?.inject(stoppedEnd(notice));
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
-  assert.ok(
-    blocksOf(h.slack.callsTo("chat.stopStream").at(-1)).some(
-      (block) => block.type === "divider" && Object.keys(block).length === 1,
-    ),
-  );
+  await h.until(() => session.idle);
+  await h.sleep(3);
+  assert.deepEqual(footers(h), [true]);
   assert.ok(h.slack.postedTs.length === 0 && h.slack.pushes() === 1);
   assert.equal(h.reactions().at(-1), Status.DONE);
 });
@@ -4530,12 +4552,13 @@ test("the reply is not ended while its turn is still active", async (t) => {
   h.clients[0]?.inject(tail);
   await turn.done.wait();
   await h.until(() => h.reactions().at(-1) === Status.DONE);
-  // Ended once, by its own turn, with the footer. The update that follows the stop is the
-  // silent one that draws the command's end line small and grey, which a stream cannot.
-  assert.deepEqual(footerWrites(h), ["chat.stopStream", "chat.update"]);
+  await h.idle();
+  // Ended once, by its own turn; the footer follows by an edit once the session has ended.
+  assert.equal(h.slack.callsTo("chat.stopStream").length, 1);
+  assert.deepEqual(footerWrites(h), ["chat.update"]);
 });
 
-test("a recorded turn that outlives its subagent s command ends once with its footer", async (t) => {
+test("a recorded turn that outlives its subagent s command ends once, then shows its footer", async (t) => {
   // subagent-nested-background-mid-turn.jsonl, in the order the CLI sent it (issue #149): the
   // command a subagent left running ends, and is notified, while the owner's turn still runs
   // a foreground command of its own; the agent then ends a second time and a report follows.
@@ -4553,19 +4576,17 @@ test("a recorded turn that outlives its subagent s command ends once with its fo
   const session = h.session();
   await (await session.submit("start it")).done.wait();
   await h.until(() => h.reactions().at(-1) === Status.DONE);
-  assert.deepEqual(footerWrites(h).slice(0, 1), ["chat.stopStream"]); // the footer rode on the stream's stop
+  await h.idle();
+  assert.deepEqual(footerWrites(h), ["chat.update"]); // the session ended: its footer, by an edit
   assert.equal(h.slack.callsTo("chat.stopStream").length, 1); // at the turn's end, not before
   assert.deepEqual(h.slack.callsTo("chat.postMessage"), []); // no closing message of its own
 
   h.clients[0]?.inject(later); // the agent's second end, then Claude Code's report turn
   await h.until(() => h.slack.callsTo("chat.stopStream").length === 2);
   await h.until(() => h.reactions().at(-1) === Status.DONE && session.idle);
-  const stops = h.slack.callsTo("chat.stopStream");
-  assert.ok(
-    stops.every((stop) =>
-      blocksOf(stop).some((block) => block.type === "divider" && Object.keys(block).length === 1),
-    ),
-  );
+  await h.idle();
+  // Each end of the session drew its footer by an edit; no stop carried one.
+  assert.deepEqual(footerWrites(h), ["chat.update", "chat.update"]);
   assert.deepEqual(h.slack.callsTo("chat.postMessage"), []);
 });
 

@@ -1,7 +1,8 @@
 /**
  * Where the messages of one thread sit, as far as the daemon saw them: the owner's, and the last
  * message of each reply. Kept in memory only (a restart forgets it), and decided by `isLast`,
- * `isOvertaken` and `tails` of the core. A reply the places let go of leaves its position behind
+ * `isOvertaken` and `tails` of the core. The session's footer is not placed here: the session
+ * names the reply it goes under. A reply the places let go of leaves its position behind
  * in `floor`, so that the answers do not change when it goes, and keeps showing what it showed.
  */
 
@@ -26,23 +27,14 @@ export function positionOf(ts: string): number | null {
   return Number.isSafeInteger(position) ? position : null;
 }
 
-/** What a reply shows under its last message: the footer, and the list of what still runs. */
-export interface Shown {
-  readonly footer: string | null;
-  /** Only the reply that holds the thread's list has one. */
-  readonly list: RunningList | null;
-}
-
 /** What the places need of a reply. `ReplySink` implements it. */
 export interface Placed {
   /** The position of its last message, null while it has none. */
   readonly lastAt: number | null;
-  /** It rests or its end has landed: its last message can be rewritten, and it can show a footer. */
+  /** It rests or its end has landed: its last message can be rewritten. */
   readonly resting: boolean;
-  /** The footer its turn left, formatted; null when that turn had none. */
-  readonly ownFooter: string | null;
-  /** What it shows under its last message from now on. */
-  assign(shown: Shown): void;
+  /** What it shows under its last message from now on; only the reply that holds the list has one. */
+  assign(list: RunningList | null): void;
   /** Writes what it still owes now; false when it is not on Slack. */
   settle(): Promise<boolean>;
 }
@@ -69,6 +61,8 @@ export class ThreadPlaces {
   private marks: number[] = [];
   /** The highest position of a reply let go of: it still sits in the thread. */
   private floor: number | null = null;
+  /** The highest position of a message of the owner's or of one the app posted outside a reply. */
+  private latest: number | null = null;
   private readonly onEmpty: () => void;
 
   /** `onEmpty` is told when the last registered reply is let go of. */
@@ -95,10 +89,30 @@ export class ThreadPlaces {
   ownerPosted(ts: string): void {
     const at = positionOf(ts);
     if (at === null) return;
+    this.latest = Math.max(this.latest ?? at, at);
     this.marks.push(at);
     this.place();
     this.release();
     this.prune();
+  }
+
+  /**
+   * The app posted a message of its own in the thread, outside its replies (a notice, a request).
+   * It changes no reply's place: it only counts in `newestAt`.
+   */
+  posted(ts: string): void {
+    const at = positionOf(ts);
+    if (at !== null) this.latest = Math.max(this.latest ?? at, at);
+  }
+
+  /** The position of the newest message of the thread the places know of; null when none. */
+  get newestAt(): number | null {
+    let newest = this.latest ?? this.floor;
+    if (this.floor !== null && newest !== null) newest = Math.max(newest, this.floor);
+    for (const reply of this.replies) {
+      if (reply.lastAt !== null) newest = Math.max(newest ?? reply.lastAt, reply.lastAt);
+    }
+    return newest;
   }
 
   /** A reply got its first message, or its last message moved. */
@@ -108,9 +122,7 @@ export class ThreadPlaces {
   }
 
   /**
-   * The reply's end has landed: it is let go of once an owner message sits below it and no reply
-   * of its stretch is still to end. Every reply is handed its tail first, so that the one that
-   * gives its footer up is told before it can be let go of.
+   * The reply's end has landed: it is let go of once an owner message sits below it.
    */
   ended(reply: Placed): void {
     if (!this.replies.has(reply)) return;
@@ -145,48 +157,33 @@ export class ThreadPlaces {
 
   /**
    * Work out every reply's tail with `tails` of the core and hand each its own. Sync: a reply
-   * whose tail did not change does nothing. Called whenever a reply's position, its resting or
-   * its own footer changes. A reply that stops holding the list may be let go of from then on.
+   * whose tail did not change does nothing. Called whenever a reply's position or its resting
+   * changes. A reply that stops holding the list may be let go of from then on.
    */
   place(): void {
-    const result = this.tailsWith(null);
+    const result = this.tailsOf();
     let holder: Placed | null = null;
     for (const reply of [...this.replies]) {
-      const shown = this.shownOf(result.get(reply));
-      if (shown.list !== null) {
+      const list = result.get(reply)?.running ? this.list : null;
+      if (list !== null) {
         holder = reply;
         this.listed.add(reply);
       }
-      reply.assign(shown);
+      reply.assign(list);
     }
     const previous = this.holder;
     this.holder = holder;
     if (previous !== null && previous !== holder) this.release();
   }
 
-  /**
-   * What the reply would be handed if it rested now: what its stop or its end writes while it is
-   * still on the way, so that a footer is not written where the next pass takes it off.
-   */
-  tailIf(reply: Placed): Shown {
-    return this.shownOf(this.tailsWith(reply).get(reply), reply.ownFooter);
-  }
-
-  private shownOf(tail: Tail<string> | undefined, footer: string | null = null): Shown {
-    if (tail === undefined) return { footer, list: null };
-    return { footer: tail.footer, list: tail.running ? this.list : null };
-  }
-
-  /** The tails of the registered replies; `subject` counts as resting, and as the lowest if unplaced. */
-  private tailsWith(subject: Placed | null): Map<Placed, Tail<string>> {
-    const entries: TailEntry<Placed, string>[] = [];
+  /** The tails of the registered replies that have a message. */
+  private tailsOf(): Map<Placed, Tail> {
+    const entries: TailEntry<Placed>[] = [];
     for (const reply of this.replies) {
-      const resting = reply.resting || reply === subject;
-      // A reply whose first message is not written yet lands below everything.
-      const at = reply.lastAt ?? (reply === subject ? Number.POSITIVE_INFINITY : null);
-      if (at !== null) entries.push({ key: reply, at, resting, footer: reply.ownFooter });
+      if (reply.lastAt !== null)
+        entries.push({ key: reply, at: reply.lastAt, resting: reply.resting });
     }
-    return tails(entries, this.marks);
+    return tails(entries);
   }
 
   /** The thread object that opened the reply closed: the reply is let go of, its end landed or not. */
@@ -243,30 +240,14 @@ export class ThreadPlaces {
   }
 
   /**
-   * Whether a reply is let go of: its thread closed, or an owner message sits below it and no
-   * reply of its stretch, above it or below, is still to end. The holder of the list counts as
-   * still to end while it holds it: it stays, and may show the footer of a reply above it, which
-   * `tails` could not find once that reply is gone. A stretch is let go of as a whole: the reply
-   * still to end takes the stretch's footer from its holder, or gives it back. A reply with no
-   * message yet counts in no stretch.
+   * Whether a reply is let go of: its thread closed, or an owner message sits below it. The
+   * holder of the list counts as still to end while it holds it (`release`). A reply with no
+   * message yet is let go of with its thread alone.
    */
   private sealed(reply: Placed, top: number | null): boolean {
     const at = reply.lastAt;
     if (this.shut.has(reply) || at === null) return true;
-    if (top === null || top <= at) return false;
-    const prev = Math.max(Number.NEGATIVE_INFINITY, ...this.marks.filter((mark) => mark < at));
-    const next = Math.min(...this.marks.filter((mark) => mark > at));
-    for (const other of this.replies) {
-      if (
-        other === reply ||
-        (this.done.has(other) && other !== this.holder) ||
-        other.lastAt === null
-      ) {
-        continue;
-      }
-      if (other.lastAt > prev && other.lastAt < next) return false;
-    }
-    return true;
+    return top !== null && top > at;
   }
 
   /** Keeps the marks not below the lowest placed reply, and always the highest. */
