@@ -255,6 +255,13 @@ export class ThreadSession {
   // A report turn was awaited when a prompt's own turn started in its place: it is awaited
   // again once that turn ends (`settle`).
   private reportDue = false;
+  // Tasks that ended inside a running turn, by the reply that shows them, whose notification
+  // that turn has not taken (`notification_folded`). One still standing when the turn ends is
+  // reported in a turn the agent opens by itself (issue #317): its reply rests with no footer
+  // until that turn renders into it, or `INJECTED_TURN_WAIT` passes (`expectUnfoldedReports`).
+  // Empty for an agent that does not declare `foldedNotifications`, which counts such a task as
+  // reported by the turn it ended in.
+  private readonly unfolded = new Map<string, TurnRenderer>();
   // A task's notification arrived with no turn running and no report turn has started since:
   // the agent has a report to make (`whoseTurn`).
   private notificationWaits = false;
@@ -1623,6 +1630,10 @@ export class ThreadSession {
         return declared.compaction ? null : "compaction";
       case "report_started":
         return declared.backgroundTasks ? null : "backgroundTasks";
+      case "notification_folded":
+        return declared.backgroundTasks && declared.foldedNotifications
+          ? null
+          : "foldedNotifications";
       case "state_changed":
         return declared.declaredState ? null : "declaredState";
       case "limits_changed":
@@ -1669,6 +1680,9 @@ export class ThreadSession {
         // Said with no turn running, right before the turn it names. Inside a running turn it
         // names no turn to come.
         if (this.active === null) this.reportOf = event.taskId;
+        return;
+      case "notification_folded":
+        this.unfolded.delete(event.taskId);
         return;
       case "effort_observed":
         // The Stop hook's input carries the level, absent when the model takes none.
@@ -1745,6 +1759,13 @@ export class ThreadSession {
       const writing = this.active?.renderer ?? null;
       const reply = this.taskReplies.get(event.taskId) ?? writing;
       if (reply?.lineless(event.taskId)) {
+        if (
+          writing !== null &&
+          event.foldNamed &&
+          this.deps.agent.capabilities.foldedNotifications
+        ) {
+          this.unfolded.set(event.taskId, reply);
+        }
         if (writing !== null) await writing.feedLine(this.endedLine(event));
         else if (this.sent.length > 0) this.endedAhead.push(this.endedLine(event));
       }
@@ -1996,16 +2017,20 @@ export class ThreadSession {
     // it would hide the report above them (issue #295).
     const candidates = [
       ...lines.map(([taskId]) => taskId),
+      ...this.unfolded.keys(),
       ...(reported === null ? [] : [reported]),
     ];
     let target: TurnRenderer | null = null;
     for (const taskId of candidates) {
-      const reply = this.taskReplies.get(taskId) ?? this.showing(taskId);
+      const reply =
+        this.unfolded.get(taskId) ?? this.taskReplies.get(taskId) ?? this.showing(taskId);
       if (reply !== null && !reply.closedOut && this.reply(reply).last) {
         target = reply;
         break;
       }
     }
+    // The tasks that ended inside a turn are reported now, or given up on.
+    this.unfolded.clear();
     const ends = lines.map(([, line]) => line).join("\n");
     // End lines are lines about the work.
     return [ends || null, target, ends !== ""];
@@ -2536,6 +2561,7 @@ export class ThreadSession {
     this.ownedBySubagent.clear();
     this.unreported.clear();
     this.notificationWaits = false;
+    this.unfolded.clear();
     this.stopped.clear();
     this.refusedTasks.clear();
     for (const renderer of renderers) {
@@ -2592,6 +2618,9 @@ export class ThreadSession {
     for (const [taskId] of [...(this.opening ?? []), ...this.ended]) {
       if (this.taskReplies.get(taskId) === renderer) return true;
     }
+    // A task that ended inside a turn without that turn taking its notification: the report
+    // turn is due and renders into this reply.
+    for (const reply of this.unfolded.values()) if (reply === renderer) return true;
     const now = this.deps.clock.time();
     for (const [taskId, ended] of this.unreported) {
       if (now - ended < INJECTED_TURN_WAIT && this.taskReplies.get(taskId) === renderer) {
@@ -2809,6 +2838,8 @@ export class ThreadSession {
       // lines never disagree.
       this.sessionTokens = sessionTokens(result.tokens);
       stopped = result.ending === "interrupted";
+      // A turn that did not end well is no ground to wait for a report under its reply.
+      if (result.ending !== "done") this.unfolded.clear();
       this.interrupting = false; // this turn's own tail, whichever way it ended
       if (released.length > 0) {
         this.endNotes.push(takenNote(released.length, this.names));
@@ -2834,6 +2865,7 @@ export class ThreadSession {
       // `abandon` ends the reply and releases the turn, as for a close while the turn runs.
       if (!active.cut) {
         this.settle(active.turn, result, released);
+        this.expectUnfoldedReports();
         // A report turn's own reply is `closeReply`'s concern above; this catches every other
         // reply a joint one left stranded.
         await this.sweepClosedOut(live(signal));
@@ -2841,6 +2873,20 @@ export class ThreadSession {
       }
     }
     return stopped;
+  }
+
+  /**
+   * A turn ended with a task that ended inside it and whose notification it did not take
+   * (`unfolded`): the agent opens a turn of its own to report it, as for a task that ends between
+   * turns, and the wait for that turn is the same one (`expectInjectedTurn`).
+   */
+  private expectUnfoldedReports(): void {
+    if (this.unfolded.size === 0) return;
+    // Tracked as a reply a task outlived its turn in: the sweep that closes it out, if no report
+    // turn comes, reads this map.
+    for (const [taskId, reply] of this.unfolded) this.taskReplies.set(taskId, reply);
+    this.notificationWaits = true;
+    this.notified();
   }
 
   /**
@@ -2952,6 +2998,7 @@ export class ThreadSession {
     this.announced = null;
     this.reportDue = false;
     this.notificationWaits = false;
+    this.unfolded.clear();
     this.interrupting = false; // whatever it was waiting on, this ends it
     this.compacting = false; // the process that was compacting is gone
     this.agentState = null; // and it will never say that it rests

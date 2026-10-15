@@ -157,6 +157,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKMessage` | `subtype` | field | translate.ts: kindOf | package | none |
 | `SDKMessage` | `type` | field | translate.ts: kindOf | package | none |
 | `SDKMessageOrigin` | `kind` | field | translate.ts: result, user | reference | none |
+| `SDKMessageOrigin` | `runId` | field | translate.ts: user | package | none |
 | `SDKMessageOrigin` | `senderTaskId` | field | translate.ts: user | reference | none |
 | `SDKPartialAssistantMessage` | `event` | field | translate.ts: kindOf, messageStart, contentBlockStart, contentBlockDelta | reference | none |
 | `SDKPartialAssistantMessage` | `parent_tool_use_id` | field | translate.ts: parentOf | reference | none |
@@ -190,6 +191,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKTaskProgressMessage` | `tool_use_id` | field | translate.ts: taskProgress | reference | none |
 | `SDKTaskStartedMessage` | `description` | field | translate.ts: taskStarted | reference | none |
 | `SDKTaskStartedMessage` | `is_backgrounded` | field | translate.ts: taskStarted | reference | none |
+| `SDKTaskStartedMessage` | `run_id` | field | translate.ts: taskStarted | package | none |
 | `SDKTaskStartedMessage` | `subagent_type` | field | translate.ts: taskStarted | package | none |
 | `SDKTaskStartedMessage` | `task_id` | field | translate.ts: taskStarted | reference | none |
 | `SDKTaskStartedMessage` | `task_type` | field | translate.ts: taskStarted | reference | none |
@@ -283,6 +285,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKCompactBoundaryMessage.subtype` | `"compact_boundary"` | value | translate.ts: HANDLERS | reference | P21 |
 | `SDKMessageOrigin.kind` | `"human"` | value | translate.ts: result | reference | none |
 | `SDKMessageOrigin.kind` | `"peer"` | value | translate.ts: user | reference | none |
+| `SDKMessageOrigin.kind` | `"task-notification"` | value | translate.ts: user | package | none |
 | `SDKPartialAssistantMessage.event.content_block.type` | `"text"` | value | translate.ts: contentBlockStart | measured | none |
 | `SDKPartialAssistantMessage.event.delta.type` | `"text_delta"` | value | translate.ts: contentBlockDelta | measured | none |
 | `SDKPartialAssistantMessage.event.type` | `"content_block_delta"` | value | translate.ts: HANDLERS | measured | none |

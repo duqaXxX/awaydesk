@@ -716,6 +716,7 @@ test("a background command is a task of the call that launched it", () => {
       summary: 'Background command "Sleep for 5 seconds then print done" completed (exit code 0)',
       durationMs: null,
       callId: call,
+      foldNamed: false,
     },
   ]);
 });
@@ -773,6 +774,7 @@ test("a task no call started names none", () => {
       summary: "/list-files",
       durationMs: null,
       callId: null,
+      foldNamed: false,
     },
   ]);
 });
@@ -1262,6 +1264,42 @@ test("a result that names no count of steps reads as one that took some", () => 
   const { num_turns: _, ...bare } = result;
   const [ended] = of(new Translator().translate(bare), "turn_ended");
   assert.equal(ended?.steps, null);
+});
+
+// A background subagent that ends while a turn runs (issue #317), recorded on 2026-10-15 with
+// `@anthropic-ai/claude-agent-sdk` 0.3.300, Claude Code 2.1.300 and the daemon's options: the
+// turn that takes the notification replays it as a `user` record whose origin names the run
+// (`task-end-in-turn-folded`); a turn that does not take it leaves nothing, and Claude Code
+// opens a turn of its own for it (`task-end-in-turn-unfolded`).
+
+test("a notification folded into a turn names the task whose run it reports", () => {
+  const all = events("task-end-in-turn-folded");
+  const agent = of(all, "task_started").find((event) => event.taskType === "local_agent");
+  assert.ok(agent);
+  assert.deepEqual(of(all, "notification_folded"), [
+    { type: "notification_folded", taskId: agent.taskId },
+  ]);
+  // After the task's end and before the turn's: the core clears its wait on it there.
+  const folded = all.findIndex((event) => event.type === "notification_folded");
+  const ended = all.findIndex(
+    (event) => event.type === "task_ended" && event.taskId === agent.taskId,
+  );
+  assert.ok(ended < folded && folded < all.findIndex((event) => event.type === "turn_ended"));
+});
+
+test("a task's end says whether its run is known, so a fold can be named", () => {
+  const ends = (name: string) => of(events(name), "task_ended").map((event) => event.foldNamed);
+  assert.deepEqual(ends("task-end-in-turn-unfolded"), [true, true]);
+  // Recorded before Claude Code gave runs an id: nothing can be named.
+  assert.deepEqual(ends("background"), [false]);
+});
+
+test("a task whose notification no turn took gives no folded notification", () => {
+  assert.deepEqual(of(events("task-end-in-turn-unfolded"), "notification_folded"), []);
+});
+
+test("a Monitor's line folded into a turn names no run, so no task", () => {
+  assert.deepEqual(of(events("background-forms"), "notification_folded"), []);
 });
 
 // The model a call's agent ran on (issue #292): `resolvedModel` of the Agent call's

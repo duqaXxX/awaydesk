@@ -15,6 +15,9 @@ export const CAPABILITIES: Capabilities = Object.freeze({
   }),
   subagents: true,
   backgroundTasks: true,
+  // A notification folded into a running turn is replayed as a `user` record whose origin names
+  // the run (`SDKMessageOrigin.runId`, recorded 2026-10-15, issue #317).
+  foldedNotifications: true,
   compaction: true,
   // `session_state_changed`, which a session emits when asked to (`SESSION_SIGNALS`).
   declaredState: true,

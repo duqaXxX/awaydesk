@@ -60,7 +60,16 @@ interface Memory {
   /** A top-level `message_start` carried no id: the ids tell nothing. */
   unnamed: boolean;
   compacting: boolean;
+  /**
+   * The task each run started, by run id: the notification folded into a turn names the run
+   * (`SDKMessageOrigin.runId`), the core names tasks. An entry goes when its notification is
+   * read; the oldest go past RUNS_KEPT.
+   */
+  readonly runs: Map<string, string>;
 }
+
+// Runs remembered for a notification that may never be folded (one a turn of its own reports).
+const RUNS_KEPT = 200;
 
 type Handler = (memory: Memory, record: WireRecord) => SessionEvent[];
 
@@ -301,6 +310,15 @@ function user(memory: Memory, record: WireRecord): SessionEvent[] {
   const origin = isRecord(record.origin) ? record.origin : {};
   const sender = origin.kind === "peer" ? string(origin.senderTaskId) : null;
   if (sender !== null) return [{ type: "report_started", taskId: sender }];
+  // A task's notification folded into the running turn is replayed with the run it reports
+  // (recorded 2026-10-15, `task-end-in-turn-folded`); one a turn of its own reports is not
+  // (`task-end-in-turn-unfolded`), nor is a Monitor's line, which names no run.
+  const runId = origin.kind === "task-notification" ? string(origin.runId) : null;
+  const folded = runId === null ? undefined : memory.runs.get(runId);
+  if (runId !== null && folded !== undefined) {
+    memory.runs.delete(runId);
+    return [{ type: "notification_folded", taskId: folded }];
+  }
   const message = isRecord(record.message) ? record.message : {};
   if (!Array.isArray(message.content)) return [];
   const blocks = records(message.content);
@@ -379,10 +397,19 @@ function compactBoundary(_memory: Memory, record: WireRecord): SessionEvent[] {
   ];
 }
 
-function taskStarted(_memory: Memory, record: WireRecord): SessionEvent[] {
+function taskStarted(memory: Memory, record: WireRecord): SessionEvent[] {
   const taskId = string(record.task_id);
   const description = string(record.description);
   if (taskId === null || description === null) return [];
+  // Absent for a task this process did not register (`SDKTaskStartedMessage.run_id`).
+  const runId = string(record.run_id);
+  if (runId !== null) {
+    memory.runs.set(runId, taskId);
+    for (const kept of memory.runs.keys()) {
+      if (memory.runs.size <= RUNS_KEPT) break;
+      memory.runs.delete(kept);
+    }
+  }
   const taskType = words(record.task_type);
   return [
     {
@@ -420,12 +447,15 @@ function taskUpdated(_memory: Memory, record: WireRecord): SessionEvent[] {
   ];
 }
 
-function taskNotification(_memory: Memory, record: WireRecord): SessionEvent[] {
+function taskNotification(memory: Memory, record: WireRecord): SessionEvent[] {
   const taskId = string(record.task_id);
   const reported = string(record.status);
   const summary = string(record.summary);
   if (taskId === null || reported === null || summary === null) return [];
   const usage = isRecord(record.usage) ? record.usage : {};
+  // The replay of a folded notification names the run, which the task's start recorded: a task
+  // whose run this process never saw cannot be named (`SDKTaskStartedMessage.run_id`).
+  const runId = string(record.run_id);
   return [
     {
       type: "task_ended",
@@ -434,6 +464,7 @@ function taskNotification(_memory: Memory, record: WireRecord): SessionEvent[] {
       summary,
       durationMs: number(usage.duration_ms),
       callId: words(record.tool_use_id),
+      foldNamed: runId !== null && memory.runs.has(runId),
     },
   ];
 }
@@ -553,6 +584,7 @@ export class Translator {
     open: false,
     unnamed: false,
     compacting: false,
+    runs: new Map(),
   };
 
   /** The daemon is sending a prompt under `promptId`: its replay will be `prompt_taken`. */
