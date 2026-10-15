@@ -197,8 +197,10 @@ export const RESTART_HOLD_REPORT = "a background task is about to report, within
 // The one form of a task started in the background, whatever its kind (issue #311): the
 // terminal's two lines for an agent it starts in the background, `**type**(description)` and
 // `⎿ Backgrounded agent` without its key hints (captured on Claude Code 2.1.296, 2026-10-13),
-// with words that fit every task under the name.
-export const TASK_LAUNCHED = "**{name}**({description})\n⎿ Running in background";
+// with words that fit every task under the name. `{model}` is the model an agent ran on when it
+// is not the session's, a space and its name after the description as the terminal writes it
+// (captured on Claude Code 2.1.300, 2026-10-15), and empty otherwise.
+export const TASK_LAUNCHED = "**{name}**({description}){model}\n⎿ Running in background";
 // The terminal's one line for several agents started in one message, with what each does under
 // it as a tree (captured the same day: `2 background agents launched`), for every task.
 export const TASKS_LAUNCHED = "**{n} background tasks launched**";

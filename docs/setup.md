@@ -735,7 +735,8 @@ the calls have ended it counts them in the terminal's words (`Ran 2 shell comman
 A command that failed is counted with the others, as in the terminal; a failed call of another
 tool keeps a card that says why. A task Claude Code starts in the background has no card, whatever
 its kind: it is two lines of text, its name in bold and what it does, `Monitor(ticks)` or
-`mechanical(review)`, then `⎿ Running in background`, and it shows in the list of what still runs.
+`mechanical(review)`, then `⎿ Running in background` (a subagent on another model than the
+session names it after the description, `Agent(review) Haiku`), and it shows in the list of what still runs.
 The call that left a command or a Monitor running is counted with the others, as in the terminal.
 Several tasks started in one message share one line, `3 background tasks launched`, with what each
 does under it. What a subagent does shows nowhere in the reply. A turn Claude Code opens by itself

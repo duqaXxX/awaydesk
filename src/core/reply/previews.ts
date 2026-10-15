@@ -57,9 +57,13 @@ const PLAIN_AGENT = "general-purpose";
  * the name of the call that started it, then what the task does.
  */
 export function launched(launch: Launch): string {
-  const { name, agentType, description } = launch;
+  const { name, agentType, description, model } = launch;
   const shown = agentType === null || agentType === PLAIN_AGENT ? name : agentType;
-  return fill(TASK_LAUNCHED, { name: shown, description: oneLine(description, TITLE_LIMIT) });
+  return fill(TASK_LAUNCHED, {
+    name: shown,
+    description: oneLine(description, TITLE_LIMIT),
+    model: model === null ? "" : ` ${model}`,
+  });
 }
 
 /** A task started in the background, as its launch line names it. */
@@ -68,6 +72,8 @@ export interface Launch {
   readonly name: string;
   readonly agentType: string | null;
   readonly description: string;
+  /** The name of the model the agent runs on when it is not the session's; null otherwise. */
+  readonly model: string | null;
 }
 
 /**

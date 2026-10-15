@@ -20,6 +20,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A subagent that runs on another model than the session shows it, as the terminal does (issue
+  #292): after the description on the launch line of a background subagent
+  (`**Agent**(List folder files) Haiku`), and as `· Haiku` at the end of the card of a foreground
+  subagent once its call ends. The Claude back end reads `resolvedModel` of the Agent call's
+  `tool_use_result` and compares it with the model of the main thread's last message, so a
+  `!model` switch is followed; `call_ended` carries it as `model`, and `ModelInfo` gains
+  `resolvedModel`. The name is the display name of the session's model list found by that id, the
+  id itself when the list does not hold it (`core/models.ts`). The launch line of a subagent now
+  waits for the call's result, which comes right after the task starts, and is written without
+  the model if no result comes. The footer's model uses the same name: `Haiku 4.5` where it showed
+  `claude-haiku-4-5-20251001`. `TurnRenderer` takes the lookup as a function.
+
 - Every task Claude Code starts in the background takes one form, whatever its kind (issue #311):
   two lines of text built from what the SDK says of every task, its name in bold and its
   description, then `⎿ Running in background`, and no card. A command or a Monitor left running

@@ -42,6 +42,7 @@ const TERMINAL_TASK_STATUSES: ReadonlySet<string> = new Set([
 ]);
 const INTERRUPTED: ReadonlySet<string> = new Set(["aborted_streaming", "aborted_tools"]);
 const AUTHENTICATION_FAILED = "authentication_failed";
+const SYNTHETIC_MODEL = "<synthetic>";
 // The signs a line of a `structuredPatch` hunk opens with; the backslash is
 // `\ No newline at end of file`, about the line above.
 const SIGNS: ReadonlySet<string> = new Set(["-", "+", " ", "\\"]);
@@ -50,6 +51,8 @@ const SIGNS: ReadonlySet<string> = new Set(["-", "+", " ", "\\"]);
 interface Memory {
   /** The ids of the prompts the daemon sent. */
   readonly sent: Set<string>;
+  /** The model of the top-level assistant message last seen: the one that makes the next call. */
+  mainModel: string | null;
   /** The ids of the messages a `message_start` announced: their text is written from its deltas. */
   readonly streamed: Set<string>;
   /** The top-level stream is writing a message. */
@@ -172,6 +175,7 @@ function callEnded(
   parentCallId: string | null,
   isError: boolean,
   change: FileChange | null,
+  model: string | null = null,
 ): SessionEvent[] {
   const callId = string(block.tool_use_id);
   if (callId === null) return [];
@@ -182,6 +186,7 @@ function callEnded(
       isError,
       output: resultText(block.content),
       fileChange: change,
+      model,
       parentCallId,
     },
   ];
@@ -202,6 +207,12 @@ function assistant(memory: Memory, record: WireRecord): SessionEvent[] {
     return [{ type: "agent_error", kind, category, text, parentCallId }];
   }
   const events: SessionEvent[] = [];
+  // A message Claude Code wrote itself (a local command's answer, recorded: `usage.jsonl`) names
+  // `<synthetic>`, no model the session runs on.
+  const model = words(message.model);
+  if (parentCallId === null && model !== null && model !== SYNTHETIC_MODEL) {
+    memory.mainModel = model;
+  }
   const messageId = string(message.id);
   if (
     text !== "" &&
@@ -271,6 +282,19 @@ export function fileChange(result: unknown): FileChange | null {
   return { path, kind: "edited", hunks, content: null };
 }
 
+/**
+ * The model an Agent call's agent ran on, from `resolvedModel` of the call's `tool_use_result`
+ * (the SDK's `AgentOutput`, SDK 0.3.300; measured on `subagent`, `subagent-foreground` and
+ * `background-forms`), when it is not the model of the main thread's last message, which made
+ * the call: the terminal names a subagent's model only then (captured on Claude Code 2.1.300,
+ * 2026-10-15). Null for any other result and when either model is unknown.
+ */
+function agentModel(memory: Memory, result: unknown): string | null {
+  if (!isRecord(result) || memory.mainModel === null) return null;
+  const ran = words(result.resolvedModel);
+  return ran === memory.mainModel ? null : ran;
+}
+
 function user(memory: Memory, record: WireRecord): SessionEvent[] {
   const promptId = string(record.uuid);
   if (promptId !== null && memory.sent.has(promptId)) {
@@ -302,11 +326,12 @@ function user(memory: Memory, record: WireRecord): SessionEvent[] {
   // One `tool_use_result` per message: it belongs to a result only when it is alone.
   const results = blocks.filter((block) => block.type === "tool_result");
   const change = results.length === 1 ? fileChange(record.tool_use_result) : null;
+  const model = results.length === 1 ? agentModel(memory, record.tool_use_result) : null;
   const events: SessionEvent[] = [];
   for (const block of blocks) {
     if (block.type === "tool_use") events.push(...callStarted(block, parentCallId));
     else if (block.type === "tool_result") {
-      events.push(...callEnded(block, parentCallId, block.is_error === true, change));
+      events.push(...callEnded(block, parentCallId, block.is_error === true, change, model));
     }
   }
   return events;
@@ -554,6 +579,7 @@ function handlerOf(kind: string | null): Handler | null {
 export class Translator {
   readonly #memory: Memory = {
     sent: new Set(),
+    mainModel: null,
     streamed: new Set(),
     open: false,
     unnamed: false,

@@ -176,6 +176,7 @@ function setup(requestId: string): OwnerRequest {
     models: [
       {
         value: "model-a",
+        resolvedModel: null,
         displayName: "Model A",
         description: null,
         supportsEffort: true,

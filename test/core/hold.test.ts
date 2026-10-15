@@ -42,6 +42,7 @@ test("the context given to open comes back with the pending", () => {
   const models = [
     {
       value: "m",
+      resolvedModel: null,
       displayName: "M",
       description: null,
       supportsEffort: false,

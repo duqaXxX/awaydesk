@@ -99,6 +99,18 @@ test("models off: the footer shows the model the agent reports, and none otherwi
   assert.ok((await reported.session().status()).includes("Model: `claude-haiku-4-5-20251001`"));
 });
 
+test("models on: the footer names the model by the agent's display name, and by its id when unlisted", async (t) => {
+  const listed = harnessFor(t)({ turns: [sdkMessages("tools")] });
+  await (await listed.session().submit("list the files")).done.wait();
+  assert.ok((await listed.session().status()).includes("Model: `Haiku 4.5`"));
+  const unlisted = harnessFor(t)({
+    turns: [sdkMessages("tools")],
+    contextUsage: { model: "claude-unlisted-9", percentage: null },
+  });
+  await (await unlisted.session().submit("list the files")).done.wait();
+  assert.ok((await unlisted.session().status()).includes("Model: `claude-unlisted-9`"));
+});
+
 test("models off and none reported: the footer and the status show no model", async (t) => {
   const h = harnessFor(t)({
     turns: [sdkMessages("tools")],
@@ -244,6 +256,7 @@ function subagentTurn(): Item[] {
       isError: false,
       output: "ok",
       fileChange: null,
+      model: null,
       parentCallId: "agent-1",
     }),
     event({ type: "task_progress", taskId: "task-1", description: "reading", callId: "agent-1" }),
@@ -262,6 +275,7 @@ function subagentTurn(): Item[] {
       isError: false,
       output: "looked",
       fileChange: null,
+      model: null,
       parentCallId: null,
     }),
     event({ type: "message_ended", parentCallId: null }),
