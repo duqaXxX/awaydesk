@@ -156,6 +156,23 @@ export class Holds {
     return null;
   }
 
+  /**
+   * Whether this message shows a hold that was decided and whose answer is still being applied:
+   * false once its asker discarded it, as for a hold never held (a restart).
+   */
+  decidedAt(channelId: string, threadId: string, messageTs: string): boolean {
+    for (const { pending } of this.entries.values()) {
+      if (
+        pending.channelId === channelId &&
+        pending.threadId === threadId &&
+        pending.messageTs === messageTs
+      ) {
+        return pending.decided;
+      }
+    }
+    return false;
+  }
+
   discard(holdId: string): void {
     this.entries.delete(holdId);
   }

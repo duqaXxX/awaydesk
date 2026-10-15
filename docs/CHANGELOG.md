@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A second `Start` on a session's setup while the first is applied, and a model picked just
+  before `Start` but handled after it, no longer add `This question is no longer open: it was
+  already answered, or awaydesk restarted.` under the summary (issue #142): the summary says
+  what happened. The handlers run concurrently, so either click can find the setup decided. A
+  click on a setup no longer held (a restart, or a click after the start was applied) keeps the
+  notice, since the daemon cannot tell those two apart. The log line names the path as before;
+  the model's is now `setup model, decided` (`Holds.decidedAt`).
 - A command that a subagent continued after a restart of the daemon starts no longer ends with
   a `Background command` line in the reply (issue #294). The subagent's records name the call
   that first started it, which the new process never saw, so the command read as one of the

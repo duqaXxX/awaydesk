@@ -114,3 +114,16 @@ test("a control with no id of its own finds the open hold its message shows", ()
   holds.resolve(holdId, CHANNEL, THREAD, DEFAULT_CHOICE);
   assert.equal(holds.atMessage(CHANNEL, THREAD, "1790000000.000001"), null);
 });
+
+test("a message whose hold was decided is told apart from one whose hold is gone", () => {
+  const holds = new Holds();
+  const [holdId] = holds.open(CHANNEL, THREAD);
+  holds.posted(holdId, "1790000000.000001");
+  assert.equal(holds.decidedAt(CHANNEL, THREAD, "1790000000.000001"), false);
+  holds.resolve(holdId, CHANNEL, THREAD, DEFAULT_CHOICE);
+  assert.equal(holds.decidedAt(CHANNEL, THREAD, "1790000000.000001"), true);
+  assert.equal(holds.decidedAt(CHANNEL, OTHER_THREAD, "1790000000.000001"), false);
+  assert.equal(holds.decidedAt(CHANNEL, THREAD, "1790000000.000009"), false);
+  holds.discard(holdId);
+  assert.equal(holds.decidedAt(CHANNEL, THREAD, "1790000000.000001"), false);
+});

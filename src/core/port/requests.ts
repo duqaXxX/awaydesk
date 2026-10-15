@@ -12,5 +12,8 @@ export type RequestsSessions = Pick<SessionManager, "live" | "wrote">;
 
 export type RequestsApprovals = Pick<Approvals, "questions">;
 
-/** A setup waits for its Start as a hold does; the model picked redraws the open one. */
-export type RequestsHolds = Pick<Holds, "atMessage">;
+/**
+ * A setup waits for its Start as a hold does; the model picked redraws the open one, and says
+ * nothing when Start already decided it.
+ */
+export type RequestsHolds = Pick<Holds, "atMessage" | "decidedAt">;

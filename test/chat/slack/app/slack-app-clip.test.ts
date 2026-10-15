@@ -21,6 +21,7 @@ import * as texts from "../../../../src/core/texts.ts";
 import { fill, named } from "../../../../src/core/texts.ts";
 import { setWriter } from "../../../../src/log.ts";
 import {
+  AsyncEvent,
   BOT,
   CHANNEL,
   OTHER_TEAM,
@@ -35,6 +36,7 @@ import {
   clickIn,
   clipInfo,
   clipMessage,
+  gateLimiter,
   manualWorld,
   message,
   ownerWasTold,
@@ -143,6 +145,26 @@ test("a model change after start is logged", async (t) => {
   assert.ok(line.includes("(setup model, no open setup)"));
   assert.ok(line.includes(`action ${SETUP_MODEL} in ${CHANNEL}/${THREAD}`));
   assert.ok(line.includes("open_at_message=False, held=False"));
+  assert.ok(!log.text().includes("SECRET-PROMPT-CONTENT"));
+});
+
+test("a model change while start is applied is logged as decided", async (t) => {
+  const world = manualWorld(t);
+  await world.dispatch(message("SECRET-PROMPT-CONTENT", { ts: THREAD }));
+  const gate = new AsyncEvent();
+  gateLimiter(world, gate);
+  const model = setupClick(world, SETUP_MODEL, { model: "haiku" });
+  await world.dispatch(setupClick(world));
+  await world.idle();
+  const log = captureLog(t);
+  await world.dispatch(model);
+  gate.set();
+  await world.settle();
+  const lines = log.app.filter((line) => line.includes("refused a click"));
+  assert.equal(lines.length, 1);
+  const line = lines[0] as string;
+  assert.ok(line.includes("(setup model, decided)"));
+  assert.ok(line.includes("open_at_message=False, held=True"));
   assert.ok(!log.text().includes("SECRET-PROMPT-CONTENT"));
 });
 
