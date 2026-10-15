@@ -65,10 +65,10 @@ All notable changes to this project are documented here. The format follows
   `texts.BACKGROUND_NOTICE` is gone.
 - Text that follows a launch line is set a paragraph apart when the card of the call that started
   the task changes above the line in between.
-- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.300, which bundles Claude Code 2.1.300 (issue
-  #307). The release probe certified it on 2026-10-14: the SDK surface table holds and the 24
-  claims hold. The release offers one command the recorded `server-info.json` does not list,
-  `/plugin-authoring` (issue #225).
+- `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.301, which bundles Claude Code 2.1.301. The
+  release probe certified it on 2026-10-15: the SDK surface table holds and the 25 claims hold.
+  The release offers one command the recorded `server-info.json` does not list,
+  `/plugin-authoring` (issue #225), as 0.3.300 did (issue #307).
 - The footer shows once, under the reply of the session's latest work, when the session has ended
   everything it was doing (no turn, no prompt waiting, no background task, no report expected, no
   approval or question open), and at a forced end (`!stop`, a restart, a lost process, an error,
