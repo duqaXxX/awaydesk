@@ -27,6 +27,7 @@ const HOLD: HoldRequest = {
 const MODELS: readonly ModelInfo[] = [
   {
     value: "sonnet",
+    resolvedModel: null,
     displayName: "Sonnet",
     description: null,
     supportsEffort: true,

@@ -226,6 +226,98 @@ test("a subagent in the background is the terminal's line, with no card", async 
   assert.deepEqual(renderer.runningTasks, []);
 });
 
+// Issue #292: the model an agent ran on, when it is not the session's. The event carries it
+// (`call_ended.model`, from the result of the call); the recordings hold none, so the event is
+// altered.
+
+const HAIKU = "claude-haiku-4-5-20251001";
+
+/** `events` with the model set on the call_ended of the call `callId`. */
+function ranOn(events: readonly SessionEvent[], callId: string, model: string): SessionEvent[] {
+  return events.map((event) =>
+    event.type === "call_ended" && event.callId === callId ? { ...event, model } : event,
+  );
+}
+
+async function renderNamed(
+  events: readonly SessionEvent[],
+  modelName: (id: string) => string,
+): Promise<[RecordingSink, TurnRenderer]> {
+  const sink = new RecordingSink();
+  const renderer = new TurnRenderer(sink, NAMES, null, true, () => false, modelName);
+  for (const event of events) await renderer.feed(event);
+  await renderer.close();
+  await renderer.closeOut();
+  return [sink, renderer];
+}
+
+test("the launch line names the model the agent runs on, as the agent's list names it", async () => {
+  const [first = []] = splitTurns(recordedEvents("subagent"));
+  const [call] = topLevelToolIds(first);
+  assert.ok(call !== undefined);
+  const [sink] = await renderNamed(ranOn(first, call, HAIKU), (id) =>
+    id === HAIKU ? "Haiku 4.5" : id,
+  );
+  assert.deepEqual(sink.notices, [
+    "**Agent**(Run ls and report contents) Haiku 4.5\n⎿ Running in background",
+  ]);
+});
+
+test("a model the list does not hold is shown by its id", async () => {
+  const [first = []] = splitTurns(recordedEvents("subagent"));
+  const [call] = topLevelToolIds(first);
+  assert.ok(call !== undefined);
+  const [sink] = await render(ranOn(first, call, HAIKU));
+  assert.deepEqual(sink.notices, [
+    `**Agent**(Run ls and report contents) ${HAIKU}\n⎿ Running in background`,
+  ]);
+});
+
+test("a launch line waits for the result that names the model, and is written without it when none comes", async () => {
+  const [first = []] = splitTurns(recordedEvents("subagent"));
+  const [call] = topLevelToolIds(first);
+  assert.ok(call !== undefined);
+  const ended = first.findIndex((event) => event.type === "call_ended");
+  const closed = first.findIndex((event) => event.type === "message_ended");
+  assert.ok(ended > 0 && closed > ended);
+  // The message ends before the result of its call comes (the order is the event's, altered).
+  const late = ranOn(first, call, HAIKU);
+  const [result] = late.splice(ended, 1);
+  late.splice(closed, 0, result as SessionEvent);
+  const sink = new RecordingSink();
+  const renderer = new TurnRenderer(
+    sink,
+    NAMES,
+    null,
+    true,
+    () => false,
+    () => "Haiku",
+  );
+  for (const event of late.slice(0, closed)) await renderer.feed(event);
+  assert.deepEqual(sink.notices, []); // the message ended, the result has not come
+  await renderer.feed(late[closed] as SessionEvent);
+  assert.deepEqual(sink.notices, [
+    "**Agent**(Run ls and report contents) Haiku\n⎿ Running in background",
+  ]);
+  // The call's result never comes: the turn's end still writes the line, with no model.
+  const never = first.filter((event) => event.type !== "call_ended");
+  const [unanswered] = await render(never);
+  assert.deepEqual(unanswered.notices, [
+    "**Agent**(Run ls and report contents)\n⎿ Running in background",
+  ]);
+});
+
+test("an agent the call waited for names its model on the card once the call ends", async () => {
+  const events = recordedEvents("subagent-foreground");
+  const [call] = topLevelToolIds(events);
+  assert.ok(call !== undefined);
+  const [named] = await renderNamed(ranOn(events, call, HAIKU), () => "Haiku");
+  assert.ok(finals(named.tasks).get(call)?.title.endsWith(" · Haiku"));
+  const [plain] = await render(events);
+  assert.ok(!finals(plain.tasks).get(call)?.title.includes(" · Haiku"));
+  assert.ok(!(finals(plain.tasks).get(call)?.title ?? "").includes("claude"));
+});
+
 test("the launch line names the agent's type, and none for the plain one", async () => {
   // The type is the event's, altered: no recording holds a type other than `general-purpose`,
   // which the terminal writes as `Agent(...)` (measured 2026-10-13: `mechanical(...)`).

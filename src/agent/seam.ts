@@ -147,6 +147,8 @@ export interface ContextUsage {
 
 export interface ModelInfo {
   readonly value: string;
+  /** The full id the value stands for, which a message or a result names the model by; null when the agent gives none. */
+  readonly resolvedModel: string | null;
   /** The agent's name for the model, or its value when it gives none. */
   readonly displayName: string;
   readonly description: string | null;
@@ -267,6 +269,12 @@ export type SessionEvent =
       /** The result's text, as the agent wrote it; null when the result holds none. */
       readonly output: string | null;
       readonly fileChange: FileChange | null;
+      /**
+       * The model the call's agent ran on, when it is not the one that made the call; null when
+       * it is the same, and when the agent does not say. Only a call that starts an agent has
+       * one.
+       */
+      readonly model: string | null;
       readonly parentCallId: string | null;
     }
   /** A task starts: the work of a call (`callId`), or of nothing the core saw (null). */

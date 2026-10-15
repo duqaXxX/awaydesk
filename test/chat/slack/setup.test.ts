@@ -103,6 +103,7 @@ test("a model option carries the cli s description cut to 75", () => {
   });
   const model = (description: string | null): ModelInfo => ({
     value: "m",
+    resolvedModel: null,
     displayName: "M",
     description,
     supportsEffort: false,

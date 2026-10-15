@@ -571,6 +571,7 @@ export class PlainSession implements AgentSession {
       isError: !allowed || options.isError === true,
       output: allowed ? (options.output ?? "done") : message,
       fileChange: null,
+      model: null,
       parentCallId: null,
     });
   }
@@ -611,6 +612,7 @@ export class PlainSession implements AgentSession {
       isError: !answer.answered,
       output: answer.answered ? JSON.stringify(answer.answers) : answer.message,
       fileChange: null,
+      model: null,
       parentCallId: null,
     });
   }
