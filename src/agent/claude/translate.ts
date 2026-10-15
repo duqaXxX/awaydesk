@@ -421,6 +421,7 @@ function taskStarted(memory: Memory, record: WireRecord): SessionEvent[] {
       callId: words(record.tool_use_id),
       agentType: words(record.subagent_type),
       background: typeof record.is_backgrounded === "boolean" ? record.is_backgrounded : null,
+      parentTaskId: words(record.parent_task_id),
     },
   ];
 }

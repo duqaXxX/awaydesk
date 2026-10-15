@@ -4612,6 +4612,23 @@ test("a subagent s command and the agent s second end close the reply as before"
   assert.equal(body.split("✓ Agent ").length - 1, 2);
 });
 
+test("a command a continued subagent starts after a restart gets no end line either", async (t) => {
+  // subagent-resume-after-restart.jsonl (issue #294, CLI 2.1.300): a new process resumes the
+  // session and continues a background subagent with `SendMessage`. The subagent's own records
+  // name the `Agent` call of the process before, which this one never saw; the command's
+  // `task_started` names the subagent's task as its parent.
+  const m = sdkMessages("subagent-resume-after-restart");
+  const first = m.findIndex(isResult);
+  const h = harnessFor(t)({ turns: [m.slice(0, first + 1)] });
+  const session = h.session();
+  await (await session.submit("continue the agent")).done.wait();
+  h.clients[0]?.inject(m.slice(first + 1));
+  await h.until(() => session.idle && h.reactions().at(-1) === Status.DONE, 3.0);
+  const body = h.bodies().join("\n");
+  assert.ok(!body.includes("Background command"), body);
+  assert.equal(body.split("✓ Agent ").length - 1, 2, body);
+});
+
 test("a posted and a removed request are logged by id and age only", async (t) => {
   // Issue #71: the push of a request is matched to its timing from the log.
   const recorded = recordedQuestion();

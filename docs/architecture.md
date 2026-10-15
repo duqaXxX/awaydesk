@@ -1320,8 +1320,10 @@ closed when the start returns (`ThreadSession.connect`).
   and the queue is put back in order (`ThreadSession.settle`, which logs it); that one reply can
   then carry the other's label.
 - A task a subagent started and left running (`ThreadSession.ownedBySubagent`, a command
-  promoted through `TurnRenderer.takePromoted`) gets no end line: its end is told to the
-  subagent, whose own end is the one the conversation reports.
+  promoted through `TurnRenderer.takePromoted`, or one whose `parentTaskId` is a subagent the
+  session knows) gets no end line: its end is told to the subagent, whose own end is the one the
+  conversation reports. The parent covers a subagent continued after a restart, whose records
+  name a call this process never saw.
 - An end line is written `aside` (`ReplySink.text`): a line about the work, which a chat may draw
   smaller, as it draws the count of a run of calls. The list of what still runs counts the tasks in
   the background alone (`TurnRenderer.backgroundTasks`): a task whose call still waits for it

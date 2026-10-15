@@ -191,6 +191,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKTaskProgressMessage` | `tool_use_id` | field | translate.ts: taskProgress | reference | none |
 | `SDKTaskStartedMessage` | `description` | field | translate.ts: taskStarted | reference | none |
 | `SDKTaskStartedMessage` | `is_backgrounded` | field | translate.ts: taskStarted | reference | none |
+| `SDKTaskStartedMessage` | `parent_task_id` | field | translate.ts: taskStarted | package | none |
 | `SDKTaskStartedMessage` | `run_id` | field | translate.ts: taskStarted | package | none |
 | `SDKTaskStartedMessage` | `subagent_type` | field | translate.ts: taskStarted | package | none |
 | `SDKTaskStartedMessage` | `task_id` | field | translate.ts: taskStarted | reference | none |

@@ -242,6 +242,7 @@ function subagentTurn(): Item[] {
       agentType: "general-purpose",
       // One the call waits for, which has a card for its calls to be counted on.
       background: false,
+      parentTaskId: null,
     }),
     event({
       type: "call_started",

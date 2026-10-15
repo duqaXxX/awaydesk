@@ -703,6 +703,7 @@ test("a background command is a task of the call that launched it", () => {
       callId: call,
       agentType: null,
       background: true,
+      parentTaskId: null,
     },
   ]);
   assert.deepEqual(made[45], [
@@ -735,6 +736,7 @@ test("a subagent is a task with its progress and the time it took", () => {
       callId: call,
       agentType: "general-purpose",
       background: true,
+      parentTaskId: null,
     },
   ]);
   assert.deepEqual(made[73], [
@@ -752,6 +754,21 @@ test("a subagent is a task with its progress and the time it took", () => {
   assert.ok(ended?.summary.startsWith("The current working directory is empty"));
 });
 
+test("a command a subagent starts names the subagent's task as its parent", () => {
+  // subagent-resume-after-restart.jsonl: the command of a subagent continued in a new process.
+  const started = perRecord("subagent-resume-after-restart")
+    .flat()
+    .filter((event) => event.type === "task_started");
+  assert.deepEqual(
+    started.map((event) => [event.taskId, event.kind, event.parentTaskId]),
+    [
+      ["af22137d3f2cf9aa4", "subagent", null],
+      ["bu05w70lu", "command", "af22137d3f2cf9aa4"],
+      ["af22137d3f2cf9aa4", "subagent", null],
+    ],
+  );
+});
+
 test("a task no call started names none", () => {
   const made = perRecord("skill-fork-command");
   assert.deepEqual(made[0], [
@@ -764,6 +781,7 @@ test("a task no call started names none", () => {
       callId: null,
       agentType: "general-purpose",
       background: false,
+      parentTaskId: null,
     },
   ]);
   assert.deepEqual(made[2], [
