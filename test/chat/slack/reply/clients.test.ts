@@ -18,6 +18,7 @@ import {
 import {
   type ClientOptions,
   CREATING_METHODS,
+  RATE_LIMIT_WAIT_SECONDS,
   repliesClient,
   sharedClient,
 } from "../../../../src/chat/slack/reply/clients.ts";
@@ -28,8 +29,21 @@ import { UPLOAD_DONE, UPLOAD_URL } from "../../../support/fake-slack.ts";
 
 type FetchResponse = Awaited<ReturnType<FetchFunction>>;
 
-/** What Slack, or the network, does to one request. */
-type Step = "reset" | "timeout" | "429" | "500" | "502" | "503" | "504" | "refused" | "ok";
+/**
+ * What Slack, or the network, does to one request. `429` rate limits it with a `Retry-After` of
+ * 30 seconds, `429:<s>` with one of `<s>`.
+ */
+type Step =
+  | "reset"
+  | "timeout"
+  | "429"
+  | `429:${number}`
+  | "500"
+  | "502"
+  | "503"
+  | "504"
+  | "refused"
+  | "ok";
 
 /** The method a request went to: the last part of its URL. */
 function methodOf(url: string | URL): string {
@@ -71,6 +85,7 @@ function network(requests: string[], ...steps: Step[]): FetchFunction {
       throw new TypeError("fetch failed", { cause });
     }
     if (step === "429") return respond(url, 429, "", "30");
+    if (step.startsWith("429:")) return respond(url, 429, "", step.slice(4));
     if (step !== "ok") return respond(url, Number(step), "oops");
     return respond(url, 200, JSON.stringify({ ok: true }));
   };
@@ -210,17 +225,64 @@ test("a rate limited call is given up after 3 more sends, and thrown as a rate l
   for (const make of [replies, shared]) {
     const requests: string[] = [];
     const clock = new Pauses();
-    const failure = await make(network(requests, "429"), clock)
+    const failure = await make(network(requests, "429:10"), clock)
       .apiCall("chat.postMessage", {})
       .catch((error: unknown) => error);
     assert.ok(failure instanceof WebAPIRateLimitedError);
-    assert.equal(failure.retryAfter, 30);
+    assert.equal(failure.retryAfter, 10);
     assert.equal(describe(failure), "ratelimited");
     // Known not applied: the sink may send it again at once.
     assert.equal(unknownOutcome(failure), false);
     assert.equal(requests.length, 4);
-    assert.deepEqual(clock.slept, [30, 30, 30]);
+    assert.deepEqual(clock.slept, [10, 10, 10]);
   }
+});
+
+// Issue #236: the sink sends a reply's calls while it holds the reply's lock, which a `!stop`
+// waits for, so a call waits out at most `RATE_LIMIT_WAIT_SECONDS` of Slack's pauses in all.
+test("a rate limit whose pause would pass the wait of the call is thrown with no pause", async () => {
+  for (const make of [replies, shared]) {
+    const requests: string[] = [];
+    const clock = new Pauses();
+    const failure = await make(network(requests, "429"), clock)
+      .apiCall("chat.update", {})
+      .catch((error: unknown) => error);
+    assert.ok(failure instanceof WebAPIRateLimitedError);
+    assert.equal(unknownOutcome(failure), false);
+    // 30 and 30 make the 60 seconds; a third pause of 30 would pass them.
+    assert.equal(requests.length, 3);
+    assert.deepEqual(clock.slept, [30, 30]);
+  }
+});
+
+test("a Retry-After longer than the wait of a call is not waited at all", async () => {
+  const requests: string[] = [];
+  const clock = new Pauses();
+  const failure = await replies(
+    network(requests, `429:${RATE_LIMIT_WAIT_SECONDS + 1}`, "ok"),
+    clock,
+  )
+    .apiCall("chat.update", {})
+    .catch((error: unknown) => error);
+  assert.ok(failure instanceof WebAPIRateLimitedError);
+  assert.deepEqual(requests, ["chat.update"]);
+  assert.deepEqual(clock.slept, []);
+});
+
+test("the jitter does not count toward the wait of a call", async () => {
+  // Three pauses of 20 seconds are the whole 60; with their jitter they would pass it.
+  const requests: string[] = [];
+  const clock = new Pauses();
+  const client = repliesClient(undefined, {
+    ...QUIET,
+    clock,
+    random: () => 0.5,
+    fetch: network(requests, "429:20", "429:20", "429:20", "ok"),
+  });
+  const result = await client.apiCall("chat.update", {});
+  assert.equal(result.ok, true);
+  assert.equal(requests.length, 4);
+  assert.deepEqual(clock.slept, [20.5, 20.5, 20.5]);
 });
 
 // Issue #236: which methods Slack rate limits, and the pauses it asks for, were never recorded.
@@ -229,7 +291,7 @@ test("each rate limit is logged with its method, its Retry-After and the send it
     const lines: string[] = [];
     const restore = setWriter((line) => lines.push(line));
     try {
-      await make(network([], "429"))
+      await make(network([], "429:10"))
         .apiCall("chat.delete", { channel: "C000CHAN", ts: "1.000001" })
         .catch(() => {});
     } finally {
@@ -240,7 +302,7 @@ test("each rate limit is logged with its method, its Retry-After and the send it
       [1, 2, 3, 4].map(
         (send) =>
           "INFO awaydesk.chat.slack.reply.clients: " +
-          `Slack rate limited chat.delete: Retry-After 30 s, send ${send} of 4`,
+          `Slack rate limited chat.delete: Retry-After 10 s, send ${send} of 4`,
       ),
     );
   }

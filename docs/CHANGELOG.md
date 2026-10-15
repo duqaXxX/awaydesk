@@ -27,6 +27,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A rate limited Slack call waits out at most 60 seconds of Slack's pauses in all
+  (`clients.RATE_LIMIT_WAIT_SECONDS`, issue #236). It was sent again up to 3 times after any
+  `Retry-After`, so one call could hold a reply's lock, and a `!stop` behind it, for minutes. A
+  pause that would pass the 60 seconds is not taken, and the call is thrown as rate limited, as
+  when its retries run out. The jitter does not count. The one `Retry-After` in the owner's log
+  of 2026-10-12 and 2026-10-13 was 10 seconds, on `chat.delete`, 11 times, which the limit leaves
+  untouched.
 - A report no reply of its tasks can take renders into the thread's last reply when that reply
   is at rest, instead of opening a reply of its own (2026-10-15): fewer messages and
   pushes for one prompt. This covers the report of a task whose reply has a later reply below it,
