@@ -134,7 +134,7 @@ it they cannot be done.
 | What | Why | Looked into |
 |---|---|---|
 | Logging Claude Code in or out | `claude` and `/login` on the machine. `!login` and `!logout` answer with that pointer | none |
-| Signing in to an MCP server that asks for it | Claude Code runs that flow in the terminal: `claude mcp login <name>`, or `/mcp` | [#221](https://github.com/duqaXxX/awaydesk/issues/221) |
+| Configuring Claude Code: adding an MCP server or signing in to one, turning a plugin on, changing its settings | Done in the terminal, with `claude mcp`, `claude plugin`, `/mcp` or `/config`; awaydesk offers no way of its own. A session started from Slack loads the result from your Claude Code settings. Signing in from Slack would carry an authorization code through a Slack message | none |
 | Trusting a folder or a repository you have not used before | Claude Code shows its trust dialog in the terminal only. A session starts only in a trusted folder, and the footer, `!status` and `!open` read git only in a repository trusted by itself, one inside a trusted folder too | none |
 
 ## Choices of awaydesk
