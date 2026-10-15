@@ -625,7 +625,7 @@ for a turn, a download or a setup the owner has not answered. A refused check le
 Threads do not wait for each other, and a thread's entry is dropped when its last place is left.
 A later message of a thread waits for the checks of the messages before it. A check is two calls,
 each bounded by the client's 30 seconds (`clients.REQUEST_TIMEOUT_MS`), so about 60 seconds per
-message ahead with no network, plus the pause of the one connection retry and any `Retry-After`
+message ahead with no network, plus the pause of the one connection retry and up to 60 seconds of `Retry-After`
 Slack sends; a message with none ahead waits for nothing. Other threads are not affected.
 The buttons and forms keep no such order: each names the message it answers.
 
