@@ -1,0 +1,440 @@
+{
+ "recording": "subagent-resume-after-restart",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01MJGutPenwisjAow67jmTGs",
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "ToolSearch: select:SendMessage"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01MJGutPenwisjAow67jmTGs",
+      "name": "ToolSearch",
+      "output": null,
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "ToolSearch: select:SendMessage"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01WkGwHEw38zhqwH5z9i74kE",
+      "name": "SendMessage",
+      "output": null,
+      "preview": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "SendMessage: af22137d3f2cf9aa4"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**SendMessage**(Run sleep 5 in background and wait for completion)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01WkGwHEw38zhqwH5z9i74kE",
+      "name": "SendMessage",
+      "output": "{\"success\":true,\"message\":\"Resuming agent af22137\",\"resumedAgentId\":\"af22137d3f2cf9aa4\",\"pin\":{\"id\":\"af22137d3f2cf9aa4\",\"name\":\"af22137d3f2cf9aa4\",\"ref\":\"ee327c\"}}",
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "SendMessage: af22137d3f2cf9aa4"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nMessage",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " sent.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Waiting for the subagent",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " to complete.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "af22137d3f2cf9aa4"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_012CKNu57KhBcSoxaTiGrCsj",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "Sleep for 5 seconds in the background"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**Bash**(Sleep for 5 seconds in the background)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_012CKNu57KhBcSoxaTiGrCsj",
+      "name": "Bash",
+      "output": "Command running in background with ID: bu05w70lu. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bu05w70lu.output. You will be notified when it completes. To check interim outpu…",
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "Sleep for 5 seconds in the background"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-af22137d3f2cf9aa4",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "af22137d3f2cf9aa4"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-af22137d3f2cf9aa4",
+      "name": "task",
+      "output": "Waiting for the sleep command to complete...",
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "af22137d3f2cf9aa4"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "Still",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " waiting for the background",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " command to complete.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "bu05w70lu"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bu05w70lu",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "bu05w70lu"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bu05w70lu",
+      "name": "task",
+      "output": "Background command \"Sleep for 5 seconds in the background\" completed (exit code 0)",
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "bu05w70lu"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "noted",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01MJGutPenwisjAow67jmTGs",
+     "name": "ToolSearch",
+     "output": null,
+     "preview": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "ToolSearch: select:SendMessage"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01MJGutPenwisjAow67jmTGs",
+     "name": "ToolSearch",
+     "output": null,
+     "preview": null,
+     "status": "complete",
+     "task": false,
+     "title": "ToolSearch: select:SendMessage"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01WkGwHEw38zhqwH5z9i74kE",
+     "name": "SendMessage",
+     "output": null,
+     "preview": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "SendMessage: af22137d3f2cf9aa4"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n**SendMessage**(Run sleep 5 in background and wait for completion)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01WkGwHEw38zhqwH5z9i74kE",
+     "name": "SendMessage",
+     "output": "{\"success\":true,\"message\":\"Resuming agent af22137\",\"resumedAgentId\":\"af22137d3f2cf9aa4\",\"pin\":{\"id\":\"af22137d3f2cf9aa4\",\"name\":\"af22137d3f2cf9aa4\",\"ref\":\"ee327c\"}}",
+     "preview": null,
+     "status": "complete",
+     "task": false,
+     "title": "SendMessage: af22137d3f2cf9aa4"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nMessage",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " sent.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Waiting for the subagent",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " to complete.",
+    "notice": false
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_012CKNu57KhBcSoxaTiGrCsj",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "Sleep for 5 seconds in the background"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n**Bash**(Sleep for 5 seconds in the background)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_012CKNu57KhBcSoxaTiGrCsj",
+     "name": "Bash",
+     "output": "Command running in background with ID: bu05w70lu. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bu05w70lu.output. You will be notified when it completes. To check interim outpu…",
+     "preview": null,
+     "status": "complete",
+     "task": false,
+     "title": "Sleep for 5 seconds in the background"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nStill",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " waiting for the background",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " command to complete.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nnoted",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

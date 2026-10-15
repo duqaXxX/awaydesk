@@ -1743,7 +1743,15 @@ export class ThreadSession {
         return;
       }
     }
-    if (event.type === "task_started") this.recordTask(event);
+    if (event.type === "task_started") {
+      // A task whose parent is a subagent this session knows is that subagent's, even when its
+      // call is one this process never saw: a subagent continued after a restart still names
+      // its first call, and its task. An unknown parent counts as none (`sdk.d.ts` 0.3.300).
+      if (event.parentTaskId !== null && this.tasks.has(event.parentTaskId)) {
+        this.ownedBySubagent.add(event.taskId);
+      }
+      this.recordTask(event);
+    }
     const stopped = task !== null && this.stopped.has(task.taskId);
     const owned = task !== null && this.ownedBySubagent.has(task.taskId);
     if (

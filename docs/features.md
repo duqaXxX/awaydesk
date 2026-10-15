@@ -95,7 +95,7 @@ Facts about a feature that neither `setup.md` nor `architecture.md` states, kept
 
 ### Background commands and subagents
 
-- A command left running in the background has no card: its call is counted in its run (`Ran 2 shell commands`), it gets the launch line of every task in the background, the command is a line of the list of what still runs, and its end is one line, `✓ Background command "Wait 40 seconds" completed (exit code 0)`. A command a subagent leaves running is in the list too and has no end line: its end is told to the subagent, whose own end line follows.
+- A command left running in the background has no card: its call is counted in its run (`Ran 2 shell commands`), it gets the launch line of every task in the background, the command is a line of the list of what still runs, and its end is one line, `✓ Background command "Wait 40 seconds" completed (exit code 0)`. A command a subagent leaves running is in the list too and has no end line: its end is told to the subagent, whose own end line follows. The same holds for a subagent continued after a restart of the daemon.
 - Several tasks started in the background by one message share one launch line, `3 background tasks launched`, with what each does under it as a tree, below the run of that message's calls.
 - The list of what still runs counts what is in the background alone, as the terminal's `1 shell still running` does: a command the turn still waits for shows on its own card and is not in it.
 - A task's end line is small and grey, as the count of a run of calls is, from its first draw: a stream carries it as the same `context` block the update after the stream's stop writes. It keeps its `✓` or `✗`.

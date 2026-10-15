@@ -305,6 +305,11 @@ export type SessionEvent =
        * it; null when the agent does not say.
        */
       readonly background: boolean | null;
+      /**
+       * The subagent task whose agent started this one; null when the conversation started it
+       * and when the agent does not say. A continued subagent's tasks still name it.
+       */
+      readonly parentTaskId: string | null;
     }
   | {
       readonly type: "task_progress";

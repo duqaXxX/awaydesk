@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A command that a subagent continued after a restart of the daemon starts no longer ends with
+  a `Background command` line in the reply (issue #294). The subagent's records name the call
+  that first started it, which the new process never saw, so the command read as one of the
+  conversation's. The back end now passes `parent_task_id` of the command's `task_started` as
+  `parentTaskId`, and a task whose parent is a subagent the session knows is that subagent's
+  (recorded 2026-10-15, Claude Code 2.1.300, `subagent-resume-after-restart.jsonl`).
+  `SDKTaskStartedMessage.parent_task_id` is a row of `docs/sdk-surface.md`.
 - A background subagent that ends while a turn runs no longer leaves its report in a second
   reply under a second footer (issue #317). Claude Code either takes the notification into that
   turn or opens a turn of its own after it, and only the first is replayed in the stream, as a
