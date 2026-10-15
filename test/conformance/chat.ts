@@ -708,13 +708,14 @@ export function chatConformance(
           assert.match(shown, /First reply/, "under the reply at rest");
           assert.match(shown, /Sleep for 5 seconds/, "with a line per task");
           assert.ok(shown.lastIndexOf(title) < shown.indexOf("model-a"), "above the footer");
-          // A reply written below that has not ended is not at rest: the list stays above it.
+          // A reply written below takes the list off the one above at once, and shows none while
+          // it is written: the list never sits between two replies.
           const second = thread.openReply(() => {});
           await second.text("Second reply");
           await second.settle();
+          await first.settle();
           await s.rig.settle();
-          assert.equal(holders().length, 1);
-          assert.match(holders()[0]?.text ?? "", /First reply/);
+          assert.equal(holders().length, 0);
           // Once it rests, the list is under it and the first reply shows none.
           await second.finish([]);
           await second.closeOut();

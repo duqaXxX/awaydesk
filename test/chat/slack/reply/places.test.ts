@@ -154,14 +154,18 @@ describe("ThreadPlaces", () => {
     assert.equal(places.holds(upper), false, "it will land below the owner message");
   });
 
-  test("the list is handed to the lowest resting reply, and to no other", () => {
+  test("the list is handed to the lowest reply once it rests, and to no other", () => {
     const places = new ThreadPlaces();
     const upper = joined(places, "1760000001.000001");
-    const lower = joined(places, "1760000002.000001");
     const running = { title: "1 shell still running", lines: ["sleep"] };
     upper.resting = true;
     places.showRunning(running);
     assert.deepEqual(upper.assigned.at(-1), running);
+    // A reply written below it takes the list off it at once, and holds none while written.
+    const lower = joined(places, "1760000002.000001");
+    places.place();
+    assert.equal(upper.assigned.at(-1), null);
+    assert.equal(lower.assigned.at(-1) ?? null, null);
     lower.resting = true;
     places.place();
     assert.equal(upper.assigned.at(-1), null);

@@ -5435,8 +5435,8 @@ test("a reply whose end did not land draws no second card, and none is left when
     args.ts === lowerTs ? rejected("ratelimited") : { ok: true };
   assert.equal(await lower.closeOut(), false);
   await settled();
-  assert.equal(listCards(slack).length, 1, "the list is drawn once");
-  assert.equal(slack.messageBlocks()[0]?.some(isCard), true, "still on the reply that held it");
+  // The lowest reply is not at rest: the list waits for it, on no message.
+  assert.deepEqual(listCards(slack), [], "no second card, and none above the lower reply");
   places.showRunning(null);
   await settled();
   assert.deepEqual(listCards(slack), []);

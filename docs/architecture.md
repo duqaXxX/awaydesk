@@ -1325,7 +1325,7 @@ closed when the start returns (`ThreadSession.connect`).
   Claude Code names (`constants.TASK_WORDS`; the kind `other` counts as a task) and said once, as a
   list: a title (`2 agents · 1 shell still running`) and a line per task, in the order they started
   (`ThreadSession.runningList`, handed over by `ThreadChat.showRunning`). The chat draws it under
-  the thread's last reply at rest, above the footer if that reply has one; it moves down when a newer reply rests, and
+  the thread's last reply once it rests, above the footer if that reply has one; a newer reply takes it off at its first message and shows it once it rests, and
   goes when nothing runs. The thread's status line never says it.
 - When the Claude Code process goes away (shutdown, an idle close, a process that exits), its tasks
   go with it: their lines close with `Stopped` and the list empties. The map lives in memory only.

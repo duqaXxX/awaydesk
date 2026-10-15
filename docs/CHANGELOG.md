@@ -158,11 +158,12 @@ All notable changes to this project are documented here. The format follows
   by edit, and its end then posts the ending with the footer and cuts it out of the first message,
   unless the reply is no longer the last thing in the thread and got no report (#295).
 
-- What still runs in a thread is a list: one card under the thread's last reply at rest and above
-  its footer, with a title such as `2 agents · 1 shell still running` and a line per subagent or
+- What still runs in a thread is a list: one card under the thread's last reply once it rests and
+  above its footer, with a title such as `2 agents · 1 shell still running` and a line per subagent or
   background command, six at most and then `+N more`. It is written whenever it changes, on a
-  reply at rest or one whose end has landed, moves down to a newer reply when that one rests (not
-  while that reply is still a stream), and goes when nothing runs. The `⏳ 1 shell` count that
+  reply at rest or one whose end has landed, leaves a reply as soon as a newer one has a message
+  and shows under that one once it rests (on no reply while it is still a stream, so that the
+  card never sits between two replies), and goes when nothing runs. The `⏳ 1 shell` count that
   followed the footer is gone. After a crash `repair.endReply` removes the list's block, and writes
   no note on a message that only the list kept open (#295).
 
