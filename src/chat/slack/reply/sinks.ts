@@ -1215,7 +1215,24 @@ export class ReplySink implements Sink {
     }
     plan.text.set(index, upto);
     if (!blank(piece)) {
-      plan.chunks.push({ type: "markdown_text", text: piece });
+      // A line about the work is drawn small from its first chunk, as the update that follows
+      // the stream writes it: drawn as text first, it would shrink once the stream stops. A
+      // context block in a `blocks` chunk is drawn by Slack (seen 2026-10-03, `pieceChunk`).
+      // A later piece of the same part gets an id of its own: no two blocks of a message share
+      // one.
+      plan.chunks.push(
+        part.aside
+          ? {
+              type: "blocks",
+              blocks: [
+                asideBlock(
+                  mrkdwnEscape(stripNewlines(piece)),
+                  sent > floor ? `${index}-${sent}` : index,
+                ),
+              ],
+            }
+          : { type: "markdown_text", text: piece },
+      );
       plan.size += len(piece);
       const made = markdownBlocks(words);
       plan.textBlocks.set(index, made);

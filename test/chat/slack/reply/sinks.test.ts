@@ -5511,9 +5511,10 @@ test("a card whose title grows back is charged once for its longest title", () =
   );
 });
 
-test("a line about the work is text in the stream and a grey line once the body has ended", async () => {
-  // A task's end line (issue #299): a stream takes only text and cards, so the line is grey
-  // from the silent update that follows the stream's stop, as a run's count is.
+test("a line about the work is a grey line in the stream and stays one once the body has ended", async () => {
+  // A task's end line (issue #299): drawn as text while the stream ran, it shrank to a grey line
+  // at the update that follows the stream's stop, and the reply's height jumped (recorded on
+  // Slack desktop, 2026-10-15). The stream now carries it as the same context block.
   const slack = new FakeSlack();
   const sink = reply(slack);
   await sink.text("Started.");
@@ -5523,6 +5524,22 @@ test("a line about the work is text in the stream and a grey line once the body 
   assert.deepEqual(slack.messageTexts(), [
     'Started.\n\n✓ Agent "Review" finished · 5s\n\nIt found <nothing>.',
   ]);
+  const streamed = [
+    ...slack.callsTo("chat.startStream"),
+    ...slack.callsTo("chat.appendStream"),
+  ].flatMap((call) => call.chunks as JsonObject[]);
+  assert.deepEqual(
+    streamed.filter((chunk) => chunk.type === "blocks"),
+    [
+      {
+        type: "blocks",
+        blocks: [{ ...context('✓ Agent "Review" finished · 5s'), block_id: "aside-1" }],
+      },
+    ],
+  );
+  assert.ok(
+    streamed.every((chunk) => chunk.type !== "markdown_text" || !String(chunk.text).includes("✓")),
+  );
   await sink.finish([]);
   assert.equal(await sink.closeOut(), true);
   assert.deepEqual(methods(slack).slice(-2), ["chat.stopStream", "chat.update"]);

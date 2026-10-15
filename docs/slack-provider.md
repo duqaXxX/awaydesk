@@ -74,9 +74,9 @@ turns into one of these keeps the run's card when it was the run's only call. An
 ended well also ends the run, and has no card: its preview is all that shows it.
 
 A line about the work, which the core marks `aside` (a task's end line), is a `context` block too,
-with the `block_id` `aside-` and the place of its text (`blocks.asideBlock`): text in the
-stream, grey from the update that follows the stream's stop or from any update of a message no
-longer a stream.
+with the `block_id` `aside-` and the place of its text (`blocks.asideBlock`). A stream carries
+it as the same block in a `blocks` chunk, so the line keeps its size when the update that follows
+the stream's stop writes the message again.
 
 Once the reply's body has ended, each run reads as one line of counts in a `context` block
 (`Ran 3 shell commands, read 1 file`), as the terminal folds a run that

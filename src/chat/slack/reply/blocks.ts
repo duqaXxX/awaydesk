@@ -161,7 +161,7 @@ export function contextBlock(text: string): ContextBlock {
 export const ASIDE_ID = "aside-";
 
 /** A line about the work (a task's end), small and grey. `at` is unique within the message. */
-export function asideBlock(text: string, at: number): ContextBlock {
+export function asideBlock(text: string, at: number | string): ContextBlock {
   return { ...contextBlock(text), block_id: `${ASIDE_ID}${at}` };
 }
 

@@ -59,7 +59,8 @@ All notable changes to this project are documented here. The format follows
 - A task's end line is drawn small and grey, as the count of a run of calls is (the owner's
   choice, 2026-10-14; the terminal writes it as text behind a coloured dot). The chat seam's
   `ReplySink.text` takes `aside` for such a line; the Slack provider draws it as a `context`
-  block once the message is written by an update, and as text while it is a stream.
+  block, in a `blocks` chunk while the message is a stream. Drawn as text there, the line shrank
+  when the stream stopped and the reply's height jumped.
 - The list of what still runs counts what is in the background alone
   (`TurnRenderer.backgroundTasks`). A long command the turn still waits for was counted as
   `1 shell still running` beside its own card.
