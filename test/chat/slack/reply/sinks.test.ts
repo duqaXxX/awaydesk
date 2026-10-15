@@ -571,6 +571,39 @@ test("a stopped stream gets no timed write, a rewrite for another reason shows t
   assert.equal(card.title, "Sleeping · 6m 41s"); // 401 s, read when the message was rewritten
 });
 
+test("a command in an earlier message is not refreshed once the reply went on in another", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  await sink.task(sleeping());
+  await sink.text("x".repeat(MESSAGE_LIMIT + 10)); // the reply goes on in a second message
+  await settled();
+  assert.equal(slack.streamTs.length, 2);
+  const written = slack.apiCalls.length;
+  await clock.advance(RUNNING_REFRESH_SECONDS * 2);
+  await settled();
+  assert.equal(slack.apiCalls.length, written);
+  assert.deepEqual(slack.callsTo("chat.update"), []);
+});
+
+test("the switch at 280 seconds reads the seconds again", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  await sink.text("Running it.\n\n");
+  await sink.task(sleeping("in_progress", 0));
+  await settled();
+  // The refresh at 270 s is the last; the stop at 280 s rewrites the message from the model.
+  await clock.advance(STREAM_SECONDS - 5);
+  await settled();
+  await sink.text("More words.");
+  await clock.advance(10);
+  await settled();
+  const update = last(slack.callsTo("chat.update"));
+  const card = only(list(update.blocks).filter((b) => b.type === "task_card"));
+  assert.equal(card.title, "Sleeping · 4m 45s");
+});
+
 test("the refresh ends with the call", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();

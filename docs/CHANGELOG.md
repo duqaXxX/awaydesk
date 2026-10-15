@@ -180,12 +180,14 @@ All notable changes to this project are documented here. The format follows
   New field `TaskUpdate.startedAt` (seconds on `ChatContext.steady`, null for every other call),
   `previews.commandLine` and `ReplySinkOptions.steady`; the card of a run carries the running
   call's start, and `formatDuration` reaches a provider through `core/port.ts`.
-- A message to a subagent the session already started (`SendMessage` to its task id) draws no
+- A message to a subagent that has ended (`SendMessage` to its task id) draws no
   card and writes `⎿ Resuming agent <first 7 characters of the id>` as a small grey line, as the
   terminal does (issue #315, `report-turn-agent-resume.jsonl`). The task that starts again under
   that call opens no card and no launch line. After a restart of the daemon the task is unknown
-  and the call keeps its card and the launch line. The renderer takes the session's `starts` for
-  the check (`TurnRenderer`'s `knows`).
+  and the call keeps its card and the launch line, as does a message to a task that still runs.
+  A resumed call that fails draws its error card. The renderer asks the session whether the task
+  ended in an earlier reply (`TurnRenderer`'s `endedBefore`). The refresh of a running command's
+  seconds touches only the cards of the message whose stream is open.
 - Probe claim P25 sends a command to the background and reads the raw stream up to the turn its
   end opens, with `replay-user-messages` as the daemon passes it: it holds while no `user` record
   of origin `task-notification` comes before that turn's result. `BROKEN` means Claude Code now says what woke such a turn, and the row of

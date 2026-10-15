@@ -737,10 +737,21 @@ export class ReplySink implements Sink {
     return this.live ? this.stampedAt : this.steady.time();
   }
 
-  /** Read the seconds of every running command at `now`; true when a card's title changed. */
-  private restamp(now: number): boolean {
+  /** The tools whose card sits in `message`: the span a stream is told about. */
+  private toolsOf(message: Message): Tool[] {
+    return this.span(message.start, null).flatMap(({ part }) =>
+      part instanceof Tool ? [part] : [],
+    );
+  }
+
+  /**
+   * Read the seconds of the running commands at `now`, those of `message`'s cards alone when it
+   * is given, else of every card; true when a card's title changed.
+   */
+  private restamp(now: number, message?: Message): boolean {
     let moved = false;
-    for (const tool of this.tools.values()) {
+    const tools = message === undefined ? this.tools.values() : this.toolsOf(message);
+    for (const tool of tools) {
       if (!tool.stamp(now)) continue;
       tool.rev = this.nextRev();
       moved = true;
@@ -751,7 +762,7 @@ export class ReplySink implements Sink {
   /** Start the refresh of the seconds on `message`, a stream that is open, if a command runs. */
   private armRefresh(message: Message): void {
     if (!message.streaming || message.refresh !== null) return;
-    if (![...this.tools.values()].some((tool) => tool.timed)) return;
+    if (!this.toolsOf(message).some((tool) => tool.timed)) return;
     this.stampedAt = this.steady.time();
     message.refresh = new Task((signal) => this.refreshTimed(message, signal));
   }
@@ -763,11 +774,11 @@ export class ReplySink implements Sink {
    */
   private async refreshTimed(message: Message, signal: AbortSignal): Promise<void> {
     try {
-      while (message.streaming && [...this.tools.values()].some((tool) => tool.timed)) {
+      while (message.streaming && this.toolsOf(message).some((tool) => tool.timed)) {
         await this.clock.sleep(RUNNING_REFRESH_SECONDS, signal);
         if (!message.streaming) return;
         this.stampedAt = this.steady.time();
-        if (this.restamp(this.stampedAt)) this.changed();
+        if (this.restamp(this.stampedAt, message)) this.changed();
       }
     } finally {
       if (message.refresh?.signal === signal) message.refresh = null;
@@ -2108,6 +2119,8 @@ export class ReplySink implements Sink {
       if ((await this.stop(message, null, null)) === "failed") {
         return; // Slack ends it at 5 minutes: the next append finds it over
       }
+      // The message is rewritten from the model now, with no stream to wait for.
+      this.restamp(this.steady.time());
       await this.sync();
     } finally {
       release();

@@ -1562,6 +1562,127 @@ test("without native streaming the last text is handed over when the reply close
   assert.notEqual(sink.finished, null);
 });
 
+// A message to an agent (issue #315): the words are drawn only for an agent that has ended.
+
+function started(
+  taskId: string,
+  callId: string,
+  background: boolean,
+): Extract<SessionEvent, { type: "task_started" }> {
+  return {
+    type: "task_started",
+    taskId,
+    kind: "subagent",
+    taskType: "local_agent",
+    description: "Look around",
+    callId,
+    agentType: null,
+    background,
+    parentTaskId: null,
+  };
+}
+
+function ended(taskId: string): SessionEvent {
+  return {
+    type: "task_ended",
+    taskId,
+    status: "completed",
+    summary: "Look around",
+    durationMs: 1000,
+    callId: null,
+    foldNamed: true,
+  } as SessionEvent;
+}
+
+function message(callId: string, to: string): SessionEvent {
+  return {
+    type: "call_started",
+    callId,
+    toolName: "SendMessage",
+    input: { to, message: "go on" },
+    parentCallId: null,
+  };
+}
+
+function callEnded(callId: string, isError: boolean, output: string): SessionEvent {
+  return {
+    type: "call_ended",
+    callId,
+    isError,
+    output,
+    fileChange: null,
+    model: null,
+    parentCallId: null,
+  };
+}
+
+test("a foreground agent that ended and is resumed in the background keeps its card closed", async () => {
+  const sink = new RecordingSink();
+  const renderer = new TurnRenderer(sink, NAMES);
+  const call = (id: string): SessionEvent => ({
+    type: "call_started",
+    callId: id,
+    toolName: "Agent",
+    input: { description: "Look around" },
+    parentCallId: null,
+  });
+  for (const event of [
+    call("c1"),
+    started("t1", "c1", false),
+    ended("t1"),
+    callEnded("c1", false, "done"),
+    message("c2", "t1"),
+    started("t1", "c2", true),
+  ]) {
+    await renderer.feed(event);
+  }
+  await renderer.close();
+  // The resumed task is in the background and the first call's card is not touched again.
+  assert.ok(!(sink.finished ?? []).some((update) => update.id === "c1"));
+  assert.equal(finals(sink.tasks).get("c1")?.status, "complete");
+  assert.equal(sink.asides.filter((text) => text.includes("Resuming agent")).length, 1);
+  assert.deepEqual(renderer.runningTasks, ["t1"]);
+  const count = sink.tasks.length;
+  await renderer.feed(ended("t1"));
+  assert.equal(sink.tasks.length, count); // its end is the session's end line, no card
+  assert.deepEqual(renderer.runningTasks, []);
+});
+
+test("a message to an agent that still runs keeps its card", async () => {
+  const sink = new RecordingSink();
+  const renderer = new TurnRenderer(sink, NAMES);
+  await renderer.feed({
+    type: "call_started",
+    callId: "c1",
+    toolName: "Agent",
+    input: { description: "Look around" },
+    parentCallId: null,
+  });
+  await renderer.feed(started("t1", "c1", true));
+  await renderer.feed(message("c2", "t1"));
+  assert.ok(sink.tasks.some((update) => update.id === "c2"));
+  assert.equal(sink.asides.filter((text) => text.includes("Resuming agent")).length, 0);
+});
+
+test("a message that resumes an agent and fails is a card that says why", async () => {
+  const sink = new RecordingSink();
+  const renderer = new TurnRenderer(
+    sink,
+    NAMES,
+    null,
+    true,
+    () => false,
+    (id) => id,
+    (id) => id === "t1",
+  );
+  await renderer.feed(message("c2", "t1"));
+  assert.deepEqual(sink.tasks, []);
+  await renderer.feed(callEnded("c2", true, "No agent is running by that name"));
+  const card = finals(sink.tasks).get("c2");
+  assert.equal(card?.status, "error");
+  assert.equal(card?.output, "No agent is running by that name");
+});
+
 // A shell command is timed (issue #315): its line carries when it began and the command itself.
 
 function bash(callId: string, command: string, description?: string): SessionEvent {
