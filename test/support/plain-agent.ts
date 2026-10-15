@@ -70,6 +70,7 @@ export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   permissionModes: Object.freeze({ default: PLAIN_MODE, auto: null, bypass: null }),
   subagents: false,
   backgroundTasks: false,
+  foldedNotifications: false,
   compaction: false,
   declaredState: false,
   questions: true,

@@ -298,6 +298,10 @@ function assertDeclared(events: readonly SessionEvent[], caps: Capabilities): vo
       assert.ok(!event.type.startsWith("task_"), `${event.type} without tasks`);
     }
     if (!caps.backgroundTasks) assert.notEqual(event.type, "report_started");
+    if (!caps.foldedNotifications) {
+      assert.notEqual(event.type, "notification_folded");
+      if (event.type === "task_ended") assert.equal(event.foldNamed, false);
+    }
     if (!caps.compaction) {
       assert.ok(!event.type.startsWith("compaction_") && event.type !== "compacted");
     }

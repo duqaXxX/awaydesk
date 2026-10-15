@@ -52,6 +52,12 @@ export interface Capabilities {
   readonly subagents: boolean;
   /** A task outlives the turn that started it, and the agent starts a turn to report it. */
   readonly backgroundTasks: boolean;
+  /**
+   * The agent says when it takes a task's notification into the turn that is running
+   * (`notification_folded`). Without it, a task that ends inside a turn counts as reported by
+   * that turn. Meaningful with `backgroundTasks`.
+   */
+  readonly foldedNotifications: boolean;
   /** The agent compacts a conversation (`compaction_started`, `compacted`). */
   readonly compaction: boolean;
   /**
@@ -320,6 +326,12 @@ export type SessionEvent =
       readonly summary: string;
       readonly durationMs: number | null;
       readonly callId: string | null;
+      /**
+       * Whether the agent will name this task in `notification_folded` should a running turn
+       * take its notification. False when it cannot tell for this task (the SDK gave the run no
+       * id): the core then counts the task as reported by the turn it ended in.
+       */
+      readonly foldNamed: boolean;
     }
   /**
    * What the agent says it is doing, in its own judgement: `working` from before a turn's first
@@ -351,6 +363,13 @@ export type SessionEvent =
    * whether or not the task's own end was told yet.
    */
   | { readonly type: "report_started"; readonly taskId: string }
+  /**
+   * The agent took the notification of the ended background task `taskId` into the turn that
+   * is running, so that turn reports it and no turn of its own follows. Said after the task's
+   * end and before the running turn's end. A task that ended inside a turn and is never named
+   * so before that turn ends is owed a turn of its own.
+   */
+  | { readonly type: "notification_folded"; readonly taskId: string }
   | {
       readonly type: "turn_ended";
       readonly sessionId: string | null;

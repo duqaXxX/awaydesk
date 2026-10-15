@@ -1,0 +1,4383 @@
+{
+ "recording": "task-end-in-turn-unfolded",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01S6eNniLhyVRRXJdAG6mt2n",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "Sleep for 2 seconds"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**Agent**(Run sleep 7 and answer ok)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01S6eNniLhyVRRXJdAG6mt2n",
+      "name": "Bash",
+      "output": "(Bash completed with no output)",
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "Sleep for 2 seconds"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nThe",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " old",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " lighthouse keeper clim",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "bed the iron",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " st",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "aircase for",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the thous",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "andth time that",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " year",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", his weathered hand",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " trailing",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " along the cold",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " metal",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " rail",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ". The steps",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " curved upward in a spiral",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " that",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " seemed to have",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " no end",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", though",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Thomas",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " had long",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " since memor",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ized exactly",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " how many there",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " were:",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " 127",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ",",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " one",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " for",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " each year",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " his",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " family",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " had kept",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " this",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " light",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " burning above",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the rocky",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Maine",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " coast.\n\nThe",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " beam",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " at",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the top rot",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ated with",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " a",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " rhyth",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "mic who",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "osh,",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " casting its",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " golden",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " eye",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " across the dark",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Atlantic",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ". Ships",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " passing in",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the night",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " dep",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ended on this light,",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " though",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " fewer",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " of",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " them came",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " by",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " now. The GPS",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " satellites had stolen",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " much",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " of his",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " purpose",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", but Thomas",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " maintained",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the lighthouse",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " with",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " same devotion his",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " grandfather",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " had shown, and his",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " grandfather before him",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".\n\nAt sev",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "enty-three, his",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " joints",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " complained",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " with",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " every",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " climb",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ",",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " but he welcomed",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the pain. It",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " meant",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " he",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " was still here",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", still needed",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ",",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " even",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " if",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the maritime",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " world had largely",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " moved on.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " The light clicked",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " and",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " whirred above",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " him, unchanged",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " for",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " sixty",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " years, and perhaps that was",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the point",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Const",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ancy.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Reliability. A",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " promise",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " kept",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " to sailors",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " and",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " storms",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " alike.\n\nHe checked",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " lamp",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "'s",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " fuel",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ",",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " pol",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ished the great",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Fresnel lens until it gle",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "amed like",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " a captured",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " moon",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", and logged",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the night",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "'s observations in the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " leather",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " journal",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " that documented",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " every day",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " since",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " 1897",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ". His",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " entries",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " were",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " brief:",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " \"Wind east",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "-northeast",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", ",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "15",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " knots.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Clear",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " skies. All",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " well",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".\" But",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " in",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the margins, he sometimes",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " sket",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ched the ships",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " he",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " saw",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "—a",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " fishing",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " vessel, a distant",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " container",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " ship, once",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " a sail",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "boat that reminded",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " him of his daughter",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "'s childhood",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " dreams",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".\n\nHis",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " daughter lived",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " in Boston",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " now, two",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " hours away,",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " yet",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " it",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " might",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " as well have been across the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " ocean. She",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " called",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " every",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Sunday, worried",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " about his lon",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "eliness,",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " suggested",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " he",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " move",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " to a retirement community. Thomas",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " would smile",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " and",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " promise",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " to consider",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " it, but",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " they",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " both knew he never",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " would.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " The lighthouse",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " was",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " not",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " simply",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " where",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " he lived; it was who",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " he was.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nThe night",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " stretched",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " before",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " him as",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " it",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " always",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " did.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Thomas",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " made",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " his tea",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " in",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the keeper",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "'s cottage",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", an",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " ins",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ulated room",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " where he read",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " to the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " sound",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " of the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " ocean and the rhyth",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "mic turning",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " of the light above",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ". He",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " read",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " old",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " paper",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "backs—",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "Hem",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ingway, Jack",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " London, anyone",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " who understood",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " sea",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "'s particular",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " cr",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "uelty and",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " grace",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nAround",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " midnight, a",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " storm",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " rolled in from the northeast",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " The light above",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " sw",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ayed slightly",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", and the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " wind",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " how",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "led like",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " something",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " alive. This",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " was when",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Thomas felt most",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " alive",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " himself",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " While",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " others",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " h",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "unkered down in",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " their homes, he climbed",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " again",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " to",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " check",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " every",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " mechanism",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", to",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " ensure the light",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " continued",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " its vigil",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ant rotation",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " A fishing",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " boat passed",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " nearby",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", its lights blinking twice",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ",",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " a",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " greeting",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ". He knew",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " captain",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "—",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "old",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " Pete, who'd been running",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " these",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " waters for forty",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " years. They",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "'d never",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " met",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", but they",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " were",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " companions",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " nonetheless",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ",",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " bound",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " by salt",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " water",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " and the recognition",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " that some",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " people",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " simply",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " keep",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " their",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " lights burning in the dark.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nAs the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " storm passed",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " and",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the sky",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " began",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " to sof",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ten with",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " pre",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "-dawn gray",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", Thomas sat",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " in the gallery",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " surrounding",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the light, his",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " coffee",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " cooling",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " in",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " his",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " hands",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ". The sea",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " was gradually",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " revealing",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " itself",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " again",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", the chaos",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " giving",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " way to rhythm",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ". He thought",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " of all",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the sle",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "epless nights he'd kept",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " watch",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " here",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ", all",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the storms",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " weather",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "ed, all the ships guided",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " safely past",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the rocks.",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nThe light would",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " turn",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " on",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " It always did. And as",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " long",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " as it",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " did, Thomas would be here",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " to",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " keep it burning.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "noted",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01S6eNniLhyVRRXJdAG6mt2n",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "Sleep for 2 seconds"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n**Agent**(Run sleep 7 and answer ok)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01S6eNniLhyVRRXJdAG6mt2n",
+     "name": "Bash",
+     "output": "(Bash completed with no output)",
+     "preview": null,
+     "status": "complete",
+     "task": false,
+     "title": "Sleep for 2 seconds"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " old",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " lighthouse keeper clim",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "bed the iron",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " st",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "aircase for",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the thous",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "andth time that",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " year",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", his weathered hand",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " trailing",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " along the cold",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " metal",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " rail",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ". The steps",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " curved upward in a spiral",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " that",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " seemed to have",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " no end",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", though",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Thomas",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " had long",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " since memor",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ized exactly",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " how many there",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " were:",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " 127",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ",",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " one",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " for",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " each year",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " his",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " family",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " had kept",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " this",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " light",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " burning above",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the rocky",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Maine",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " coast.\n\nThe",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " beam",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " at",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the top rot",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ated with",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " a",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " rhyth",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "mic who",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "osh,",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " casting its",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " golden",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " eye",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " across the dark",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Atlantic",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ". Ships",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " passing in",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the night",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " dep",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ended on this light,",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " though",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " fewer",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " of",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " them came",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " by",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " now. The GPS",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " satellites had stolen",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " much",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " of his",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " purpose",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", but Thomas",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " maintained",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the lighthouse",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " with",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " same devotion his",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " grandfather",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " had shown, and his",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " grandfather before him",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".\n\nAt sev",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "enty-three, his",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " joints",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " complained",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " with",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " every",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " climb",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ",",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " but he welcomed",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the pain. It",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " meant",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " he",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " was still here",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", still needed",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ",",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " even",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " if",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the maritime",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " world had largely",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " moved on.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " The light clicked",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " and",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " whirred above",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " him, unchanged",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " for",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " sixty",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " years, and perhaps that was",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the point",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Const",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ancy.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Reliability. A",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " promise",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " kept",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " to sailors",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " and",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " storms",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " alike.\n\nHe checked",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " lamp",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "'s",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " fuel",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ",",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " pol",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ished the great",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Fresnel lens until it gle",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "amed like",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " a captured",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " moon",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", and logged",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the night",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "'s observations in the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " leather",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " journal",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " that documented",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " every day",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " since",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " 1897",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ". His",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " entries",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " were",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " brief:",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " \"Wind east",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "-northeast",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", ",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "15",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " knots.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Clear",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " skies. All",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " well",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".\" But",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " in",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the margins, he sometimes",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " sket",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ched the ships",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " he",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " saw",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "—a",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " fishing",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " vessel, a distant",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " container",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " ship, once",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " a sail",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "boat that reminded",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " him of his daughter",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "'s childhood",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " dreams",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".\n\nHis",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " daughter lived",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " in Boston",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " now, two",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " hours away,",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " yet",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " it",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " might",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " as well have been across the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " ocean. She",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " called",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " every",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Sunday, worried",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " about his lon",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "eliness,",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " suggested",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " he",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " move",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " to a retirement community. Thomas",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " would smile",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " and",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " promise",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " to consider",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " it, but",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " they",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " both knew he never",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " would.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " The lighthouse",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " was",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " not",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " simply",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " where",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " he lived; it was who",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " he was.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe night",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " stretched",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " before",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " him as",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " it",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " always",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " did.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Thomas",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " made",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " his tea",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " in",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the keeper",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "'s cottage",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", an",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " ins",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ulated room",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " where he read",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " to the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " sound",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " of the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " ocean and the rhyth",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "mic turning",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " of the light above",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ". He",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " read",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " old",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " paper",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "backs—",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "Hem",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ingway, Jack",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " London, anyone",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " who understood",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " sea",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "'s particular",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " cr",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "uelty and",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " grace",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nAround",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " midnight, a",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " storm",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " rolled in from the northeast",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " The light above",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " sw",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ayed slightly",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", and the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " wind",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " how",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "led like",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " something",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " alive. This",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " was when",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Thomas felt most",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " alive",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " himself",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " While",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " others",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " h",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "unkered down in",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " their homes, he climbed",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " again",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " to",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " check",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " every",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " mechanism",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", to",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " ensure the light",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " continued",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " its vigil",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ant rotation",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " A fishing",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " boat passed",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " nearby",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", its lights blinking twice",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ",",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " a",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " greeting",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ". He knew",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " captain",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "—",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "old",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " Pete, who'd been running",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " these",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " waters for forty",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " years. They",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "'d never",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " met",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", but they",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " were",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " companions",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " nonetheless",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ",",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " bound",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " by salt",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " water",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " and the recognition",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " that some",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " people",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " simply",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " keep",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " their",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " lights burning in the dark.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nAs the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " storm passed",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " and",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the sky",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " began",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " to sof",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ten with",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " pre",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "-dawn gray",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", Thomas sat",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " in the gallery",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " surrounding",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the light, his",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " coffee",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " cooling",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " in",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " his",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " hands",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ". The sea",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " was gradually",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " revealing",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " itself",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " again",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", the chaos",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " giving",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " way to rhythm",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ". He thought",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " of all",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the sle",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "epless nights he'd kept",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " watch",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " here",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ", all",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the storms",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " weather",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "ed, all the ships guided",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " safely past",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the rocks.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe light would",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " turn",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " on",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " It always did. And as",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " long",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " as it",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " did, Thomas would be here",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " to",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " keep it burning.",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nnoted",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

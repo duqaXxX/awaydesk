@@ -254,6 +254,7 @@ function subagentTurn(): Item[] {
       summary: "looked",
       durationMs: 5,
       callId: "agent-1",
+      foldNamed: false,
     }),
     event({
       type: "call_ended",
@@ -397,6 +398,7 @@ test("an agent that declares no optional capability runs a whole turn", async (t
   lacking(h, {
     subagents: false,
     backgroundTasks: false,
+    foldedNotifications: false,
     compaction: false,
     declaredState: false,
     questions: false,

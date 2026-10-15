@@ -5,6 +5,19 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- A background subagent that ends while a turn runs no longer leaves its report in a second
+  reply under a second footer (issue #317). Claude Code either takes the notification into that
+  turn or opens a turn of its own after it, and only the first is replayed in the stream, as a
+  user record whose origin names the task's run (recorded 2026-10-15, Claude Code 2.1.300). The
+  back end now says `notification_folded`, behind the new capability `foldedNotifications`;
+  a task that ended inside a turn and was not named so keeps its reply at rest with no footer,
+  the report turn renders into it, and one footer shows under it. If no report turn comes,
+  `INJECTED_TURN_WAIT` ends the reply with its footer as before. `SDKMessageOrigin.runId`,
+  `SDKMessageOrigin.kind` `"task-notification"` and `SDKTaskStartedMessage.run_id` are rows of
+  `docs/sdk-surface.md`.
+
 ### Changed
 
 - Every task Claude Code starts in the background takes one form, whatever its kind (issue #311):

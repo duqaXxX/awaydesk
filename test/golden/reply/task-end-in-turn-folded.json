@@ -1,0 +1,236 @@
+{
+ "recording": "task-end-in-turn-folded",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01BxoAL62GKokxD7MioK3JGo",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "Wait for 20 seconds"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**Agent**(Run sleep 8 then respond ok)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01BxoAL62GKokxD7MioK3JGo",
+      "name": "Bash",
+      "output": "Wait for 20 seconds",
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "Wait for 20 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01BxoAL62GKokxD7MioK3JGo",
+      "name": "Bash",
+      "output": "(Bash completed with no output)",
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "Wait for 20 seconds"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nThe",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " background",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " agent",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " completed",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " while",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " the",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " foreground sleep was running.",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01BxoAL62GKokxD7MioK3JGo",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "Wait for 20 seconds"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n**Agent**(Run sleep 8 then respond ok)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01BxoAL62GKokxD7MioK3JGo",
+     "name": "Bash",
+     "output": "Wait for 20 seconds",
+     "preview": null,
+     "status": "complete",
+     "task": false,
+     "title": "Wait for 20 seconds"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01BxoAL62GKokxD7MioK3JGo",
+     "name": "Bash",
+     "output": "(Bash completed with no output)",
+     "preview": null,
+     "status": "complete",
+     "task": false,
+     "title": "Wait for 20 seconds"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " background",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " agent",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " completed",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " while",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " the",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " foreground sleep was running.",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

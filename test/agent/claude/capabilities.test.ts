@@ -13,6 +13,7 @@ test("the Claude back end declares what the core adapts to", () => {
     permissionModes: { default: "default", auto: "auto", bypass: "bypassPermissions" },
     subagents: true,
     backgroundTasks: true,
+    foldedNotifications: true,
     compaction: true,
     declaredState: true,
     questions: true,

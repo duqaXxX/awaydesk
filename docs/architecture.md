@@ -49,7 +49,7 @@ What crosses the agent seam:
 | Crossing | Direction | What |
 |---|---|---|
 | commands | core to back end | on `AgentBackend`: `start`, `listSessions`, `datedSessions`, `aliveSessions`, `folderTrusted`, `trustedRepository`, `usageLimits` and `close`. On the `AgentSession` a start returns: `send`, `interrupt`, `stopTask`, `setPermissionMode`, `setModel`, `setEffort`, `contextUsage`, `info`, `close` |
-| events | back end to core | `SessionEvent`, read in order from `AgentSession.events`: the session's id and version, a message's start and end, text as pieces or whole, a call's start and end, a task's life, a compaction, a change of permission mode, effort or folder, a prompt the agent took, word that the coming turn reports a background task (`report_started`), usage limits gone stale, a turn's end, an error message of the agent's, a lost process. A turn has no start event, and `turn_ended` is an event like the others, never the answer to `send` |
+| events | back end to core | `SessionEvent`, read in order from `AgentSession.events`: the session's id and version, a message's start and end, text as pieces or whole, a call's start and end, a task's life, a compaction, a change of permission mode, effort or folder, a prompt the agent took, word that the coming turn reports a background task (`report_started`), word that the running turn took a task's notification (`notification_folded`), usage limits gone stale, a turn's end, an error message of the agent's, a lost process. A turn has no start event, and `turn_ended` is an event like the others, never the answer to `send` |
 | requests | back end to core, which answers | `RequestHandler.permission` and `RequestHandler.question`: each resolves once, for as long as the owner takes, with a `PermissionAnswer` or a `QuestionAnswer` |
 | declarations | read by the core | `AgentBackend.name` and `AgentBackend.words`, which the texts take, with the names of the commands the core treats on its own (`AgentWords.newSession`, `AgentWords.login`, `AgentWords.logout`: an agent with none leaves a list empty or a name null, and the core refuses and answers nothing for it); `AgentBackend.capabilities`, what the back end supports (`capabilities.CAPABILITIES` for Claude), listed under "Modules" |
 
@@ -221,6 +221,7 @@ the same capabilities. A part appears when the pair declares what it describes: 
 | `permissionModes` | the modes by role (`default`, `auto`, `bypass`); with `bypass` null the setup offers no Bypass checkbox and `!bypass` answers that the agent has no such mode (`texts.BYPASS_UNAVAILABLE`) |
 | `subagents` | an event that runs under a call of its own, or a task that is a subagent's, is ignored, with a warning in the log |
 | `backgroundTasks` | a task that outlives its turn, and the turn the agent starts to report it, are ignored; the session tracks and waits for none |
+| `foldedNotifications` | a task that ends inside a turn counts as reported by that turn; the reply is closed out, with the footer, when the turn ends, and a report turn the agent opens afterwards gets a reply of its own. With it, such a task is owed a report turn until `notification_folded` names it (see "A report turn after the turn a task ended in") |
 | `compaction` | the compaction events are ignored |
 | `declaredState` | a `state_changed` event is ignored, with a warning in the log; the thread's activity line says `Working…` for the owner's prompts alone, so a turn the agent starts by itself shows none |
 | `questions` | `!guide` leaves out the sentence about the question form and titles its approvals section "Approvals"; no other code of the core reads it, and the conformance suite runs its question checks only for a back end that declares it |
@@ -285,6 +286,7 @@ module that breaks it fails only in use.
 | A command | The owner types `!name args`. When `name` is the `name` of an entry of `AgentInfo.commands`, the agent receives the prompt `/name args` (the message flow, `messages.messages`); an alias does not match, and any other `!text` arrives as typed. A name in `AgentWords.newSession` is refused inside a thread and the names in `AgentWords.login` and `AgentWords.logout` are answered by the core: none of the three reaches the agent | `a command's output arrives whole, once, and uses no model`; nothing checks the text that arrives as typed |
 | The effort | `effort_observed` comes before the `turn_ended` of its turn: `ThreadSession.showFooterIfEnded` builds the footer once the session has ended, from what it has by then. Null is the agent's default | Not checked: only that a level is one of `Capabilities.effortLevels` |
 | Who started a turn | `turn_ended.startedBy` is `owner` for a prompt's turn and `agent` for one the agent starts by itself to report a task. `report_started` names the task before such a turn's words, and needs `backgroundTasks` | `startedBy` is checked for a prompt's turn only |
+| A notification folded | An agent that declares `foldedNotifications` emits `notification_folded` with the task's id when the running turn takes that task's notification, after the task's end and before the turn's `turn_ended`; it emits none for a task whose report the agent opens a turn for, and needs `backgroundTasks`. `task_ended.foldNamed` says per task whether it can: false when the SDK gave the run no id | Only that a back end that lacks `foldedNotifications` emits none (`assertDeclared`, run on the turns of the suite) |
 | A prompt taken | An agent that declares `promptDuringTurn` emits `prompt_taken` with the `Prompt.id` of each prompt it accepts, before that turn's words, whether it took the prompt into the running turn or as the next one | `a prompt taken is named by its id, before the turn's words` |
 | `interrupt` | The running turn ends with `turn_ended` whose `ending` is `interrupted`, and the session stays usable. With no turn running it resolves and ends nothing. The core has no timer for a turn that never ends after it | `interrupt ends the turn as interrupted, and the session goes on` |
 | `stopTask` | The task's line closes only when the agent then sends `task_ended`, or `task_updated` with `terminal` and a status. Until then the reply that holds the line stays open | Not checked |
@@ -1287,7 +1289,25 @@ closed when the start returns (`ThreadSession.connect`).
   (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; when
   that reply is no longer tracked (a restart or an idle close dropped it) or is not last, the
   report gets a reply of its own at the bottom. The next queued message waits for it to finish.
-  With no task end seen, no line opens it (`ThreadSession.openingTarget`). When a message was already sent
+  With no task end seen, no line opens it (`ThreadSession.openingTarget`).
+
+  A background task that ends while a turn runs is reported either by that turn or by a turn the
+  agent opens by itself once it has ended (issue #317, recorded 2026-10-15 on Claude Code 2.1.300:
+  `task-end-in-turn-folded`, `task-end-in-turn-unfolded`). The agent tells them apart in the
+  stream: a notification the running turn takes is replayed as a user record whose origin names
+  the task's run, and the back end says so as `notification_folded`; one that is not replayed
+  before the turn's result is owed a turn of its own. For an agent that declares
+  `foldedNotifications`, `ThreadSession.unfolded` holds every such task whose `task_ended` has
+  `foldNamed` from its end, with the
+  reply that shows it, until `notification_folded` clears it. A task still there when the turn
+  ends keeps its reply at rest with no footer (`ThreadSession.stillOwed`) and is waited for as a
+  task that ended between turns is (`ThreadSession.expectUnfoldedReports`, `injectedExpected`,
+  `constants.INJECTED_TURN_WAIT`); the report turn renders into that reply
+  (`ThreadSession.openingTarget`), and if none comes the sweep closes the reply out with its
+  footer. A turn that does not end with `done` waits for nothing. Without the capability the
+  reply closes with its footer when the turn ends. A replay that comes after the turn's result is
+  not handled: none was seen, and a notification replayed once the wait has begun is cleared by
+  the wait's end. When a message was already sent
   and waits for its turn, that turn comes first, so nothing waits; the turn that reports the task
   follows it on its own (measured: "Prompt sent before a notification"; an older observation,
   "Report inside a queued turn", saw none follow). If no turn follows within
