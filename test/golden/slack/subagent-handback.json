@@ -13,7 +13,7 @@
      "type": "context"
     },
     {
-     "text": "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
+     "text": "**Agent**(Run echo subagent-ok)\n⎿ Running in background\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background",
      "type": "markdown"
     },
     {
@@ -38,7 +38,7 @@
    []
   ],
   "message_texts": [
-   "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent\n\nBoth tasks are started in the background: the subagent that runs `echo subagent-ok` and the command `sleep 15`. Neither has finished yet.\n\nThe subagent finished: `echo subagent-ok` printed `subagent-ok`. The command `sleep 15` is still running.\n\nThe command `sleep 15` ended with exit code 0, so both tasks are done."
+   "**Agent**(Run echo subagent-ok)\n⎿ Running in background\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background\n\nBoth tasks are started in the background: the subagent that runs `echo subagent-ok` and the command `sleep 15`. Neither has finished yet.\n\nThe subagent finished: `echo subagent-ok` printed `subagent-ok`. The command `sleep 15` is still running.\n\nThe command `sleep 15` ended with exit code 0, so both tasks are done."
   ],
   "pushes": 1
  },
@@ -69,7 +69,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Run echo subagent-ok)\n⎿ Running in background",
       "type": "markdown_text"
      }
     ],
@@ -79,6 +79,20 @@
   },
   {
    "after_sink_call": 2,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 3,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -94,26 +108,12 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 3,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "text": "Both ",
-      "type": "markdown_text"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
    "after_sink_call": 4,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "tasks",
+      "text": "\n\nBoth ",
       "type": "markdown_text"
      }
     ],
@@ -127,7 +127,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " are ",
+      "text": "tasks",
       "type": "markdown_text"
      }
     ],
@@ -141,7 +141,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "start",
+      "text": " are ",
       "type": "markdown_text"
      }
     ],
@@ -155,7 +155,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ed in",
+      "text": "start",
       "type": "markdown_text"
      }
     ],
@@ -169,7 +169,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " the ",
+      "text": "ed in",
       "type": "markdown_text"
      }
     ],
@@ -183,7 +183,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "backg",
+      "text": " the ",
       "type": "markdown_text"
      }
     ],
@@ -197,7 +197,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "round",
+      "text": "backg",
       "type": "markdown_text"
      }
     ],
@@ -211,7 +211,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": ": the",
+      "text": "round",
       "type": "markdown_text"
      }
     ],
@@ -225,7 +225,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " suba",
+      "text": ": the",
       "type": "markdown_text"
      }
     ],
@@ -239,7 +239,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "gent ",
+      "text": " suba",
       "type": "markdown_text"
      }
     ],
@@ -253,7 +253,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "that ",
+      "text": "gent ",
       "type": "markdown_text"
      }
     ],
@@ -267,7 +267,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "runs ",
+      "text": "that ",
       "type": "markdown_text"
      }
     ],
@@ -281,7 +281,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "`echo",
+      "text": "runs ",
       "type": "markdown_text"
      }
     ],
@@ -295,7 +295,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " suba",
+      "text": "`echo",
       "type": "markdown_text"
      }
     ],
@@ -309,7 +309,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "gent-",
+      "text": " suba",
       "type": "markdown_text"
      }
     ],
@@ -323,7 +323,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ok` a",
+      "text": "gent-",
       "type": "markdown_text"
      }
     ],
@@ -337,7 +337,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "nd th",
+      "text": "ok` a",
       "type": "markdown_text"
      }
     ],
@@ -351,7 +351,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "e com",
+      "text": "nd th",
       "type": "markdown_text"
      }
     ],
@@ -365,7 +365,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "mand ",
+      "text": "e com",
       "type": "markdown_text"
      }
     ],
@@ -379,7 +379,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "`slee",
+      "text": "mand ",
       "type": "markdown_text"
      }
     ],
@@ -393,7 +393,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "p 15`",
+      "text": "`slee",
       "type": "markdown_text"
      }
     ],
@@ -407,7 +407,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": ". Nei",
+      "text": "p 15`",
       "type": "markdown_text"
      }
     ],
@@ -421,7 +421,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ther ",
+      "text": ". Nei",
       "type": "markdown_text"
      }
     ],
@@ -435,7 +435,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "has f",
+      "text": "ther ",
       "type": "markdown_text"
      }
     ],
@@ -449,7 +449,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "inish",
+      "text": "has f",
       "type": "markdown_text"
      }
     ],
@@ -463,7 +463,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ed ye",
+      "text": "inish",
       "type": "markdown_text"
      }
     ],
@@ -477,7 +477,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "t.",
+      "text": "ed ye",
       "type": "markdown_text"
      }
     ],
@@ -491,7 +491,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "\n\nThe sub",
+      "text": "t.",
       "type": "markdown_text"
      }
     ],
@@ -505,7 +505,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "agent f",
+      "text": "\n\nThe sub",
       "type": "markdown_text"
      }
     ],
@@ -519,7 +519,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "inished",
+      "text": "agent f",
       "type": "markdown_text"
      }
     ],
@@ -533,7 +533,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": ": `echo",
+      "text": "inished",
       "type": "markdown_text"
      }
     ],
@@ -547,7 +547,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " subage",
+      "text": ": `echo",
       "type": "markdown_text"
      }
     ],
@@ -561,7 +561,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "nt-ok` ",
+      "text": " subage",
       "type": "markdown_text"
      }
     ],
@@ -575,7 +575,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "printed",
+      "text": "nt-ok` ",
       "type": "markdown_text"
      }
     ],
@@ -589,7 +589,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " `subag",
+      "text": "printed",
       "type": "markdown_text"
      }
     ],
@@ -603,7 +603,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ent-ok`",
+      "text": " `subag",
       "type": "markdown_text"
      }
     ],
@@ -617,7 +617,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": ". The c",
+      "text": "ent-ok`",
       "type": "markdown_text"
      }
     ],
@@ -631,7 +631,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ommand ",
+      "text": ". The c",
       "type": "markdown_text"
      }
     ],
@@ -645,7 +645,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "`sleep ",
+      "text": "ommand ",
       "type": "markdown_text"
      }
     ],
@@ -659,7 +659,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "15` is ",
+      "text": "`sleep ",
       "type": "markdown_text"
      }
     ],
@@ -673,7 +673,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "still r",
+      "text": "15` is ",
       "type": "markdown_text"
      }
     ],
@@ -687,7 +687,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "unning.",
+      "text": "still r",
       "type": "markdown_text"
      }
     ],
@@ -701,7 +701,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "\n\nThe comm",
+      "text": "unning.",
       "type": "markdown_text"
      }
     ],
@@ -715,7 +715,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "and `sle",
+      "text": "\n\nThe comm",
       "type": "markdown_text"
      }
     ],
@@ -729,7 +729,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ep 15` e",
+      "text": "and `sle",
       "type": "markdown_text"
      }
     ],
@@ -743,7 +743,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "nded wit",
+      "text": "ep 15` e",
       "type": "markdown_text"
      }
     ],
@@ -757,7 +757,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "h exit c",
+      "text": "nded wit",
       "type": "markdown_text"
      }
     ],
@@ -771,7 +771,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ode 0, s",
+      "text": "h exit c",
       "type": "markdown_text"
      }
     ],
@@ -785,7 +785,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "o both t",
+      "text": "ode 0, s",
       "type": "markdown_text"
      }
     ],
@@ -799,7 +799,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "asks are",
+      "text": "o both t",
       "type": "markdown_text"
      }
     ],
@@ -813,6 +813,20 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "text": "asks are",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 55,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
       "text": " done.",
       "type": "markdown_text"
      }
@@ -822,7 +836,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 56,
+   "after_sink_call": 57,
    "args": {
     "channel": "C000CHAN",
     "ts": "1790000000.000001"
@@ -830,7 +844,7 @@
    "method": "chat.stopStream"
   },
   {
-   "after_sink_call": 56,
+   "after_sink_call": 57,
    "args": {
     "blocks": [
      {
@@ -843,7 +857,7 @@
       "type": "context"
      },
      {
-      "text": "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Run echo subagent-ok)\n⎿ Running in background\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background",
       "type": "markdown"
      },
      {
@@ -858,7 +872,7 @@
    "method": "chat.update"
   },
   {
-   "after_sink_call": 56,
+   "after_sink_call": 57,
    "args": {
     "blocks": [
      {
@@ -871,7 +885,7 @@
       "type": "context"
      },
      {
-      "text": "**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Run echo subagent-ok)\n⎿ Running in background\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background",
       "type": "markdown"
      },
      {

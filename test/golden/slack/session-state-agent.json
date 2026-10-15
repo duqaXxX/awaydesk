@@ -4,7 +4,7 @@
   "message_blocks": [
    [
     {
-     "text": "**Agent**(Run sleep 15)\n⎿ Backgrounded agent",
+     "text": "**Agent**(Run sleep 15)\n⎿ Running in background",
      "type": "markdown"
     },
     {
@@ -29,7 +29,7 @@
    []
   ],
   "message_texts": [
-   "**Agent**(Run sleep 15)\n⎿ Backgrounded agent\n\nlaunched\n\ndone"
+   "**Agent**(Run sleep 15)\n⎿ Running in background\n\nlaunched\n\ndone"
   ],
   "pushes": 1
  },
@@ -41,7 +41,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Run sleep 15)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Run sleep 15)\n⎿ Running in background",
       "type": "markdown_text"
      }
     ],
@@ -93,7 +93,7 @@
    "args": {
     "blocks": [
      {
-      "text": "**Agent**(Run sleep 15)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Run sleep 15)\n⎿ Running in background",
       "type": "markdown"
      },
      {

@@ -6,7 +6,7 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Run sleep 15)\n⎿ Backgrounded agent",
+     "markdown": "**Agent**(Run sleep 15)\n⎿ Running in background",
      "notice": true
     },
     {
@@ -147,7 +147,7 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Run sleep 15)\n⎿ Backgrounded agent",
+    "markdown": "**Agent**(Run sleep 15)\n⎿ Running in background",
     "notice": true
    },
    {

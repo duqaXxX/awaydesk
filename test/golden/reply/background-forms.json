@@ -1,0 +1,608 @@
+{
+ "recording": "background-forms",
+ "turns": [
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01WVSpFrZmiY1m47tskiP7iE",
+      "name": "Monitor",
+      "output": null,
+      "preview": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "Monitor: echo tick one; sleep 6; echo tick two; sleep 600"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01WVSpFrZmiY1m47tskiP7iE",
+      "name": "Monitor",
+      "output": "Monitor started (task bpyl7epa0, expires in 5m unless the source ends first; you get one notice at expiry — re-arm if you still need the watch). You will be notified on each event. Keep working — do …",
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "Monitor: echo tick one; sleep 6; echo tick two; sleep 600"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01RGUcMX9zYiZXxXNKywnLQa",
+      "name": "Bash",
+      "output": null,
+      "preview": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "Background sleep and echo"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01RGUcMX9zYiZXxXNKywnLQa",
+      "name": "Bash",
+      "output": "Command running in background with ID: bhdf6s2h8. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bhdf6s2h8.output. You will be notified when it completes. To check interim outpu…",
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "Background sleep and echo"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**3 background tasks launched**\n├ ticks\n├ Background sleep and echo\n└ Run sleep command and report",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nstarted",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "bpyl7epa0",
+    "bhdf6s2h8",
+    "aa4de42604579b9e6"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01Q3D7mgmFoLxS7WRRviz7Dj",
+      "name": "TaskStop",
+      "output": null,
+      "preview": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "TaskStop: bpyl7epa0"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01Q3D7mgmFoLxS7WRRviz7Dj",
+      "name": "TaskStop",
+      "output": "<tool_use_error>InputValidationError: TaskStop failed due to the following issue:",
+      "preview": null,
+      "status": "error",
+      "task": false,
+      "title": "TaskStop: bpyl7epa0"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01RCAomkjz8tcWSELXzPzgFF",
+      "name": "TaskStop",
+      "output": null,
+      "preview": null,
+      "status": "in_progress",
+      "task": false,
+      "title": "TaskStop: bpyl7epa0"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bpyl7epa0",
+      "name": "task",
+      "output": "Stopped",
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "bpyl7epa0"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bpyl7epa0",
+      "name": "task",
+      "output": "Stopped",
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "bpyl7epa0"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "toolu_01RCAomkjz8tcWSELXzPzgFF",
+      "name": "TaskStop",
+      "output": "{\"message\":\"Successfully stopped task: bpyl7epa0 (echo tick one; sleep 6; echo tick two; sleep 600)\",\"task_id\":\"bpyl7epa0\",\"task_type\":\"local_bash\",\"command\":\"echo tick one; sleep 6; echo tick two; s…",
+      "preview": null,
+      "status": "complete",
+      "task": false,
+      "title": "TaskStop: bpyl7epa0"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "I",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " was",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " told tick",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " two appeared",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": [
+    "bmum5ujgu"
+   ]
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bhdf6s2h8",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "bhdf6s2h8"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bhdf6s2h8",
+      "name": "task",
+      "output": "Background command \"Background sleep and echo\" completed (exit code 0)",
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "bhdf6s2h8"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " background sleep and echo command completed",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-bmum5ujgu",
+      "name": "task",
+      "output": "Wait for 20 seconds",
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "Wait for 20 seconds"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-aa4de42604579b9e6",
+      "name": "task",
+      "output": null,
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "aa4de42604579b9e6"
+     }
+    },
+    {
+     "call": "task",
+     "update": {
+      "calls": 0,
+      "details": null,
+      "folded": null,
+      "id": "task-aa4de42604579b9e6",
+      "name": "task",
+      "output": "ok",
+      "preview": null,
+      "status": "complete",
+      "task": true,
+      "title": "aa4de42604579b9e6"
+     }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "The agent completed",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " and",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": " returned ok",
+     "notice": false
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": ".",
+     "notice": false
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": true,
+   "running_tasks": []
+  },
+  {
+   "calls": [
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "_Done. Claude Code returned no text._",
+     "notice": true
+    },
+    {
+     "call": "finish",
+     "closing": []
+    },
+    {
+     "call": "close_out"
+    }
+   ],
+   "result_set": false,
+   "running_tasks": []
+  }
+ ],
+ "whole": {
+  "calls": [
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01WVSpFrZmiY1m47tskiP7iE",
+     "name": "Monitor",
+     "output": null,
+     "preview": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "Monitor: echo tick one; sleep 6; echo tick two; sleep 600"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01WVSpFrZmiY1m47tskiP7iE",
+     "name": "Monitor",
+     "output": "Monitor started (task bpyl7epa0, expires in 5m unless the source ends first; you get one notice at expiry — re-arm if you still need the watch). You will be notified on each event. Keep working — do …",
+     "preview": null,
+     "status": "complete",
+     "task": false,
+     "title": "Monitor: echo tick one; sleep 6; echo tick two; sleep 600"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01RGUcMX9zYiZXxXNKywnLQa",
+     "name": "Bash",
+     "output": null,
+     "preview": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "Background sleep and echo"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01RGUcMX9zYiZXxXNKywnLQa",
+     "name": "Bash",
+     "output": "Command running in background with ID: bhdf6s2h8. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bhdf6s2h8.output. You will be notified when it completes. To check interim outpu…",
+     "preview": null,
+     "status": "complete",
+     "task": false,
+     "title": "Background sleep and echo"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n**3 background tasks launched**\n├ ticks\n├ Background sleep and echo\n└ Run sleep command and report",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nstarted",
+    "notice": false
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01Q3D7mgmFoLxS7WRRviz7Dj",
+     "name": "TaskStop",
+     "output": null,
+     "preview": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "TaskStop: bpyl7epa0"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01Q3D7mgmFoLxS7WRRviz7Dj",
+     "name": "TaskStop",
+     "output": "<tool_use_error>InputValidationError: TaskStop failed due to the following issue:",
+     "preview": null,
+     "status": "error",
+     "task": false,
+     "title": "TaskStop: bpyl7epa0"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01RCAomkjz8tcWSELXzPzgFF",
+     "name": "TaskStop",
+     "output": null,
+     "preview": null,
+     "status": "in_progress",
+     "task": false,
+     "title": "TaskStop: bpyl7epa0"
+    }
+   },
+   {
+    "call": "task",
+    "update": {
+     "calls": 0,
+     "details": null,
+     "folded": null,
+     "id": "toolu_01RCAomkjz8tcWSELXzPzgFF",
+     "name": "TaskStop",
+     "output": "{\"message\":\"Successfully stopped task: bpyl7epa0 (echo tick one; sleep 6; echo tick two; sleep 600)\",\"task_id\":\"bpyl7epa0\",\"task_type\":\"local_bash\",\"command\":\"echo tick one; sleep 6; echo tick two; s…",
+     "preview": null,
+     "status": "complete",
+     "task": false,
+     "title": "TaskStop: bpyl7epa0"
+    }
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "I",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " was",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " told tick",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " two appeared",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " background sleep and echo command completed",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\nThe agent completed",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " and",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": " returned ok",
+    "notice": false
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": ".",
+    "notice": false
+   },
+   {
+    "call": "finish",
+    "closing": []
+   },
+   {
+    "call": "close_out"
+   }
+  ],
+  "result_set": true,
+  "running_tasks": []
+ }
+}

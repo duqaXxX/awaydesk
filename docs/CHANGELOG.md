@@ -7,6 +7,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Every task Claude Code starts in the background takes one form, whatever its kind (issue #311):
+  two lines of text built from what the SDK says of every task, its name in bold and its
+  description, then `⎿ Running in background`, and no card. A command or a Monitor left running
+  gets that line too, below the run that counts its call; a subagent's line reads
+  `⎿ Running in background` in place of `⎿ Backgrounded agent`; several tasks started by one
+  message share `3 background tasks launched`; a task of a kind the daemon does not know has no
+  card either. The name is the agent's type, else the name of the call that started the task.
+  `texts.TASK_LAUNCHED` and `texts.TASKS_LAUNCHED` replace `AGENT_LAUNCHED` and
+  `AGENTS_LAUNCHED`, `previews.launched` takes a `Launch`, and `TurnRenderer` takes a predicate
+  that says whether the session saw a task start before: the session counts each task's starts,
+  past its end, so that a subagent a message continues gets no second launch line. A turn Claude Code opens by itself with no end to report keeps
+  `_Background task update_`: SDK 0.3.300 sends nothing of what woke it, and `docs/limits.md`
+  says so with the other differences of this form.
+- Text that follows a launch line is set a paragraph apart when the card of the call that started
+  the task changes above the line in between.
 - `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.300, which bundles Claude Code 2.1.300 (issue
   #307). The release probe certified it on 2026-10-14: the SDK surface table holds and the 24
   claims hold. The release offers one command the recorded `server-info.json` does not list,
@@ -99,6 +114,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Probe claim P25 sends a command to the background and reads the raw stream up to the turn its
+  end opens: it holds while no `user` record of origin `task-notification` comes before that
+  turn's result. `BROKEN` means Claude Code now says what woke such a turn, and the row of
+  `docs/limits.md` on it leaves the page. The recording `test/fixtures/sdk/background-forms.jsonl`
+  (2026-10-15, Claude Code 2.1.300, SDK 0.3.300) holds a Monitor stopped with `TaskStop`, a
+  command and a subagent, all in the background, in one session started with the daemon's
+  options.
 - `BASH_DEFAULT_TIMEOUT_MS` in `.env`, Claude Code's own variable, reaches every session as
   written (issue #300). Above 30 minutes it replaces the limit Claude Code puts on a command left
   running in the background in a session of the SDK, which a terminal session does not have;

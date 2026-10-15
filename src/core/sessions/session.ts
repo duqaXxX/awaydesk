@@ -220,6 +220,10 @@ export class ThreadSession {
     string,
     readonly [kind: TaskKind, description: string, agentType: string | null]
   >();
+  // How many times each task started, kept past its end: a resumed task keeps its id (SDK
+  // 0.3.300, `SDKTaskStartedMessage.run_id`), and nothing else says it is one. A reply asks
+  // here, so that an agent a message continues gets no second launch line.
+  private readonly starts = new Map<string, number>();
   // Ended tasks not yet opened into a report turn's reply: (task id, its formatted end line).
   // The task id finds the reply that started it (the report renders there when that reply is
   // the last thing in the thread).
@@ -1911,10 +1915,15 @@ export class ThreadSession {
   private recordTask(event: TaskStarted): void {
     this.tasks.set(event.taskId, [event.kind, event.description, event.agentType]);
     if (this.mayHaveOrderedRestart) this.afterRestart.add(event.taskId);
+    const starts = (this.starts.get(event.taskId) ?? 0) + 1;
+    this.starts.delete(event.taskId); // the latest start is the newest entry
+    this.starts.set(event.taskId, starts);
     const kept = this.deps.tasksKept ?? TASKS_KEPT;
-    for (const taskId of this.tasks.keys()) {
-      if (this.tasks.size <= kept) break;
-      this.tasks.delete(taskId);
+    for (const known of [this.tasks, this.starts]) {
+      for (const taskId of known.keys()) {
+        if (known.size <= kept) break;
+        known.delete(taskId);
+      }
     }
   }
 
@@ -2725,6 +2734,8 @@ export class ThreadSession {
       this.names,
       this.directory,
       this.deps.chat.capabilities.nativeStreaming,
+      // Recorded before any reply sees the start (`dispatch`), so a first start counts one.
+      (taskId) => (this.starts.get(taskId) ?? 0) > 1,
     );
     this.replyOf.set(renderer, reply);
     return renderer;

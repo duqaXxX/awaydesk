@@ -6,7 +6,7 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent",
+     "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Running in background",
      "notice": true
     },
     {
@@ -209,7 +209,7 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent",
+    "markdown": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Running in background",
     "notice": true
    },
    {

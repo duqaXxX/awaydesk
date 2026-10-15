@@ -1622,14 +1622,14 @@ test("a background agent is a launch line, and its calls write nothing", async (
   const h = harnessFor(t)({ turns: [first] });
   const session = h.session();
   await (await session.submit("start it")).done.wait();
-  const launch = "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent";
+  const launch = "**Agent**(Run ls and report contents)\n⎿ Running in background";
   assert.ok(at(h.bodies(), 0).includes(launch));
   h.clients[0]?.inject(later.flat());
   await h.until(() => h.reactions().at(-1) === Status.DONE && session.idle, 3.0);
   // No card at any point, for the agent or for what it ran, and one launch line.
   assert.deepEqual(h.slack.messageCards().flat(), []);
   const body = at(h.bodies(), 0);
-  assert.equal(body.split("Backgrounded agent").length - 1, 1);
+  assert.equal(body.split("Running in background").length - 1, 1);
   assert.ok(body.includes('✓ Agent "Run ls and report contents" finished'));
   assert.equal(h.slack.streamTs.length, 1);
 });
@@ -1650,7 +1650,7 @@ test("a background agent that ends while a turn runs has its end line in that tu
   await h.until(() => session.idle);
   const body = at(h.bodies(), 0);
   assert.equal(body.split('✓ Agent "Run ls and report contents" finished').length - 1, 1);
-  assert.ok(body.indexOf("Backgrounded agent") < body.indexOf("✓ Agent"));
+  assert.ok(body.indexOf("Running in background") < body.indexOf("✓ Agent"));
   assert.deepEqual(h.slack.messageCards().flat(), []);
   assert.equal(session.runningKinds, "");
 });
@@ -4417,7 +4417,7 @@ test("a subagent s commands have no card and no end line in the report", async (
   const body = at(bodies, 0);
   assert.ok(body.split("✓ ").length - 1 === 1 && body.includes('✓ Agent "'));
   // The agent runs in the background: a launch line, and no card for it or for its commands.
-  assert.equal(body.split("Backgrounded agent").length - 1, 1);
+  assert.equal(body.split("Running in background").length - 1, 1);
   assert.deepEqual(h.slack.messageCards().flat(), []);
   assert.ok(noStreamOpen(h));
 });

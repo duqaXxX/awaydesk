@@ -162,7 +162,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKResultMessage` | `is_error` | field | translate.ts: endingOf; session.ts: ClaudeSession.#pump | reference | none |
 | `SDKResultMessage` | `modelUsage` | field | translate.ts: result | reference | none |
 | `SDKResultMessage` | `num_turns` | field | translate.ts: result | reference | none |
-| `SDKResultMessage` | `origin` | field | translate.ts: result | reference | none |
+| `SDKResultMessage` | `origin` | field | translate.ts: result | reference | P25 |
 | `SDKResultMessage` | `result` | field | translate.ts: result | reference | none |
 | `SDKResultMessage` | `session_id` | field | translate.ts: result | reference | P3 |
 | `SDKResultMessage` | `terminal_reason` | field | translate.ts: endingOf | reference | none |
@@ -197,7 +197,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKTaskUpdatedMessage` | `task_id` | field | translate.ts: taskUpdated | reference | none |
 | `SDKTaskUpdatedMessage.patch` | `status` | field | translate.ts: taskUpdated | package | none |
 | `SDKUserMessage` | `message` | field | translate.ts: user | reference | none |
-| `SDKUserMessage` | `origin` | field | translate.ts: user | reference | none |
+| `SDKUserMessage` | `origin` | field | translate.ts: user | reference | P25 |
 | `SDKUserMessage` | `parent_tool_use_id` | field | translate.ts: parentOf | reference | none |
 | `SDKUserMessage` | `tool_use_result` | field | translate.ts: user | reference | P13 |
 | `SDKUserMessageReplay` | `uuid` | field | translate.ts: user | reference | P19 |

@@ -12,14 +12,14 @@
 import type { DiffHunk, FileChange, Question } from "../../agent/seam.ts";
 import type { Preview } from "../../chat/seam.ts";
 import {
-  AGENT_LAUNCHED,
-  AGENTS_LAUNCHED,
-  AGENTS_LAUNCHED_BRANCH,
-  AGENTS_LAUNCHED_LAST,
   ANSWERED,
   fill,
   type Names,
   named,
+  TASK_LAUNCHED,
+  TASKS_LAUNCHED,
+  TASKS_LAUNCHED_BRANCH,
+  TASKS_LAUNCHED_LAST,
 } from "../texts.ts";
 import { oneLine, spaced, splitLines, TITLE_LIMIT } from "./words.ts";
 
@@ -48,37 +48,41 @@ export const PREVIEWED: ReadonlySet<string> = new Set(["Edit", "Write"]);
 // the background the terminal writes a line and no more (`launched`), and a stream cannot take
 // back a card.
 export const LAUNCHERS: ReadonlySet<string> = new Set(["Agent"]);
-// The type the terminal does not name in that line: it reads `Agent(...)`, as for no type.
+// The type the terminal does not name in an agent's launch line: it reads `Agent(...)`, the
+// call's name, as for no type.
 const PLAIN_AGENT = "general-purpose";
-const AGENT = "Agent";
 
-/** The terminal's line for an agent started in the background: its type, then what it does. */
-export function launched(agentType: string | null, description: string): string {
-  const type = agentType === null || agentType === PLAIN_AGENT ? AGENT : agentType;
-  return fill(AGENT_LAUNCHED, { type, description: oneLine(description, TITLE_LIMIT) });
+/**
+ * The launch line of a task started in the background: the agent's type when it names one, else
+ * the name of the call that started it, then what the task does.
+ */
+export function launched(launch: Launch): string {
+  const { name, agentType, description } = launch;
+  const shown = agentType === null || agentType === PLAIN_AGENT ? name : agentType;
+  return fill(TASK_LAUNCHED, { name: shown, description: oneLine(description, TITLE_LIMIT) });
 }
 
-/** An agent started in the background, as its launch line names it. */
+/** A task started in the background, as its launch line names it. */
 export interface Launch {
+  /** The name of the call that started it. */
+  readonly name: string;
   readonly agentType: string | null;
   readonly description: string;
 }
 
 /**
- * The terminal's lines for the agents one message started in the background: one agent's own
- * line, or for several a count and what each does, with no type.
+ * The lines for the tasks one message started in the background: one task's own line, or for
+ * several a count and what each does, with no name.
  */
 export function launchedTogether(launches: readonly Launch[]): string {
   const [only] = launches;
-  if (only !== undefined && launches.length === 1) {
-    return launched(only.agentType, only.description);
-  }
+  if (only !== undefined && launches.length === 1) return launched(only);
   const lines = launches.map(({ description }, index) =>
-    fill(index === launches.length - 1 ? AGENTS_LAUNCHED_LAST : AGENTS_LAUNCHED_BRANCH, {
+    fill(index === launches.length - 1 ? TASKS_LAUNCHED_LAST : TASKS_LAUNCHED_BRANCH, {
       description: oneLine(description, TITLE_LIMIT),
     }),
   );
-  return [fill(AGENTS_LAUNCHED, { n: launches.length }), ...lines].join("\n");
+  return [fill(TASKS_LAUNCHED, { n: launches.length }), ...lines].join("\n");
 }
 
 // The tools whose failed call the terminal counts with the others and says nothing more of: a

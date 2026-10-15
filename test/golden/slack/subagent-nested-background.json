@@ -4,7 +4,7 @@
   "message_blocks": [
    [
     {
-     "text": "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent",
+     "text": "**Agent**(Launch background sleep command)\n⎿ Running in background",
      "type": "markdown"
     },
     {
@@ -29,7 +29,7 @@
    []
   ],
   "message_texts": [
-   "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent\n\nstarted\n\nThe background sleep command was launched.\n\nThe sleep command finished after 20 seconds and exited successfully."
+   "**Agent**(Launch background sleep command)\n⎿ Running in background\n\nstarted\n\nThe background sleep command was launched.\n\nThe sleep command finished after 20 seconds and exited successfully."
   ],
   "pushes": 1
  },
@@ -41,7 +41,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Launch background sleep command)\n⎿ Running in background",
       "type": "markdown_text"
      }
     ],
@@ -247,7 +247,7 @@
    "args": {
     "blocks": [
      {
-      "text": "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Launch background sleep command)\n⎿ Running in background",
       "type": "markdown"
      },
      {

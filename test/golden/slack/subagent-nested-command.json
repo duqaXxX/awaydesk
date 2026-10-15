@@ -4,7 +4,7 @@
   "message_blocks": [
    [
     {
-     "text": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent",
+     "text": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Running in background",
      "type": "markdown"
     },
     {
@@ -29,7 +29,7 @@
    []
   ],
   "message_texts": [
-   "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent\n\nstarted\n\nThe agent finished running both sleep commands and reported finished."
+   "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Running in background\n\nstarted\n\nThe agent finished running both sleep commands and reported finished."
   ],
   "pushes": 1
  },
@@ -41,7 +41,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Running in background",
       "type": "markdown_text"
      }
     ],
@@ -177,7 +177,7 @@
    "args": {
     "blocks": [
      {
-      "text": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Run two 12-second sleep commands and report finished)\n⎿ Running in background",
       "type": "markdown"
      },
      {

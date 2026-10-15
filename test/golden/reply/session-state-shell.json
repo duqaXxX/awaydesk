@@ -19,6 +19,12 @@
      }
     },
     {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**Bash**(Wait 25 seconds in background)\n⎿ Running in background",
+     "notice": true
+    },
+    {
      "call": "task",
      "update": {
       "calls": 0,
@@ -36,7 +42,7 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "started",
+     "markdown": "\n\nstarted",
      "notice": false
     },
     {
@@ -139,6 +145,12 @@
     }
    },
    {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n**Bash**(Wait 25 seconds in background)\n⎿ Running in background",
+    "notice": true
+   },
+   {
     "call": "task",
     "update": {
      "calls": 0,
@@ -156,7 +168,7 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "started",
+    "markdown": "\n\nstarted",
     "notice": false
    },
    {
