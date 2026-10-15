@@ -723,13 +723,17 @@ export class ReplySink implements Sink {
 
   /**
    * The list taken off this reply's message now, not after the debounce: a reply below is about
-   * to create its first message (`ThreadPlaces.opens`).
+   * to create its first message (`ThreadPlaces.opens`). Through the lock, whatever the message
+   * shows now: a pass in flight may be drawing the list. A write that failed is tried again, as a
+   * debounced one would have been.
    */
   async unlist(): Promise<boolean> {
-    if (this.assigned !== null || !this.showsList()) return true;
+    if (this.assigned !== null) return true;
     this.pending?.cancel();
     this.pending = null;
-    return this.flush();
+    const ok = await this.flush();
+    if (!ok) this.retryLater();
+    return ok;
   }
 
   /** `showFooterFormatted` with the footer as one line of mrkdwn. */
