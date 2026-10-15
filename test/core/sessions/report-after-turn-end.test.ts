@@ -16,7 +16,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { INJECTED_TURN_WAIT } from "../../../src/core/sessions/constants.ts";
-import { type Harness, harnessFor, isResult, sdkMessages } from "../../support/sessions.ts";
+import {
+  type Harness,
+  harnessFor,
+  isResult,
+  recordOf,
+  sdkMessages,
+} from "../../support/sessions.ts";
 
 /** Whether each message of the thread, in the order they were made, shows a footer now. */
 function footers(h: Harness): boolean[] {
@@ -114,4 +120,42 @@ test("no report turn comes: the wait ends and the reply closes with its footer",
   await h.until(() => session.idle);
   await settled(h);
   assertOneAtTheEnd(h);
+});
+
+test("a task that ends unfolded inside the owner's next turn leaves one footer, under its report", async (t) => {
+  // The recording cut at the main thread's last message before the agent ends: the first turn
+  // launches the agent and ends (its result reused), and the owner's next turn is that message,
+  // during which the agent ends with no replay.
+  const { turn, after } = cut("task-end-in-turn-unfolded");
+  const end = turn.findIndex((item) => recordOf(item)?.subtype === "task_updated");
+  const start = turn.findLastIndex((item, index) => {
+    const record = recordOf(item);
+    const event = record?.event as { type?: string } | undefined;
+    return (
+      index < end &&
+      record?.type === "stream_event" &&
+      record.parent_tool_use_id === null &&
+      event?.type === "message_start"
+    );
+  });
+  const result = turn.at(-1);
+  assert.ok(start > 0 && result !== undefined);
+  const h = harnessFor(t)({ turns: [[...turn.slice(0, start), result], turn.slice(start)] });
+  const session = h.session();
+  await (await session.submit("start it")).done.wait();
+  await settled(h);
+  await (await session.submit("something else")).done.wait();
+  await settled(h);
+  h.clients[0]?.inject(after);
+  await h.until(() => session.idle);
+  await settled(h);
+  // The stretch after the owner's second message: one footer, under its last message.
+  const second = footers(h).slice(1);
+  assert.deepEqual(
+    second,
+    second.map((_, index) => index === second.length - 1),
+    `one footer after the second prompt: ${JSON.stringify(footers(h))}`,
+  );
+  // The report keeps a reply of its own, as every turn Claude Code opens by itself does.
+  assert.equal(h.slack.callsTo("chat.startStream").length, 3);
 });
