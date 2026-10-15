@@ -5421,6 +5421,98 @@ test("a reply that was settled and goes on is tried again after a failed write",
   assert.deepEqual(listCards(slack), [listCard(SHELL)]);
 });
 
+test("a reply written below takes the list off the one above before its first message is created", async () => {
+  // Created first, the new message showed under the list for as long as the edit that took it off
+  // waited for its debounce, then the list jumped below it (seen on Slack desktop, 2026-10-15).
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  await endedReply(slack, places);
+  places.showRunning(SHELL);
+  await settled();
+  assert.deepEqual(listCards(slack), [listCard(SHELL)]);
+  // The edit that takes the list off is held: the new message must wait for it.
+  slack.gateMethod = "chat.update";
+  slack.gate = new AsyncEvent();
+  slack.gated = new AsyncEvent();
+  const lower = reply(slack, { places });
+  const writing = lower.text("I was told the monitor emitted tick two.");
+  await settled();
+  await slack.gated.wait();
+  assert.equal(slack.callsTo("chat.startStream").length, 1, "no new message while the list is on");
+  slack.gate.set();
+  slack.gate = null;
+  await writing;
+  await settled();
+  assert.equal(slack.callsTo("chat.startStream").length, 2);
+  assert.deepEqual(listCards(slack), [], "while the reply below is a stream, no reply shows it");
+  await lower.finish([]);
+  lower.rest();
+  await settled();
+  assert.deepEqual(
+    listCards(slack),
+    [listCard(SHELL)],
+    "and it shows under that reply once it rests",
+  );
+  assert.equal(slack.messageBlocks()[1]?.some(isCard), true);
+});
+
+test("an edit that fails to take the list off is tried again, and the list shows once", async () => {
+  // Before the edit was written at once, a failed one was retried with the debounced pass; written
+  // at once, it must be retried the same way, or the list stays on both replies.
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  await endedReply(slack, places, { finalRetrySeconds: 60 });
+  places.showRunning(SHELL);
+  await settled();
+  const upperTs = slack.streamTs[0];
+  let fails = 1;
+  slack.responses["chat.update"] = (args) =>
+    args.ts === upperTs && fails-- > 0 ? rejected("ratelimited") : { ok: true };
+  const lower = reply(slack, { places });
+  await lower.text("Report.");
+  await settled();
+  await lower.finish([]);
+  lower.rest();
+  await settled();
+  await passed(60);
+  await settled();
+  assert.deepEqual(
+    slack.messageBlocks().map((blocks) => blocks.filter(isCard).length),
+    [0, 1],
+  );
+});
+
+test("a list still being drawn on the reply above is taken off before the message below is created", async () => {
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  await endedReply(slack, places);
+  const upperTs = slack.streamTs[0];
+  // The update that draws the list is in flight when the reply below starts.
+  slack.gateMethod = "chat.update";
+  slack.gate = new AsyncEvent();
+  slack.gated = new AsyncEvent();
+  places.showRunning(SHELL);
+  await settled();
+  await slack.gated.wait();
+  const lower = reply(slack, { places });
+  const writing = lower.text("Report.");
+  await settled();
+  slack.gate.set();
+  slack.gate = null;
+  await writing;
+  await settled();
+  const writes = slack.apiCalls.filter((call) => WRITE_METHODS.includes(call.method));
+  const started = writes.findLastIndex((call) => call.method === "chat.startStream");
+  const lastUpper = writes.findLastIndex(
+    (call) => call.method === "chat.update" && call.args.ts === upperTs,
+  );
+  assert.ok(
+    lastUpper < started,
+    "nothing is written on the reply above once the message below exists",
+  );
+  assert.deepEqual(listCards(slack), []);
+});
+
 test("a reply whose end did not land draws no second card, and none is left when the list goes", async () => {
   const slack = new FakeSlack();
   const places = new ThreadPlaces();
@@ -5435,8 +5527,8 @@ test("a reply whose end did not land draws no second card, and none is left when
     args.ts === lowerTs ? rejected("ratelimited") : { ok: true };
   assert.equal(await lower.closeOut(), false);
   await settled();
-  assert.equal(listCards(slack).length, 1, "the list is drawn once");
-  assert.equal(slack.messageBlocks()[0]?.some(isCard), true, "still on the reply that held it");
+  // The lowest reply is not at rest: the list waits for it, on no message.
+  assert.deepEqual(listCards(slack), [], "no second card, and none above the lower reply");
   places.showRunning(null);
   await settled();
   assert.deepEqual(listCards(slack), []);
@@ -5511,9 +5603,10 @@ test("a card whose title grows back is charged once for its longest title", () =
   );
 });
 
-test("a line about the work is text in the stream and a grey line once the body has ended", async () => {
-  // A task's end line (issue #299): a stream takes only text and cards, so the line is grey
-  // from the silent update that follows the stream's stop, as a run's count is.
+test("a line about the work is a grey line in the stream and stays one once the body has ended", async () => {
+  // A task's end line (issue #299): drawn as text while the stream ran, it shrank to a grey line
+  // at the update that follows the stream's stop, and the reply's height jumped (recorded on
+  // Slack desktop, 2026-10-15). The stream now carries it as the same context block.
   const slack = new FakeSlack();
   const sink = reply(slack);
   await sink.text("Started.");
@@ -5523,6 +5616,22 @@ test("a line about the work is text in the stream and a grey line once the body 
   assert.deepEqual(slack.messageTexts(), [
     'Started.\n\n✓ Agent "Review" finished · 5s\n\nIt found <nothing>.',
   ]);
+  const streamed = [
+    ...slack.callsTo("chat.startStream"),
+    ...slack.callsTo("chat.appendStream"),
+  ].flatMap((call) => call.chunks as JsonObject[]);
+  assert.deepEqual(
+    streamed.filter((chunk) => chunk.type === "blocks"),
+    [
+      {
+        type: "blocks",
+        blocks: [{ ...context('✓ Agent "Review" finished · 5s'), block_id: "aside-1" }],
+      },
+    ],
+  );
+  assert.ok(
+    streamed.every((chunk) => chunk.type !== "markdown_text" || !String(chunk.text).includes("✓")),
+  );
   await sink.finish([]);
   assert.equal(await sink.closeOut(), true);
   assert.deepEqual(methods(slack).slice(-2), ["chat.stopStream", "chat.update"]);

@@ -58,6 +58,8 @@ const COUNT_TO = 2000;
 // or an interrupt, which no event announces.
 const QUIET_MS = 1500;
 const QUIET_LIMIT = 60_000;
+// How long the background wake scene waits for the turn a command's end opens.
+const WAKE_LIMIT = 120_000;
 
 export type Log = (line: string) => void;
 type Seen = Record<string, Observation>;
@@ -103,6 +105,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   compact: ["P21", "P22"],
   "commands not offered": ["P23"],
   "computer use": ["P24"],
+  "background wake": ["P25"],
 };
 
 /** `text` without any path of this machine, one line, cut to `limit` characters. */
@@ -929,6 +932,95 @@ async function computerUse(s: Stage): Promise<Seen> {
 }
 
 /**
+ * P25: what a raw stream says of the first turn Claude Code opened by itself, which a result
+ * whose origin is `task-notification` closes. The claim holds while no user record of that
+ * origin came in that turn, since such a record would carry the text that woke it (recorded
+ * absent on Claude Code 2.1.300: `test/fixtures/sdk/background-forms.jsonl`). Unproven when no
+ * such turn came.
+ */
+export function judgeWake(records: readonly unknown[]): Observation {
+  let woke: string[] = [];
+  for (const record of records) {
+    if (!isRecord(record)) continue;
+    const kind = isRecord(record.origin) ? record.origin.kind : null;
+    if (record.type === "user" && kind === "task-notification") {
+      woke.push(JSON.stringify(isRecord(record.message) ? record.message.content : null));
+    }
+    if (record.type !== "result") continue;
+    if (kind === "task-notification") {
+      const said = woke.length === 0;
+      return observation(true, said, said ? "" : `a user record came first: ${woke[0]}`);
+    }
+    woke = []; // a turn of the owner's: what came in it opened none of Claude Code's own
+  }
+  return observation(false, false, "no turn opened by a task's notification");
+}
+
+/**
+ * Runs a command in the background and reads the raw stream up to the turn its end opens. The
+ * back end turns neither a user record of origin `task-notification` nor a result's origin into
+ * an event of its own, which is why this scene reads the SDK itself. The session may run Bash
+ * alone.
+ */
+async function backgroundWake(s: Stage): Promise<Seen> {
+  const folder = join(s.root, "wake");
+  await mkdir(folder);
+  const input = new AsyncQueue<SDKUserMessage>();
+  // The owner's login, as for every session of the probe; no setting source.
+  const raw = query({
+    prompt: input,
+    options: {
+      cwd: folder,
+      settingSources: [],
+      model: PROBE_MODEL,
+      // As the daemon passes it (`src/agent/claude/session.ts`): Claude Code re-emits each
+      // prompt it takes, a task's notification folded into a running turn included.
+      extraArgs: { "replay-user-messages": null },
+      canUseTool: async (toolName, toolInput) =>
+        toolName === "Bash"
+          ? { behavior: "allow", updatedInput: toolInput }
+          : { behavior: "deny", message: "the probe allows Bash alone" },
+    },
+  });
+  const records: unknown[] = [];
+  let late = false;
+  // A turn that never comes learns nothing: the stream is closed, and the claim is unproven.
+  const timer = setTimeout(() => {
+    late = true;
+    raw.close();
+  }, WAKE_LIMIT);
+  try {
+    input.push({
+      type: "user",
+      message: {
+        role: "user",
+        content:
+          "Use the Bash tool with run_in_background set to true to run `sleep 3; echo done`. " +
+          "Then reply with the single word: started. When you are told the command finished, " +
+          "reply with the single word: finished.",
+      },
+      parent_tool_use_id: null,
+    });
+    try {
+      for await (const record of raw) {
+        records.push(record);
+        // Read as any record of Claude Code's is: unknown, narrowed where it is read.
+        const seen: unknown = record;
+        const origin = isRecord(seen) && isRecord(seen.origin) ? seen.origin.kind : null;
+        if (record.type === "result" && origin === "task-notification") break;
+      }
+    } catch (error) {
+      if (!late) throw error;
+    }
+    return { P25: judgeWake(records) };
+  } finally {
+    clearTimeout(timer);
+    input.end();
+    raw.close();
+  }
+}
+
+/**
  * Removes the transcripts the probe's sessions left under Claude Code's projects folder: only
  * the folders whose name holds this run's random temporary folder. Anything else is left alone.
  */
@@ -981,6 +1073,7 @@ export async function runScenes(log: Log): Promise<Seen> {
       Object.assign(seen, await attempt("compact", s, () => compact(s)));
       Object.assign(seen, await attempt("commands not offered", s, () => commandsNotOffered(s)));
       Object.assign(seen, await attempt("computer use", s, () => computerUse(s)));
+      Object.assign(seen, await attempt("background wake", s, () => backgroundWake(s)));
     } finally {
       await Promise.allSettled(s.lives.map((live) => live.session.close()));
       await forgetSessions(root, log);

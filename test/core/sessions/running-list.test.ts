@@ -179,7 +179,7 @@ test("a reply written below takes the list once it rests, and the first loses it
   assert.ok(!JSON.stringify(h.slack.messageBlocks()).includes("⏳"));
 });
 
-test("while the reply written below is still a stream, the list stays on the first", async (t) => {
+test("while the reply written below is still a stream, no reply shows the list", async (t) => {
   const [first] = splitBackground();
   const tools = sdkMessages("tools");
   const result = tools.findLastIndex((item) => isResult(item));
@@ -191,7 +191,9 @@ test("while the reply written below is still a stream, the list stays on the fir
   const second = await session.submit("list the files");
   await h.until(() => h.slack.streamTs.length === 2);
   await h.sleep(0.2);
-  assert.deepEqual(holders(h.slack.messageBlocks()), [0], "the stream below holds none");
+  // Taken off the first at once, so that it never sits between the two replies.
+  await h.until(() => holders(h.slack.messageBlocks()).length === 0);
+  assert.deepEqual(holders(h.slack.messageBlocks()), [], "the stream below holds none either");
   h.clients[0]?.inject(tools.slice(result));
   await second.done.wait();
   await h.until(() => holders(h.slack.messageBlocks()).join() === "1");

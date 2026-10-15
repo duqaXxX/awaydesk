@@ -225,6 +225,8 @@ class MemoryReply implements Reply, Placed {
         );
         this.#message.unfinished = true;
         this.#onOpen(null, this.#message.id);
+        // A reply below the one that shows the list takes it off that one at once.
+        this.#room.place(this.#ref);
       } else {
         this.#room.edit(this.#message, text);
       }

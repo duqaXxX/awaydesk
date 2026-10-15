@@ -20,6 +20,7 @@ import {
 } from "../../probe/claims.ts";
 import { changes, notOffered, recorded, report } from "../../probe/commands.ts";
 import { certified, pinnedTo } from "../../probe/main.ts";
+import { type JsonObject, sdkRecords } from "../support/fixtures.ts";
 
 const ROOT = join(import.meta.dirname, "..", "..");
 const GESTURE = claim(
@@ -294,3 +295,35 @@ test("computer use is judged only when the control server shows the folder's ent
     assert.equal(unread.holds, false);
   }
 });
+
+test("a turn opened by a task's notification is judged on what came before its result", async () => {
+  const { judgeWake } = await import("../../probe/scenes.ts");
+  // background-forms.jsonl (CLI 2.1.300): three turns opened by notifications, none of them
+  // after a user record of that origin. The limit stands.
+  const recorded = sdkRecords("background-forms");
+  assert.deepEqual(judgeWake(recorded), { caused: true, holds: true, detail: "" });
+  // The same with a user record of that origin before the first such result, as a release
+  // that sends what woke the turn would: the limit is gone. The record is the wire's user
+  // message with an origin of the kind sdk.d.ts 0.3.300 defines.
+  const opened = recorded.findIndex(
+    (record) => record.type === "result" && isRecordOrigin(record, "task-notification"),
+  );
+  const woke = {
+    type: "user",
+    message: { role: "user", content: "Monitor event: tick two" },
+    parent_tool_use_id: null,
+    origin: { kind: "task-notification" },
+  };
+  const told = judgeWake([...recorded.slice(0, opened), woke, ...recorded.slice(opened)]);
+  assert.equal(told.caused, true);
+  assert.equal(told.holds, false);
+  assert.match(told.detail, /tick two/);
+  // No notification, or no turn it opened: nothing was learned.
+  const owners = recorded.slice(0, recorded.findIndex((record) => record.type === "result") + 1);
+  assert.equal(judgeWake(owners).caused, false);
+});
+
+function isRecordOrigin(record: JsonObject, kind: string): boolean {
+  const origin = record.origin;
+  return typeof origin === "object" && origin !== null && (origin as JsonObject).kind === kind;
+}

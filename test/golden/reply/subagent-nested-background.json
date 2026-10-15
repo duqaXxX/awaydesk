@@ -6,7 +6,7 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent",
+     "markdown": "**Agent**(Launch background sleep command)\n⎿ Running in background",
      "notice": true
     },
     {
@@ -44,6 +44,12 @@
       "task": false,
       "title": "Sleep for 20 seconds then echo done"
      }
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**Bash**(Sleep for 20 seconds then echo done)\n⎿ Running in background",
+     "notice": true
     },
     {
      "call": "task",
@@ -224,7 +230,7 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Launch background sleep command)\n⎿ Backgrounded agent",
+    "markdown": "**Agent**(Launch background sleep command)\n⎿ Running in background",
     "notice": true
    },
    {

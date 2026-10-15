@@ -1,0 +1,630 @@
+{
+ "discipline": "Each sink call of the seam-1 'whole' list is replayed in order on a ReplySink over FakeSlack. After a text or task call, ReplySink.settle() flushes the reply at once, standing in for the debounced write (one flush per sink call, so the debounce never merges two calls); finish and close_out flush by themselves. After close_out the session's footer is drawn, as at the end of a session whose last reply this is. The fake clock never advances, so the 280-second stream deadline never fires, and the UpdateLimiter has a budget no recording can spend.",
+ "final": {
+  "message_blocks": [
+   [
+    {
+     "elements": [
+      {
+       "text": "ToolSearch, Monitor, ran 1 shell command",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    },
+    {
+     "text": "**3 background tasks launched**\n├ ticks\n├ Sleep 12 seconds then print done\n└ Run sleep 20 and reply ok",
+     "type": "markdown"
+    },
+    {
+     "text": "The Monitor reported \"tick one\"; I'm waiting for \"tick two\" before stopping it with TaskStop.",
+     "type": "markdown"
+    },
+    {
+     "elements": [
+      {
+       "text": "TaskStop",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    },
+    {
+     "text": "I was told the Monitor printed \"tick two\", so I stopped it with TaskStop and it is now shut down.\n\nI was told the background `sleep 12; echo done` command finished with exit code 0.\n\nI was told the subagent that ran `sleep 20` finished and replied \"ok\".",
+     "type": "markdown"
+    },
+    {
+     "type": "divider"
+    },
+    {
+     "elements": [
+      {
+       "text": "footer",
+       "type": "mrkdwn"
+      }
+     ],
+     "type": "context"
+    }
+   ]
+  ],
+  "message_cards": [
+   []
+  ],
+  "message_texts": [
+   "**3 background tasks launched**\n├ ticks\n├ Sleep 12 seconds then print done\n└ Run sleep 20 and reply ok\n\nThe Monitor reported \"tick one\"; I'm waiting for \"tick two\" before stopping it with TaskStop.\n\nI was told the Monitor printed \"tick two\", so I stopped it with TaskStop and it is now shut down.\n\nI was told the background `sleep 12; echo done` command finished with exit code 0.\n\nI was told the subagent that ran `sleep 20` finished and replied \"ok\"."
+  ],
+  "pushes": 1
+ },
+ "recording": "background-forms",
+ "slack_calls": [
+  {
+   "after_sink_call": 0,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+      "status": "in_progress",
+      "title": "ToolSearch: select:Monitor,TaskStop",
+      "type": "task_update"
+     }
+    ],
+    "recipient_team_id": "T000TEAM",
+    "recipient_user_id": "U000ALICE",
+    "task_display_mode": "timeline",
+    "thread_ts": "1780000000.000001"
+   },
+   "method": "chat.startStream"
+  },
+  {
+   "after_sink_call": 1,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+      "status": "complete",
+      "title": "ToolSearch",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 2,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+      "status": "in_progress",
+      "title": "Monitor: echo tick one; sleep 6; echo tick two; sleep 600",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 3,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+      "status": "complete",
+      "title": "ToolSearch, Monitor",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 4,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+      "status": "in_progress",
+      "title": "Sleep 12 seconds then print done",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 5,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01MZhhVJohKQorMajbEwrgUJ",
+      "status": "complete",
+      "title": "ToolSearch, Monitor, ran 1 shell command",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 6,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "**3 background tasks launched**\n├ ticks\n├ Sleep 12 seconds then print done\n└ Run sleep 20 and reply ok",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 7,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nThe",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 8,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " Monitor re",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 9,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ported \"",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 10,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "tick one\"",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 11,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "; I'm waiting for",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 12,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " \"tick two\" before stop",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 13,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ping it with",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 14,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " TaskStop.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 15,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01FwuSq9CGUfKffP59buWPdL",
+      "status": "in_progress",
+      "title": "TaskStop: b2p882lpn",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 16,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "id": "fold:toolu_01FwuSq9CGUfKffP59buWPdL",
+      "status": "complete",
+      "title": "TaskStop",
+      "type": "task_update"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 17,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "I was told the Monitor",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 18,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " printed \"tick two\", so",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 19,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " I stopped it",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 20,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " with TaskStop and it",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 21,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " is now sh",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 22,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ut down.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 23,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nI was told the background `",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 24,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "sleep 12;",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 25,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " echo done` command",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 26,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " finished with",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 27,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " exit code 0.",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 28,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nI was told the subagent that",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 29,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": " ran `sleep 20",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 30,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "` finished and replied \"",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 31,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "ok\".",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 33,
+   "args": {
+    "channel": "C000CHAN",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.stopStream"
+  },
+  {
+   "after_sink_call": 33,
+   "args": {
+    "blocks": [
+     {
+      "elements": [
+       {
+        "text": "ToolSearch, Monitor, ran 1 shell command",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "**3 background tasks launched**\n├ ticks\n├ Sleep 12 seconds then print done\n└ Run sleep 20 and reply ok",
+      "type": "markdown"
+     },
+     {
+      "text": "The Monitor reported \"tick one\"; I'm waiting for \"tick two\" before stopping it with TaskStop.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "TaskStop",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "I was told the Monitor printed \"tick two\", so I stopped it with TaskStop and it is now shut down.\n\nI was told the background `sleep 12; echo done` command finished with exit code 0.\n\nI was told the subagent that ran `sleep 20` finished and replied \"ok\".",
+      "type": "markdown"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "The Monitor reported \"tick one\"; I'm waiting for \"tick two\" before stopping it with TaskStop.",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  },
+  {
+   "after_sink_call": 33,
+   "args": {
+    "blocks": [
+     {
+      "elements": [
+       {
+        "text": "ToolSearch, Monitor, ran 1 shell command",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "**3 background tasks launched**\n├ ticks\n├ Sleep 12 seconds then print done\n└ Run sleep 20 and reply ok",
+      "type": "markdown"
+     },
+     {
+      "text": "The Monitor reported \"tick one\"; I'm waiting for \"tick two\" before stopping it with TaskStop.",
+      "type": "markdown"
+     },
+     {
+      "elements": [
+       {
+        "text": "TaskStop",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     },
+     {
+      "text": "I was told the Monitor printed \"tick two\", so I stopped it with TaskStop and it is now shut down.\n\nI was told the background `sleep 12; echo done` command finished with exit code 0.\n\nI was told the subagent that ran `sleep 20` finished and replied \"ok\".",
+      "type": "markdown"
+     },
+     {
+      "type": "divider"
+     },
+     {
+      "elements": [
+       {
+        "text": "footer",
+        "type": "mrkdwn"
+       }
+      ],
+      "type": "context"
+     }
+    ],
+    "channel": "C000CHAN",
+    "text": "The Monitor reported \"tick one\"; I'm waiting for \"tick two\" before stopping it with TaskStop.",
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.update"
+  }
+ ]
+}

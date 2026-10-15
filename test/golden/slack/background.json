@@ -13,6 +13,10 @@
      "type": "context"
     },
     {
+     "text": "**Bash**(Sleep for 5 seconds then print done)\n⎿ Running in background",
+     "type": "markdown"
+    },
+    {
      "text": "started\n\nThe background command completed successfully after running for 5 seconds. The sleep period elapsed without any issues, and the echo command executed afterward. The output file contains \"done\", confirming that the entire command sequence ran as expected.",
      "type": "markdown"
     },
@@ -34,7 +38,7 @@
    []
   ],
   "message_texts": [
-   "started\n\nThe background command completed successfully after running for 5 seconds. The sleep period elapsed without any issues, and the echo command executed afterward. The output file contains \"done\", confirming that the entire command sequence ran as expected."
+   "**Bash**(Sleep for 5 seconds then print done)\n⎿ Running in background\n\nstarted\n\nThe background command completed successfully after running for 5 seconds. The sleep period elapsed without any issues, and the echo command executed afterward. The output file contains \"done\", confirming that the entire command sequence ran as expected."
   ],
   "pushes": 1
  },
@@ -65,10 +69,8 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01LiZwhcy5g12fYSVLgAq5TS",
-      "status": "complete",
-      "title": "Ran 1 shell command",
-      "type": "task_update"
+      "text": "**Bash**(Sleep for 5 seconds then print done)\n⎿ Running in background",
+      "type": "markdown_text"
      }
     ],
     "ts": "1790000000.000001"
@@ -81,8 +83,10 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "started",
-      "type": "markdown_text"
+      "id": "fold:toolu_01LiZwhcy5g12fYSVLgAq5TS",
+      "status": "complete",
+      "title": "Ran 1 shell command",
+      "type": "task_update"
      }
     ],
     "ts": "1790000000.000001"
@@ -95,7 +99,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "\n\nThe backgro",
+      "text": "\n\nstarted",
       "type": "markdown_text"
      }
     ],
@@ -109,7 +113,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "und command",
+      "text": "\n\nThe backgro",
       "type": "markdown_text"
      }
     ],
@@ -123,7 +127,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " completed ",
+      "text": "und command",
       "type": "markdown_text"
      }
     ],
@@ -137,7 +141,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "successfull",
+      "text": " completed ",
       "type": "markdown_text"
      }
     ],
@@ -151,7 +155,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "y after run",
+      "text": "successfull",
       "type": "markdown_text"
      }
     ],
@@ -165,7 +169,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ning for 5 ",
+      "text": "y after run",
       "type": "markdown_text"
      }
     ],
@@ -179,7 +183,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "seconds. Th",
+      "text": "ning for 5 ",
       "type": "markdown_text"
      }
     ],
@@ -193,7 +197,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "e sleep per",
+      "text": "seconds. Th",
       "type": "markdown_text"
      }
     ],
@@ -207,7 +211,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "iod elapsed",
+      "text": "e sleep per",
       "type": "markdown_text"
      }
     ],
@@ -221,7 +225,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " without an",
+      "text": "iod elapsed",
       "type": "markdown_text"
      }
     ],
@@ -235,7 +239,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "y issues, a",
+      "text": " without an",
       "type": "markdown_text"
      }
     ],
@@ -249,7 +253,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "nd the echo",
+      "text": "y issues, a",
       "type": "markdown_text"
      }
     ],
@@ -263,7 +267,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " command ex",
+      "text": "nd the echo",
       "type": "markdown_text"
      }
     ],
@@ -277,7 +281,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "ecuted afte",
+      "text": " command ex",
       "type": "markdown_text"
      }
     ],
@@ -291,7 +295,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "rward. The ",
+      "text": "ecuted afte",
       "type": "markdown_text"
      }
     ],
@@ -305,7 +309,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "output file",
+      "text": "rward. The ",
       "type": "markdown_text"
      }
     ],
@@ -319,7 +323,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " contains \"",
+      "text": "output file",
       "type": "markdown_text"
      }
     ],
@@ -333,7 +337,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "done\", conf",
+      "text": " contains \"",
       "type": "markdown_text"
      }
     ],
@@ -347,7 +351,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "irming that",
+      "text": "done\", conf",
       "type": "markdown_text"
      }
     ],
@@ -361,7 +365,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " the entire",
+      "text": "irming that",
       "type": "markdown_text"
      }
     ],
@@ -375,7 +379,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": " command se",
+      "text": " the entire",
       "type": "markdown_text"
      }
     ],
@@ -389,7 +393,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "quence ran ",
+      "text": " command se",
       "type": "markdown_text"
      }
     ],
@@ -403,7 +407,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "as expected",
+      "text": "quence ran ",
       "type": "markdown_text"
      }
     ],
@@ -417,6 +421,20 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "text": "as expected",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 27,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
       "text": ".",
       "type": "markdown_text"
      }
@@ -426,7 +444,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 28,
+   "after_sink_call": 29,
    "args": {
     "channel": "C000CHAN",
     "ts": "1790000000.000001"
@@ -434,7 +452,7 @@
    "method": "chat.stopStream"
   },
   {
-   "after_sink_call": 28,
+   "after_sink_call": 29,
    "args": {
     "blocks": [
      {
@@ -445,6 +463,10 @@
        }
       ],
       "type": "context"
+     },
+     {
+      "text": "**Bash**(Sleep for 5 seconds then print done)\n⎿ Running in background",
+      "type": "markdown"
      },
      {
       "text": "started\n\nThe background command completed successfully after running for 5 seconds. The sleep period elapsed without any issues, and the echo command executed afterward. The output file contains \"done\", confirming that the entire command sequence ran as expected.",
@@ -458,7 +480,7 @@
    "method": "chat.update"
   },
   {
-   "after_sink_call": 28,
+   "after_sink_call": 29,
    "args": {
     "blocks": [
      {
@@ -469,6 +491,10 @@
        }
       ],
       "type": "context"
+     },
+     {
+      "text": "**Bash**(Sleep for 5 seconds then print done)\n⎿ Running in background",
+      "type": "markdown"
      },
      {
       "text": "started\n\nThe background command completed successfully after running for 5 seconds. The sleep period elapsed without any issues, and the echo command executed afterward. The output file contains \"done\", confirming that the entire command sequence ran as expected.",

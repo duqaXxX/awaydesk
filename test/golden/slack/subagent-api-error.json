@@ -4,7 +4,7 @@
   "message_blocks": [
    [
     {
-     "text": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent",
+     "text": "**Agent**(Synthetic subtask)\n⎿ Running in background",
      "type": "markdown"
     },
     {
@@ -29,7 +29,7 @@
    []
   ],
   "message_texts": [
-   "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent\n\nSynthetic answer.\n\nSynthetic answer."
+   "**Agent**(Synthetic subtask)\n⎿ Running in background\n\nSynthetic answer.\n\nSynthetic answer."
   ],
   "pushes": 1
  },
@@ -41,7 +41,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Synthetic subtask)\n⎿ Running in background",
       "type": "markdown_text"
      }
     ],
@@ -93,7 +93,7 @@
    "args": {
     "blocks": [
      {
-      "text": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Synthetic subtask)\n⎿ Running in background",
       "type": "markdown"
      },
      {

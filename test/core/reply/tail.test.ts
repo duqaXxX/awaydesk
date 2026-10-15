@@ -25,9 +25,9 @@ test("the order of the entries does not matter, only where their messages sit", 
   assert.deepEqual(result.get("b"), { running: true });
 });
 
-test("a lower reply that is not resting leaves the list on the upper one", () => {
+test("a lower reply that is not resting takes the list off the upper one, and holds none yet", () => {
   const result = tails([entry("a", 5, true), entry("b", 9, false)]);
-  assert.deepEqual(result.get("a"), { running: true });
+  assert.deepEqual(result.get("a"), { running: false });
   assert.deepEqual(result.get("b"), { running: false });
 });
 

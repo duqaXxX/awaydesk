@@ -194,15 +194,16 @@ export const RESTART_HOLD_TURN = "a turn is running";
 export const RESTART_HOLD_TASKS = "{counts} running";
 // Ends by itself (`INJECTED_TURN_WAIT`): `!stop` has nothing to stop there.
 export const RESTART_HOLD_REPORT = "a background task is about to report, within 30 seconds";
-export const BACKGROUND_NOTICE = "_Background task update_";
-// The terminal's two lines for an agent it starts in the background, without its key hints
-// (`↓ to manage · ctrl+o to expand`), captured on Claude Code 2.1.296 (2026-10-13).
-export const AGENT_LAUNCHED = "**{type}**({description})\n⎿ Backgrounded agent";
-// Its one line for several agents started in one message, with what each does under it as a
-// tree (captured the same day: `2 background agents launched`).
-export const AGENTS_LAUNCHED = "**{n} background agents launched**";
-export const AGENTS_LAUNCHED_BRANCH = "├ {description}";
-export const AGENTS_LAUNCHED_LAST = "└ {description}";
+// The one form of a task started in the background, whatever its kind (issue #311): the
+// terminal's two lines for an agent it starts in the background, `**type**(description)` and
+// `⎿ Backgrounded agent` without its key hints (captured on Claude Code 2.1.296, 2026-10-13),
+// with words that fit every task under the name.
+export const TASK_LAUNCHED = "**{name}**({description})\n⎿ Running in background";
+// The terminal's one line for several agents started in one message, with what each does under
+// it as a tree (captured the same day: `2 background agents launched`), for every task.
+export const TASKS_LAUNCHED = "**{n} background tasks launched**";
+export const TASKS_LAUNCHED_BRANCH = "├ {description}";
+export const TASKS_LAUNCHED_LAST = "└ {description}";
 export const PROMPT_IMAGE = "an image";
 export const COMPACTED = "Compacted the conversation: {before} → {after} tokens.";
 export const COMPACTED_PLAIN = "Compacted the conversation.";

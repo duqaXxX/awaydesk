@@ -6,7 +6,7 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent",
+     "markdown": "**Agent**(Synthetic subtask)\n⎿ Running in background",
      "notice": true
     },
     {
@@ -83,7 +83,7 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Synthetic subtask)\n⎿ Backgrounded agent",
+    "markdown": "**Agent**(Synthetic subtask)\n⎿ Running in background",
     "notice": true
    },
    {

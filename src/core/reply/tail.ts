@@ -19,15 +19,19 @@ export interface Tail {
   readonly running: boolean;
 }
 
-/** For each entry, what it shows: the list goes to the lowest resting reply of the thread. */
+/**
+ * For each entry, what it shows: the list goes to the lowest reply of the thread once it rests,
+ * and to no reply while that one is still written. Left on a reply above it, the list sat
+ * between that reply and the one being written, then jumped below it (seen on Slack desktop,
+ * 2026-10-15).
+ */
 export function tails<K>(entries: readonly TailEntry<K>[]): Map<K, Tail> {
-  const lowest = entries
-    .filter((entry) => entry.resting)
-    .reduce<TailEntry<K> | undefined>(
-      (found, entry) => (found === undefined || entry.at > found.at ? entry : found),
-      undefined,
-    );
-  return new Map(entries.map((entry) => [entry.key, { running: entry === lowest }]));
+  const lowest = entries.reduce<TailEntry<K> | undefined>(
+    (found, entry) => (found === undefined || entry.at > found.at ? entry : found),
+    undefined,
+  );
+  const holder = lowest?.resting ? lowest : undefined;
+  return new Map(entries.map((entry) => [entry.key, { running: entry === holder }]));
 }
 
 /** Nothing of the owner's and no other reply sits below `at`. */

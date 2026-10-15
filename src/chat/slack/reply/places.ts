@@ -37,6 +37,8 @@ export interface Placed {
   assign(list: RunningList | null): void;
   /** Writes what it still owes now; false when it is not on Slack. */
   settle(): Promise<boolean>;
+  /** Takes off its message, now, a list it no longer holds; false when that write failed. */
+  unlist(): Promise<boolean>;
 }
 
 export class ThreadPlaces {
@@ -58,6 +60,8 @@ export class ThreadPlaces {
   private holder: Placed | null = null;
   /** The replies that held the list, for a change of it that only debounced. */
   private readonly listed = new Set<Placed>();
+  /** The replies about to create their first message: below every other from then on. */
+  private readonly opening = new Set<Placed>();
   private marks: number[] = [];
   /** The highest position of a reply let go of: it still sits in the thread. */
   private floor: number | null = null;
@@ -131,6 +135,23 @@ export class ThreadPlaces {
     this.release();
   }
 
+  /**
+   * `reply` is about to create its first message, below every other: the list leaves the reply
+   * that shows it, and that reply's edit is written before the message is created. Created first,
+   * the message showed under the list for as long as the edit waited (seen on Slack desktop,
+   * 2026-10-15). Returns the call that ends the wait for the message, created or not. Not to be
+   * called with the places' lock held: the holder's write may need it.
+   */
+  async opens(reply: Placed): Promise<() => void> {
+    this.opening.add(reply);
+    const before = this.holder;
+    this.place();
+    if (before !== null && before !== this.holder) await before.unlist().catch(() => false);
+    return () => {
+      if (this.opening.delete(reply)) this.place();
+    };
+  }
+
   /** What still runs in the thread changed; null for nothing. The holder is written at once. */
   showRunning(list: RunningList | null): void {
     this.list = list;
@@ -180,8 +201,11 @@ export class ThreadPlaces {
   private tailsOf(): Map<Placed, Tail> {
     const entries: TailEntry<Placed>[] = [];
     for (const reply of this.replies) {
-      if (reply.lastAt !== null)
+      if (reply.lastAt !== null) {
         entries.push({ key: reply, at: reply.lastAt, resting: reply.resting });
+      } else if (this.opening.has(reply)) {
+        entries.push({ key: reply, at: Number.POSITIVE_INFINITY, resting: false });
+      }
     }
     return tails(entries);
   }

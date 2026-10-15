@@ -13,6 +13,10 @@
      "type": "context"
     },
     {
+     "text": "**Bash**(Wait 25 seconds in background)\n⎿ Running in background",
+     "type": "markdown"
+    },
+    {
      "text": "started\n\nfinished",
      "type": "markdown"
     },
@@ -34,7 +38,7 @@
    []
   ],
   "message_texts": [
-   "started\n\nfinished"
+   "**Bash**(Wait 25 seconds in background)\n⎿ Running in background\n\nstarted\n\nfinished"
   ],
   "pushes": 1
  },
@@ -65,10 +69,8 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01EW2531ZDptrHYYHXJxmz55",
-      "status": "complete",
-      "title": "Ran 1 shell command",
-      "type": "task_update"
+      "text": "**Bash**(Wait 25 seconds in background)\n⎿ Running in background",
+      "type": "markdown_text"
      }
     ],
     "ts": "1790000000.000001"
@@ -81,8 +83,10 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "started",
-      "type": "markdown_text"
+      "id": "fold:toolu_01EW2531ZDptrHYYHXJxmz55",
+      "status": "complete",
+      "title": "Ran 1 shell command",
+      "type": "task_update"
      }
     ],
     "ts": "1790000000.000001"
@@ -91,6 +95,20 @@
   },
   {
    "after_sink_call": 3,
+   "args": {
+    "channel": "C000CHAN",
+    "chunks": [
+     {
+      "text": "\n\nstarted",
+      "type": "markdown_text"
+     }
+    ],
+    "ts": "1790000000.000001"
+   },
+   "method": "chat.appendStream"
+  },
+  {
+   "after_sink_call": 4,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -104,7 +122,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 5,
+   "after_sink_call": 6,
    "args": {
     "channel": "C000CHAN",
     "ts": "1790000000.000001"
@@ -112,7 +130,7 @@
    "method": "chat.stopStream"
   },
   {
-   "after_sink_call": 5,
+   "after_sink_call": 6,
    "args": {
     "blocks": [
      {
@@ -123,6 +141,10 @@
        }
       ],
       "type": "context"
+     },
+     {
+      "text": "**Bash**(Wait 25 seconds in background)\n⎿ Running in background",
+      "type": "markdown"
      },
      {
       "text": "started\n\nfinished",
@@ -136,7 +158,7 @@
    "method": "chat.update"
   },
   {
-   "after_sink_call": 5,
+   "after_sink_call": 6,
    "args": {
     "blocks": [
      {
@@ -147,6 +169,10 @@
        }
       ],
       "type": "context"
+     },
+     {
+      "text": "**Bash**(Wait 25 seconds in background)\n⎿ Running in background",
+      "type": "markdown"
      },
      {
       "text": "started\n\nfinished",

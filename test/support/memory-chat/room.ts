@@ -301,7 +301,7 @@ export class Room {
 
   /**
    * Hands every reply of the thread the list of what still runs when it holds it, with `tails` of
-   * the core: the lowest resting reply. A reply never moves, so only its text changes.
+   * the core: the lowest reply, once it rests. A reply never moves, so only its text changes.
    */
   place(ref: ThreadRef): void {
     for (const [reply, tail] of this.#tails(ref, null)) reply.assign(this.#listOf(ref, tail));

@@ -103,6 +103,8 @@ export class TurnRenderer {
   /** The names the texts that name the agent or the chat take. */
   readonly #names: texts.Names;
   readonly #lines = new Map<string, TaskUpdate>();
+  /** The lines the sink has been given: a held call's line is in `#lines` before it is drawn. */
+  readonly #drawn = new Set<string>();
   readonly #rootOf = new Map<string, string>();
   readonly #children = new Map<string, string[]>();
   readonly #lineOfTask = new Map<string, string>();
@@ -125,13 +127,14 @@ export class TurnRenderer {
   readonly #closedCalls = new Set<string>();
   /** Calls of a tool that starts agents, kept from the sink until their task says how it runs. */
   readonly #undecided = new Set<string>();
-  // Calls whose agent runs in the background: a line of text as the terminal writes it, and no
-  // card. What the agent does under such a call writes nothing, as in the terminal.
+  // Calls whose agent runs in the background, and lines of tasks in the background no call of
+  // this reply started: no card. What the agent does under such a call writes nothing, as in
+  // the terminal.
   readonly #launched = new Set<string>();
-  // The agents started in the background whose launch line is not written yet. The terminal
+  // The tasks started in the background whose launch line is not written yet. The terminal
   // writes one line for the agents of one message, so they wait for the message to end and for
-  // every held call of it to say how its agent runs; anything else the reply writes comes
-  // after them.
+  // every held call of it to say how its agent runs; the cards of the message's calls come
+  // before them, and anything else the reply writes after them.
   #launches: Launch[] = [];
   /** Tasks whose call has not ended: in the foreground, as far as the reply knows. */
   readonly #waited = new Set<string>();
@@ -141,9 +144,9 @@ export class TurnRenderer {
   #wroteLine = false;
   /** What kind of task each one is, as it said when it started. */
   readonly #kinds = new Map<string, TaskStarted["kind"]>();
-  // Commands left running in the background. The terminal draws none of them: the call is
-  // counted in its run like any other, and the command shows in the list of what still runs
-  // and by its end line (captured on Claude Code 2.1.296, 2026-10-14).
+  // Tasks in the background under a call that stays a call, counted in its run like any other
+  // (captured on Claude Code 2.1.296, 2026-10-14): no card of their own. Each shows by its launch
+  // line, in the list of what still runs and by its end line.
   readonly #quiet = new Set<string>();
   // A line of the daemon's inside the reply (an agent's launch, a task's end) is the last thing
   // written. It ends with no break of its own, since a card that follows needs none and Slack
@@ -169,11 +172,21 @@ export class TurnRenderer {
   error: string | null = null;
   #closedOut = false;
 
-  constructor(sink: Sink, names: texts.Names, cwd: string | null = null, streaming = true) {
+  /** Whether the session saw a task start before this reply did (an agent a message continues). */
+  readonly #startedBefore: (taskId: string) => boolean;
+
+  constructor(
+    sink: Sink,
+    names: texts.Names,
+    cwd: string | null = null,
+    streaming = true,
+    startedBefore: (taskId: string) => boolean = () => false,
+  ) {
     this.#sink = sink;
     this.#names = names;
     this.#cwd = cwd;
     this.#streaming = streaming;
+    this.#startedBefore = startedBefore;
   }
 
   /** One event of the session into the reply. An event that shows nothing is left out. */
@@ -612,14 +625,17 @@ export class TurnRenderer {
       return;
     }
     const held = call !== null && this.#undecided.delete(call) ? this.#lines.get(call) : undefined;
-    if (call !== null && held !== undefined) {
-      if (event.kind === "subagent" && event.background === true) {
-        await this.#launch(event, call);
-        return;
-      }
-      // An agent the call waits for: its card, from here on.
-      await this.#set(held);
+    // A task that started before, here or in an earlier reply, and starts again under another
+    // call (an agent a message continues) is that call's work, with no second launch line: a
+    // resumed task keeps its id (SDK 0.3.300, `SDKTaskStartedMessage.run_id`).
+    const known = this.#lineOfTask.has(event.taskId) || this.#startedBefore(event.taskId);
+    const line = call === null ? undefined : this.#lines.get(call);
+    if (line !== undefined && event.background === true && !known) {
+      await this.#launch(event, line, held !== undefined);
+      return;
     }
+    // An agent the call waits for: its card, from here on.
+    if (held !== undefined) await this.#set(held);
     if (call !== null && this.#lines.has(call)) {
       // A call's task: the agent starts one for a long command in the foreground too
       // (recorded: `interrupt.jsonl`, CLI 2.1.283). The line stays the call's until the call's
@@ -642,16 +658,28 @@ export class TurnRenderer {
   }
 
   /**
-   * An agent started in the background: the terminal's line for it, as text of the reply, and
-   * no card. The task still runs for this reply, which the list of what still runs reads.
+   * A task a call of this reply started in the background, whatever its kind (issue #311): its
+   * launch line, as text of the reply, and no card. A call held until its task said how it runs
+   * (one that starts an agent) is that line alone, as in the terminal; any other call stays a
+   * call, counted in its run. The task still runs for this reply, which the list of what still
+   * runs reads.
    */
-  async #launch(event: TaskStarted, call: string): Promise<void> {
-    this.#lines.delete(call);
+  async #launch(event: TaskStarted, line: TaskUpdate, held: boolean): Promise<void> {
+    const call = line.id;
+    this.#bind(event.taskId, call);
+    if (held) {
+      this.#lines.delete(call);
+      this.#launched.add(call);
+    } else {
+      this.#quiet.add(event.taskId);
+    }
     // A line of the daemon's: it is not the turn's text, so a turn that says nothing else still
     // gets its last text or its error from the turn's end.
-    this.#launched.add(call);
-    this.#bind(event.taskId, call);
-    this.#launches.push({ agentType: event.agentType, description: event.description });
+    this.#launches.push({
+      name: line.name,
+      agentType: event.agentType,
+      description: event.description,
+    });
     await this.#settleLaunches();
   }
 
@@ -664,11 +692,11 @@ export class TurnRenderer {
   async #openLine(event: TaskStarted): Promise<void> {
     const lineId = `task-${event.taskId}`;
     this.#bind(event.taskId, lineId);
-    if (event.kind === "subagent" && event.background === true) {
-      // A background agent whose call this reply does not hold: one that started again once
-      // the reply of its call had ended (recorded: `subagent-nested-background-mid-turn.jsonl`),
-      // or one a subagent started. No card, as for any agent in the background, and no launch
-      // line, which belongs under its call.
+    if (event.background === true) {
+      // A task in the background whose call this reply does not hold: an agent that started
+      // again once the reply of its call had ended (recorded:
+      // `subagent-nested-background-mid-turn.jsonl`), or a task a subagent started. No card, as
+      // for any task in the background, and no launch line, which belongs under its call.
       this.#launched.add(lineId);
       return;
     }
@@ -778,9 +806,14 @@ export class TurnRenderer {
       this.#afterText = false;
     }
     this.#lines.set(update.id, update);
-    await this.#writeLaunches();
-    this.#breakOwed = false;
+    // The calls of the message that started a task keep their run whole: its launch line waits
+    // for the message to end, below them.
+    if (!this.#messageOpen) await this.#writeLaunches();
+    // A card that changes where it sits (a command's call ending under its own launch line)
+    // leaves the line of the daemon's last, and its break still owed.
+    if (!this.#drawn.has(update.id)) this.#breakOwed = false;
     await this.#handOver();
+    this.#drawn.add(update.id);
     await this.#sink.task(update);
   }
 

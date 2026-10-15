@@ -7,6 +7,23 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Every task Claude Code starts in the background takes one form, whatever its kind (issue #311):
+  two lines of text built from what the SDK says of every task, its name in bold and its
+  description, then `⎿ Running in background`, and no card. A command or a Monitor left running
+  gets that line too, below the run that counts its call; a subagent's line reads
+  `⎿ Running in background` in place of `⎿ Backgrounded agent`; several tasks started by one
+  message share `3 background tasks launched`; a task of a kind the daemon does not know has no
+  card either. The name is the agent's type, else the name of the call that started the task.
+  `texts.TASK_LAUNCHED` and `texts.TASKS_LAUNCHED` replace `AGENT_LAUNCHED` and
+  `AGENTS_LAUNCHED`, `previews.launched` takes a `Launch`, and `TurnRenderer` takes a predicate
+  that says whether the session saw a task start before: the session counts each task's starts,
+  past its end, so that a subagent a message continues gets no second launch line. A turn Claude
+  Code opens by itself with no end to report no longer opens with `_Background task update_`, a
+  line that named nothing: SDK 0.3.300 sends nothing of what woke it, so the reply is Claude
+  Code's text alone, and `docs/limits.md` says so with the other differences of this form.
+  `texts.BACKGROUND_NOTICE` is gone.
+- Text that follows a launch line is set a paragraph apart when the card of the call that started
+  the task changes above the line in between.
 - `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.300, which bundles Claude Code 2.1.300 (issue
   #307). The release probe certified it on 2026-10-14: the SDK surface table holds and the 24
   claims hold. The release offers one command the recorded `server-info.json` does not list,
@@ -42,7 +59,8 @@ All notable changes to this project are documented here. The format follows
 - A task's end line is drawn small and grey, as the count of a run of calls is (the owner's
   choice, 2026-10-14; the terminal writes it as text behind a coloured dot). The chat seam's
   `ReplySink.text` takes `aside` for such a line; the Slack provider draws it as a `context`
-  block once the message is written by an update, and as text while it is a stream.
+  block, in a `blocks` chunk while the message is a stream. Drawn as text there, the line shrank
+  when the stream stopped and the reply's height jumped.
 - The list of what still runs counts what is in the background alone
   (`TurnRenderer.backgroundTasks`). A long command the turn still waits for was counted as
   `1 shell still running` beside its own card.
@@ -99,6 +117,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Probe claim P25 sends a command to the background and reads the raw stream up to the turn its
+  end opens, with `replay-user-messages` as the daemon passes it: it holds while no `user` record
+  of origin `task-notification` comes before that turn's result. `BROKEN` means Claude Code now says what woke such a turn, and the row of
+  `docs/limits.md` on it leaves the page. The recording `test/fixtures/sdk/background-forms.jsonl`
+  (2026-10-15, Claude Code 2.1.300, SDK 0.3.300) holds a Monitor stopped with `TaskStop`, a
+  command and a subagent, all in the background, in one session started with the daemon's
+  options.
 - `BASH_DEFAULT_TIMEOUT_MS` in `.env`, Claude Code's own variable, reaches every session as
   written (issue #300). Above 30 minutes it replaces the limit Claude Code puts on a command left
   running in the background in a session of the SDK, which a terminal session does not have;
@@ -133,11 +158,12 @@ All notable changes to this project are documented here. The format follows
   by edit, and its end then posts the ending with the footer and cuts it out of the first message,
   unless the reply is no longer the last thing in the thread and got no report (#295).
 
-- What still runs in a thread is a list: one card under the thread's last reply at rest and above
-  its footer, with a title such as `2 agents · 1 shell still running` and a line per subagent or
+- What still runs in a thread is a list: one card under the thread's last reply once it rests and
+  above its footer, with a title such as `2 agents · 1 shell still running` and a line per subagent or
   background command, six at most and then `+N more`. It is written whenever it changes, on a
-  reply at rest or one whose end has landed, moves down to a newer reply when that one rests (not
-  while that reply is still a stream), and goes when nothing runs. The `⏳ 1 shell` count that
+  reply at rest or one whose end has landed, leaves a reply as soon as a newer one has a message
+  and shows under that one once it rests (on no reply while it is still a stream, so that the
+  card never sits between two replies), and goes when nothing runs. The `⏳ 1 shell` count that
   followed the footer is gone. After a crash `repair.endReply` removes the list's block, and writes
   no note on a message that only the list kept open (#295).
 

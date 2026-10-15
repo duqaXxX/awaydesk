@@ -74,9 +74,9 @@ turns into one of these keeps the run's card when it was the run's only call. An
 ended well also ends the run, and has no card: its preview is all that shows it.
 
 A line about the work, which the core marks `aside` (a task's end line), is a `context` block too,
-with the `block_id` `aside-` and the place of its text (`blocks.asideBlock`): text in the
-stream, grey from the update that follows the stream's stop or from any update of a message no
-longer a stream.
+with the `block_id` `aside-` and the place of its text (`blocks.asideBlock`). A stream carries
+it as the same block in a `blocks` chunk, so the line keeps its size when the update that follows
+the stream's stop writes the message again.
 
 Once the reply's body has ended, each run reads as one line of counts in a `context` block
 (`Ran 3 shell commands, read 1 file`), as the terminal folds a run that
@@ -299,18 +299,22 @@ dropped and the message shows less than the model: unless a later update of it p
 end counts as not landed and the root shows ❌. The update that only folds the cards of a stream sent
 all of its span is the exception, since nothing of the reply is missing. The thread shows the
 footer of each end of the session once, under the reply that held the session's latest work then
-(see "The footer, once"); the list of what still runs sits on the lowest reply at rest of the
-whole thread (see "The list of what still runs"). A card left `in_progress` in a stopped message
+(see "The footer, once"); the list of what still runs sits on the lowest reply of the whole
+thread once it rests (see "The list of what still runs"). A card left `in_progress` in a stopped message
 is stored as an error until it is updated (measured: "Open card stored as error"), so every end
 closes its cards first.
 
 ### The list of what still runs
 
 While a subagent or a background command runs, one `task_card` lists it, above the footer's
-divider if the reply has one, in the thread's last reply at rest: the lowest reply of the whole
-thread whose turn has ended and whose last message is no stream (`tails` of the core, applied
-by `ThreadPlaces.place`). A newer reply that is still a stream does not take it; one that rests
-does, and the older one is edited without it. `ThreadChat.showRunning` hands the list over and
+divider if the reply has one, in the thread's last reply once it rests: the lowest reply of the
+whole thread, when its turn has ended and its last message is no stream (`tails` of the core,
+applied by `ThreadPlaces.place`). A newer reply takes the list off the older one as soon as it
+has a message, and shows it once it rests: while it is still a stream no reply shows the list, so
+the card never sits between two replies (seen on Slack desktop, 2026-10-15). The newer reply
+asks for that before it creates its first message (`ThreadPlaces.opens`), and the older one
+writes its edit at once, not after the debounce (`ReplySink.unlist`): the message is created
+once the list is off. `ThreadChat.showRunning` hands the list over and
 the reply that holds it writes it with its next pass, on a reply at rest or one whose end has
 landed. The card is `{ type: "task_card", block_id: "running-list", task_id: "running-list",
 status: "in_progress" }` with the title the core made (`2 agents · 1 shell still running`, cut at

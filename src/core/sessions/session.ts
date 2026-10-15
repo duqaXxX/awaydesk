@@ -220,6 +220,10 @@ export class ThreadSession {
     string,
     readonly [kind: TaskKind, description: string, agentType: string | null]
   >();
+  // How many times each task started, kept past its end: a resumed task keeps its id (SDK
+  // 0.3.300, `SDKTaskStartedMessage.run_id`), and nothing else says it is one. A reply asks
+  // here, so that an agent a message continues gets no second launch line.
+  private readonly starts = new Map<string, number>();
   // Ended tasks not yet opened into a report turn's reply: (task id, its formatted end line).
   // The task id finds the reply that started it (the report renders there when that reply is
   // the last thing in the thread).
@@ -1911,10 +1915,15 @@ export class ThreadSession {
   private recordTask(event: TaskStarted): void {
     this.tasks.set(event.taskId, [event.kind, event.description, event.agentType]);
     if (this.mayHaveOrderedRestart) this.afterRestart.add(event.taskId);
+    const starts = (this.starts.get(event.taskId) ?? 0) + 1;
+    this.starts.delete(event.taskId); // the latest start is the newest entry
+    this.starts.set(event.taskId, starts);
     const kept = this.deps.tasksKept ?? TASKS_KEPT;
-    for (const taskId of this.tasks.keys()) {
-      if (this.tasks.size <= kept) break;
-      this.tasks.delete(taskId);
+    for (const known of [this.tasks, this.starts]) {
+      for (const taskId of known.keys()) {
+        if (known.size <= kept) break;
+        known.delete(taskId);
+      }
     }
   }
 
@@ -1963,8 +1972,9 @@ export class ThreadSession {
    * restart or an idle close dropped it, it already ended because a notification later than
    * INJECTED_TURN_WAIT let `expireUnreported` end it first, or something sits below it): the
    * report then gets a reply of its own at the bottom, rather than an edit of a reply that
-   * ended and will not notify again or one the owner has scrolled past. The text is null for a
-   * report the agent named the task of (`report_started`) that renders in that task's reply with no end line to open it.
+   * ended and will not notify again or one the owner has scrolled past. The text is null when
+   * no end line opens the report: the SDK says nothing of what woke a turn with none (a
+   * Monitor's event, issue #311), and a report the agent named the task of needs none.
    */
   private openingTarget(): readonly [
     text: string | null,
@@ -1996,11 +2006,8 @@ export class ThreadSession {
       }
     }
     const ends = lines.map(([, line]) => line).join("\n");
-    // In the reply that started the task the report needs no line to say what it is about:
-    // the task's card or launch line is there. Anywhere else the notice says it, as it always has.
-    const named = lines.length === 0 && reported !== null && target !== null;
-    // End lines are lines about the work; the notice that stands in for them is the daemon's.
-    return [named ? null : ends || texts.BACKGROUND_NOTICE, target, ends !== ""];
+    // End lines are lines about the work.
+    return [ends || null, target, ends !== ""];
   }
 
   /**
@@ -2725,6 +2732,8 @@ export class ThreadSession {
       this.names,
       this.directory,
       this.deps.chat.capabilities.nativeStreaming,
+      // Recorded before any reply sees the start (`dispatch`), so a first start counts one.
+      (taskId) => (this.starts.get(taskId) ?? 0) > 1,
     );
     this.replyOf.set(renderer, reply);
     return renderer;

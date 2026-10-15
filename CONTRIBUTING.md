@@ -171,7 +171,11 @@ certificate. `node probe/main.ts --commands` runs it alone, with no token spent.
 
 One claim sends every command that [docs/limits.md](docs/limits.md) lists as not offered to a
 session. A command that no longer answers `isn't available in this environment` makes the claim
-BROKEN: the limit is gone, and its row leaves the page before the release is pinned.
+BROKEN: the limit is gone, and its row leaves the page before the release is pinned. Another
+leaves a command running in the background and reads the turn Claude Code opens by itself when it
+ends: it holds while nothing in the stream says what woke that turn. BROKEN there means the release
+now sends that text: the row of `docs/limits.md` on such a turn leaves the page, and the thread can
+show the text above Claude Code's reply.
 
 The **SDK release watch** workflow (`.github/workflows/sdk-release-watch.yml`) reads, every day,
 the latest `@anthropic-ai/claude-agent-sdk` release from the npm registry, runs `npm test` on it,

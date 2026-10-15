@@ -6,7 +6,7 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Test background agent)\n⎿ Backgrounded agent",
+     "markdown": "**Agent**(Test background agent)\n⎿ Running in background",
      "notice": true
     },
     {
@@ -128,39 +128,32 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": "Running in background",
+      "details": null,
       "folded": null,
       "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
       "name": "SendMessage",
       "output": "{\"success\":true,\"message\":\"Resuming agent a0d6cae\",\"resumedAgentId\":\"a0d6caecc437a1298\",\"pin\":{\"id\":\"a0d6caecc437a1298\",\"name\":\"a0d6caecc437a1298\",\"ref\":\"ecd3c5\"}}",
       "preview": null,
-      "status": "in_progress",
-      "task": true,
+      "status": "complete",
+      "task": false,
       "title": "SendMessage: a0d6caecc437a1298"
      }
     },
     {
      "call": "text",
      "ending": false,
-     "markdown": "SENT",
+     "markdown": "\n\n**SendMessage**(Test background agent)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\nSENT",
      "notice": false
     },
     {
      "call": "finish",
-     "closing": [
-      {
-       "calls": 0,
-       "details": "Running in background",
-       "folded": null,
-       "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
-       "name": "SendMessage",
-       "output": "{\"success\":true,\"message\":\"Resuming agent a0d6cae\",\"resumedAgentId\":\"a0d6caecc437a1298\",\"pin\":{\"id\":\"a0d6caecc437a1298\",\"name\":\"a0d6caecc437a1298\",\"ref\":\"ecd3c5\"}}",
-       "preview": null,
-       "status": "in_progress",
-       "task": true,
-       "title": "SendMessage: a0d6caecc437a1298"
-      }
-     ]
+     "closing": []
     },
     {
      "call": "close_out"
@@ -341,7 +334,7 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Test background agent)\n⎿ Backgrounded agent",
+    "markdown": "**Agent**(Test background agent)\n⎿ Running in background",
     "notice": true
    },
    {

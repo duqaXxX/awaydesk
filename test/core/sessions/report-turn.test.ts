@@ -175,8 +175,11 @@ test("a report turn after a restart renders into the one reply that is the last 
   assert.equal(texts.length, 3, texts.join("\n---\n"));
   const [continued, report, answered] = texts as [string, string, string];
   // The reply rested while the agent worked: the report that ended it is posted as its ending,
-  // and cut out of the message it grew in.
-  assert.ok(continued.startsWith("SENT") && !continued.includes("REPORTED"), continued);
+  // and cut out of the message it grew in. A daemon that never saw the agent start cannot tell
+  // it from a new task in the background (a resumed task keeps its id, and nothing else says
+  // so): the continuing call writes its launch line.
+  const launch = "**SendMessage**(Test background agent)\n⎿ Running in background\n\n";
+  assert.ok(continued.startsWith(`${launch}SENT`) && !continued.includes("REPORTED"), continued);
   assert.ok(report.includes("REPORTED"), report);
   assert.equal(answered, "KIWI");
   assert.equal(h.slack.callsTo("chat.postMessage").length, 1);
@@ -203,4 +206,25 @@ test("a report turn in the daemon that saw the first call opens its own reply be
   assert.equal(answered, "KIWI");
   // Only the waiting reply's ending was posted; the others ended in place.
   assert.equal(h.slack.callsTo("chat.postMessage").length, 1);
+});
+
+test("an agent that ended inside its own turn and is continued later gets no second launch line", async (t) => {
+  // The recording with the agent's end moved into the turn that started it, before that turn's
+  // result: the reply never records the agent as one that outlived its turn. Claude Code's
+  // report of it follows; then the owner has it continued with `SendMessage`, and its task starts
+  // again under that call with the same id.
+  const r = cut(sdkMessages("report-turn-agent-resume"));
+  const m = r.messages;
+  const [owner, firstReport, sent] = r.results as [number, number, number];
+  const reportStarts = m.findIndex((item, index) => index > owner && isSystem(item, "init"));
+  const ownerTurn = [...m.slice(0, owner), ...m.slice(owner + 1, reportStarts), at(m, owner)];
+  const h = harnessFor(t)({ turns: [ownerTurn, m.slice(firstReport + 1, sent + 1)] });
+  const session = h.session();
+  await (await session.submit("start an agent")).done.wait();
+  h.clients[0]?.inject(m.slice(reportStarts, firstReport + 1));
+  await h.until(() => session.idle);
+  await (await session.submit("continue the agent")).done.wait();
+  const all = h.replies().join("\n---\n");
+  assert.equal(all.split("⎿ Running in background").length - 1, 1, all);
+  assert.ok(!all.includes("**SendMessage**("), all);
 });

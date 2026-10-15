@@ -6,7 +6,7 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent",
+     "markdown": "**Agent**(Run ls and report contents)\n⎿ Running in background",
      "notice": true
     },
     {
@@ -305,7 +305,7 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent",
+    "markdown": "**Agent**(Run ls and report contents)\n⎿ Running in background",
     "notice": true
    },
    {

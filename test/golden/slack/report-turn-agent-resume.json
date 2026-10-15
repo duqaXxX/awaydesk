@@ -4,7 +4,7 @@
   "message_blocks": [
    [
     {
-     "text": "**Agent**(Test background agent)\n⎿ Backgrounded agent",
+     "text": "**Agent**(Test background agent)\n⎿ Running in background",
      "type": "markdown"
     },
     {
@@ -67,7 +67,7 @@
    ]
   ],
   "message_texts": [
-   "**Agent**(Test background agent)\n⎿ Backgrounded agent\n\nSTARTED\n\nNOTED\n\nSENT\n\nREPORTED\nPINEAPPLE\n\nKIWI"
+   "**Agent**(Test background agent)\n⎿ Running in background\n\nSTARTED\n\nNOTED\n\nSENT\n\nREPORTED\nPINEAPPLE\n\nKIWI"
   ],
   "pushes": 1
  },
@@ -79,7 +79,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Test background agent)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Test background agent)\n⎿ Running in background",
       "type": "markdown_text"
      }
     ],
@@ -323,7 +323,7 @@
    "args": {
     "blocks": [
      {
-      "text": "**Agent**(Test background agent)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Test background agent)\n⎿ Running in background",
       "type": "markdown"
      },
      {
@@ -374,7 +374,7 @@
    "args": {
     "blocks": [
      {
-      "text": "**Agent**(Test background agent)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Test background agent)\n⎿ Running in background",
       "type": "markdown"
      },
      {

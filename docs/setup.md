@@ -733,12 +733,15 @@ the order it is written. The tool calls between two pieces of text show as one c
 draws one line for them: it names the call that runs now, a command by its description, and once
 the calls have ended it counts them in the terminal's words (`Ran 2 shell commands, read 1 file`).
 A command that failed is counted with the others, as in the terminal; a failed call of another
-tool keeps a card that says why. A command left running in the background has no card: its call is counted
-with the others, as in the terminal, and it shows in the list of what still runs. A subagent Claude Code starts in the background is two
-lines of text, as in the terminal, with its type in bold: `mechanical(review)`, then
-`⎿ Backgrounded agent`. Several started in one message share one line,
-`2 background agents launched`, with what each does under it. A subagent has no card, and what it
-does shows nowhere in the reply. An Edit or a Write shows once it has ended, as
+tool keeps a card that says why. A task Claude Code starts in the background has no card, whatever
+its kind: it is two lines of text, its name in bold and what it does, `Monitor(ticks)` or
+`mechanical(review)`, then `⎿ Running in background`, and it shows in the list of what still runs.
+The call that left a command or a Monitor running is counted with the others, as in the terminal.
+Several tasks started in one message share one line, `3 background tasks launched`, with what each
+does under it. What a subagent does shows nowhere in the reply. A turn Claude Code opens by itself
+opens with the end line of each task it reports, `✓ Background command "..." completed (exit code
+0)`; one with no end to report, such as a turn a Monitor's event opens, shows Claude Code's text
+alone, since the SDK does not say what woke it ([limits.md](limits.md)). An Edit or a Write shows once it has ended, as
 one collapsed block titled with the call (`Update(notes.txt)`) that opens on its diff or on the
 new file's first lines. When the reply ends, each of those cards gives way to its line of counts, in grey (`Ran 2 shell commands, read 1 file`). A reply still
 running 280 seconds after it started stops being a stream (Slack closes streams at 5 minutes) and

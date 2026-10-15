@@ -14,7 +14,6 @@ import type { Approvals } from "../../../src/core/requests.ts";
 import { logger, ThreadSession } from "../../../src/core/sessions/session.ts";
 import type { Event, Task } from "../../../src/core/sessions/tasks.ts";
 import type { ActiveTurn, Turn } from "../../../src/core/sessions/turn.ts";
-import * as texts from "../../../src/core/texts.ts";
 import { FIXTURES, type JsonObject } from "../../support/fixtures.ts";
 import { gitEnv } from "../../support/git-layouts.ts";
 import {
@@ -96,7 +95,7 @@ export const REPORT = /^[✓✗] (Background command|Agent) "/m;
 
 /** A reply of Claude Code's own turn about a background task (not the owner's). */
 export function isReport(reply: string): boolean {
-  return REPORT.test(reply) || reply.includes(texts.BACKGROUND_NOTICE);
+  return REPORT.test(reply);
 }
 
 function indexWhere(items: readonly Item[], test: (item: Item) => boolean, from = 0): number {

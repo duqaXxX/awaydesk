@@ -774,19 +774,28 @@ Notes on the table:
    "Subagent reply is one record"); the back end emits no text of a subagent.
 2. A call of a tool that starts an agent (`previews.LAUNCHERS`) is kept from the sink until its
    task starts, since a stream cannot take back a card. A task that starts in the background
-   (`background` true, as every subagent Claude Code starts does with fork mode on) is written as
-   the terminal writes it, two lines of text and no card: `**mechanical**(Background sleeper)`,
-   then `⎿ Backgrounded agent` (`previews.launched`, `texts.AGENT_LAUNCHED`; captured on Claude
-   Code 2.1.296). The agents one message starts share one line, `2 background agents launched`
-   with what each does under it (`previews.launchedTogether`): the line is written when the
-   message has ended and every held call of it has said how its agent runs, or before anything
-   else the reply writes. The type `general-purpose` reads `Agent`. Nothing under that call writes a line
-   from then on, and the task stays one of the reply's running tasks. A subagent the call waits
+   (`background` true: every subagent Claude Code starts with fork mode on, a command or a
+   Monitor left running, a task of any other kind) is written in one form whatever its kind, two
+   lines of text and no card: its name in bold and its description, then
+   `⎿ Running in background` (`previews.launched`, `texts.TASK_LAUNCHED`). The two lines are the ones the
+   terminal writes for a subagent (captured on Claude Code 2.1.296), with words under the name
+   that fit every task. The name is the agent's type when it names one
+   (`**mechanical**(Background sleeper)`; the type `general-purpose` reads `Agent`), else the
+   name of the call that started the task (`**Monitor**(ticks)`). A held call is that line alone;
+   any other call stays a call, counted in its run. The tasks one message starts share one line,
+   `3 background tasks launched` with what each does under it (`previews.launchedTogether`): the
+   line is written when the message has ended and every held call of it has said how its agent
+   runs, below the cards of the message's calls and before anything else the reply writes. A
+   task that starts again under another call (a subagent a message continues) writes no second
+   line when the reply saw it start before, or the session did, which counts each task's starts
+   past its end: a resumed task keeps its id, and nothing else says it is one. Nothing under a held call writes
+   a line from then on, and the task stays one of the reply's running tasks. A subagent the call waits
    for (a skill run in a fork) gets its card when its task starts: the count reads
    `Skill: review · 12 calls`, the line holds its latest calls (`renderer.CHILD_LINES`) as the
    card's `details`, and it keeps a card of its own once it ends. A call that ends with no task
-   shows as any other call. A background subagent whose call the reply does not hold (one that
-   starts again after that reply ended, one a subagent started) gets no card and no launch line.
+   shows as any other call. A task in the background whose call the reply does not hold (a
+   subagent that starts again after that reply ended, a task a subagent started) gets no card and
+   no launch line.
 3. Claude Code starts a task for a long command in the foreground too, which ends before the call's
    result. When the call's result arrives with its task still running, a command's call ends as
    any other and is counted in its run: the command goes on with no line, as the terminal draws
@@ -1278,7 +1287,7 @@ closed when the start returns (`ThreadSession.connect`).
   (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; when
   that reply is no longer tracked (a restart or an idle close dropped it) or is not last, the
   report gets a reply of its own at the bottom. The next queued message waits for it to finish.
-  `texts.BACKGROUND_NOTICE` opens it only when no task end was seen. When a message was already sent
+  With no task end seen, no line opens it (`ThreadSession.openingTarget`). When a message was already sent
   and waits for its turn, that turn comes first, so nothing waits; the turn that reports the task
   follows it on its own (measured: "Prompt sent before a notification"; an older observation,
   "Report inside a queued turn", saw none follow). If no turn follows within
@@ -1316,7 +1325,7 @@ closed when the start returns (`ThreadSession.connect`).
   Claude Code names (`constants.TASK_WORDS`; the kind `other` counts as a task) and said once, as a
   list: a title (`2 agents · 1 shell still running`) and a line per task, in the order they started
   (`ThreadSession.runningList`, handed over by `ThreadChat.showRunning`). The chat draws it under
-  the thread's last reply at rest, above the footer if that reply has one; it moves down when a newer reply rests, and
+  the thread's last reply once it rests, above the footer if that reply has one; a newer reply takes it off at its first message and shows it once it rests, and
   goes when nothing runs. The thread's status line never says it.
 - When the Claude Code process goes away (shutdown, an idle close, a process that exits), its tasks
   go with it: their lines close with `Stopped` and the list empties. The map lives in memory only.

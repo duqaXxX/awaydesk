@@ -21,7 +21,13 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
+     "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Running in background",
+     "notice": true
+    },
+    {
+     "call": "text",
+     "ending": false,
+     "markdown": "\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background",
      "notice": true
     },
     {
@@ -42,7 +48,7 @@
     {
      "call": "text",
      "ending": false,
-     "markdown": "Both ",
+     "markdown": "\n\nBoth ",
      "notice": false
     },
     {
@@ -521,7 +527,13 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Backgrounded agent",
+    "markdown": "\n\n**Agent**(Run echo subagent-ok)\n⎿ Running in background",
+    "notice": true
+   },
+   {
+    "call": "text",
+    "ending": false,
+    "markdown": "\n\n**Bash**(Wait 15 seconds)\n⎿ Running in background",
     "notice": true
    },
    {
@@ -542,7 +554,7 @@
    {
     "call": "text",
     "ending": false,
-    "markdown": "Both ",
+    "markdown": "\n\nBoth ",
     "notice": false
    },
    {

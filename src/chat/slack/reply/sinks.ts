@@ -721,6 +721,21 @@ export class ReplySink implements Sink {
     if (moved && this.messages.at(-1)?.streaming !== true) this.changed();
   }
 
+  /**
+   * The list taken off this reply's message now, not after the debounce: a reply below is about
+   * to create its first message (`ThreadPlaces.opens`). Through the lock, whatever the message
+   * shows now: a pass in flight may be drawing the list. A write that failed is tried again, as a
+   * debounced one would have been.
+   */
+  async unlist(): Promise<boolean> {
+    if (this.assigned !== null) return true;
+    this.pending?.cancel();
+    this.pending = null;
+    const ok = await this.flush();
+    if (!ok) this.retryLater();
+    return ok;
+  }
+
   /** `showFooterFormatted` with the footer as one line of mrkdwn. */
   showFooter(footer: FooterFields, signal?: AbortSignal): Promise<boolean> {
     return this.showFooterFormatted(formatFooter(footer, this.clock.time() * 1000), signal);
@@ -1215,7 +1230,24 @@ export class ReplySink implements Sink {
     }
     plan.text.set(index, upto);
     if (!blank(piece)) {
-      plan.chunks.push({ type: "markdown_text", text: piece });
+      // A line about the work is drawn small from its first chunk, as the update that follows
+      // the stream writes it: drawn as text first, it would shrink once the stream stops. A
+      // context block in a `blocks` chunk is drawn by Slack (seen 2026-10-03, `pieceChunk`).
+      // A later piece of the same part gets an id of its own: no two blocks of a message share
+      // one.
+      plan.chunks.push(
+        part.aside
+          ? {
+              type: "blocks",
+              blocks: [
+                asideBlock(
+                  mrkdwnEscape(stripNewlines(piece)),
+                  sent > floor ? `${index}-${sent}` : index,
+                ),
+              ],
+            }
+          : { type: "markdown_text", text: piece },
+      );
       plan.size += len(piece);
       const made = markdownBlocks(words);
       plan.textBlocks.set(index, made);
@@ -2065,6 +2097,8 @@ export class ReplySink implements Sink {
       let step: Step;
       const fresh = message.ts === null;
       if (message.ts === null) {
+        // The reply's first message: the list leaves the reply above it before it is created.
+        const opened = this.messages.length === 1 ? await this.places.opens(this) : null;
         // A message is created with the thread's places held, after the decision that it may be.
         const free = await this.creating();
         try {
@@ -2081,6 +2115,7 @@ export class ReplySink implements Sink {
               : await this.postStep(message, true, free);
         } finally {
           free();
+          opened?.();
         }
       } else if (message.streaming) {
         step = await this.streamStep(message);

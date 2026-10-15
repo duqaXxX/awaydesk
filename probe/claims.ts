@@ -260,6 +260,18 @@ export const CLAIMS: readonly Claim[] = [
       "computer-use tool. If it does, the limit is gone: take its row out of `docs/limits.md`, " +
       "say so in the issue it names, and see what Slack shows for a screenshot in a result",
   ),
+  claim(
+    "P25",
+    "gesture",
+    "a turn Claude Code opens by itself on a task's notification brings nothing that says what " +
+      "woke it: no user record of origin `task-notification` comes before its result, as " +
+      "`docs/limits.md` says",
+    "src/core/sessions/session.ts#ThreadSession.openingTarget",
+    "in a thread, ask Claude to watch `echo tick; sleep 600` with the Monitor tool; the reply of " +
+      "the turn the line `tick` opens is Claude's text alone, with no line before it. If the " +
+      "SDK now says what woke the turn, the limit is gone: take its row out of `docs/limits.md` " +
+      "and say so in the issue it names",
+  ),
 ];
 
 if (new Set(CLAIMS.map((c) => c.id)).size !== CLAIMS.length) {

@@ -644,5 +644,8 @@ test("a turn with no replay and no notification waiting is the prompt s", async 
   h.clients[0]?.inject(c.own.filter((item) => !isReplay(item)));
   await prompt.done.wait();
   assert.deepEqual(misrouted(warnings), []);
-  assert.deepEqual(h.bodies(), ["STARTED", "PINEAPPLE"]);
+  assert.deepEqual(h.bodies(), [
+    "**Bash**(Sleep for 20 seconds in background)\n⎿ Running in background\n\nSTARTED",
+    "PINEAPPLE",
+  ]);
 });

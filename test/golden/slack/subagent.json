@@ -4,7 +4,7 @@
   "message_blocks": [
    [
     {
-     "text": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent",
+     "text": "**Agent**(Run ls and report contents)\n⎿ Running in background",
      "type": "markdown"
     },
     {
@@ -29,7 +29,7 @@
    []
   ],
   "message_texts": [
-   "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent\n\nI've launched the general-purpose agent to run `ls` and report the directory contents. The agent is working in the background now. I'll notify you when it completes with the results.\n\nThe agent has completed running `ls`. Here's what it found:\n\n**Files and directories in the current working directory:**\n- `notes.txt` (6 bytes, regular file)\n\nThe directory contains only this single file."
+   "**Agent**(Run ls and report contents)\n⎿ Running in background\n\nI've launched the general-purpose agent to run `ls` and report the directory contents. The agent is working in the background now. I'll notify you when it completes with the results.\n\nThe agent has completed running `ls`. Here's what it found:\n\n**Files and directories in the current working directory:**\n- `notes.txt` (6 bytes, regular file)\n\nThe directory contains only this single file."
   ],
   "pushes": 1
  },
@@ -41,7 +41,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Run ls and report contents)\n⎿ Running in background",
       "type": "markdown_text"
      }
     ],
@@ -541,7 +541,7 @@
    "args": {
     "blocks": [
      {
-      "text": "**Agent**(Run ls and report contents)\n⎿ Backgrounded agent",
+      "text": "**Agent**(Run ls and report contents)\n⎿ Running in background",
       "type": "markdown"
      },
      {

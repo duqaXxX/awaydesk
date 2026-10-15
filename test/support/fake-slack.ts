@@ -631,10 +631,22 @@ export class FakeSlack extends WebClient {
       const cards = message.blocks.filter((b) => b.type === "task_card").map(cardOf);
       return [text, cards];
     }
-    const text = message.chunks
-      .filter((chunk) => chunk.type === "markdown_text")
-      .map((chunk) => str(need(chunk, "text")))
-      .join("");
+    // A line about the work comes as a context block in a `blocks` chunk: read with the text,
+    // a paragraph apart from what is before it, as the update that follows the stream draws it.
+    let text = "";
+    for (const chunk of message.chunks) {
+      if (chunk.type === "markdown_text") text += str(need(chunk, "text"));
+      if (chunk.type !== "blocks") continue;
+      for (const item of list(need(chunk, "blocks"), "blocks")) {
+        const block = object(item, "block");
+        if (block.type !== "context" || !String(block.block_id ?? "").startsWith(ASIDE_ID))
+          continue;
+        const said = str(
+          need(object(list(need(block, "elements"), "elements")[0], "element"), "text"),
+        );
+        text += `${text === "" || text.endsWith("\n\n") ? "" : "\n\n"}${said}`;
+      }
+    }
     const cards = new Map<string, JsonObject>();
     for (const chunk of message.chunks) {
       if (chunk.type !== "task_update") continue;
