@@ -1389,7 +1389,7 @@ test("a notification during the expiry s standalone write waits for its own turn
   const working = inside(session).expiry;
   openGate(h, gate);
   await h.until(() => inside(session).expiry !== working); // the wait of the second notification
-  assert.equal(h.slack.createdTs.length, 3); // the expiry posted the held update, a reply of its own
+  assert.equal(h.slack.createdTs.length, 2); // the expiry wrote the held update into B, the last reply
   assert.equal(inside(session).expiry?.done, false);
   assert.ok(inside(session).injectedExpected && !inside(session).settled.isSet && !session.idle);
   await session.submit("and now?");
@@ -1548,7 +1548,7 @@ test("the list follows the thread's last reply at rest", async (t) => {
   await h.until(() => h.slack.messageBlocks().every((blocks) => runningTitle(blocks) === null));
 });
 
-test("two prompts in a row each reply ends with its own stop", async (t) => {
+test("two prompts in a row: the last reply rests for the first command and takes its report", async (t) => {
   const [first, notice, injected] = splitBackground();
   const h = harnessFor(t)({ turns: [first, sdkMessages("tools")] });
   const session = h.session();
@@ -1556,20 +1556,20 @@ test("two prompts in a row each reply ends with its own stop", async (t) => {
   // The first reply's stream stays open for its background task: nothing has stopped yet.
   assert.deepEqual([h.slack.streamTs.length, h.slack.callsTo("chat.stopStream").length], [1, 0]);
   await (await session.submit("next")).done.wait();
-  // the second reply has nothing of its own pending: its stream stops right away, with no
-  // footer, since the first command still runs
-  assert.deepEqual([h.slack.streamTs.length, h.slack.callsTo("chat.stopStream").length], [2, 1]);
+  // the second reply has nothing of its own pending, but it is the last reply and the first
+  // command still runs: it rests, to take that command's report
+  assert.equal(h.slack.streamTs.length, 2);
   assert.ok(!at(h.slack.messageBlocks(), -1).some((block) => block.type === "divider"));
   h.clients[0]?.inject([...notice, ...injected]);
-  // The first reply is no longer the last thing in the thread: the report opens a third reply of
-  // its own at the bottom (issue #295), and the first reply stops in place, once its task has
-  // fully ended, with a footer of its own: no longer the latest, it still says how its last turn
-  // ended. The second's stop is untouched.
-  await h.until(() => h.slack.callsTo("chat.stopStream").length === 3);
-  assert.ok(isReport(at(h.bodies(), -1)));
+  // The first reply is no longer the last thing in the thread: the report renders into the
+  // second, which then ends, and the first stops in place with it. One footer, under the last
+  // message.
   await h.until(() => session.idle);
   await h.sleep(3);
-  assert.deepEqual(footers(h), [false, false, true], "the session ended with the report");
+  assert.equal(h.slack.streamTs.length, 2);
+  assert.ok(h.bodies().some(isReport));
+  assert.equal(footers(h).filter(Boolean).length, 1, "the session ended with the report");
+  assert.equal(footers(h).at(-1), true);
   assert.equal(h.slack.pushes(), 3);
 });
 

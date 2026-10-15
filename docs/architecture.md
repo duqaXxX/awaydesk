@@ -1288,7 +1288,8 @@ closed when the start returns (`ThreadSession.connect`).
   `summary` is its result, except for an agent that failed, whose summary is the reason and follows the words; plus the duration when the notification's `usage` reports `duration_ms`
   (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; when
   that reply is no longer tracked (a restart or an idle close dropped it) or is not last, the
-  report gets a reply of its own at the bottom. The next queued message waits for it to finish.
+  report renders into the thread's last reply when that one is at rest (tracked, not ended, and
+  last: `ThreadSession.restingLast`), also when the turn names no task; with no such reply it gets a reply of its own at the bottom. The next queued message waits for it to finish.
   With no task end seen, no line opens it (`ThreadSession.openingTarget`).
 
   A background task that ends while a turn runs is reported either by that turn or by a turn the
@@ -1337,8 +1338,12 @@ closed when the start returns (`ThreadSession.connect`).
 - The report of such a task renders into the task's reply only while that reply is the last thing
   in the thread (`Reply.last`): no message of the owner's and no other reply's message below it.
   `ThreadSession.openingTarget` takes the first of the ended tasks' replies, then the reply of the
-  task the agent named, that is still tracked, not ended and last. With none, the report opens a
-  reply of its own at the bottom. A reply that ends with a message of the owner's or another reply below it (`Reply.last`) because the
+  task the agent named, that is still tracked, not ended and last. With none, the report renders
+  into the last reply at rest (`ThreadSession.restingLast`), and only with no such reply does it
+  open one of its own at the bottom, a message of the owner's below the last reply being such a case.
+  To keep one there, `ThreadSession.stillOwed` also counts, for the reply that is last, the tasks
+  of tracked replies that are no longer last (`ThreadSession.owesItself` is the reply's own part).
+  A reply that rests only for that wait owns no task, so `restingLast` finds it in `ThreadSession.resting`. A reply that ends with a message of the owner's or another reply below it (`Reply.last`) because the
   task's notification never came is logged at INFO (`a reply ended with no report under it in
   <where>`) by `expireInjectedTurn` and `expireUnreported`; nothing is posted for it.
 - What is still running is counted by each task's `kind`, which the back end sets from the type

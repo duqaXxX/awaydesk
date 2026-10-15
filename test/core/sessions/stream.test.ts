@@ -799,8 +799,9 @@ test("a later reply that ended shows the list under it, the status says nothing"
   await (await session.submit("start it")).done.wait();
   await h.until(() => lines(h).at(-1) === ""); // the only reply is open: no footer yet
   await (await session.submit("list the files")).done.wait();
-  await h.until(() => h.slack.callsTo("chat.stopStream").length === 1);
-  // The thread's last reply has ended: the list says what still runs, the status line never.
+  // The second reply rests for the first command, which still runs: both streams have stopped.
+  await h.until(() => h.slack.callsTo("chat.stopStream").length === 2);
+  // The thread's last reply is at rest: the list says what still runs, the status line never.
   await h.until(() => lines(h).at(-1) === "");
   const [, second] = h.slack.streamTs;
   await h.until(() =>
@@ -840,8 +841,8 @@ function footersOf(h: Harness): Array<string | null> {
 }
 
 test("a thread with an owner prompt between its replies shows one footer, under the last message", async (t) => {
-  // The recorded background run, with a prompt answered while the command runs: the report goes
-  // to the bottom, in the stretch of the prompt's reply.
+  // The recorded background run, with a prompt answered while the command runs: the prompt's
+  // reply rests for the command, so the report renders into it, in the stretch of the prompt.
   // The scheduled write itself is pinned by the sink tests: here the core's own calls cause
   // other passes that would draw the tail too.
   const [first, notice, injected] = splitBackground();
@@ -854,8 +855,9 @@ test("a thread with an owner prompt between its replies shows one footer, under 
   await h.idle();
   await h.sleep(5);
   const texts = h.replies();
-  assert.equal(texts.findIndex(isReport), 2, texts.join("\n---\n"));
-  // [the first reply] | owner | [the answer, the report]: the session ends with the report
+  assert.equal(texts.findIndex(isReport), 1, texts.join("\n---\n"));
+  // [the first reply] | owner | [the answer, the report] | the report's ending: the session ends
+  // with the report
   assert.deepEqual(
     footersOf(h).map((footer) => footer !== null),
     [false, false, true],

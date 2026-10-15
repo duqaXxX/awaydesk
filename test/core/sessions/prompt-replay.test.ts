@@ -140,8 +140,8 @@ test("a prompt taken into a report turn is released when that turn ends", async 
   assertNothingRuns(h, session);
   assert.ok(said(h).includes(texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)));
   assert.ok(!said(h).includes("PINEAPPLE")); // the replay is an acknowledgement, never text
-  // the owner's first reply, the report's
-  assert.equal(h.slack.callsTo("chat.startStream").length, 2);
+  // the owner's first reply, which the report renders into
+  assert.equal(h.slack.callsTo("chat.startStream").length, 1);
   await assertStopHasNothingToStop(h, session);
 });
 
@@ -204,6 +204,7 @@ async function ownTurnFollows(
   session: ThreadSession,
   r: Scene,
   prompt: Turn,
+  streams: number,
 ): Promise<void> {
   await h.until(() => inside(session).active === null);
   assert.ok(!prompt.done.isSet);
@@ -215,8 +216,7 @@ async function ownTurnFollows(
   assertNothingRuns(h, session);
   assert.ok(!said(h).includes(texts.named(texts.TAKEN_INTO_REPLY_ONE, NAMES)));
   assert.ok(said(h).includes("PINEAPPLE"));
-  // The first reply (which the report also renders into), and the prompt's own.
-  assert.equal(h.slack.callsTo("chat.startStream").length, 3);
+  assert.equal(h.slack.callsTo("chat.startStream").length, streams);
   await assertStopHasNothingToStop(h, session);
 }
 
@@ -238,7 +238,8 @@ for (const name of ["at-init", "after-tools"]) {
       prompt = await promptDuringTheReportTurn(h, session, r);
     }
     play(h, r.rest); // the report's one result, no replay in it
-    await ownTurnFollows(h, session, r, prompt);
+    // The first reply, which the report renders into, and the prompt's own.
+    await ownTurnFollows(h, session, r, prompt, 2);
   });
 }
 
@@ -253,7 +254,8 @@ for (const name of ["at-init", "after-tools"]) {
     const prompt = await send(h, session, PROMPT);
     play(h, [...r.notice, ...r.head, ...r.rest]);
     await h.until(() => inside(session).active === null && inside(session).sent.includes(prompt));
-    await ownTurnFollows(h, session, r, prompt);
+    // The report turn took the prompt's reply, and the prompt's own turn follows.
+    await ownTurnFollows(h, session, r, prompt, 3);
   });
 }
 
@@ -441,7 +443,7 @@ test("a close that lands in the reply's last write says once that the prompt was
   await h.until(() => (inside(session).active?.taken.length ?? 0) > 0);
   await h.sleep(0.3);
   h.slack.gate = new AsyncEvent();
-  h.slack.gateMethod = "chat.startStream";
+  h.slack.gateMethod = "chat.stopStream"; // the report renders into the first reply: its stop is the close
   // The result: the footer is read at once, `finish` writes the note, and the reply's last write
   // is held at the gate.
   const result = r.rest.at(-1);
