@@ -431,6 +431,32 @@ test("a setup answered twice is refused the second time", async (t) => {
   ]);
 });
 
+// Issue #142: a second Start while the first is applied finds the setup decided. The summary that
+// replaces the controls is on its way, and a notice under it would contradict it.
+test("a second start while the first is applied is refused with no word", async (t) => {
+  const world = await AskingWorld.make(t, { gated: true });
+  const { ref, session } = world.thread();
+  const asked = world.flows.setup.beforeSending(ref, session);
+  const open = await world.asked(ref, "setup");
+  const selection = { model: "default", effort: "default", bypass: false };
+  await world.inbound.answer(ref, open.requestId, { type: "setup", selection }, open.message);
+  for (let round = 0; round < 20; round += 1) await settledTurn();
+  const shownBefore = world.shown(ref).length;
+  const lines = logged(t);
+
+  assert.equal(
+    await world.inbound.answer(ref, open.requestId, { type: "setup", selection }, open.message),
+    false,
+  );
+  assert.equal(world.shown(ref).length, shownBefore);
+  assert.deepEqual(lines, [
+    `refused a click (setup start, not resolved) in ${ref.channel}/${ref.thread} on message ${open.message}; held=True, decided=True, same_thread=True`,
+  ]);
+  world.gate.set();
+  assert.equal(await asked, session);
+  assert.ok(!world.shown(ref).includes(texts.HOLD_GONE));
+});
+
 test("a setup answered from another thread is refused with what differs", async (t) => {
   const world = await AskingWorld.make(t);
   const { ref, session } = world.thread();

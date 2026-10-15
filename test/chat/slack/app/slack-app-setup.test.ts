@@ -587,6 +587,26 @@ test("a model change cannot overwrite the summary", async (t) => {
   assert.ok(String(last.text).startsWith("Model:"));
 });
 
+// Issue #142: the handlers run concurrently, so a model picked just before Start can be handled
+// once Start decided the setup. The summary on its way says what happened; no notice is added.
+test("a model change handled while Start is applied says nothing", async (t) => {
+  const manual = manualWorld(t);
+  await manual.dispatch(message("hello", { ts: THREAD }));
+  const gate = new AsyncEvent();
+  gateLimiter(manual, gate);
+  const model = setupClick(manual, SETUP_MODEL, { model: "haiku" });
+  await manual.dispatch(setupClick(manual));
+  await manual.idle();
+  await manual.dispatch(model);
+  await manual.idle();
+  assert.deepEqual(manual.ephemerals(), []);
+  gate.set();
+  await manual.settle();
+  const last = manual.slack.callsTo("chat.update").at(-1) as Body;
+  assert.ok(String(last.text).startsWith("Model:"));
+  assert.deepEqual(manual.ephemerals(), []);
+});
+
 test("stop while the summary waits on the limiter cancels", async (t) => {
   const manual = manualWorld(t);
   await manual.dispatch(message("hello", { ts: THREAD }));

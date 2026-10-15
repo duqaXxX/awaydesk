@@ -151,12 +151,15 @@ export function answersFlow(deps: FlowDeps, talk: Talk): AnswersFlow {
         // here, and the model list is the one the request was built from.
         const choice = chosen(deps, pending.context, given.selection);
         if (holds.resolve(requestId, ref.channel, ref.thread, choice) === null) {
+          const sameThread = pending.channelId === ref.channel && pending.threadId === ref.thread;
           logRefused("setup start, not resolved", ref, message, {
             held: true,
             decided: pending.decided,
-            same_thread: pending.channelId === ref.channel && pending.threadId === ref.thread,
+            same_thread: sameThread,
           });
-          await talk.tell(ref, texts.HOLD_GONE);
+          // A second Start while the first is applied (issue #142): the summary that replaces
+          // the controls says what happened, and a notice under it would contradict it.
+          if (!(pending.decided && sameThread)) await talk.tell(ref, texts.HOLD_GONE);
           return false;
         }
         logger.info(

@@ -106,6 +106,12 @@ export class Requests {
     if (!(await this.answers.admitted(user, team, channel, threadTs)) || channel === null) return;
     const shownAt = messageTs(body);
     const setupId = holds.atMessage(channel, threadTs, shownAt);
+    if (setupId === null && holds.decidedAt(channel, threadTs, shownAt)) {
+      // Picked just before Start and handled once Start decided the setup (issue #142): the
+      // summary on its way says what happened, and a notice would contradict it.
+      this.logRefusedClick("setup model, decided", body, { open_at_message: false, held: true });
+      return;
+    }
     if (setupId === null) {
       this.logRefusedClick("setup model, no open setup", body, {
         open_at_message: false,
