@@ -28,12 +28,11 @@ test("a report goes below the reply the owner's later prompt got, not into the f
   await h.until(() => h.replies().some(isReport));
   await h.idle();
   const texts = h.replies();
-  const report = texts.findIndex(isReport);
-  assert.ok(report > 1, texts.join("\n---\n"));
+  // The second reply rests for the command, so the report renders into it, below the first.
+  assert.equal(texts.findIndex(isReport), 1, texts.join("\n---\n"));
   assert.ok(!isReport(texts[0] ?? ""), "the first reply holds the report");
-  // The first reply ended by edit: every message the thread holds was posted by the other two
-  // replies, none for the first's ending.
-  assert.equal(h.slack.callsTo("chat.postMessage").length, 0);
+  // The first reply ended by edit; the one post is the second reply's ending, below its report.
+  assert.equal(h.slack.callsTo("chat.postMessage").length, 1);
 });
 
 test("the same past the stream's own deadline", async (t) => {
@@ -47,9 +46,9 @@ test("the same past the stream's own deadline", async (t) => {
   await h.until(() => h.replies().some(isReport));
   await h.idle();
   const texts = h.replies();
-  assert.ok(texts.findIndex(isReport) > 1, texts.join("\n---\n"));
+  assert.equal(texts.findIndex(isReport), 1, texts.join("\n---\n"));
   assert.ok(!isReport(texts[0] ?? ""), "the first reply holds the report");
-  assert.equal(h.slack.callsTo("chat.postMessage").length, 0);
+  assert.equal(h.slack.callsTo("chat.postMessage").length, 1);
 });
 
 test("a command typed under the waiting reply sends the report to a reply at the bottom (R1)", async (t) => {
@@ -93,9 +92,11 @@ test("an overtaken reply whose task ends with no turn is logged, and says the en
   await h.idle();
   assert.equal(lines.filter((line) => line.startsWith(ENDED)).length, 1, lines.join("\n"));
   // No message of any kind: a stream start or a post would be a new message. The command has
-  // no card to complete, so its end line is written into the reply that started it, by edit.
+  // no card to complete, so its end line is written into the thread's last reply, which rests
+  // for it, by edit (the update debounces: `until` gives it the room to land).
   assert.equal(h.slack.createdTs.length, before);
-  assert.deepEqual(h.replies().map(isReport), [true, false]);
+  await h.until(() => h.replies().some(isReport));
+  assert.deepEqual(h.replies().map(isReport), [false, true]);
 });
 
 test("the same when the notification never comes (the unreported timer)", async (t) => {

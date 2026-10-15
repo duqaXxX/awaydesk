@@ -156,6 +156,7 @@ test("a task that ends unfolded inside the owner's next turn leaves one footer, 
     second.map((_, index) => index === second.length - 1),
     `one footer after the second prompt: ${JSON.stringify(footers(h))}`,
   );
-  // The report keeps a reply of its own, as every turn Claude Code opens by itself does.
-  assert.equal(h.slack.callsTo("chat.startStream").length, 3);
+  // The first reply rests for the agent, whose reply is no longer last, so the report renders
+  // into the second reply, which rests too, and opens none of its own.
+  assert.equal(h.slack.callsTo("chat.startStream").length, 2);
 });

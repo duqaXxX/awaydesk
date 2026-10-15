@@ -1340,7 +1340,10 @@ closed when the start returns (`ThreadSession.connect`).
   `ThreadSession.openingTarget` takes the first of the ended tasks' replies, then the reply of the
   task the agent named, that is still tracked, not ended and last. With none, the report renders
   into the last reply at rest (`ThreadSession.restingLast`), and only with no such reply does it
-  open one of its own at the bottom, a message of the owner's below the last reply being such a case. A reply that ends with a message of the owner's or another reply below it (`Reply.last`) because the
+  open one of its own at the bottom, a message of the owner's below the last reply being such a case.
+  To keep one there, `ThreadSession.stillOwed` also counts, for the reply that is last, the tasks
+  of tracked replies that are no longer last (`ThreadSession.owesItself` is the reply's own part).
+  A reply that rests only for that wait owns no task, so `restingLast` finds it in `ThreadSession.resting`. A reply that ends with a message of the owner's or another reply below it (`Reply.last`) because the
   task's notification never came is logged at INFO (`a reply ended with no report under it in
   <where>`) by `expireInjectedTurn` and `expireUnreported`; nothing is posted for it.
 - What is still running is counted by each task's `kind`, which the back end sets from the type

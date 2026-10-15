@@ -262,6 +262,11 @@ export class ThreadSession {
   // Empty for an agent that does not declare `foldedNotifications`, which counts such a task as
   // reported by the turn it ended in.
   private readonly unfolded = new Map<string, TurnRenderer>();
+  /**
+   * The replies that rest while the session waits on a task of another reply (`stillOwed`):
+   * they own no task, so `taskReplies` does not hold them, and `restingLast` still must find them.
+   */
+  private readonly resting = new Set<TurnRenderer>();
   // A task's notification arrived with no turn running and no report turn has started since:
   // the agent has a report to make (`whoseTurn`).
   private notificationWaits = false;
@@ -2048,7 +2053,12 @@ export class ThreadSession {
    * owner's or a reply that has ended.
    */
   private restingLast(): TurnRenderer | null {
-    const tracked = new Set([...this.taskReplies.values(), ...this.unfolded.values()]);
+    for (const reply of this.resting) if (reply.closedOut) this.resting.delete(reply);
+    const tracked = new Set([
+      ...this.taskReplies.values(),
+      ...this.unfolded.values(),
+      ...this.resting,
+    ]);
     for (const reply of tracked) {
       if (!reply.closedOut && this.reply(reply).last) return reply;
     }
@@ -2563,6 +2573,7 @@ export class ThreadSession {
       // Still owed a report: the reply rests, its stream stopped with no footer, so that the
       // list of what still runs shows under it.
       this.reply(renderer).rest();
+      this.resting.add(renderer);
     }
   }
 
@@ -2574,6 +2585,7 @@ export class ThreadSession {
   private async stopTaskReplies(): Promise<void> {
     const renderers = new Set(this.taskReplies.values());
     this.taskReplies.clear();
+    this.resting.clear();
     this.tasks.clear();
     this.ended = [];
     this.opening = null;
@@ -2632,6 +2644,20 @@ export class ThreadSession {
    * since nothing else would.
    */
   private stillOwed(renderer: TurnRenderer): boolean {
+    if (this.owesItself(renderer)) return true;
+    // The thread's last reply also waits while a reply above it does: that reply is no longer
+    // last, so its report renders here (`restingLast`), and closing this one out now would
+    // leave the report a reply of its own. The expiry (`expireUnreported`) and the sweep end
+    // such a wait when no report comes.
+    if (!this.reply(renderer).last) return false;
+    for (const other of new Set([...this.taskReplies.values(), ...this.unfolded.values()])) {
+      if (other !== renderer && !other.closedOut && this.owesItself(other)) return true;
+    }
+    return false;
+  }
+
+  /** Whether one of `renderer`'s own tasks keeps it open (`stillOwed` says which). */
+  private owesItself(renderer: TurnRenderer): boolean {
     if (renderer.runningTasks.length > 0) return true;
     // An end line not yet said belongs to a turn to come, or to the wait for one: the reply
     // that started its task stays open to take it.

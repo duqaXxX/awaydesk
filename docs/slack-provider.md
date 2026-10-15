@@ -257,7 +257,11 @@ last reply if that one is at rest: its turn ended, it still owes a task or a rep
 not ended) and nothing sits below it (`ThreadSession.restingLast`). The report keeps its end
 lines, so it reads in order, and that reply rests again or ends as usual. Only with no such
 reply (the last thing in the thread is a message of the owner's, or the last reply has ended)
-does the report get a reply of its own at the bottom (`ThreadSession.newReply`). The footer of
+does the report get a reply of its own at the bottom (`ThreadSession.newReply`). While a task
+of a reply that is no longer last still runs or waits for its report, the last reply rests
+instead of ending (`ThreadSession.stillOwed`), so that report has it to render into; the wait
+ends as any other, by the report or by `ThreadSession.expireUnreported`, and a message of the
+owner's below the last reply releases it. The footer of
 the session's end goes under the reply that holds the latest work (see "The footer, once"). A reply that ends with a message of the owner's or another reply below it (`Reply.last`)
 because no report came is logged at INFO.
 
