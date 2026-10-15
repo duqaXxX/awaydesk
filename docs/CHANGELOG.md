@@ -28,8 +28,7 @@ All notable changes to this project are documented here. The format follows
   message of the owner's as the last thing in the thread, or the last reply ended, does it open
   a reply of its own at the bottom. The last reply also stays at rest while a task of an earlier
   reply still runs or waits for its report, so that the report of the earlier task does not
-  open a reply of its own after the last one ended (`ThreadSession.stillOwed`). Not run yet on
-  Slack.
+  open a reply of its own after the last one ended (`ThreadSession.stillOwed`).
 - A subagent that runs on another model than the session shows it, as the terminal does (issue
   #292): after the description on the launch line of a background subagent
   (`**Agent**(List folder files) Haiku`), and as `· Haiku` at the end of the card of a foreground
