@@ -24,6 +24,7 @@ function modelOf(entry: WireRecord): ModelInfo | null {
   const supportsEffort = entry.supportsEffort === true;
   return {
     value,
+    resolvedModel: words(entry.resolvedModel),
     displayName: words(entry.displayName) ?? value,
     description: words(entry.description),
     supportsEffort,

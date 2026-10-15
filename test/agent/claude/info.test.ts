@@ -19,6 +19,7 @@ test("the server info gives each model with what the setup shows of it", () => {
   assert.deepEqual(models.slice(0, 2), [
     {
       value: "default",
+      resolvedModel: "claude-sonnet-5-5",
       displayName: "Default (recommended)",
       description: "Sonnet 5.5 · Efficient for routine tasks",
       supportsEffort: true,
@@ -26,6 +27,7 @@ test("the server info gives each model with what the setup shows of it", () => {
     },
     {
       value: "opus",
+      resolvedModel: "claude-opus-5-5",
       displayName: "Opus 5.5",
       description: "For complex work and everyday tasks",
       supportsEffort: true,
@@ -38,6 +40,7 @@ test("a model without effort has no level", () => {
   const haiku = agentInfo(SERVER_INFO).models.find((model) => model.value === "haiku");
   assert.deepEqual(haiku, {
     value: "haiku",
+    resolvedModel: "claude-haiku-4-5-20251001",
     displayName: "Haiku 4.5",
     description: "Fastest for quick answers",
     supportsEffort: false,
@@ -61,6 +64,7 @@ test("a model with no name of its own is shown by its value", () => {
     const [model] = agentInfo({ models: [{ value: "opus", displayName }] }).models;
     assert.deepEqual(model, {
       value: "opus",
+      resolvedModel: null,
       displayName: "opus",
       description: null,
       supportsEffort: false,

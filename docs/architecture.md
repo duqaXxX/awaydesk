@@ -753,7 +753,7 @@ left unfinished does not hide the next turn's text.
 | `text` | the same in a top-level `assistant` record whose message id no `message_start` announced; a subagent's gives none | the text, where it arrives, a paragraph apart from text before it (note 1) |
 | `call_started` with no parent call | a `tool_use` or `server_tool_use` block | a new tool line, in progress, titled `Name: first string argument`, or with its description for a command (`previews.described`), as the terminal titles its line. A call of a tool that starts an agent is held until its task starts (note 2) |
 | the same with `parentCallId` set, from the record's `parent_tool_use_id` (a subagent, or a skill run in a forked context) | the same blocks | the parent's line counts the subagent's calls and holds its latest ones; nothing under the call of a subagent in the background (note 2) |
-| `call_ended` for a line | a `tool_result` or `advisor_tool_result` block | the line completes, or shows an error with the output's first line when `isError`; a line whose task already ended as stopped keeps `Stopped` |
+| `call_ended` for a line | a `tool_result` or `advisor_tool_result` block; `model` is `resolvedModel` of the Agent call's `tool_use_result` when it differs from the main thread's last `message.model` | the line completes, or shows an error with the output's first line when `isError`; a line whose task already ended as stopped keeps `Stopped` |
 | `task_started` | a `system` record of subtype `task_started`; `agentType` is its `subagent_type`, `background` its `is_backgrounded` | for a tool call, nothing yet; a task's line once the call's result arrives with the task still running (note 3). For a subagent in the background, its launch line as text and no line (note 2) |
 | `task_progress` | subtype `task_progress` | the line shows the task's description |
 | `task_ended`, a terminal `task_updated` | subtype `task_notification`; subtype `task_updated` whose patch names the status `completed`, `failed`, `stopped` or `killed` | the line completes, shows an error when the task failed, or completes with `Stopped` |
@@ -922,7 +922,7 @@ and the footer is left out only when nothing at all can be read. When the core e
 that never comes (a misattributed turn), the footer waits for `constants.INJECTED_TURN_WAIT`. The footer is handed over as fields
 (`FooterFields`, from `ThreadSession.footerData`), and the Slack provider writes the line
 (`footer.formatFooter`): `⚡ bypass` when bypass is on, the model from `AgentSession.contextUsage`
-(the SDK's `getContextUsage()`), the effort level, the name of the folder this thread was opened in,
+(the SDK's `getContextUsage()`, named by the display name of the agent's model list, `core/models.ts`), the effort level, the name of the folder this thread was opened in,
 the git branch and the uncommitted changes of the folder the session works in, the session's tokens
 from the turn's `turn_ended` event (the `modelUsage` of the `result` record, summed by
 `footer.sessionTokens`), the context percentage from the same `contextUsage`, and the 5-hour and

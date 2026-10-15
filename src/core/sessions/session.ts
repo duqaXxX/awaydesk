@@ -78,6 +78,7 @@ import {
   setsEffort,
   type UsageCache,
 } from "../footer.ts";
+import { modelName } from "../models.ts";
 import { resolvePath } from "../paths.ts";
 import {
   endedLine,
@@ -2734,6 +2735,7 @@ export class ThreadSession {
       this.deps.chat.capabilities.nativeStreaming,
       // Recorded before any reply sees the start (`dispatch`), so a first start counts one.
       (taskId) => (this.starts.get(taskId) ?? 0) > 1,
+      (id) => modelName(this.models, id),
     );
     this.replyOf.set(renderer, reply);
     return renderer;
@@ -3032,7 +3034,7 @@ export class ThreadSession {
     const usage = this.usage?.current ?? null;
     return {
       bypass: this.bypass,
-      model: context.model,
+      model: context.model === null ? null : modelName(this.models, context.model),
       effort: this.effortReported ? this.effort || "default" : null,
       folder: this.directory,
       branch,

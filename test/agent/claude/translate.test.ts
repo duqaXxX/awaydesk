@@ -17,6 +17,7 @@ import {
 import type { SessionEvent, SessionEventType } from "../../../src/agent/seam.ts";
 import { type JsonObject, sdkRecordings, sdkRecords } from "../../support/fixtures.ts";
 import {
+  type EventOf,
   recordedEvents as events,
   eventsOf as of,
   splitTurns as turns,
@@ -399,6 +400,7 @@ test("a call ends with its result's text", () => {
       isError: false,
       output: "notes.txt",
       fileChange: null,
+      model: null,
       parentCallId: null,
     },
   ]);
@@ -410,6 +412,7 @@ test("a call ends with its result's text", () => {
       isError: false,
       output: "1\talpha\n2\tbeta\n3\t",
       fileChange: null,
+      model: null,
       parentCallId: null,
     },
   ]);
@@ -424,6 +427,7 @@ test("a failed call ends as an error with what the tool said", () => {
       isError: true,
       output: `File does not exist. Note: your current working directory is ${PROJECT}.`,
       fileChange: null,
+      model: null,
       parentCallId: null,
     },
   ]);
@@ -512,6 +516,7 @@ test("a server tool's call starts and ends like any other", () => {
       isError: false,
       output: "advisor_result",
       fileChange: null,
+      model: null,
       parentCallId: null,
     },
   ]);
@@ -1257,4 +1262,65 @@ test("a result that names no count of steps reads as one that took some", () => 
   const { num_turns: _, ...bare } = result;
   const [ended] = of(new Translator().translate(bare), "turn_ended");
   assert.equal(ended?.steps, null);
+});
+
+// The model a call's agent ran on (issue #292): `resolvedModel` of the Agent call's
+// `tool_use_result` (Claude Code 2.1.286, `subagent`, `subagent-foreground`), against the
+// `message.model` of the main thread's last assistant message. The recordings run their session
+// and their subagent on one model, so a session on another is the recording with the main
+// thread's `message.model` altered.
+
+const SONNET = "claude-sonnet-5-5";
+
+/** The `call_ended` events of a recording whose main thread ran on `model`. */
+function agentEnds(name: string, model: string | null): EventOf<"call_ended">[] {
+  const translator = new Translator();
+  const ended: EventOf<"call_ended">[] = [];
+  for (const wire of sdkRecords(name)) {
+    let record = wire;
+    if (model !== null && wire.type === "assistant" && wire.parent_tool_use_id === null) {
+      record = { ...wire, message: { ...(wire.message as JsonObject), model } };
+    }
+    ended.push(...of(translator.translate(record), "call_ended"));
+  }
+  return ended;
+}
+
+test("a background agent on another model than the session's ends its call with that model", () => {
+  const launched = agentEnds("subagent", SONNET).find((e) => e.output?.startsWith("Async agent"));
+  assert.equal(launched?.model, HAIKU);
+});
+
+test("a foreground agent on another model than the session's ends its call with that model", () => {
+  const ended = agentEnds("subagent-foreground", SONNET).filter((e) => e.model !== null);
+  assert.deepEqual(
+    ended.map((e) => e.model),
+    [HAIKU],
+  );
+});
+
+test("an agent on the session's own model ends its call with none", () => {
+  for (const name of ["subagent", "subagent-foreground", "background-forms"]) {
+    assert.deepEqual(
+      agentEnds(name, null).filter((e) => e.model !== null),
+      [],
+      name,
+    );
+  }
+});
+
+test("a result that names no model ends its call with none", () => {
+  const translator = new Translator();
+  for (const wire of sdkRecords("subagent")) {
+    let record = wire;
+    if (wire.type === "assistant" && wire.parent_tool_use_id === null) {
+      record = { ...wire, message: { ...(wire.message as JsonObject), model: SONNET } };
+    }
+    if (wire.tool_use_result !== undefined && wire.tool_use_result !== null) {
+      const { resolvedModel: _gone, ...rest } = wire.tool_use_result as JsonObject;
+      record = { ...record, tool_use_result: rest };
+    }
+    for (const event of of(translator.translate(record), "call_ended"))
+      assert.equal(event.model, null);
+  }
 });

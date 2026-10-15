@@ -135,6 +135,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `CanUseTool` | `toolUseID` | field | requests.ts: toRequest, CallContext | reference | none |
 | `ModelInfo` | `description` | field | info.ts: modelOf | reference | none |
 | `ModelInfo` | `displayName` | field | info.ts: modelOf | reference | P17 |
+| `ModelInfo` | `resolvedModel` | field | info.ts: modelOf | package | none |
 | `ModelInfo` | `supportedEffortLevels` | field | info.ts: modelOf | reference | P17 |
 | `ModelInfo` | `supportsEffort` | field | info.ts: modelOf | reference | none |
 | `ModelInfo` | `value` | field | info.ts: modelOf | reference | P17 |
@@ -218,6 +219,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Options.extraArgs` | `replay-user-messages` | key | session.ts: ClaudeSession.#options | measured | P19 |
 | `SDKAssistantMessage.message` | `content` | key | translate.ts: assistant | measured | none |
 | `SDKAssistantMessage.message` | `id` | key | translate.ts: assistant | measured | P20 |
+| `SDKAssistantMessage.message` | `model` | key | translate.ts: assistant | measured | none |
 | `SDKAssistantMessage.message.content[]` | `content` | key | translate.ts: callEnded | measured | none |
 | `SDKAssistantMessage.message.content[]` | `id` | key | translate.ts: callStarted | measured | none |
 | `SDKAssistantMessage.message.content[]` | `input` | key | translate.ts: callStarted | measured | none |
@@ -248,6 +250,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKUserMessage.message.content[].content` | `type` | key | translate.ts: resultText | measured | none |
 | `SDKUserMessage.tool_use_result` | `content` | key | translate.ts: fileChange | measured | none |
 | `SDKUserMessage.tool_use_result` | `filePath` | key | translate.ts: fileChange | measured | none |
+| `SDKUserMessage.tool_use_result` | `resolvedModel` | key | translate.ts: agentModel | measured | none |
 | `SDKUserMessage.tool_use_result` | `structuredPatch` | key | translate.ts: fileChange | measured | none |
 | `SDKUserMessage.tool_use_result` | `type` | key | translate.ts: fileChange | measured | none |
 | `SDKUserMessage.tool_use_result.structuredPatch[]` | `lines` | key | translate.ts: hunkOf | measured | none |

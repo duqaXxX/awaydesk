@@ -2383,7 +2383,7 @@ test("the footer names the bound folder", async (t) => {
   await (await h.session().submit("list the files")).done.wait();
   await h.idle(); // the footer is drawn once the session has ended
   const folder = basename(h.tmpPath);
-  assert.ok(statuses(h).at(-1)?.startsWith("claude-haiku-4-5-20251001 · "));
+  assert.ok(statuses(h).at(-1)?.startsWith("Haiku 4.5 · "));
   assert.ok(statuses(h).at(-1)?.includes(` · ${folder} · `));
 });
 
@@ -2485,7 +2485,7 @@ test("status lists the footer s values of the latest reply", async (t) => {
   assert.notEqual(tokens, null);
   const lines = text.split("\n");
   assert.deepEqual(lines.slice(lines.indexOf("Now: idle") + 1), [
-    "Model: `claude-haiku-4-5-20251001`",
+    "Model: `Haiku 4.5`",
     "Effort: `medium`",
     `Session tokens: \`${tokens?.[1]}\``,
     "Context: `7%`",
@@ -2499,7 +2499,7 @@ test("status before any turn starts the client and leaves out the tokens", async
   assert.ok(h.clients.length === 1 && h.clients[0]?.queries.length === 0);
   // The version comes with a turn's `init` message, never on connect (measured 2026-09-26).
   assert.ok(text.includes(`Claude Code: \`${texts.VERSION_PENDING}\``));
-  assert.ok(text.includes("Model: `claude-haiku-4-5-20251001`") && text.includes("Context: `7%`"));
+  assert.ok(text.includes("Model: `Haiku 4.5`") && text.includes("Context: `7%`"));
   // Only a turn's Stop hook, or `/effort`, reports the level: the settings do not say it.
   assert.ok(!text.includes("Session tokens") && !text.includes("Effort"));
   // No session exists yet, so there is nothing the terminal could fork (#12).
@@ -2590,7 +2590,7 @@ test("status during a turn shows the model and the context", async (t) => {
   assert.deepEqual(h.clients[0]?.queries, ["list the files"]);
   const text = await session.status();
   assert.ok(text.includes(texts.fill(texts.ACTIVITY_BUSY, { queued: 0 })));
-  assert.ok(text.includes("Model: `claude-haiku-4-5-20251001`") && text.includes("Context: `7%`"));
+  assert.ok(text.includes("Model: `Haiku 4.5`") && text.includes("Context: `7%`"));
 });
 
 test("status shows a running task beside the list the waiting reply holds", async (t) => {

@@ -135,7 +135,11 @@ export class TurnRenderer {
   // writes one line for the agents of one message, so they wait for the message to end and for
   // every held call of it to say how its agent runs; the cards of the message's calls come
   // before them, and anything else the reply writes after them.
-  #launches: Launch[] = [];
+  #launches: (Launch & { readonly callId: string })[] = [];
+  // The calls whose agent launched in the background and whose result has not come: it names
+  // the model the agent runs on, so their launch line waits for it. `close` and the notes that
+  // follow a launch write the line without it when the result never comes.
+  readonly #awaiting = new Set<string>();
   /** Tasks whose call has not ended: in the foreground, as far as the reply knows. */
   readonly #waited = new Set<string>();
   /** A message of the agent's is being written, at the top level. */
@@ -174,6 +178,8 @@ export class TurnRenderer {
 
   /** Whether the session saw a task start before this reply did (an agent a message continues). */
   readonly #startedBefore: (taskId: string) => boolean;
+  /** The name of a model by its id, for the model an agent ran on. */
+  readonly #modelName: (id: string) => string;
 
   constructor(
     sink: Sink,
@@ -181,12 +187,14 @@ export class TurnRenderer {
     cwd: string | null = null,
     streaming = true,
     startedBefore: (taskId: string) => boolean = () => false,
+    modelName: (id: string) => string = (id) => id,
   ) {
     this.#sink = sink;
     this.#names = names;
     this.#cwd = cwd;
     this.#streaming = streaming;
     this.#startedBefore = startedBefore;
+    this.#modelName = modelName;
   }
 
   /** One event of the session into the reply. An event that shows nothing is left out. */
@@ -468,7 +476,9 @@ export class TurnRenderer {
 
   /** Write the launch lines that wait, once nothing more can join them. */
   async #settleLaunches(): Promise<void> {
-    if (!this.#messageOpen && this.#undecided.size === 0) await this.#writeLaunches();
+    if (!this.#messageOpen && this.#undecided.size === 0 && this.#awaiting.size === 0) {
+      await this.#writeLaunches();
+    }
   }
 
   /** The launch line of the agents that wait for one: their own, or one for them all. */
@@ -476,6 +486,7 @@ export class TurnRenderer {
     if (this.#launches.length === 0) return;
     const launches = this.#launches;
     this.#launches = [];
+    this.#awaiting.clear(); // written as it stands: a result that comes later changes nothing
     await this.#line(launchedTogether(launches));
   }
 
@@ -555,6 +566,12 @@ export class TurnRenderer {
 
   async #callEnded(event: EventOf<"call_ended">): Promise<void> {
     await this.#outlived(event.callId);
+    const model = event.model === null ? null : this.#modelName(event.model);
+    if (this.#awaiting.delete(event.callId)) {
+      this.#launches = this.#launches.map((launch) =>
+        launch.callId === event.callId ? { ...launch, model } : launch,
+      );
+    }
     const entry = this.#lines.get(event.callId);
     if (entry === undefined) {
       await this.#settleLaunches();
@@ -595,11 +612,15 @@ export class TurnRenderer {
         : (kept ?? preview(entry.name, event.fileChange, this.#cwd));
       await this.#set({
         ...entry,
+        // The terminal names a subagent's model on its call line; a card has the title.
+        title:
+          model === null || !LAUNCHERS.has(entry.name) ? entry.title : `${entry.title} · ${model}`,
         status: event.isError ? "error" : "complete",
         output: resultSummary(event.output),
         preview: shown,
       });
     }
+    await this.#settleLaunches();
   }
 
   async #taskStarted(event: TaskStarted): Promise<void> {
@@ -676,10 +697,14 @@ export class TurnRenderer {
     // A line of the daemon's: it is not the turn's text, so a turn that says nothing else still
     // gets its last text or its error from the turn's end.
     this.#launches.push({
+      callId: call,
       name: line.name,
       agentType: event.agentType,
       description: event.description,
+      model: null,
     });
+    // The result of the call carries the model, and comes after the task starts.
+    if (LAUNCHERS.has(line.name)) this.#awaiting.add(call);
     await this.#settleLaunches();
   }
 
