@@ -721,6 +721,17 @@ export class ReplySink implements Sink {
     if (moved && this.messages.at(-1)?.streaming !== true) this.changed();
   }
 
+  /**
+   * The list taken off this reply's message now, not after the debounce: a reply below is about
+   * to create its first message (`ThreadPlaces.opens`).
+   */
+  async unlist(): Promise<boolean> {
+    if (this.assigned !== null || !this.showsList()) return true;
+    this.pending?.cancel();
+    this.pending = null;
+    return this.flush();
+  }
+
   /** `showFooterFormatted` with the footer as one line of mrkdwn. */
   showFooter(footer: FooterFields, signal?: AbortSignal): Promise<boolean> {
     return this.showFooterFormatted(formatFooter(footer, this.clock.time() * 1000), signal);
@@ -2082,6 +2093,8 @@ export class ReplySink implements Sink {
       let step: Step;
       const fresh = message.ts === null;
       if (message.ts === null) {
+        // The reply's first message: the list leaves the reply above it before it is created.
+        const opened = this.messages.length === 1 ? await this.places.opens(this) : null;
         // A message is created with the thread's places held, after the decision that it may be.
         const free = await this.creating();
         try {
@@ -2098,6 +2111,7 @@ export class ReplySink implements Sink {
               : await this.postStep(message, true, free);
         } finally {
           free();
+          opened?.();
         }
       } else if (message.streaming) {
         step = await this.streamStep(message);

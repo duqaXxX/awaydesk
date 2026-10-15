@@ -5421,6 +5421,37 @@ test("a reply that was settled and goes on is tried again after a failed write",
   assert.deepEqual(listCards(slack), [listCard(SHELL)]);
 });
 
+test("a reply written below takes the list off the one above before its first message is created", async () => {
+  // Created first, the new message showed under the list for as long as the edit that took it off
+  // waited for its debounce, then the list jumped below it (seen on Slack desktop, 2026-10-15).
+  const slack = new FakeSlack();
+  const places = new ThreadPlaces();
+  await endedReply(slack, places);
+  places.showRunning(SHELL);
+  await settled();
+  assert.deepEqual(listCards(slack), [listCard(SHELL)]);
+  const upperTs = slack.streamTs[0];
+  const lower = reply(slack, { places });
+  await lower.text("I was told the monitor emitted tick two.");
+  await settled();
+  const writes = slack.apiCalls.filter((call) => WRITE_METHODS.includes(call.method));
+  const takenOff = writes.findLastIndex(
+    (call) => call.method === "chat.update" && call.args.ts === upperTs,
+  );
+  const started = writes.findLastIndex((call) => call.method === "chat.startStream");
+  assert.ok(takenOff !== -1 && takenOff < started, "the list goes before the new message comes");
+  assert.deepEqual(listCards(slack), [], "while the reply below is a stream, no reply shows it");
+  await lower.finish([]);
+  lower.rest();
+  await settled();
+  assert.deepEqual(
+    listCards(slack),
+    [listCard(SHELL)],
+    "and it shows under that reply once it rests",
+  );
+  assert.equal(slack.messageBlocks()[1]?.some(isCard), true);
+});
+
 test("a reply whose end did not land draws no second card, and none is left when the list goes", async () => {
   const slack = new FakeSlack();
   const places = new ThreadPlaces();

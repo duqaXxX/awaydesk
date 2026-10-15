@@ -10,6 +10,8 @@ interface Reply extends Placed {
   assigned: (RunningList | null)[];
   /** How many times it was told to settle. */
   settled: number;
+  /** How many times it was told to take the list off now. */
+  unlisted: number;
 }
 
 function reply(ts: string | null): Reply {
@@ -21,6 +23,11 @@ function reply(ts: string | null): Reply {
     settled: 0,
     settle: async () => {
       made.settled += 1;
+      return true;
+    },
+    unlisted: 0,
+    unlist: async () => {
+      made.unlisted += 1;
       return true;
     },
   };
@@ -172,6 +179,21 @@ describe("ThreadPlaces", () => {
     assert.deepEqual(lower.assigned.at(-1), running);
     places.showRunning(null);
     assert.equal(lower.assigned.at(-1), null);
+  });
+
+  test("a reply about to create its first message takes the list off the holder, written first", async () => {
+    const places = new ThreadPlaces();
+    const upper = joined(places, "1760000001.000001");
+    const running = { title: "1 shell still running", lines: ["sleep"] };
+    upper.resting = true;
+    places.showRunning(running);
+    const lower = joined(places, null);
+    const opened = await places.opens(lower);
+    assert.equal(upper.assigned.at(-1), null);
+    assert.equal(upper.unlisted, 1, "the holder took it off now");
+    // The message was not created: the list goes back to the reply above.
+    opened();
+    assert.deepEqual(upper.assigned.at(-1), running);
   });
 
   test("the reply that holds the list is not let go of while it does", () => {

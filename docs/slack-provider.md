@@ -311,7 +311,10 @@ divider if the reply has one, in the thread's last reply once it rests: the lowe
 whole thread, when its turn has ended and its last message is no stream (`tails` of the core,
 applied by `ThreadPlaces.place`). A newer reply takes the list off the older one as soon as it
 has a message, and shows it once it rests: while it is still a stream no reply shows the list, so
-the card never sits between two replies (seen on Slack desktop, 2026-10-15). `ThreadChat.showRunning` hands the list over and
+the card never sits between two replies (seen on Slack desktop, 2026-10-15). The newer reply
+asks for that before it creates its first message (`ThreadPlaces.opens`), and the older one
+writes its edit at once, not after the debounce (`ReplySink.unlist`): the message is created
+once the list is off. `ThreadChat.showRunning` hands the list over and
 the reply that holds it writes it with its next pass, on a reply at rest or one whose end has
 landed. The card is `{ type: "task_card", block_id: "running-list", task_id: "running-list",
 status: "in_progress" }` with the title the core made (`2 agents · 1 shell still running`, cut at
