@@ -1993,8 +1993,10 @@ export class ThreadSession {
    * not ended and the last thing in the thread: the report renders there. Null when none is (a
    * restart or an idle close dropped it, it already ended because a notification later than
    * INJECTED_TURN_WAIT let `expireUnreported` end it first, or something sits below it): the
-   * report then gets a reply of its own at the bottom, rather than an edit of a reply that
-   * ended and will not notify again or one the owner has scrolled past. The text is null when
+   * report then goes to the last reply at rest, and with none to a reply of its own at the
+   * bottom, rather than an edit of a reply that
+   * ended and will not notify again or one the owner has scrolled past, unless the thread's last
+   * reply is at rest (`restingLast`), which takes it in. The text is null when
    * no end line opens the report: the SDK says nothing of what woke a turn with none (a
    * Monitor's event, issue #311), and a report the agent named the task of needs none.
    */
@@ -2029,11 +2031,29 @@ export class ThreadSession {
         break;
       }
     }
+    // None of those replies qualifies (or the turn names no task, a Monitor's event): the
+    // report goes where the owner is looking, into the last reply when it is at rest.
+    target ??= this.restingLast();
     // The tasks that ended inside a turn are reported now, or given up on.
     this.unfolded.clear();
     const ends = lines.map(([, line]) => line).join("\n");
     // End lines are lines about the work.
     return [ends || null, target, ends !== ""];
+  }
+
+  /**
+   * The thread's last reply when it is at rest: its turn ended, it still owes a task or a
+   * report (tracked, not ended) and nothing sits below it. A report no reply of its own tasks
+   * can take renders there, as the terminal prints everything in order, instead of opening a
+   * message and a push of its own. Null when the last thing in the thread is a message of the
+   * owner's or a reply that has ended.
+   */
+  private restingLast(): TurnRenderer | null {
+    const tracked = new Set([...this.taskReplies.values(), ...this.unfolded.values()]);
+    for (const reply of tracked) {
+      if (!reply.closedOut && this.reply(reply).last) return reply;
+    }
+    return null;
   }
 
   /**
@@ -2457,7 +2477,8 @@ export class ThreadSession {
       this.notificationWaits = false;
       // A report turn renders into the reply that started a task it reports, so no new message
       // follows for it, but only a reply that is still tracked, not ended and the last thing in
-      // the thread (`openingTarget`); otherwise it gets a reply of its own at the bottom.
+      // the thread (`openingTarget`); otherwise into the last reply when at rest, and with none
+      // it gets a reply of its own at the bottom.
       const [text, target, aside] = this.openingTarget();
       renderer = target ?? this.newRenderer(this.newReply());
       opening = text;

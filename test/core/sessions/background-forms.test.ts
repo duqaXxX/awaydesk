@@ -66,19 +66,23 @@ test("a Monitor, a command and an agent in the background read in one form", asy
   h.clients[0]?.inject(after);
   await h.until(() => h.bodies().join("\n").includes(AGENT_SAID));
   for (let passes = 0; passes < 10; passes += 1) await h.sleep(0.5);
+  // The reply of the owner's turn is the last thing in the thread and rests while a task of it
+  // runs, so every report renders into it in order, each under its end line (2026-10-15). The last report ends the reply: its text is the ending, posted below.
   assert.deepEqual(h.bodies(), [
     // One launch line for the three, whatever their kind, under the run of the calls.
-    `${LAUNCHED}\n\n${STARTED}`,
-    // The Monitor's line is in no record: the turn it opens has no line to say what woke it,
-    // and its stop is the end line of any task in the background.
-    `✓ ticks\n\n${MONITOR_SAID}`,
-    `${SHELL_ENDED}\n\n${SHELL_SAID}`,
-    `${AGENT_ENDED} · 23s\n\n${AGENT_SAID}`,
+    [
+      `${LAUNCHED}\n\n${STARTED}`,
+      // The Monitor's line is in no record: the turn it opens has no line to say what woke it,
+      // and its stop is the end line of any task in the background.
+      `✓ ticks\n\n${MONITOR_SAID}`,
+      `${SHELL_ENDED}\n\n${SHELL_SAID}`,
+      `${AGENT_ENDED} · 23s`,
+    ].join("\n\n"),
+    AGENT_SAID,
   ]);
-  // The form adds no message: one reply for the owner's turn and one for each turn Claude Code
-  // opened by itself, as before.
-  assert.equal(h.slack.callsTo("chat.startStream").length, 4);
-  assert.equal(h.slack.callsTo("chat.postMessage").length, 0);
+  // The form adds no stream: one reply for the owner's turn, and the ending of the last report.
+  assert.equal(h.slack.callsTo("chat.startStream").length, 1);
+  assert.equal(h.slack.callsTo("chat.postMessage").length, 1);
 });
 
 test("a turn Claude Code opens by itself with no end to report opens with its text alone", async (t) => {
@@ -107,5 +111,8 @@ test("a turn Claude Code opens by itself with no end to report opens with its te
   h.clients[0]?.inject(unended);
   await h.until(() => h.bodies().join("\n").includes(AGENT_SAID));
   for (let passes = 0; passes < 10; passes += 1) await h.sleep(0.5);
-  assert.equal(h.bodies()[2], SHELL_SAID);
+  assert.ok(
+    h.bodies()[0]?.includes(`${MONITOR_SAID}\n\n${SHELL_SAID}`),
+    h.bodies().join("\n---\n"),
+  );
 });

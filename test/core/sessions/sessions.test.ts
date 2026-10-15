@@ -1389,7 +1389,7 @@ test("a notification during the expiry s standalone write waits for its own turn
   const working = inside(session).expiry;
   openGate(h, gate);
   await h.until(() => inside(session).expiry !== working); // the wait of the second notification
-  assert.equal(h.slack.createdTs.length, 3); // the expiry posted the held update, a reply of its own
+  assert.equal(h.slack.createdTs.length, 2); // the expiry wrote the held update into B, the last reply
   assert.equal(inside(session).expiry?.done, false);
   assert.ok(inside(session).injectedExpected && !inside(session).settled.isSet && !session.idle);
   await session.submit("and now?");

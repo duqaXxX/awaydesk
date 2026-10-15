@@ -252,9 +252,13 @@ every turn and after `ThreadSession.expireInjectedTurn`, ends every other reply 
 turn Claude Code starts on its own to report a background task renders into the reply of the
 first of the ended tasks (then of the task the agent named) whose reply is still tracked, not
 ended and the last thing in the thread (`ThreadSession.openingTarget`, `Reply.last`). When none
-is, the report gets a reply of its own at the bottom (`ThreadSession.newReply`), and the footer
-of the session's end goes under it, the reply that holds the latest work (see "The footer,
-once"). A reply that ends with a message of the owner's or another reply below it (`Reply.last`)
+is, and also when the turn names no task (a Monitor's event), the report goes into the thread's
+last reply if that one is at rest: its turn ended, it still owes a task or a report (tracked,
+not ended) and nothing sits below it (`ThreadSession.restingLast`). The report keeps its end
+lines, so it reads in order, and that reply rests again or ends as usual. Only with no such
+reply (the last thing in the thread is a message of the owner's, or the last reply has ended)
+does the report get a reply of its own at the bottom (`ThreadSession.newReply`). The footer of
+the session's end goes under the reply that holds the latest work (see "The footer, once"). A reply that ends with a message of the owner's or another reply below it (`Reply.last`)
 because no report came is logged at INFO.
 
 A background subagent can hand its report back before, or without, a turn of that kind (measured

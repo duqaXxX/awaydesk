@@ -20,6 +20,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A report no reply of its tasks can take renders into the thread's last reply when that reply
+  is at rest, instead of opening a reply of its own (2026-10-15): fewer messages and
+  pushes for one prompt. This covers the report of a task whose reply has a later reply below it,
+  and a turn Claude Code opens with no task named (a Monitor's event, issue #311). The report
+  keeps its end lines (`ThreadSession.restingLast`, `ThreadSession.openingTarget`). Only with a
+  message of the owner's as the last thing in the thread, or the last reply ended, does it open
+  a reply of its own at the bottom. Not run yet on Slack.
 - A subagent that runs on another model than the session shows it, as the terminal does (issue
   #292): after the description on the launch line of a background subagent
   (`**Agent**(List folder files) Haiku`), and as `· Haiku` at the end of the card of a foreground
