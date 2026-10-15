@@ -45,14 +45,20 @@ class RecordingSink implements Sink {
   finished: readonly TaskUpdate[] | null = null;
   notices: string[] = [];
   endings: string[] = [];
+  asides: string[] = [];
   closedOut = false;
 
   async text(
     markdown: string,
-    options: { readonly notice?: boolean; readonly ending?: boolean } = {},
+    options: {
+      readonly notice?: boolean;
+      readonly ending?: boolean;
+      readonly aside?: boolean;
+    } = {},
   ): Promise<void> {
     this.texts.push(markdown);
     if (options.notice) this.notices.push(markdown);
+    if (options.aside) this.asides.push(markdown);
     if (options.ending) this.endings.push(markdown);
   }
 
@@ -571,10 +577,10 @@ test("a call that starts no agent shows as any other call", async () => {
   assert.deepEqual(sink.notices, []);
 });
 
-test("an agent that is continued gets no second launch line", async () => {
-  // report-turn-agent-resume.jsonl: the agent's task starts again under the call that
-  // continues it, which is no call that starts an agent and keeps its card. The terminal writes
-  // no second launch line either (captured 2026-10-13, Claude Code 2.1.296).
+test("an agent that is continued gets no second launch line and no card for the message", async () => {
+  // report-turn-agent-resume.jsonl: the agent's task starts again under the SendMessage call
+  // that continues it. The terminal draws no line for that call and writes `Resuming agent` under
+  // the agent (captured 2026-10-16, Claude Code 2.1.301), and no second launch line.
   const events = recordedEvents("report-turn-agent-resume");
   const agents = eventsOf(events, "task_started").filter((event) => event.kind === "subagent");
   assert.equal(agents.length, 2);
@@ -583,8 +589,51 @@ test("an agent that is continued gets no second launch line", async () => {
   const [sink, renderer] = await render(events);
   assert.equal(sink.notices.filter((text) => text.includes("Running in background")).length, 1);
   assert.ok(!sink.tasks.some((t) => t.id === agents[0]?.callId));
-  assert.ok(sink.tasks.some((t) => t.id === agents[1]?.callId));
+  assert.ok(!sink.tasks.some((t) => t.id === agents[1]?.callId));
+  assert.ok(!sink.tasks.some((t) => t.id === `task-${agents[0]?.taskId}`));
+  const resuming = sink.asides.filter((text) => text.includes("Resuming agent"));
+  assert.equal(resuming.length, 1);
+  assert.ok(resuming[0]?.endsWith(`⎿ Resuming agent ${agents[0]?.taskId.slice(0, 7)}`));
   assert.deepEqual(renderer.runningTasks, []);
+});
+
+test("an agent that is continued after a restart keeps its card and its launch line", async () => {
+  // The session no longer knows the task (subagent-resume-after-restart): nothing says that
+  // `to` names an agent, so the call is a card as any other and the task's launch line follows.
+  const events = recordedEvents("report-turn-agent-resume");
+  const first = eventsOf(events, "task_started").find((event) => event.kind === "subagent");
+  const second = eventsOf(events, "task_started").filter((event) => event.kind === "subagent")[1];
+  const later = events.slice(events.indexOf(second as SessionEvent));
+  const call = eventsOf(events, "call_started").find((event) => event.callId === second?.callId);
+  assert.ok(first !== undefined && call !== undefined);
+  const [sink] = await render([call, ...later]);
+  assert.ok(sink.tasks.some((t) => t.id === call.callId));
+  assert.equal(sink.asides.filter((text) => text.includes("Resuming agent")).length, 0);
+  assert.equal(sink.notices.filter((text) => text.includes("Running in background")).length, 1);
+});
+
+test("a message to a task an earlier reply started is the aside line alone", async () => {
+  const events = recordedEvents("report-turn-agent-resume");
+  const second = eventsOf(events, "task_started").filter((event) => event.kind === "subagent")[1];
+  const call = eventsOf(events, "call_started").find((event) => event.callId === second?.callId);
+  assert.ok(second !== undefined && call !== undefined);
+  const sink = new RecordingSink();
+  const known = (taskId: string): boolean => taskId === second.taskId;
+  const renderer = new TurnRenderer(
+    sink,
+    NAMES,
+    null,
+    true,
+    () => true,
+    (id) => id,
+    known,
+  );
+  for (const event of [call, second]) await renderer.feed(event);
+  await renderer.close();
+  assert.deepEqual(sink.tasks, []);
+  assert.equal(sink.asides.filter((text) => text.includes("Resuming agent")).length, 1);
+  assert.equal(sink.notices.filter((text) => text.includes("Running in background")).length, 0);
+  assert.deepEqual(renderer.runningTasks.length, 1);
 });
 
 test("a local command shows its result text", async () => {
@@ -1511,4 +1560,53 @@ test("without native streaming the last text is handed over when the reply close
   await renderer.close();
   assert.deepEqual(sink.log, [["text", "done"]]);
   assert.notEqual(sink.finished, null);
+});
+
+// A shell command is timed (issue #315): its line carries when it began and the command itself.
+
+function bash(callId: string, command: string, description?: string): SessionEvent {
+  const input: Record<string, unknown> =
+    description === undefined ? { command } : { command, description };
+  return { type: "call_started", callId, toolName: "Bash", input, parentCallId: null };
+}
+
+test("a shell command carries when it began and its command line, any other call neither", async () => {
+  const sink = new RecordingSink();
+  const renderer = new TurnRenderer(
+    sink,
+    NAMES,
+    null,
+    true,
+    () => false,
+    (id) => id,
+    () => false,
+    () => 500,
+  );
+  await renderer.feed(bash("c1", "sleep 20\n&& echo done", "Sleeping"));
+  await renderer.feed({
+    type: "call_started",
+    callId: "c2",
+    toolName: "Read",
+    input: { file_path: "/x" },
+    parentCallId: null,
+  });
+  const [command, read] = sink.tasks;
+  assert.equal(command?.startedAt, 500);
+  assert.equal(command?.details, "$ sleep 20 && echo done");
+  assert.equal(read?.startedAt, null);
+  assert.equal(read?.details, null);
+});
+
+test("a command with no text to show is not timed", async () => {
+  const sink = new RecordingSink();
+  const renderer = new TurnRenderer(sink, NAMES);
+  await renderer.feed({
+    type: "call_started",
+    callId: "c1",
+    toolName: "Bash",
+    input: {},
+    parentCallId: null,
+  });
+  assert.equal(sink.tasks[0]?.startedAt, null);
+  assert.equal(sink.tasks[0]?.details, null);
 });

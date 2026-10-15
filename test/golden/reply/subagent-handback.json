@@ -7,12 +7,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 15",
       "folded": null,
       "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Wait 15 seconds"
@@ -34,12 +35,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 15",
       "folded": null,
       "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
       "name": "Bash",
       "output": "Command running in background with ID: btmuz8js3. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/btmuz8js3.output. You will be notified when it completes. To check interim outpu…",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Wait 15 seconds"
@@ -239,6 +241,7 @@
       "name": "SubagentHandback",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "SubagentHandback: subagent-ok"
@@ -254,6 +257,7 @@
       "name": "SubagentHandback",
       "output": "{\"success\":true,\"message\":\"Report delivered to your caller.\"}",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "SubagentHandback: subagent-ok"
@@ -269,6 +273,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "a2212140c7c7bb15e"
@@ -284,6 +289,7 @@
       "name": "task",
       "output": "This agent's report was delivered to you as a message from \"a2212140c7c7bb15e\" (its SubagentHandback call). Read it there; it is not repeated here.",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "a2212140c7c7bb15e"
@@ -421,6 +427,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "btmuz8js3"
@@ -436,6 +443,7 @@
       "name": "task",
       "output": "Background command \"Wait 15 seconds\" completed (exit code 0)",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "btmuz8js3"
@@ -513,12 +521,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 15",
      "folded": null,
      "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "Wait 15 seconds"
@@ -540,12 +549,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 15",
      "folded": null,
      "id": "toolu_01Y54HD6jqz3tmBKBzz4V8tR",
      "name": "Bash",
      "output": "Command running in background with ID: btmuz8js3. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/btmuz8js3.output. You will be notified when it completes. To check interim outpu…",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Wait 15 seconds"

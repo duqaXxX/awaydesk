@@ -104,6 +104,7 @@ function upd(
     calls: 0,
     preview: null,
     folded: null,
+    startedAt: null,
     ...fields,
   };
 }

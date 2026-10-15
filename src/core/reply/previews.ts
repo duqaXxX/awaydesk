@@ -111,6 +111,41 @@ export function described(name: string, input: Readonly<Record<string, unknown>>
   return typeof said === "string" && said.trim() !== "" ? oneLine(said, TITLE_LIMIT) : null;
 }
 
+// The input a timed call shows under its title, after a prompt mark: a running command's line in
+// the terminal reads `$ <command> (5s)` (captured on Claude Code 2.1.301, 2026-10-16).
+const COMMANDED: Readonly<Record<string, string>> = { Bash: "command" };
+const COMMAND_LIMIT = 200;
+
+/**
+ * The line a call the terminal times lists under its title (`$ sleep 20`); null for any other
+ * call, and for one whose input holds no text there.
+ */
+export function commandLine(name: string, input: Readonly<Record<string, unknown>>): string | null {
+  const said = Object.hasOwn(COMMANDED, name) ? input[COMMANDED[name] as string] : undefined;
+  return typeof said === "string" && said.trim() !== ""
+    ? `$ ${oneLine(said, COMMAND_LIMIT)}`
+    : null;
+}
+
+// The calls that continue an agent already started, and the input that names it: the terminal
+// draws no line for such a call, and writes `Resuming agent` under the agent (captured on
+// Claude Code 2.1.301, 2026-10-16).
+const CONTINUERS: Readonly<Record<string, string>> = { SendMessage: "to" };
+const RESUMING = "\u23bf Resuming agent {id}";
+// The terminal names an agent by the first characters of its id.
+const AGENT_ID_CHARS = 7;
+
+/** The task a call continues, when its tool is one that continues an agent; null otherwise. */
+export function continued(name: string, input: Readonly<Record<string, unknown>>): string | null {
+  const to = Object.hasOwn(CONTINUERS, name) ? input[CONTINUERS[name] as string] : undefined;
+  return typeof to === "string" && to !== "" ? to : null;
+}
+
+/** The line that says the task `taskId` is resumed. */
+export function resuming(taskId: string): string {
+  return fill(RESUMING, { id: taskId.slice(0, AGENT_ID_CHARS) });
+}
+
 /**
  * How `n` finished calls of `name` read in a folded line. The terminal's words take a capital
  * only when they open the line (`Read 1 file, ran 4 shell commands`); a tool's name is its own.

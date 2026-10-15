@@ -2819,6 +2819,9 @@ export class ThreadSession {
       // Recorded before any reply sees the start (`dispatch`), so a first start counts one.
       (taskId) => (this.starts.get(taskId) ?? 0) > 1,
       (id) => modelName(this.models, id),
+      // A message to an agent already started is a resume, whatever the number of its starts.
+      (taskId) => this.starts.has(taskId),
+      () => this.deps.clock.time(),
     );
     this.replyOf.set(renderer, reply);
     return renderer;

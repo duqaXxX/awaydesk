@@ -50,6 +50,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "details": "$ sleep 15",
       "id": "fold:toolu_01Y54HD6jqz3tmBKBzz4V8tR",
       "status": "in_progress",
       "title": "Wait 15 seconds",

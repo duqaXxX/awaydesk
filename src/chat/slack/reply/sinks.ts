@@ -47,7 +47,7 @@
 import { isDeepStrictEqual } from "node:util";
 import type { WebClient } from "@slack/web-api";
 import { type Clock, systemClock } from "../../../clock.ts";
-import { cancellable, Fold, Mutex, shownPreview } from "../../../core/port.ts";
+import { cancellable, Fold, formatDuration, Mutex, shownPreview } from "../../../core/port.ts";
 import { blank, strip } from "../../../text.ts";
 import type { FooterFields, RunningList, ReplySink as Sink, TaskUpdate } from "../../seam.ts";
 import { formatFooter } from "../footer.ts";
@@ -120,6 +120,11 @@ export const FINAL_RETRY_SECONDS = 10.0;
 export const STREAM_SECONDS = 280.0;
 // A stream past this age is over, whatever the daemon did (refused at 300.3 s).
 export const STREAM_LIFE = 300.0;
+// A running command's card shows how long it has run from this age (the terminal shows seconds
+// from the first; a card is rewritten, so the first number waits for the first refresh) and is
+// refreshed at this interval while the stream lives. After the stream has stopped nothing
+// refreshes it: the seconds are read again whenever the message is rewritten.
+export const RUNNING_REFRESH_SECONDS = 30.0;
 // How far back a create of unknown outcome is looked for: the attempt's own clock, less this.
 export const ADOPT_SKEW_SECONDS = 2.0;
 // How much of a message's first words is compared to know it is the one that was lost.
@@ -163,20 +168,48 @@ class Text {
   }
 }
 
+/**
+ * The call as its card shows it: a call the terminal times (a shell command) that has run
+ * RUNNING_REFRESH_SECONDS reads `<title> · <duration>`.
+ */
+function timedUpdate(update: TaskUpdate, now: number): TaskUpdate {
+  if (update.startedAt === null || update.status !== "in_progress") return update;
+  const ran = now - update.startedAt;
+  if (ran < RUNNING_REFRESH_SECONDS) return update;
+  return { ...update, title: `${update.title} · ${formatDuration(ran)}` };
+}
+
 export class Tool {
+  /** The call as the card shows it: the title carries the seconds read at the last `stamp`. */
   update!: TaskUpdate;
+  /** The call as the core gave it. */
+  private base!: TaskUpdate;
   rev = 0;
   private shownPieces: string[] = [];
   private sizes: number[] = [];
   private carded = false;
 
-  constructor(update: TaskUpdate) {
-    this.set(update);
+  constructor(update: TaskUpdate, now: number) {
+    this.set(update, now);
   }
 
-  /** A new state of the call. What follows its card is worked out once, here. */
-  set(update: TaskUpdate): void {
-    this.update = update;
+  /** The seconds of a timed call read at `now`; true when the card's title changed. */
+  stamp(now: number): boolean {
+    const shown = timedUpdate(this.base, now);
+    if (shown.title === this.update.title) return false;
+    this.update = shown;
+    return true;
+  }
+
+  /** Whether the call is one whose card shows seconds and it still runs. */
+  get timed(): boolean {
+    return this.base.startedAt !== null && this.base.status === "in_progress";
+  }
+
+  /** A new state of the call, its seconds read at `now`. What follows its card is worked out once, here. */
+  set(update: TaskUpdate, now: number): void {
+    this.base = update;
+    this.update = timedUpdate(update, now);
     const view = shownPreview(update);
     if (view === null || !view.body) {
       this.shownPieces = [];
@@ -357,6 +390,8 @@ class Message {
   /** The footer it shows. */
   footer: Block[] = [];
   deadline: Task<void> | null = null;
+  /** The refresh of a running command's seconds, while the stream lives (`refreshTimed`). */
+  refresh: Task<void> | null = null;
   // An append whose outcome is unknown: the stream is no longer told anything, it is stopped
   // and the message goes on by update, from the model.
   blind = false;
@@ -396,6 +431,11 @@ export interface ReplySinkOptions {
   readonly limiter: Limiter;
   /** Wall-clock seconds, and every pause of the sink. */
   readonly clock?: Clock;
+  /**
+   * The clock `TaskUpdate.startedAt` is on, which the seconds of a running command are counted
+   * against: `ChatContext.steady`. The sink's `clock` when absent (a test's one clock).
+   */
+  readonly steady?: Clock;
   /**
    * Crash repair: `(old ts, new ts)`, this sink's own transition in the thread's open-replies
    * list (more than one sink can be open at once: a background task's own reply can outlive the
@@ -444,6 +484,7 @@ export class ReplySink implements Sink {
   private readonly botUserId: string;
   private readonly limiter: Limiter;
   private readonly clock: Clock;
+  private readonly steady: Clock;
   private readonly onOpenReply: ((old: string | null, fresh: string | null) => void) | null;
   private readonly onWrite: (() => void) | null;
   private readonly places: ThreadPlaces;
@@ -525,6 +566,8 @@ export class ReplySink implements Sink {
   // arrived while the pass wrote or waited its turn, and runs another pass for it.
   private version = 0;
   private rev = 0;
+  /** When the seconds of the running commands were last read while a stream lived. */
+  private stampedAt = 0;
 
   /** `slack` is the replies client (`repliesClient`), whatever the sink calls goes through it. */
   constructor(slack: WebClient, options: ReplySinkOptions) {
@@ -536,6 +579,7 @@ export class ReplySink implements Sink {
     this.botUserId = options.botUserId;
     this.limiter = options.limiter;
     this.clock = options.clock ?? systemClock;
+    this.steady = options.steady ?? this.clock;
     this.onOpenReply = options.onOpenReply ?? null;
     this.places = options.places ?? new ThreadPlaces();
     this.places.join(this);
@@ -662,16 +706,72 @@ export class ReplySink implements Sink {
     const cards = this.fold.task(update);
     for (const card of cards) {
       let tool = this.tools.get(card.id);
+      const now = this.reading();
       if (tool === undefined) {
-        tool = new Tool(card);
+        tool = new Tool(card, now);
         this.tools.set(card.id, tool);
         this.parts.push(tool);
       } else {
-        tool.set(card);
+        tool.set(card, now);
       }
       tool.rev = this.nextRev();
     }
-    if (cards.length > 0) this.changed();
+    if (cards.length > 0) {
+      this.changed();
+      const last = this.messages.at(-1);
+      if (last !== undefined) this.armRefresh(last);
+    }
+  }
+
+  /** Whether the reply's last message is a stream that is open. */
+  private get live(): boolean {
+    return this.messages.at(-1)?.streaming === true;
+  }
+
+  /**
+   * The time a running command's seconds are read at. While the stream lives they move at the
+   * refresh alone, so that a card's title does not change with every piece of text; otherwise
+   * they are as of now.
+   */
+  private reading(): number {
+    return this.live ? this.stampedAt : this.steady.time();
+  }
+
+  /** Read the seconds of every running command at `now`; true when a card's title changed. */
+  private restamp(now: number): boolean {
+    let moved = false;
+    for (const tool of this.tools.values()) {
+      if (!tool.stamp(now)) continue;
+      tool.rev = this.nextRev();
+      moved = true;
+    }
+    return moved;
+  }
+
+  /** Start the refresh of the seconds on `message`, a stream that is open, if a command runs. */
+  private armRefresh(message: Message): void {
+    if (!message.streaming || message.refresh !== null) return;
+    if (![...this.tools.values()].some((tool) => tool.timed)) return;
+    this.stampedAt = this.steady.time();
+    message.refresh = new Task((signal) => this.refreshTimed(message, signal));
+  }
+
+  /**
+   * Every RUNNING_REFRESH_SECONDS, while `message` streams and a timed command runs: read the
+   * seconds again and, when a title changed, send it. A wait outside a pass, cancelled with the
+   * stream (`gone`); the write is the debounced one every change makes.
+   */
+  private async refreshTimed(message: Message, signal: AbortSignal): Promise<void> {
+    try {
+      while (message.streaming && [...this.tools.values()].some((tool) => tool.timed)) {
+        await this.clock.sleep(RUNNING_REFRESH_SECONDS, signal);
+        if (!message.streaming) return;
+        this.stampedAt = this.steady.time();
+        if (this.restamp(this.stampedAt)) this.changed();
+      }
+    } finally {
+      if (message.refresh?.signal === signal) message.refresh = null;
+    }
   }
 
   private nextRev(): number {
@@ -897,6 +997,9 @@ export class ReplySink implements Sink {
    * process's shared budget) inline on the caller, the SDK reader loop among them.
    */
   private changed(): void {
+    // A message that is no stream is rewritten whole: the seconds of a running command are
+    // read again with it. A stream's wait for the refresh.
+    if (!this.live) this.restamp(this.steady.time());
     this.version += 1;
     this.schedule();
   }
@@ -1874,6 +1977,7 @@ export class ReplySink implements Sink {
       ReplySink.sent(message, plan);
       this.retrack();
       message.deadline = new Task((signal) => this.expire(message, signal));
+      this.armRefresh(message);
       return [true, plan.overflow];
     }
     try {
@@ -1934,6 +2038,8 @@ export class ReplySink implements Sink {
     // Its own deadline may be what stopped it: past its waits, a cancel changes nothing there.
     message.deadline?.cancel();
     message.deadline = null;
+    message.refresh?.cancel();
+    message.refresh = null;
   }
 
   /**

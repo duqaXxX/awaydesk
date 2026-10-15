@@ -204,6 +204,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "details": "$ sleep 5",
       "id": "fold:toolu_012CKNu57KhBcSoxaTiGrCsj",
       "status": "in_progress",
       "title": "Sleep for 5 seconds in the background",

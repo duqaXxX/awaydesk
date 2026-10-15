@@ -34,12 +34,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ python3 -c 'import time; time.sleep(12)'",
       "folded": null,
       "id": "toolu_01VuYf3xvrqBf6xe5UN5uDWh",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Sleep for 12 seconds"
@@ -55,6 +56,7 @@
       "name": "Bash",
       "output": "Sleep for 12 seconds",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep for 12 seconds"
@@ -70,6 +72,7 @@
       "name": "Bash",
       "output": "(Bash completed with no output)",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep for 12 seconds"
@@ -79,12 +82,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ python3 -c 'import time; time.sleep(12)'",
       "folded": null,
       "id": "toolu_01UHhHBJqasUoU6SUJjct3zq",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Sleep for 12 seconds"
@@ -100,6 +104,7 @@
       "name": "Bash",
       "output": "Sleep for 12 seconds",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep for 12 seconds"
@@ -115,6 +120,7 @@
       "name": "Bash",
       "output": "(Bash completed with no output)",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep for 12 seconds"
@@ -130,6 +136,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "a99ac728588823f5a"
@@ -145,6 +152,7 @@
       "name": "task",
       "output": "finished",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "a99ac728588823f5a"

@@ -13,6 +13,7 @@
       "name": "AskUserQuestion",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "AskUserQuestion"
@@ -28,6 +29,7 @@
       "name": "AskUserQuestion",
       "output": "recording only",
       "preview": null,
+      "startedAt": null,
       "status": "error",
       "task": false,
       "title": "AskUserQuestion"
@@ -405,6 +407,7 @@
      "name": "AskUserQuestion",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": false,
      "title": "AskUserQuestion"
@@ -420,6 +423,7 @@
      "name": "AskUserQuestion",
      "output": "recording only",
      "preview": null,
+     "startedAt": null,
      "status": "error",
      "task": false,
      "title": "AskUserQuestion"

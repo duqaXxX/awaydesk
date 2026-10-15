@@ -43,6 +43,7 @@ function line(id: string, title: string, folded: string | null = null): TaskUpda
     calls: 0,
     preview: null,
     folded,
+    startedAt: null,
   };
 }
 

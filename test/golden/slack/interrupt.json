@@ -60,6 +60,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "details": "$ python3 -c 'import time; time.sleep(30)'",
       "id": "fold:toolu_014RM24vF5EeUNHQ57579Vma",
       "status": "in_progress",
       "title": "Sleep for 30 seconds using Python",

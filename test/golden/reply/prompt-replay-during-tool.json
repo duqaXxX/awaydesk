@@ -7,12 +7,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 20",
       "folded": null,
       "id": "toolu_01LCo5tHeWDBK4833FMV9SQi",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Sleep for 20 seconds in background"
@@ -28,12 +29,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 20",
       "folded": null,
       "id": "toolu_01LCo5tHeWDBK4833FMV9SQi",
       "name": "Bash",
       "output": "Command running in background with ID: b90ua4icr. Output is being written to: /private/tmp/claude-502/-home-dev-project/e862f8bb-47b6-4937-8772-e658320dd231/tasks/b90ua4icr.output. You will be notifi…",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep for 20 seconds in background"
@@ -70,6 +72,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "b90ua4icr"
@@ -85,6 +88,7 @@
       "name": "task",
       "output": "Background command \"Sleep for 20 seconds in background\" completed (exit code 0)",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "b90ua4icr"
@@ -94,12 +98,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 15",
       "folded": null,
       "id": "toolu_01JTnajtU3fJhEjrcoTjZxN8",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Sleep for 15 seconds in foreground"
@@ -115,6 +120,7 @@
       "name": "Bash",
       "output": "Sleep for 15 seconds in foreground",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep for 15 seconds in foreground"
@@ -130,6 +136,7 @@
       "name": "Bash",
       "output": "(Bash completed with no output)",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep for 15 seconds in foreground"
@@ -178,12 +185,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 20",
      "folded": null,
      "id": "toolu_01LCo5tHeWDBK4833FMV9SQi",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "Sleep for 20 seconds in background"
@@ -199,12 +207,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 20",
      "folded": null,
      "id": "toolu_01LCo5tHeWDBK4833FMV9SQi",
      "name": "Bash",
      "output": "Command running in background with ID: b90ua4icr. Output is being written to: /private/tmp/claude-502/-home-dev-project/e862f8bb-47b6-4937-8772-e658320dd231/tasks/b90ua4icr.output. You will be notifi…",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Sleep for 20 seconds in background"
@@ -220,12 +229,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 15",
      "folded": null,
      "id": "toolu_01JTnajtU3fJhEjrcoTjZxN8",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "Sleep for 15 seconds in foreground"
@@ -241,6 +251,7 @@
      "name": "Bash",
      "output": "Sleep for 15 seconds in foreground",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Sleep for 15 seconds in foreground"
@@ -256,6 +267,7 @@
      "name": "Bash",
      "output": "(Bash completed with no output)",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Sleep for 15 seconds in foreground"

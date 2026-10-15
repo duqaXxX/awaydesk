@@ -32,6 +32,7 @@
       "name": "Read",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "Read: /home/dev/project/notes/ledger-one.txt"
@@ -47,6 +48,7 @@
       "name": "Read",
       "output": "1 Ledger one",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "Read: /home/dev/project/notes/ledger-one.txt"
@@ -126,6 +128,7 @@
      "name": "Read",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": false,
      "title": "Read: /home/dev/project/notes/ledger-one.txt"
@@ -141,6 +144,7 @@
      "name": "Read",
      "output": "1 Ledger one",
      "preview": null,
+     "startedAt": null,
      "status": "complete",
      "task": false,
      "title": "Read: /home/dev/project/notes/ledger-one.txt"

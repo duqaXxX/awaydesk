@@ -7,12 +7,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ ls",
       "folded": null,
       "id": "toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "List files in current directory"
@@ -22,12 +23,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ ls",
       "folded": null,
       "id": "toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
       "name": "Bash",
       "output": "notes.txt",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "List files in current directory"
@@ -43,6 +45,7 @@
       "name": "Read",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "Read: /home/dev/project/notes.txt"
@@ -58,6 +61,7 @@
       "name": "Read",
       "output": "1 alpha",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "Read: /home/dev/project/notes.txt"
@@ -111,12 +115,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ ls",
      "folded": null,
      "id": "toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "List files in current directory"
@@ -126,12 +131,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ ls",
      "folded": null,
      "id": "toolu_01Xdzy1JrqnyQh4m9GkKaQvo",
      "name": "Bash",
      "output": "notes.txt",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "List files in current directory"
@@ -147,6 +153,7 @@
      "name": "Read",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": false,
      "title": "Read: /home/dev/project/notes.txt"
@@ -162,6 +169,7 @@
      "name": "Read",
      "output": "1 alpha",
      "preview": null,
+     "startedAt": null,
      "status": "complete",
      "task": false,
      "title": "Read: /home/dev/project/notes.txt"

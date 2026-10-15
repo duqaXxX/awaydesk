@@ -154,12 +154,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ ls -la",
       "folded": null,
       "id": "toolu_01NJC7PqCRjvqpuDbQxHDXTp",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "List files and directories in current working directory"
@@ -169,12 +170,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ ls -la",
       "folded": null,
       "id": "toolu_01NJC7PqCRjvqpuDbQxHDXTp",
       "name": "Bash",
       "output": "total 8",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "List files and directories in current working directory"
@@ -190,6 +192,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "a42694cd437f15ed1"
@@ -205,6 +208,7 @@
       "name": "task",
       "output": "The current working directory is empty except for a single file: **Files and directories present:** - `notes.txt` (6 bytes, regular file) That's the only item in `/home/dev/project`.",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "a42694cd437f15ed1"

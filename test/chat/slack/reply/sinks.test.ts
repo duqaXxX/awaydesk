@@ -49,6 +49,7 @@ import {
   ADOPT_SKEW_SECONDS,
   DEBOUNCE_SECONDS,
   ReplySink,
+  RUNNING_REFRESH_SECONDS,
   STREAM_LIFE,
   STREAM_SECONDS,
   type Tool,
@@ -268,6 +269,7 @@ function tool(
     calls: 0,
     preview: null,
     folded: null,
+    startedAt: null,
     ...fields,
   };
 }
@@ -489,6 +491,116 @@ test("the stream stops at 280 seconds and the message grows by update", async ()
   assert.deepEqual(get(update, "blocks", 2), { type: "markdown", text: "Later words." });
   assert.equal(update.text, "First words."); // short, the banner of the message
   assert.equal(slack.pushes(), 1); // an update never pushes
+});
+
+// A shell command that runs (issue #315): the card's title carries how long it has run, from 30
+// seconds on, refreshed every RUNNING_REFRESH_SECONDS while the stream lives.
+
+/** A command's call that began at `startedAt` on the test's clock. */
+function sleeping(status: TaskStatus = "in_progress", startedAt = 0): TaskUpdate {
+  return tool("t1", "Bash", status, {
+    title: "Sleeping",
+    details: "$ sleep 75",
+    startedAt: status === "in_progress" ? startedAt : null,
+  });
+}
+
+/** The titles of the card's `task_update` chunks, in the order they were sent. */
+function titles(slack: FakeSlack): string[] {
+  return allChunks(slack)
+    .filter((chunk) => chunk.type === "task_update")
+    .map((chunk) => str(get(chunk, "title")));
+}
+
+test("a command's title shows no number before it has run 30 seconds", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  await sink.task(sleeping());
+  await settled();
+  await clock.advance(RUNNING_REFRESH_SECONDS - 1);
+  await settled();
+  assert.deepEqual(titles(slack), ["Sleeping"]);
+});
+
+test("a command's title is refreshed every 30 seconds while the stream lives", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  await sink.task(sleeping());
+  await settled();
+  await clock.advance(RUNNING_REFRESH_SECONDS);
+  await settled();
+  await clock.advance(RUNNING_REFRESH_SECONDS);
+  await settled();
+  assert.deepEqual(titles(slack), ["Sleeping", "Sleeping · 30s", "Sleeping · 1m 0s"]);
+  // The command goes under the card, once: Slack appends details.
+  const details = allChunks(slack).flatMap((chunk) => (chunk.details ? [str(chunk.details)] : []));
+  assert.deepEqual(details, ["$ sleep 75"]);
+});
+
+test("nothing is written for a refresh that changes nothing visible", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  await sink.task(tool("t1", "Bash", "in_progress", { title: "Sleeping" }));
+  await settled();
+  await clock.advance(RUNNING_REFRESH_SECONDS * 3);
+  await settled();
+  assert.deepEqual(methods(slack), ["chat.startStream"]);
+});
+
+test("a stopped stream gets no timed write, a rewrite for another reason shows the seconds", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  await sink.text("Running it.\n\n");
+  await sink.task(sleeping());
+  await settled();
+  await clock.advance(STREAM_SECONDS + 1);
+  await settled();
+  const written = methods(slack).length;
+  assert.ok(methods(slack).includes("chat.stopStream"));
+  await clock.advance(RUNNING_REFRESH_SECONDS * 4);
+  await settled();
+  assert.equal(methods(slack).length, written); // no timed write once the stream has stopped
+  await sink.text("More.");
+  await settled();
+  const update = last(slack.callsTo("chat.update"));
+  const card = only(list(update.blocks).filter((b) => b.type === "task_card"));
+  assert.equal(card.title, "Sleeping · 6m 41s"); // 401 s, read when the message was rewritten
+});
+
+test("the refresh ends with the call", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  await sink.task(sleeping());
+  await settled();
+  await clock.advance(RUNNING_REFRESH_SECONDS);
+  await settled();
+  await sink.task(sleeping("complete"));
+  await settled();
+  const written = slack.apiCalls.length;
+  await clock.advance(RUNNING_REFRESH_SECONDS * 3);
+  await settled();
+  assert.equal(slack.apiCalls.length, written);
+  assert.deepEqual(titles(slack).slice(0, 2), ["Sleeping", "Sleeping · 30s"]);
+});
+
+test("no timed write follows the reply's close", async () => {
+  const slack = new FakeSlack();
+  const clock = new FakeClock();
+  const sink = reply(slack, { clock });
+  await sink.task(sleeping());
+  await settled();
+  await sink.finish([]);
+  await sink.closeOut();
+  await settled();
+  const written = slack.apiCalls.length;
+  await clock.advance(RUNNING_REFRESH_SECONDS * 3);
+  await settled();
+  assert.equal(slack.apiCalls.length, written);
 });
 
 test("a stream stopped early with nothing changed needs no update", async () => {

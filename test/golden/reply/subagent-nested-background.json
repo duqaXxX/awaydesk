@@ -34,12 +34,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 20; echo done",
       "folded": null,
       "id": "toolu_01JjA7q6WDz1WJ3ezrrPTEkg",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Sleep for 20 seconds then echo done"
@@ -55,12 +56,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 20; echo done",
       "folded": null,
       "id": "toolu_01JjA7q6WDz1WJ3ezrrPTEkg",
       "name": "Bash",
       "output": "Command running in background with ID: bcyg8i1tv. Output is being written to: /private/tmp/claude-502/-home-dev-project/29225642-a816-42d9-a471-018555d81084/tasks/bcyg8i1tv.output. You will be notifi…",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep for 20 seconds then echo done"
@@ -76,6 +78,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "a291e2504de323f06"
@@ -91,6 +94,7 @@
       "name": "task",
       "output": "Launched.",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "a291e2504de323f06"
@@ -145,6 +149,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "bcyg8i1tv"
@@ -160,6 +165,7 @@
       "name": "task",
       "output": "Background command \"Sleep for 20 seconds then echo done\" completed (exit code 0)",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "bcyg8i1tv"

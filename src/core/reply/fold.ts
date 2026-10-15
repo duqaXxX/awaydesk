@@ -17,8 +17,10 @@
  * after it. An Edit or a Write reaches the fold only once it has ended (the renderer holds it
  * until then).
  *
- * The card carries no `details` or `output`: Slack appends both to what a card already holds
- * (measured 2026-10-01), so a card that is reused keeps its text in its title.
+ * The card carries no `output`, and no `details` but the command of each call the terminal
+ * times (`startedAt` set): Slack appends both to what a card already holds (measured
+ * 2026-10-01), so a card that is reused keeps its text in its title, and each such call adds its
+ * command line to what the card lists.
  */
 import type { Preview, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
 import { failsCounted, folded } from "./previews.ts";
@@ -26,6 +28,8 @@ import { STOPPED } from "./words.ts";
 
 export const ENDED: readonly TaskStatus[] = ["complete", "error"];
 export const SEPARATOR = ", ";
+// The most command lines a run's card lists: its last ones, as a subagent's card lists its calls.
+const RUN_COMMANDS = 10;
 
 /**
  * The preview, on a call that finished well and only there: a failed, running or task card keeps
@@ -98,6 +102,7 @@ function sameUpdate(a: TaskUpdate | undefined, b: TaskUpdate): boolean {
     a.task === b.task &&
     a.calls === b.calls &&
     a.folded === b.folded &&
+    a.startedAt === b.startedAt &&
     samePreview(a.preview, b.preview)
   );
 }
@@ -173,16 +178,23 @@ export class Fold {
     if (first === undefined) return [];
     // Named after the run's first call: a call that takes a card of its own is named by its id.
     run.card ??= `fold:${first.id}`;
+    // The command of each timed call of the run, which the card lists when it is expanded.
+    const lines = [...run.calls.values()].flatMap((call) =>
+      call.startedAt !== null && call.details !== null ? [call.details] : [],
+    );
+    const details = lines.length === 0 ? null : lines.slice(-RUN_COMMANDS).join("\n");
     const running = [...run.calls.values()].filter((call) => !ENDED.includes(call.status));
     const now = running.at(-1);
     // A call still running when the reply's body ends has no count yet and stays a card.
-    if (now !== undefined) return [card(run.card, now.title, now.status, now.name, null)];
+    if (now !== undefined) {
+      return [card(run.card, now.title, now.status, now.name, null, now.startedAt, details)];
+    }
     const ended = run.ended.flatMap((id) => run.calls.get(id) ?? []);
     const line = counts(ended);
     const status: TaskStatus = ended.some((call) => call.status === "complete")
       ? "complete"
       : "error";
-    return [card(run.card, line, status, "", line)];
+    return [card(run.card, line, status, "", line, null, details)];
   }
 
   private changed(cards: TaskUpdate[]): TaskUpdate[] {
@@ -199,17 +211,20 @@ function card(
   status: TaskStatus,
   name: string,
   line: string | null,
+  startedAt: number | null,
+  details: string | null,
 ): TaskUpdate {
   return {
     id,
     title,
     status,
-    details: null,
+    details,
     output: null,
     name,
     task: false,
     calls: 0,
     preview: null,
     folded: line,
+    startedAt,
   };
 }

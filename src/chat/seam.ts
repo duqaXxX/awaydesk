@@ -69,6 +69,12 @@ export interface TaskUpdate {
    * what replaces the line once the reply's body has ended; empty removes it.
    */
   readonly folded: string | null;
+  /**
+   * When a call the terminal times began (a shell command), in seconds on the clock the chat is
+   * built with as `ChatContext.steady`; null for every other call and for a task's line. A chat
+   * that shows how long the call has run reads it against that clock, and may ignore it.
+   */
+  readonly startedAt: number | null;
 }
 
 /** The footer as fields. A provider formats them in its own markup. */

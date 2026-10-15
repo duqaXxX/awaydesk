@@ -13,6 +13,7 @@
       "name": "ToolSearch",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "ToolSearch: select:SendMessage"
@@ -28,6 +29,7 @@
       "name": "ToolSearch",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "ToolSearch: select:SendMessage"
@@ -43,6 +45,7 @@
       "name": "SendMessage",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "SendMessage: af22137d3f2cf9aa4"
@@ -64,6 +67,7 @@
       "name": "SendMessage",
       "output": "{\"success\":true,\"message\":\"Resuming agent af22137\",\"resumedAgentId\":\"af22137d3f2cf9aa4\",\"pin\":{\"id\":\"af22137d3f2cf9aa4\",\"name\":\"af22137d3f2cf9aa4\",\"ref\":\"ee327c\"}}",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "SendMessage: af22137d3f2cf9aa4"
@@ -112,12 +116,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 5",
       "folded": null,
       "id": "toolu_012CKNu57KhBcSoxaTiGrCsj",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Sleep for 5 seconds in the background"
@@ -133,12 +138,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 5",
       "folded": null,
       "id": "toolu_012CKNu57KhBcSoxaTiGrCsj",
       "name": "Bash",
       "output": "Command running in background with ID: bu05w70lu. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bu05w70lu.output. You will be notified when it completes. To check interim outpu…",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep for 5 seconds in the background"
@@ -154,6 +160,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "af22137d3f2cf9aa4"
@@ -169,6 +176,7 @@
       "name": "task",
       "output": "Waiting for the sleep command to complete...",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "af22137d3f2cf9aa4"
@@ -217,6 +225,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "bu05w70lu"
@@ -232,6 +241,7 @@
       "name": "task",
       "output": "Background command \"Sleep for 5 seconds in the background\" completed (exit code 0)",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "bu05w70lu"
@@ -286,6 +296,7 @@
      "name": "ToolSearch",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": false,
      "title": "ToolSearch: select:SendMessage"
@@ -301,6 +312,7 @@
      "name": "ToolSearch",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "complete",
      "task": false,
      "title": "ToolSearch: select:SendMessage"
@@ -316,6 +328,7 @@
      "name": "SendMessage",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": false,
      "title": "SendMessage: af22137d3f2cf9aa4"
@@ -337,6 +350,7 @@
      "name": "SendMessage",
      "output": "{\"success\":true,\"message\":\"Resuming agent af22137\",\"resumedAgentId\":\"af22137d3f2cf9aa4\",\"pin\":{\"id\":\"af22137d3f2cf9aa4\",\"name\":\"af22137d3f2cf9aa4\",\"ref\":\"ee327c\"}}",
      "preview": null,
+     "startedAt": null,
      "status": "complete",
      "task": false,
      "title": "SendMessage: af22137d3f2cf9aa4"
@@ -370,12 +384,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 5",
      "folded": null,
      "id": "toolu_012CKNu57KhBcSoxaTiGrCsj",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "Sleep for 5 seconds in the background"
@@ -391,12 +406,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 5",
      "folded": null,
      "id": "toolu_012CKNu57KhBcSoxaTiGrCsj",
      "name": "Bash",
      "output": "Command running in background with ID: bu05w70lu. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bu05w70lu.output. You will be notified when it completes. To check interim outpu…",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Sleep for 5 seconds in the background"

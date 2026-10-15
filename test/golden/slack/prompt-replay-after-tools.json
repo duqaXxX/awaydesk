@@ -63,6 +63,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "details": "$ sleep 20",
       "id": "fold:toolu_01GBTKp9jR39XLL37JVEGSNr",
       "status": "in_progress",
       "title": "Background sleep for 20 seconds",
@@ -126,6 +127,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "details": "$ sleep 5",
       "id": "fold:toolu_016SUJeNXySPmqVDGuy53ARY",
       "status": "in_progress",
       "title": "Foreground sleep for 5 seconds",

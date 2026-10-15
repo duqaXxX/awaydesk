@@ -13,6 +13,7 @@
       "name": "local_agent",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": true,
       "title": "/list-files"
@@ -28,6 +29,7 @@
       "name": "local_agent",
       "output": "/list-files",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "/list-files"
@@ -63,6 +65,7 @@
      "name": "local_agent",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": true,
      "title": "/list-files"
@@ -78,6 +81,7 @@
      "name": "local_agent",
      "output": "/list-files",
      "preview": null,
+     "startedAt": null,
      "status": "complete",
      "task": true,
      "title": "/list-files"

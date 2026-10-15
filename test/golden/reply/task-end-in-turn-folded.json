@@ -7,12 +7,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 20",
       "folded": null,
       "id": "toolu_01BxoAL62GKokxD7MioK3JGo",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Wait for 20 seconds"
@@ -34,6 +35,7 @@
       "name": "Bash",
       "output": "Wait for 20 seconds",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Wait for 20 seconds"
@@ -49,6 +51,7 @@
       "name": "Bash",
       "output": "(Bash completed with no output)",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Wait for 20 seconds"
@@ -133,12 +136,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 20",
      "folded": null,
      "id": "toolu_01BxoAL62GKokxD7MioK3JGo",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "Wait for 20 seconds"
@@ -160,6 +164,7 @@
      "name": "Bash",
      "output": "Wait for 20 seconds",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Wait for 20 seconds"
@@ -175,6 +180,7 @@
      "name": "Bash",
      "output": "(Bash completed with no output)",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Wait for 20 seconds"
