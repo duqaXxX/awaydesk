@@ -2,7 +2,9 @@
  * The daemon's two Slack clients on one token, with the daemon's retry policy:
  *
  * - every call that Slack rate limited (HTTP 429) is sent again after the `Retry-After` Slack
- *   gave, up to 3 times. That is safe for every method: a rate limited call never ran. Once the
+ *   gave, up to 3 times and while its pauses add up to no more than `RATE_LIMIT_WAIT_SECONDS`
+ *   (60): a pause that would pass them is not taken, and the call is thrown as rate limited.
+ *   That is safe for every method: a rate limited call never ran. Once the
  *   daemon stops (`ClientOptions.stopped`) such a call is thrown as it is and the pause of one
  *   that waits ends: Slack names the length of that pause, and a stop does not wait for it.
  *   Each rate limit is logged with its method, its `Retry-After` and the send it answered.
@@ -78,6 +80,10 @@ export const SENT_ONCE = {
 // `AsyncRateLimitErrorRetryHandler(max_retry_count=3)`, and the default of slack-sdk's connection
 // handler and of its server error one: the one retry of a call covers both kinds of failure.
 export const RATE_LIMIT_RETRIES = 3;
+// The most of Slack's `Retry-After` pauses one call waits out in all, the jitter left out (issue
+// #236): the sink sends a reply's calls holding the reply's lock, which a `!stop` waits for. The
+// one value measured, on 2026-10-12 and 2026-10-13, was 10 seconds.
+export const RATE_LIMIT_WAIT_SECONDS = 60;
 export const CONNECTION_RETRIES = 1;
 /** The HTTP statuses a call is sent again after, as after a failed connection. */
 export const SERVER_ERROR_STATUSES: readonly number[] = [500, 503];
@@ -132,10 +138,15 @@ class PolicyClient extends WebClient {
     this.#stopped = stopped;
   }
 
-  /** Seconds to wait before sending the call again, or null when it is not sent again. */
-  #pause(method: string, error: unknown, retries: number): number | null {
+  /**
+   * Seconds to wait before sending the call again, or null when it is not sent again. `waited` is
+   * the sum of the `Retry-After` pauses the call already took.
+   */
+  #pause(method: string, error: unknown, retries: number, waited: number): number | null {
     if (error instanceof WebAPIRateLimitedError) {
-      return retries < RATE_LIMIT_RETRIES ? error.retryAfter + this.#random() : null;
+      return retries < RATE_LIMIT_RETRIES && waited + error.retryAfter <= RATE_LIMIT_WAIT_SECONDS
+        ? error.retryAfter + this.#random()
+        : null;
     }
     if (
       (failedOnConnection(error) || failedOnServer(error)) &&
@@ -152,6 +163,7 @@ class PolicyClient extends WebClient {
     options: Record<string, unknown> = {},
   ): Promise<WebAPICallResult> {
     if (method === "files.uploadV2") return super.apiCall(method, options);
+    let waited = 0;
     for (let retries = 0; ; retries += 1) {
       try {
         return await super.apiCall(method, options);
@@ -164,12 +176,13 @@ class PolicyClient extends WebClient {
               `send ${retries + 1} of ${RATE_LIMIT_RETRIES + 1}`,
           );
         }
-        const pause = this.#pause(method, error, retries);
+        const pause = this.#pause(method, error, retries, waited);
         if (pause === null) throw error;
         if (error instanceof WebAPIRateLimitedError) {
-          // The one pause that can last minutes (Slack names its length), and the one a stop
-          // may leave: see `ClientOptions.stopped`.
+          // The one pause whose length Slack names, and the one a stop may leave: see
+          // `ClientOptions.stopped`.
           if (this.#stopped?.aborted) throw error;
+          waited += error.retryAfter;
           try {
             await this.#clock.sleep(pause, this.#stopped);
           } catch (stop) {

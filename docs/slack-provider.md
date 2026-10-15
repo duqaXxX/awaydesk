@@ -30,7 +30,7 @@ client's `apiCall`:
 
 | Failure | What is sent again |
 |---|---|
-| Slack rate limited the call (HTTP 429) | every method, after the `Retry-After` Slack gave, up to `clients.RATE_LIMIT_RETRIES` (3) times: a rate limited call never ran. A 429 with no valid `Retry-After` is not sent again. Once the daemon stops, a rate limited call is not sent again either, and the pause of one that waits ends (`ClientOptions.stopped`): the call is thrown as rate limited. Each rate limit is logged with its method, the `Retry-After` Slack gave and which send of the call it answered, never the call's arguments |
+| Slack rate limited the call (HTTP 429) | every method, after the `Retry-After` Slack gave, up to `clients.RATE_LIMIT_RETRIES` (3) times and while the call's pauses add up to no more than `clients.RATE_LIMIT_WAIT_SECONDS` (60, the jitter left out): a rate limited call never ran. A pause that would pass the 60 seconds is not taken and the call is thrown as rate limited, since a reply's calls are sent holding its lock and a `!stop` waits for it. A 429 with no valid `Retry-After` is not sent again. Once the daemon stops, a rate limited call is not sent again either, and the pause of one that waits ends (`ClientOptions.stopped`): the call is thrown as rate limited. Each rate limit is logged with its method, the `Retry-After` Slack gave and which send of the call it answered, never the call's arguments |
 | the connection failed before an answer (a reset, a refused or unreachable host), or Slack answered with HTTP 500 or 503 (`clients.SERVER_ERROR_STATUSES`) | once, after a backoff pause, while no retry of the call was made yet. `clients.sharedClient` does so for every method. `clients.repliesClient`, the one replies are written with, does so for every method but the four of `clients.CREATING_METHODS`, `chat.postMessage` and the three stream calls: they are not idempotent, and a reset can come after Slack applied the call; whether a 500 or a 503 can was not measured, and they are left out for those too |
 | anything else | never: an error Slack answered with, any other HTTP status, and the client's own timeout (`clients.REQUEST_TIMEOUT_MS`, 30 seconds), since a timed out call may have run |
 
@@ -625,7 +625,7 @@ for a turn, a download or a setup the owner has not answered. A refused check le
 Threads do not wait for each other, and a thread's entry is dropped when its last place is left.
 A later message of a thread waits for the checks of the messages before it. A check is two calls,
 each bounded by the client's 30 seconds (`clients.REQUEST_TIMEOUT_MS`), so about 60 seconds per
-message ahead with no network, plus the pause of the one connection retry and any `Retry-After`
+message ahead with no network, plus the pause of the one connection retry and up to 60 seconds of `Retry-After`
 Slack sends; a message with none ahead waits for nothing. Other threads are not affected.
 The buttons and forms keep no such order: each names the message it answers.
 
