@@ -17,9 +17,11 @@ All notable changes to this project are documented here. The format follows
   `texts.TASK_LAUNCHED` and `texts.TASKS_LAUNCHED` replace `AGENT_LAUNCHED` and
   `AGENTS_LAUNCHED`, `previews.launched` takes a `Launch`, and `TurnRenderer` takes a predicate
   that says whether the session saw a task start before: the session counts each task's starts,
-  past its end, so that a subagent a message continues gets no second launch line. A turn Claude Code opens by itself with no end to report keeps
-  `_Background task update_`: SDK 0.3.300 sends nothing of what woke it, and `docs/limits.md`
-  says so with the other differences of this form.
+  past its end, so that a subagent a message continues gets no second launch line. A turn Claude
+  Code opens by itself with no end to report no longer opens with `_Background task update_`, a
+  line that named nothing: SDK 0.3.300 sends nothing of what woke it, so the reply is Claude
+  Code's text alone, and `docs/limits.md` says so with the other differences of this form.
+  `texts.BACKGROUND_NOTICE` is gone.
 - Text that follows a launch line is set a paragraph apart when the card of the call that started
   the task changes above the line in between.
 - `@anthropic-ai/claude-agent-sdk` is pinned to 0.3.300, which bundles Claude Code 2.1.300 (issue
@@ -115,8 +117,8 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - Probe claim P25 sends a command to the background and reads the raw stream up to the turn its
-  end opens: it holds while no `user` record of origin `task-notification` comes before that
-  turn's result. `BROKEN` means Claude Code now says what woke such a turn, and the row of
+  end opens, with `replay-user-messages` as the daemon passes it: it holds while no `user` record
+  of origin `task-notification` comes before that turn's result. `BROKEN` means Claude Code now says what woke such a turn, and the row of
   `docs/limits.md` on it leaves the page. The recording `test/fixtures/sdk/background-forms.jsonl`
   (2026-10-15, Claude Code 2.1.300, SDK 0.3.300) holds a Monitor stopped with `TaskStop`, a
   command and a subagent, all in the background, in one session started with the daemon's

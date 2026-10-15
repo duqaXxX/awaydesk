@@ -266,10 +266,11 @@ export const CLAIMS: readonly Claim[] = [
     "a turn Claude Code opens by itself on a task's notification brings nothing that says what " +
       "woke it: no user record of origin `task-notification` comes before its result, as " +
       "`docs/limits.md` says",
-    "src/core/texts.ts#BACKGROUND_NOTICE",
-    "in a thread, ask Claude to watch `echo tick; sleep 600` with the Monitor tool; the turn the " +
-      "line `tick` opens starts with `_Background task update_`. If it shows the line instead, " +
-      "the limit is gone: take its row out of `docs/limits.md` and say so in the issue it names",
+    "src/core/sessions/session.ts#ThreadSession.openingTarget",
+    "in a thread, ask Claude to watch `echo tick; sleep 600` with the Monitor tool; the reply of " +
+      "the turn the line `tick` opens is Claude's text alone, with no line before it. If the " +
+      "SDK now says what woke the turn, the limit is gone: take its row out of `docs/limits.md` " +
+      "and say so in the issue it names",
   ),
 ];
 

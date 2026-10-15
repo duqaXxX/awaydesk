@@ -1972,8 +1972,9 @@ export class ThreadSession {
    * restart or an idle close dropped it, it already ended because a notification later than
    * INJECTED_TURN_WAIT let `expireUnreported` end it first, or something sits below it): the
    * report then gets a reply of its own at the bottom, rather than an edit of a reply that
-   * ended and will not notify again or one the owner has scrolled past. The text is null for a
-   * report the agent named the task of (`report_started`) that renders in that task's reply with no end line to open it.
+   * ended and will not notify again or one the owner has scrolled past. The text is null when
+   * no end line opens the report: the SDK says nothing of what woke a turn with none (a
+   * Monitor's event, issue #311), and a report the agent named the task of needs none.
    */
   private openingTarget(): readonly [
     text: string | null,
@@ -2005,11 +2006,8 @@ export class ThreadSession {
       }
     }
     const ends = lines.map(([, line]) => line).join("\n");
-    // In the reply that started the task the report needs no line to say what it is about:
-    // the task's card or launch line is there. Anywhere else the notice says it, as it always has.
-    const named = lines.length === 0 && reported !== null && target !== null;
-    // End lines are lines about the work; the notice that stands in for them is the daemon's.
-    return [named ? null : ends || texts.BACKGROUND_NOTICE, target, ends !== ""];
+    // End lines are lines about the work.
+    return [ends || null, target, ends !== ""];
   }
 
   /**

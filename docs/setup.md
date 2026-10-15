@@ -740,8 +740,8 @@ The call that left a command or a Monitor running is counted with the others, as
 Several tasks started in one message share one line, `3 background tasks launched`, with what each
 does under it. What a subagent does shows nowhere in the reply. A turn Claude Code opens by itself
 opens with the end line of each task it reports, `✓ Background command "..." completed (exit code
-0)`; one with no end to report, such as a turn a Monitor's event opens, opens with
-`_Background task update_`, since Claude Code does not say what woke it ([limits.md](limits.md)). An Edit or a Write shows once it has ended, as
+0)`; one with no end to report, such as a turn a Monitor's event opens, shows Claude Code's text
+alone, since the SDK does not say what woke it ([limits.md](limits.md)). An Edit or a Write shows once it has ended, as
 one collapsed block titled with the call (`Update(notes.txt)`) that opens on its diff or on the
 new file's first lines. When the reply ends, each of those cards gives way to its line of counts, in grey (`Ran 2 shell commands, read 1 file`). A reply still
 running 280 seconds after it started stops being a stream (Slack closes streams at 5 minutes) and

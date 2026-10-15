@@ -175,7 +175,7 @@ BROKEN: the limit is gone, and its row leaves the page before the release is pin
 leaves a command running in the background and reads the turn Claude Code opens by itself when it
 ends: it holds while nothing in the stream says what woke that turn. BROKEN there means the release
 now sends that text: the row of `docs/limits.md` on such a turn leaves the page, and the thread can
-show the text in place of `_Background task update_`.
+show the text above Claude Code's reply.
 
 The **SDK release watch** workflow (`.github/workflows/sdk-release-watch.yml`) reads, every day,
 the latest `@anthropic-ai/claude-agent-sdk` release from the npm registry, runs `npm test` on it,

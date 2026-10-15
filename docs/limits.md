@@ -47,7 +47,7 @@ The first rows are about how a session runs, the others about commands.
 | Several tasks started in the background by one message, one of which waits for an approval | The line of the ones already running is written at once | It is written when the last one has started, or when the reply writes anything else | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | What a subagent was asked | `ctrl+o` shows its prompt under the launch line | Not shown | [#299](https://github.com/duqaXxX/awaydesk/issues/299) |
 | A task started in the background | Words of its tool: `Monitor(<description>)` then `⎿ Monitor started · task <id> · timeout 1800s`; `⎿ Backgrounded agent` under a subagent | One form for every kind of task: its name and description, then `⎿ Running in background`; no task id, no timeout | [#311](https://github.com/duqaXxX/awaydesk/issues/311) |
-| A turn Claude Code opens by itself with no task's end to report, such as one a Monitor's event opens | What woke it, on a line of its own: `Monitor event: <the line the script printed> · <description>` | `_Background task update_`, the same for every such turn: the SDK sends nothing of what woke it | [#311](https://github.com/duqaXxX/awaydesk/issues/311) |
+| A turn Claude Code opens by itself with no task's end to report, such as one a Monitor's event opens | What woke it, on a line of its own: `Monitor event: <the line the script printed> · <description>` | Claude Code's text alone, with no line before it: the SDK yields nothing of what woke a turn it opens while idle, and replays that prompt only when the event comes while a turn runs | [#311](https://github.com/duqaXxX/awaydesk/issues/311) |
 | The counts of a run that searched for tools | `ToolSearch` is not counted | Every tool is counted by its name, `ToolSearch` too | [#311](https://github.com/duqaXxX/awaydesk/issues/311) |
 | How Claude is told who it is | `You are Claude Code, Anthropic's official CLI for Claude.` | `You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK.` | none |
 | Sending feedback to Anthropic, ending a conversation | The `SendFeedback` and `EndConversation` tools | Not offered | none |
@@ -79,11 +79,14 @@ was not run.
 
 The rows on a task started in the background and on a turn Claude Code opens by itself were
 measured on 2026-10-15 with Claude Code 2.1.300 and the TypeScript SDK 0.3.300, in one session
-started with awaydesk's options and Haiku 4.5: a Monitor whose script printed two lines and was
-stopped with `TaskStop`, a command and a subagent, both in the background. Claude Code opened
-three turns by itself, for the Monitor's second line and for the two ends. No record the SDK
-yielded held the Monitor's line, and no `user` record came before any of the three turns: only
-each turn's `result` says, in its `origin`, that a task's notification opened it. The release
+started with awaydesk's options (`replay-user-messages` included) and Haiku 5.5: a Monitor whose
+script printed two lines and was stopped with `TaskStop`, a command and a subagent, both in the
+background. The Monitor's first line came while the owner's turn still ran: Claude Code took it
+into that turn and replayed the prompt that carries it, a `<task-notification>` text the SDK
+does not document. Claude Code then opened three turns by itself, for the Monitor's second line
+and for the two ends. No `user` record came before any of the three: only each turn's `result`
+says, in its `origin`, that a task's notification opened it, and the one the Monitor's line
+opened carries no `runId`. The release
 probe sends a command to the background on every new SDK and checks that this still holds (claim
 P25). The terminal's lines are those of a session run side by side with the daemon the same day.
 

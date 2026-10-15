@@ -1287,7 +1287,7 @@ closed when the start returns (`ThreadSession.connect`).
   (`constants.TASK_WORDS`, `constants.SUMMARY_IS_END_LINE`, both keyed by the `kind` of `task_started`). No new message follows for it; when
   that reply is no longer tracked (a restart or an idle close dropped it) or is not last, the
   report gets a reply of its own at the bottom. The next queued message waits for it to finish.
-  `texts.BACKGROUND_NOTICE` opens it only when no task end was seen. When a message was already sent
+  With no task end seen, no line opens it (`ThreadSession.openingTarget`). When a message was already sent
   and waits for its turn, that turn comes first, so nothing waits; the turn that reports the task
   follows it on its own (measured: "Prompt sent before a notification"; an older observation,
   "Report inside a queued turn", saw none follow). If no turn follows within

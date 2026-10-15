@@ -973,6 +973,9 @@ async function backgroundWake(s: Stage): Promise<Seen> {
       cwd: folder,
       settingSources: [],
       model: PROBE_MODEL,
+      // As the daemon passes it (`src/agent/claude/session.ts`): Claude Code re-emits each
+      // prompt it takes, a task's notification folded into a running turn included.
+      extraArgs: { "replay-user-messages": null },
       canUseTool: async (toolName, toolInput) =>
         toolName === "Bash"
           ? { behavior: "allow", updatedInput: toolInput }

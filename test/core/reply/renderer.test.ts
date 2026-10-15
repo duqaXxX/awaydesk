@@ -307,14 +307,16 @@ test("every task started in the background is a launch line from its description
   );
   const [sink, renderer] = await render(first);
   assert.deepEqual(sink.notices, [
-    "\n\n**3 background tasks launched**\n├ ticks\n├ Background sleep and echo\n└ Run sleep command and report",
+    "\n\n**3 background tasks launched**\n├ ticks\n├ Sleep 12 seconds then print done\n└ Run sleep 20 and reply ok",
   ]);
   // No card for a task: the Monitor's call and the command's are counted in the run as any
-  // other call, and the agent's call is its launch line.
+  // other call (after the ToolSearch that loads the Monitor), and the agent's call is its launch
+  // line.
   assert.ok(!sink.tasks.some((t) => t.task || t.details === BACKGROUND));
   assert.deepEqual(
     [...finals(sink.tasks).values()].map((t) => [t.name, t.status]),
     [
+      ["ToolSearch", "complete"],
       ["Monitor", "complete"],
       ["Bash", "complete"],
     ],

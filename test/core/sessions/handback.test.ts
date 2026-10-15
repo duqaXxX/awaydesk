@@ -82,7 +82,6 @@ function noExtraMessage(h: Harness, messages = 1): void {
     false,
     "the turn that did nothing wrote a reply",
   );
-  assert.equal(all.includes(texts.BACKGROUND_NOTICE), false, "a report opened under the notice");
   assert.equal(
     h.bodies().length,
     messages,

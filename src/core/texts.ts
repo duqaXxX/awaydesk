@@ -194,7 +194,6 @@ export const RESTART_HOLD_TURN = "a turn is running";
 export const RESTART_HOLD_TASKS = "{counts} running";
 // Ends by itself (`INJECTED_TURN_WAIT`): `!stop` has nothing to stop there.
 export const RESTART_HOLD_REPORT = "a background task is about to report, within 30 seconds";
-export const BACKGROUND_NOTICE = "_Background task update_";
 // The one form of a task started in the background, whatever its kind (issue #311): the
 // terminal's two lines for an agent it starts in the background, `**type**(description)` and
 // `⎿ Backgrounded agent` without its key hints (captured on Claude Code 2.1.296, 2026-10-13),

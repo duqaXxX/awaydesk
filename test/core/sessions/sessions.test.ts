@@ -892,7 +892,6 @@ test("a report opens with claude code s summary and takes the footer", async (t)
   const report = at(h.bodies(), 0); // appended to the one reply there is
   const summary = systemRecord(notice, "task_notification").summary;
   assert.ok(report.includes(`✓ ${summary}`)); // Claude Code's own words, as in the terminal
-  assert.ok(!report.includes(texts.BACKGROUND_NOTICE));
   // The task has now fully ended (report in, nothing else owed): the closing message that
   // waited for it posts at last, with its footer.
   const closing = at(h.slack.messageBlocks(), -1);
