@@ -277,6 +277,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKAssistantMessage.message.content[].type` | `"text"` | value | translate.ts: wordsOf | measured | none |
 | `SDKAssistantMessage.message.content[].type` | `"tool_result"` | value | translate.ts: assistant | measured | none |
 | `SDKAssistantMessage.message.content[].type` | `"tool_use"` | value | translate.ts: assistant | measured | none |
+| `SDKAssistantMessage.message.model` | `"<synthetic>"` | value | translate.ts: SYNTHETIC_MODEL, assistant | measured | none |
 | `SDKAssistantMessage.type` | `"assistant"` | value | translate.ts: HANDLERS | reference | none |
 | `SDKAssistantMessageError` | `"authentication_failed"` | value | translate.ts: AUTHENTICATION_FAILED, assistant | package | none |
 | `SDKCompactBoundaryMessage.subtype` | `"compact_boundary"` | value | translate.ts: HANDLERS | reference | P21 |

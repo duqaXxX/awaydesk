@@ -1271,6 +1271,7 @@ test("a result that names no count of steps reads as one that took some", () => 
 // thread's `message.model` altered.
 
 const SONNET = "claude-sonnet-5-5";
+const SYNTHETIC_MODEL = "<synthetic>";
 
 /** The `call_ended` events of a recording whose main thread ran on `model`. */
 function agentEnds(name: string, model: string | null): EventOf<"call_ended">[] {
@@ -1307,6 +1308,28 @@ test("an agent on the session's own model ends its call with none", () => {
       name,
     );
   }
+});
+
+test("a message Claude Code wrote itself does not change the session's model", () => {
+  // A local command's answer comes as an assistant message whose model is `<synthetic>`
+  // (recorded: `usage.jsonl`); an agent started after it still compares with the real model.
+  const synthetic = sdkRecords("usage").find(
+    (wire) => wire.type === "assistant" && (wire.message as JsonObject).model === SYNTHETIC_MODEL,
+  );
+  assert.ok(synthetic);
+  const translator = new Translator();
+  const ended: EventOf<"call_ended">[] = [];
+  for (const [index, wire] of sdkRecords("subagent").entries()) {
+    if (index === 0) translator.translate(synthetic);
+    ended.push(...of(translator.translate(wire), "call_ended"));
+    if (wire.type === "assistant" && wire.parent_tool_use_id === null) {
+      translator.translate(synthetic);
+    }
+  }
+  assert.deepEqual(
+    ended.filter((e) => e.model !== null),
+    [],
+  );
 });
 
 test("a result that names no model ends its call with none", () => {

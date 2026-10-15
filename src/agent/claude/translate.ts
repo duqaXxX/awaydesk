@@ -42,6 +42,7 @@ const TERMINAL_TASK_STATUSES: ReadonlySet<string> = new Set([
 ]);
 const INTERRUPTED: ReadonlySet<string> = new Set(["aborted_streaming", "aborted_tools"]);
 const AUTHENTICATION_FAILED = "authentication_failed";
+const SYNTHETIC_MODEL = "<synthetic>";
 // The signs a line of a `structuredPatch` hunk opens with; the backslash is
 // `\ No newline at end of file`, about the line above.
 const SIGNS: ReadonlySet<string> = new Set(["-", "+", " ", "\\"]);
@@ -197,7 +198,12 @@ function assistant(memory: Memory, record: WireRecord): SessionEvent[] {
     return [{ type: "agent_error", kind, category, text, parentCallId }];
   }
   const events: SessionEvent[] = [];
-  if (parentCallId === null) memory.mainModel = words(message.model) ?? memory.mainModel;
+  // A message Claude Code wrote itself (a local command's answer, recorded: `usage.jsonl`) names
+  // `<synthetic>`, no model the session runs on.
+  const model = words(message.model);
+  if (parentCallId === null && model !== null && model !== SYNTHETIC_MODEL) {
+    memory.mainModel = model;
+  }
   const messageId = string(message.id);
   if (
     text !== "" &&
