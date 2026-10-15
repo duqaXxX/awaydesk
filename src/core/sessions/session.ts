@@ -1990,13 +1990,12 @@ export class ThreadSession {
   /**
    * What opens a report of the agent's own turn (the end of each task it reports), and the
    * reply of the first of those tasks (then of the task the agent named) that is still tracked,
-   * not ended and the last thing in the thread: the report renders there. Null when none is (a
+   * not ended and the last thing in the thread: the report renders there. When none is (a
    * restart or an idle close dropped it, it already ended because a notification later than
-   * INJECTED_TURN_WAIT let `expireUnreported` end it first, or something sits below it): the
-   * report then goes to the last reply at rest, and with none to a reply of its own at the
-   * bottom, rather than an edit of a reply that
-   * ended and will not notify again or one the owner has scrolled past, unless the thread's last
-   * reply is at rest (`restingLast`), which takes it in. The text is null when
+   * INJECTED_TURN_WAIT let `expireUnreported` end it first, or something sits below it), the
+   * report renders into the thread's last reply if it is at rest (`restingLast`). Null when that
+   * fails too: the report then gets a reply of its own at the bottom, rather than an edit of a
+   * reply that ended and will not notify again or one the owner has scrolled past. The text is null when
    * no end line opens the report: the SDK says nothing of what woke a turn with none (a
    * Monitor's event, issue #311), and a report the agent named the task of needs none.
    */
