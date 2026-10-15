@@ -107,8 +107,8 @@ export class Requests {
     const shownAt = messageTs(body);
     const setupId = holds.atMessage(channel, threadTs, shownAt);
     if (setupId === null && holds.decidedAt(channel, threadTs, shownAt)) {
-      // Picked just before Start and handled once Start decided the setup (issue #142): the
-      // summary on its way says what happened, and a notice would contradict it.
+      // Picked just before Start and handled once Start decided the setup (issue #142): what
+      // ends the apply (the summary, `Not sent.` or the error) says what happened.
       this.logRefusedClick("setup model, decided", body, { open_at_message: false, held: true });
       return;
     }

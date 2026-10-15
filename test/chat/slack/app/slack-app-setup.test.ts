@@ -588,7 +588,7 @@ test("a model change cannot overwrite the summary", async (t) => {
 });
 
 // Issue #142: the handlers run concurrently, so a model picked just before Start can be handled
-// once Start decided the setup. The summary on its way says what happened; no notice is added.
+// once Start decided the setup. What ends the apply says what happened; no notice is added.
 test("a model change handled while Start is applied says nothing", async (t) => {
   const manual = manualWorld(t);
   await manual.dispatch(message("hello", { ts: THREAD }));

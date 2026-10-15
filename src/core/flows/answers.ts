@@ -157,8 +157,8 @@ export function answersFlow(deps: FlowDeps, talk: Talk): AnswersFlow {
             decided: pending.decided,
             same_thread: sameThread,
           });
-          // A second Start while the first is applied (issue #142): the summary that replaces
-          // the controls says what happened, and a notice under it would contradict it.
+          // A second Start while the first is applied (issue #142): what ends the apply (the
+          // summary, `texts.NOT_SENT` or the error) says what happened.
           if (!(pending.decided && sameThread)) await talk.tell(ref, texts.HOLD_GONE);
           return false;
         }

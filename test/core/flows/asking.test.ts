@@ -457,6 +457,23 @@ test("a second start while the first is applied is refused with no word", async 
   assert.ok(!world.shown(ref).includes(texts.HOLD_GONE));
 });
 
+test("a second start says nothing, and a stop while the first is applied still says Not sent", async (t) => {
+  const world = await AskingWorld.make(t, { gated: true });
+  const { ref, session } = world.thread();
+  const asked = world.flows.setup.beforeSending(ref, session);
+  const open = await world.asked(ref, "setup");
+  const selection = { model: "default", effort: "default", bypass: false };
+  await world.inbound.answer(ref, open.requestId, { type: "setup", selection }, open.message);
+  for (let round = 0; round < 20; round += 1) await settledTurn();
+  await world.inbound.answer(ref, open.requestId, { type: "setup", selection }, open.message);
+  await session.stop();
+  world.gate.set();
+
+  assert.equal(await asked, null);
+  assert.deepEqual(world.shown(ref).slice(-1), [texts.NOT_SENT]);
+  assert.ok(!world.shown(ref).includes(texts.HOLD_GONE));
+});
+
 test("a setup answered from another thread is refused with what differs", async (t) => {
   const world = await AskingWorld.make(t);
   const { ref, session } = world.thread();
