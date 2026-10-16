@@ -199,7 +199,7 @@ export const CLAIMS: readonly Claim[] = [
   claim(
     "P18",
     "gesture",
-    "a resumed session keeps the model set with `setModel()`",
+    "a resumed session keeps the model the setup set with `/model`",
     "src/agent/claude/session.ts#ClaudeSession.setModel",
     "at the top level, pick a model in the setup and press Start, restart the daemon, reply " +
       "in the thread; `!status` shows the model",
@@ -281,6 +281,27 @@ export const CLAIMS: readonly Claim[] = [
     "src/agent/claude/translate.ts#effortChanged",
     "in a thread, send `!effort low`; the footer shows `low`, then `!effort auto`; it shows `auto`; " +
       "send `!model opus`: the footer shows `Opus 5.5` at once, not the model before it",
+  ),
+  claim(
+    "P27",
+    "gesture",
+    "with a model named in the project settings, after `setModel()` on the query a `/model` to " +
+      "that model's alias is acknowledged and the next request still runs on the `setModel` " +
+      "model, as `docs/limits.md` says",
+    "src/agent/claude/session.ts#ClaudeSession.setModel",
+    "the scene calls the SDK's `setModel` itself, since the daemon does not. If the request now " +
+      "runs on the startup model the limit is gone: take its row out of `docs/limits.md` and say " +
+      "so in the issue it names",
+  ),
+  claim(
+    "P28",
+    "gesture",
+    "a `/model` sent under a uuid ends its turn with a `command_lifecycle` record in the state " +
+      "`completed` whose `command_uuid` is that uuid",
+    "src/agent/claude/session.ts#ClaudeSession.setModel",
+    "the daemon hides the command's turn up to that record and the first prompt waits for its " +
+      "result: with the record gone, set a model in the setup and press Start, then reply in the " +
+      "thread: the reply never shows. Read `docs/sdk-surface.md` for the rows that name it",
   ),
 ];
 

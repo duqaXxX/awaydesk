@@ -19,7 +19,6 @@ import {
 import { regularFiles } from "../../../src/core/files/read.ts";
 import { AsyncEvent, FakeClock } from "../../support/fake-clock.ts";
 import { committed, gitInit, trust } from "../../support/git-layouts.ts";
-import { GIT_LAYOUT } from "../../support/platform.ts";
 import {
   anyRepository,
   commitAll,
@@ -32,7 +31,7 @@ import {
 
 const tmp = scratch();
 const BOTH = {
-  skip: GIT_LAYOUT.skip || POSIX.skip,
+  skip: POSIX.skip,
 };
 
 /** A repository with one commit, `README`: the session's folder when it is itself one. */
@@ -110,7 +109,7 @@ test("ranking ignores case and leaves out what does not contain the words", () =
 
 // --- the file index ---
 
-test("the index is the tracked files and the untracked ones not ignored", GIT_LAYOUT, async () => {
+test("the index is the tracked files and the untracked ones not ignored", async () => {
   const folder = app();
   write(folder, ".gitignore", "*.log\nbuild/\n");
   write(folder, "src/tracked.py");
@@ -122,7 +121,10 @@ test("the index is the tracked files and the untracked ones not ignored", GIT_LA
   assert.deepEqual(found.toSorted(), [".gitignore", "README", "src/new.py", "src/tracked.py"]);
 });
 
-test("the index of a subfolder is relative to it and stops at its edge", GIT_LAYOUT, async () => {
+// Windows forbids `*` in a file name, so the folder cannot exist there.
+test("the index of a subfolder is relative to it and stops at its edge", {
+  skip: process.platform === "win32" && "Windows forbids * in a file name",
+}, async () => {
   const folder = app();
   // A folder named with glob characters: a pathspec must take it literally.
   const sub = join(folder, "we*ird [x]");
@@ -143,13 +145,13 @@ test("the index follows a folder reached through a symlink", BOTH, async () => {
   assert.deepEqual(await projectFiles(await repository(folder), join(tmp.dir, "via")), ["in.py"]);
 });
 
-test("a folder without a repository has no source", GIT_LAYOUT, async () => {
+test("a folder without a repository has no source", async () => {
   const plain = join(tmp.dir, "plain");
   mkdirSync(plain);
   assert.equal(usable(await anyRepository(plain)), null);
 });
 
-test("a git dir with no work tree is no source", GIT_LAYOUT, async () => {
+test("a git dir with no work tree is no source", async () => {
   const folder = app();
   const inside = await repository(join(folder, ".git"));
   assert.ok(inside.insideGitDir);
@@ -159,7 +161,7 @@ test("a git dir with no work tree is no source", GIT_LAYOUT, async () => {
 
 // --- the repositories of a session's folder ---
 
-test("a folder inside a repository has that repository", GIT_LAYOUT, async () => {
+test("a folder inside a repository has that repository", async () => {
   const folder = app();
   const home = join(tmp.dir, "home");
   mkdirSync(home);
@@ -169,7 +171,7 @@ test("a folder inside a repository has that repository", GIT_LAYOUT, async () =>
   assert.deepEqual(await roots(join(folder, "src"), lookupIn(home)), [folder]);
 });
 
-test("a plain folder has the usable repositories two levels below it", GIT_LAYOUT, async () => {
+test("a plain folder has the usable repositories two levels below it", async () => {
   const { work: folder, home, lookup } = work();
   const one = gitInit(join(folder, "one"));
   const two = gitInit(join(folder, "group", "two"));
@@ -178,7 +180,7 @@ test("a plain folder has the usable repositories two levels below it", GIT_LAYOU
   assert.deepEqual(await roots(folder, lookup), [one, two].toSorted());
 });
 
-test("a repository below a folder is kept only with its own trust", GIT_LAYOUT, async () => {
+test("a repository below a folder is kept only with its own trust", async () => {
   const { work: folder, home, lookup } = work();
   const trusted = gitInit(join(folder, "trusted"));
   gitInit(join(folder, "group", "other"));
@@ -188,7 +190,7 @@ test("a repository below a folder is kept only with its own trust", GIT_LAYOUT, 
   assert.deepEqual(await roots(folder, lookup), []);
 });
 
-test("the repositories below a folder are looked up together", GIT_LAYOUT, async () => {
+test("the repositories below a folder are looked up together", async () => {
   const { work: folder } = work();
   for (const name of ["a", "b", "c", "d"]) gitInit(join(folder, name));
   // Every lookup answers for itself here: the trust is not what this test is about.
@@ -221,7 +223,7 @@ test("a repository that is not usable is left out", BOTH, async () => {
   assert.deepEqual(await roots(folder, lookup), [join(folder, "a")]);
 });
 
-test("the search never goes into a repository for more", GIT_LAYOUT, async () => {
+test("the search never goes into a repository for more", async () => {
   const { work: folder, home, lookup } = work();
   const outer = gitInit(join(folder, "outer"));
   const vendored = gitInit(join(outer, "vendored"));
@@ -229,13 +231,13 @@ test("the search never goes into a repository for more", GIT_LAYOUT, async () =>
   assert.deepEqual(await roots(folder, lookup), [outer]);
 });
 
-test("hidden folders are not searched for a repository", GIT_LAYOUT, async () => {
+test("hidden folders are not searched for a repository", async () => {
   const { work: folder, home, lookup } = work();
   trustAlso(folder, home, gitInit(join(folder, ".hidden")));
   assert.deepEqual(await roots(folder, lookup), []);
 });
 
-test("a folder in an untrusted repository has nothing below it", GIT_LAYOUT, async () => {
+test("a folder in an untrusted repository has nothing below it", async () => {
   const home = join(tmp.dir, "home");
   mkdirSync(home);
   const outer = gitInit(join(tmp.dir, "outer"));
@@ -268,7 +270,7 @@ test("a plain folder is walked for regular files only", POSIX, async () => {
   ]);
 });
 
-test("a folder inside a repository lists what git does not ignore", GIT_LAYOUT, async () => {
+test("a folder inside a repository lists what git does not ignore", async () => {
   const folder = app();
   write(folder, ".gitignore", ".venv/\n*.log\n");
   writeAll(folder, "src/tracked.py");
@@ -287,32 +289,28 @@ test("a folder inside a repository lists what git does not ignore", GIT_LAYOUT, 
   ]);
 });
 
-test(
-  "the files of nested repositories come from git and the rest from disk",
-  GIT_LAYOUT,
-  async () => {
-    const { work: folder, home, lookup } = work();
-    const nested = gitInit(join(folder, "awaydesk-workspace"));
-    write(nested, ".gitignore", ".venv/\n");
-    writeAll(nested, "docs/setup.md", ".venv/lib/pkg.py");
-    commitAll(nested);
-    writeAll(nested, "docs/new.md", ".venv/lib/more.py");
-    const deep = gitInit(join(folder, "a", "b", "c")); // three levels down: walked like any folder
-    trustAlso(folder, home, nested, deep);
-    writeAll(deep, "x.txt", ".venv/y.txt");
-    writeAll(folder, "notes.md", "a/readme.md");
-    const listing = new Listings(lookup);
-    assert.deepEqual((await filesOf(listing, folder)).toSorted(), [
-      "a/b/c/.venv/y.txt",
-      "a/b/c/x.txt",
-      "a/readme.md",
-      "awaydesk-workspace/.gitignore",
-      "awaydesk-workspace/docs/new.md",
-      "awaydesk-workspace/docs/setup.md",
-      "notes.md",
-    ]);
-  },
-);
+test("the files of nested repositories come from git and the rest from disk", async () => {
+  const { work: folder, home, lookup } = work();
+  const nested = gitInit(join(folder, "awaydesk-workspace"));
+  write(nested, ".gitignore", ".venv/\n");
+  writeAll(nested, "docs/setup.md", ".venv/lib/pkg.py");
+  commitAll(nested);
+  writeAll(nested, "docs/new.md", ".venv/lib/more.py");
+  const deep = gitInit(join(folder, "a", "b", "c")); // three levels down: walked like any folder
+  trustAlso(folder, home, nested, deep);
+  writeAll(deep, "x.txt", ".venv/y.txt");
+  writeAll(folder, "notes.md", "a/readme.md");
+  const listing = new Listings(lookup);
+  assert.deepEqual((await filesOf(listing, folder)).toSorted(), [
+    "a/b/c/.venv/y.txt",
+    "a/b/c/x.txt",
+    "a/readme.md",
+    "awaydesk-workspace/.gitignore",
+    "awaydesk-workspace/docs/new.md",
+    "awaydesk-workspace/docs/setup.md",
+    "notes.md",
+  ]);
+});
 
 test("the files of a repository that is not usable are walked", BOTH, async () => {
   const { work: folder, home } = work();
@@ -576,7 +574,7 @@ test("a search checks files only until the limit and counts by name past it", as
   assert.equal(checked.length, 40);
 });
 
-test("the repositories of a folder are kept for a short while", GIT_LAYOUT, async () => {
+test("the repositories of a folder are kept for a short while", async () => {
   const { work: folder, home, lookup } = work();
   trustAlso(folder, home, gitInit(join(folder, "one")));
   const asked: string[] = [];
@@ -605,7 +603,7 @@ test("the repositories of a folder are kept for a short while", GIT_LAYOUT, asyn
   assert.ok(asked.length > made); // past its short life
 });
 
-test("a nested repository s index is relative to the folder above it", GIT_LAYOUT, async () => {
+test("a nested repository s index is relative to the folder above it", async () => {
   const { work: folder } = work();
   const nested = gitInit(join(folder, "app"));
   writeAll(nested, "docs/setup.md");

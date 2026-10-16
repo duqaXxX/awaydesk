@@ -60,6 +60,7 @@ const CONTEXT: AgentContext = { variables: {}, clock: systemClock };
 const TOOLS = sdkRecords("tools");
 const ASKED = sdkRecords("ask-answered");
 const INTERRUPTED = sdkRecords("interrupt");
+const MODEL_COMMAND = sdkJson("model-command") as JsonObject[];
 
 function record(records: readonly JsonObject[], index: number, ...is: string[]): JsonObject {
   const found = records[index];
@@ -329,6 +330,27 @@ class ClaudeWorld implements AgentWorld {
     return { prompt: "/model haiku", model };
   }
 
+  modelChange(): void {
+    this.#plays.push({
+      kind: "other",
+      batch: withSession(MODEL_COMMAND, this.#sessionId()),
+    });
+  }
+
+  hangModelChange(): void {
+    // The command's `running` state and nothing after it.
+    this.#plays.push({
+      kind: "hang",
+      batch: withSession(MODEL_COMMAND.slice(0, 1), this.#sessionId()),
+    });
+  }
+
+  async modelChangeTaken(): Promise<void> {
+    while ((this.#sdk.queries.at(-1)?.sent.length ?? 0) === 0) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+
   failTurn(): string {
     this.#plays.push({
       kind: "other",
@@ -496,6 +518,9 @@ class PlainWorld implements AgentWorld {
     this.#turns.push([switched(model)]);
     return { prompt: "switch the model", model };
   }
+
+  // The plain agent has no model to change.
+  modelChange(): void {}
 
   failTurn(): string {
     this.#turns.push([failedRequest("The request failed.")]);

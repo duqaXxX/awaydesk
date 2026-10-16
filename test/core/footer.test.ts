@@ -27,7 +27,6 @@ import {
 } from "../../src/core/footer.ts";
 import { type Json, sdkRecords } from "../support/fixtures.ts";
 import { git, gitInit } from "../support/git-layouts.ts";
-import { GIT_LAYOUT } from "../support/platform.ts";
 
 // 2026-09-23 21:00 in Europe/Berlin (UTC+2 in September).
 const NOW = Date.UTC(2026, 8, 23, 19, 0);
@@ -212,21 +211,21 @@ async function gitChanges(folder: string): Promise<readonly [number, number] | n
   return (await gitState(folder, anyRepository))[1];
 }
 
-test("git branch", GIT_LAYOUT, async () => {
+test("git branch", async () => {
   const folder = repo();
   git(folder, "switch", "-q", "-c", "feature-x");
   assert.deepEqual(await gitState(folder, anyRepository), ["feature-x", [0, 0]]);
   assert.deepEqual(await gitState(join(folder, "missing"), anyRepository), [null, null]);
 });
 
-test("a branch name keeps what Python's strip leaves", GIT_LAYOUT, async () => {
+test("a branch name keeps what Python's strip leaves", async () => {
   // U+FEFF is no whitespace to Python: git prints it, and the name is shown as it is.
   const folder = repo();
   git(folder, "switch", "-q", "-c", "feature-x\ufeff");
   assert.deepEqual(await gitState(folder, anyRepository), ["feature-x\ufeff", [0, 0]]);
 });
 
-test("git changes add staged and unstaged lines", GIT_LAYOUT, async () => {
+test("git changes add staged and unstaged lines", async () => {
   const folder = repo();
   assert.deepEqual(await gitChanges(folder), [0, 0]); // no commit yet, nothing written
   writeFileSync(join(folder, "a.txt"), "one\ntwo\n");
@@ -246,7 +245,7 @@ test("git changes outside a repo is unknown", async () => {
   assert.equal(await gitChanges(join(tmp, "missing")), null);
 });
 
-test("git changes do not run the repo s fsmonitor", GIT_LAYOUT, async () => {
+test("git changes do not run the repo s fsmonitor", async () => {
   const folder = repo();
   const marker = join(tmp, "fsmonitor-ran");
   writeFileSync(join(folder, "a.txt"), "one\n");
@@ -256,7 +255,7 @@ test("git changes do not run the repo s fsmonitor", GIT_LAYOUT, async () => {
   assert.equal(existsSync(marker), false);
 });
 
-test("git changes never write the index", GIT_LAYOUT, async () => {
+test("git changes never write the index", async () => {
   // `git diff` would refresh a stale index under index.lock; a killed one would leave the lock
   // and stop every commit in the repo (measured on git 2.54, 2026-09-27).
   const folder = repo();

@@ -195,6 +195,10 @@ export class ThreadSession {
   // The request handlers in flight (`askOwner`). A close resolves them and waits for each:
   // none may write the root's status after the close has settled it.
   private readonly asking = new Set<Promise<unknown>>();
+  // The starts a caller gave up (its signal aborted) with the process still launching, each as
+  // the promise of its disconnect. `close` waits for them before `doneClosing`: the seam's
+  // `start` takes no signal, so the process can only be closed once it is there.
+  private readonly abandoned = new Set<Promise<void>>();
   /** Task events that arrived between turns, shown in the next turn's reply. */
   private held: TaskEvent[] = [];
   // Tasks that outlived their turn, and the reply whose line each one keeps up to date, for
@@ -296,6 +300,8 @@ export class ThreadSession {
   private setupApplied = false;
   /** Held while Start is applied, so a `!bypass` typed meanwhile acts after it. */
   private readonly setupLock = new Mutex();
+  /** `applySetup` is running: a model command may be in flight in the agent. */
+  private applying = false;
   // What the live client was started with or switched to: the effort, and whether it
   // effectively runs in bypass (the switch, or the folder's own settings starting it so).
   // `applySetup` compares the owner's choice with these, not with what was stored, which a
@@ -1012,6 +1018,7 @@ export class ThreadSession {
     const release = await this.setupLock.acquire();
     try {
       this.setupApplied = true;
+      this.applying = true;
       const effort = choice.effort === DEFAULT ? null : choice.effort;
       try {
         this.deps.state.setEffort(this.channelId, this.threadId, effort);
@@ -1038,6 +1045,7 @@ export class ThreadSession {
         throw error;
       }
     } finally {
+      this.applying = false;
       release();
     }
   }
@@ -1153,7 +1161,13 @@ export class ThreadSession {
     const client = this.client;
     if (client === null) return held ? null : false;
     const tasks = this.background ? this.runningTaskIds() : [];
-    if (!this.busy && tasks.length === 0) return held ? null : false;
+    if (!this.busy && tasks.length === 0) {
+      // A Start being applied may be inside the agent's own model command, a turn no reply
+      // shows: the interrupt ends it, and the setup then fails into `forgetSetup`, which the
+      // cancelled hold turns into `Not sent.`
+      if (held && this.applying) await this.interruptApplied(client);
+      return held ? null : false;
+    }
     // What the agent said it was doing is void once the owner stops it. It says `idle` only
     // after an interrupted turn's result (recorded 2026-10-14), and no recording holds what it
     // says after a task stopped with no turn running. Its next word counts again.
@@ -1188,6 +1202,14 @@ export class ThreadSession {
     // sweep shows the same ✅ and `noteStatus` drops the persisted ⏳.
     this.react("done");
     return true;
+  }
+
+  private async interruptApplied(client: AgentSession): Promise<void> {
+    try {
+      await client.interrupt();
+    } catch (error) {
+      logger.warning(`could not interrupt a setup in ${this.where}: ${errorName(error)}`);
+    }
   }
 
   /**
@@ -1406,6 +1428,10 @@ export class ThreadSession {
           `could not clear state.json's crash-repair fields for ${this.where}: ${errorName(error)}`,
         );
       }
+      // A start the worker gave up may still be launching: its process is closed before
+      // `doneClosing`, or a session built after this one could resume the same id meanwhile.
+      // Waited for last, so the chat is settled while the agent is still coming up.
+      await Promise.allSettled([...this.abandoned]);
       // Only now: the agent's process (if any) has had its chance to flush and exit, or
       // closing failed partway through and there is nothing left worth waiting for either way.
       this.doneClosing.set();
@@ -1464,11 +1490,14 @@ export class ThreadSession {
       return await cancellable(starting, signal);
     } catch (error) {
       if (signal?.aborted) {
-        // The start goes on by itself: a process nobody holds is closed when it is there.
-        starting.then(
+        // The start goes on by itself: a process nobody holds is closed when it is there, and
+        // `close` waits for that.
+        const closing = starting.then(
           (client) => this.disconnect(client),
           () => {},
         );
+        this.abandoned.add(closing);
+        closing.finally(() => this.abandoned.delete(closing));
       }
       throw error;
     }

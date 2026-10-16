@@ -1070,8 +1070,8 @@ closed when the start returns (`ThreadSession.connect`).
   record that passes through a symlink trusts nothing. An untrusted folder starts nothing, and the
   reply says to open `claude` there in the terminal once and accept the dialog. A `!bind` runs the
   same checks (`directory.checkDirectory`: missing, unreadable, untrusted): the channel is bound,
-  and the answer gives the reason instead of promising a session. Not verified: folder trust and the
-  footer's git on Windows, where the tests that build a git layout are skipped.
+  and the answer gives the reason instead of promising a session. Not verified: the daemon on Windows;
+  folder trust and the footer's git are exercised there by the tests in CI alone.
 - The session asks the back end for a start with the thread's own directory, the thread's stored
   session id to resume, its stored effort level and the owner's own settings sources (user, project
   and local): the `StartOptions` built in `ThreadSession.connect`. `ClaudeSession` makes the SDK's
@@ -1195,7 +1195,20 @@ closed when the start returns (`ThreadSession.connect`).
   "Effort set on a live session"). A back end without that capability would get a fresh session,
   which loses nothing since no prompt has been sent. A non-default model is `AgentSession.setModel`
   on the live session (not stored: it survives a resume and leaves the owner's default alone,
-  measured: "Model survives resume"), and bypass goes through `ThreadSession.setBypass` when the
+  measured: "Model survives resume"). The Claude back end types `/model <model>` into the idle
+  session, under a uuid of its own, and reads that turn itself: the thread shows nothing of it,
+  though the command stays in the session, so the model sees it and its transcript holds it. Every
+  record from the push to the `command_lifecycle` `completed` that names the uuid (the replayed
+  command, its states, its output, its `result`, a status, the hooks that fire in it) stays in the
+  back end and no event of it reaches the core; the caller resolves at the `result`, or at that
+  `completed` when no result came; a `cancelled` naming the uuid ends it too and rejects the caller
+  that had no result. The `idle` the session says after it is read as any state: the activity line
+  does not change. An `interrupt()` while the command runs (`!stop`, which `ThreadSession.stop` forwards while a Start is applied) makes
+  `setModel` reject and closes the session, so `ThreadSession.applySetup` undoes the setup and the
+  owner gets `Not sent.`; the first prompt of a setup that went through runs on the chosen model.
+  It does not call the SDK's `setModel`, which leaves an override that a later `/model` to the
+  model the settings name does not undo (issue #333, `docs/limits.md`). Bypass goes through
+  `ThreadSession.setBypass` when the
   choice differs from what the live session effectively runs (`ThreadSession.clientBypass`: the
   choice, or the folder's own bypass). The message then becomes one summary line, written inside the
   same wait (a cancel that already deleted the message skips the edit), and stays; the held message
@@ -1441,7 +1454,10 @@ messages not sent, whether or not Claude Code had taken it in; its replay is not
   the agent makes from then on (`ThreadSession.askOwner`). A closing
   session waits for an agent session that a daemon word (`!help`, `!bypass`, `!status`) is still
   starting, then closes it, and starts no other: the word gets `SessionClosed`, which tells the
-  owner to send it again, and `!bypass` stores nothing. A session rebuilt to replace one still
+  owner to send it again, and `!bypass` stores nothing. It waits the same way for a start its own
+  worker gave up when the close cancelled it: the session keeps that start, and `close` returns,
+  and `doneClosing` fires, only once the agent process is closed (`AgentBackend.start` takes no
+  signal, so a launching process is closed when it is there). A session rebuilt to replace one still
   closing (an idle close, or a fresh lookup after a gone resume) waits for the old one to finish
   tearing down before its own first start (`ThreadSession.doneClosing`): `AgentSession.close`
   resolves once the process's stream has ended, and resuming the same session id any sooner would

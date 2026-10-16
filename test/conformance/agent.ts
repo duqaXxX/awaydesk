@@ -14,6 +14,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { describe, type TestContext, type TestOptions, test } from "node:test";
+import { setTimeout as sleep } from "node:timers/promises";
 import type {
   AgentBackend,
   AgentSession,
@@ -29,7 +30,6 @@ import type {
   StartOptions,
 } from "../../src/agent/seam.ts";
 import { ResumeRefused } from "../../src/agent/seam.ts";
-import { GIT_LAYOUT } from "../support/platform.ts";
 
 type Input = Readonly<Record<string, unknown>>;
 
@@ -94,6 +94,18 @@ export interface AgentWorld {
    * the model id the agent then runs, as its context usage will name it.
    */
   modelCommand(): { readonly prompt: string; readonly model: string };
+  /**
+   * The next model change is one the agent takes. A back end that changes the model with a turn
+   * of its own (a command the agent runs) plays that turn; one that sets it directly does nothing.
+   */
+  modelChange(): void;
+  /**
+   * The next model change never ends by itself: the agent has begun it and says nothing more.
+   * Needed with `models`.
+   */
+  hangModelChange?(): void;
+  /** Resolves once the agent has taken the model change that `setModel` started. Needed with `hangModelChange`. */
+  modelChangeTaken?(): Promise<void>;
   /** The next prompt fails as a request of the agent's own does. Returns a word its message holds. */
   failTurn(): string;
   /** The agent's process dies now. */
@@ -972,11 +984,66 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       "setModel takes a listed model or null",
       lacks(caps.models, "models"),
       async (world, t) => {
+        world.modelChange();
+        world.modelChange();
         const { session } = await open(t, world);
         const [first] = (await session.info()).models;
         assert.ok(first !== undefined);
         await session.setModel(first.value);
         await session.setModel(null);
+      },
+    );
+
+    check(
+      "a model change shows nothing, and the next turn runs after it",
+      lacks(caps.models, "models"),
+      async (world, t) => {
+        world.modelChange();
+        world.say("after the change");
+        const { session, events } = await open(t, world);
+        const [first] = (await session.info()).models;
+        assert.ok(first !== undefined);
+        await session.setModel(first.value);
+        await session.send(prompt());
+        const turn = await events.turn();
+        // Whatever the agent did to change the model is no event: the first turn the session
+        // reports is the owner's prompt.
+        assert.deepEqual(events.seen, turn);
+        assert.equal(written(turn).includes("after the change"), true);
+        assertWellFormed(turn);
+        assertDeclared(turn, caps);
+      },
+    );
+
+    check(
+      "interrupting a model change rejects it and closes the session",
+      lacks(caps.models, "models"),
+      async (world, t) => {
+        assert.ok(world.hangModelChange !== undefined && world.modelChangeTaken !== undefined);
+        world.hangModelChange();
+        const { session, events } = await open(t, world);
+        const [first] = (await session.info()).models;
+        assert.ok(first !== undefined);
+        const change = session.setModel(first.value);
+        // The rejection is read at once, so that it is never left unhandled while the test waits.
+        const rejected = assert.rejects(change);
+        await world.modelChangeTaken();
+        await session.interrupt();
+        await rejected;
+        // The stream's end is what closing means: bounded, so that a session left open fails here
+        // with its own message and not with the check's timeout.
+        const stop = new AbortController();
+        const closed = await Promise.race([
+          events.finished.then(() => true),
+          sleep(5_000, false, { signal: stop.signal }),
+        ]);
+        stop.abort();
+        assert.ok(closed, "the session was not closed");
+        // Closed by the agent, as `close` leaves it: no process is left, no prompt is taken, and
+        // nothing of the interrupted change reached the owner, not even a loss.
+        assert.equal(world.running(), 0);
+        await assert.rejects(session.send(prompt()));
+        assert.deepEqual(events.seen, []);
       },
     );
 
@@ -1089,7 +1156,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       "a folder is trusted as the agent's record says",
       {
         ...LIMIT,
-        skip: caps.folderTrust ? GIT_LAYOUT.skip : `${name} does not declare folderTrust`,
+        skip: caps.folderTrust ? false : `${name} does not declare folderTrust`,
       },
       async (world) => {
         assert.ok(world.trust, "the harness records trust");
