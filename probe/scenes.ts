@@ -716,8 +716,8 @@ async function setupModelResume(s: Stage): Promise<Seen> {
 }
 
 /**
- * P27: after the SDK's `setModel()`, a `/model` to the alias of the model the session started on
- * leaves the next request on the `setModel` model (issue #333). The daemon no longer calls
+ * P27: with a model named in the project settings, after the SDK's `setModel()` a `/model` to that
+ * model's alias leaves the next request on the `setModel` model (issue #333). The daemon no longer calls
  * `setModel`, so the scene reads the raw SDK. The startup model, which is not Haiku, runs no
  * request: the two commands cost nothing and the one-word turn runs on Haiku while the limit
  * stands. P28 rides on the same run: the command is sent under a uuid of its own, as the daemon
@@ -726,7 +726,12 @@ async function setupModelResume(s: Stage): Promise<Seen> {
  */
 async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
   const input = new AsyncQueue<SDKUserMessage>();
-  const raw = query({ prompt: input, options: { cwd: s.workdir, settingSources: [] } });
+  // The override shows through only for the model the settings name (measured 2026-10-16), so the
+  // scene names one: a project settings file in a folder of its own, read alone.
+  const cwd = join(s.workdir, "model-settings");
+  await mkdir(join(cwd, ".claude"), { recursive: true });
+  await writeFile(join(cwd, ".claude", "settings.json"), JSON.stringify({ model: "sonnet" }));
+  const raw = query({ prompt: input, options: { cwd, settingSources: ["project"] } });
   const say = (content: string, uuid?: UUID) =>
     input.push({
       type: "user",

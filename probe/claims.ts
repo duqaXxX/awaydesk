@@ -275,9 +275,9 @@ export const CLAIMS: readonly Claim[] = [
   claim(
     "P27",
     "gesture",
-    "after `setModel()` on the query, a `/model` to the alias of the model the session started " +
-      "on is acknowledged and the next request still runs on the `setModel` model, as " +
-      "`docs/limits.md` says",
+    "with a model named in the project settings, after `setModel()` on the query a `/model` to " +
+      "that model's alias is acknowledged and the next request still runs on the `setModel` " +
+      "model, as `docs/limits.md` says",
     "src/agent/claude/session.ts#ClaudeSession.setModel",
     "the scene calls the SDK's `setModel` itself, since the daemon does not. If the request now " +
       "runs on the startup model the limit is gone: take its row out of `docs/limits.md` and say " +

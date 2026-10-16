@@ -1187,7 +1187,7 @@ closed when the start returns (`ThreadSession.connect`).
   `setModel` reject and closes the session, so `ThreadSession.applySetup` undoes the setup and the
   owner gets `Not sent.`; the first prompt of a setup that went through runs on the chosen model.
   It does not call the SDK's `setModel`, which leaves an override that a later `/model` to the
-  startup model's alias does not undo (issue #333, `docs/limits.md`). Bypass goes through
+  model the settings name does not undo (issue #333, `docs/limits.md`). Bypass goes through
   `ThreadSession.setBypass` when the
   choice differs from what the live session effectively runs (`ThreadSession.clientBypass`: the
   choice, or the folder's own bypass). The message then becomes one summary line, written inside the

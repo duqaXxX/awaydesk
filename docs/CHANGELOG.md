@@ -7,10 +7,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
-- `/model` to the model a session started on works again in a thread whose setup picked another
+- `/model` to the model your settings name works again in a thread whose setup picked another
   model (issue #333). The setup set the model with the SDK's `setModel`, after which `/model
-  opus` on an Opus default answered `Set model to Opus 5.5` and requests kept running on the
-  chosen model (measured 2026-10-16, SDK 0.3.301, Claude Code 2.1.301). The Claude back end now
+  opus` with `"model": "opus"` in the settings answered `Set model to Opus 5.5` and requests kept
+  running on the chosen model; a `/model` to any other model, or with no model in the settings,
+  was not affected (measured 2026-10-16, SDK 0.3.301, Claude Code 2.1.301). The Claude back end now
   sets the model as the terminal does, by running `/model <model>` in the idle session and
   reading that turn itself, under a uuid of its own: every record from the push to the
   `command_lifecycle` `completed` that names it stays in the back end (its states, its output, its
