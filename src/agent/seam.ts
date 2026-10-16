@@ -493,9 +493,19 @@ export interface AgentSession {
    * session that has ended it rejects, and the owner is shown the error's name.
    */
   send(prompt: Prompt): Promise<void>;
+  /**
+   * Stops the running turn. An interrupt while `setModel` runs makes `setModel` reject and leaves
+   * the session closed (the agent ends it, as `close` does): a model change is no turn to resume.
+   */
   interrupt(): Promise<void>;
   stopTask(taskId: string): Promise<void>;
   setPermissionMode(mode: PermissionMode): Promise<void>;
+  /**
+   * Sets the model of the next turns and resolves once it is in force: the session is idle, and
+   * whatever the agent does to change it (Claude Code: its own `/model`, a turn of its own) is no
+   * event. Null is the agent's default. Rejects a model `AgentInfo.models` does not list, and
+   * when `interrupt` is called while it runs: the session is closed then and the core drops it.
+   */
   setModel(model: string | null): Promise<void>;
   setEffort(level: string | null): Promise<void>;
   contextUsage(): Promise<ContextUsage>;
