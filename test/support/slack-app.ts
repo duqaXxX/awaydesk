@@ -54,7 +54,7 @@ import {
 } from "../../src/chat/slack/openfile/modal.ts";
 import { type Limiter, UpdateLimiter } from "../../src/chat/slack/reply/limiter.ts";
 import { resetStatusFlags } from "../../src/chat/slack/reply/status.ts";
-import { type Draft, dumpDraft } from "../../src/chat/slack/requests.ts";
+import { QUESTION_FORM } from "../../src/chat/slack/requests.ts";
 import {
   SETUP_BLOCK,
   SETUP_BYPASS,
@@ -725,18 +725,74 @@ export const QUESTIONS: readonly Question[] = [
   },
 ];
 
-/** The form's recorded Submit (view_submission, 2026-09-24), carrying this draft and state. */
-export function formBody(kind: string, draft: Draft, values: Body, user: Body = {}): Body {
-  const body = recorded("submit");
-  body.type = kind;
-  Object.assign(body.user, user);
-  body.view.private_metadata = dumpDraft(draft);
-  body.view.state = { values };
-  return body;
+/** Answer clicked on the question `approvalId` names: the form as `views.open` showed it. */
+export async function openedForm(world: World, approvalId: string): Promise<Body> {
+  await world.dispatch(answerClick(approvalId));
+  return (world.slack.callsTo("views.open") as Body[]).at(-1)?.view as Body;
 }
 
 export function picked(index: number, value: string): Body {
   return { [`q${index}`]: { answer: { type: "radio_buttons", selected_option: { value } } } };
+}
+
+/**
+ * What Slack sends when a control of the question form dispatches an action (the block_actions
+ * payload of a modal, from the reference read 2026-10-16: `container.type` "view", the `view`
+ * with `id`, `hash`, `private_metadata` and `state.values`, and the action that fired). `view` is
+ * the form as it stands on screen, as `views.open` or the last `views.update` gave it.
+ */
+export function formAction(
+  view: Body,
+  values: Body,
+  action: { readonly id: string; readonly block: string; readonly type: string },
+  options: { readonly hash?: string; readonly user?: Body } = {},
+): Body {
+  const body = viewEvent("block_actions", values, {
+    metadata: view.private_metadata,
+    blocks: view.blocks as Body[],
+    viewHash: options.hash ?? "1790000000.h0",
+  });
+  body.view.callback_id = QUESTION_FORM;
+  body.actions = [
+    {
+      type: action.type,
+      block_id: action.block,
+      action_id: action.id,
+      action_ts: "1790000100.000000",
+    },
+  ];
+  Object.assign(body.user, options.user ?? {});
+  return body;
+}
+
+/** The Answer click, recorded 2026-09-24, on the question `approvalId` names. */
+export function answerClick(approvalId: string): Body {
+  const body = recorded("open-click");
+  body.actions[0].value = approvalId;
+  body.trigger_id = "0000000000.0000000000.fake"; // real clicks carry one; the scrub drops it
+  return body;
+}
+
+/**
+ * Answer clicked on the question `approvalId` names and Next pressed with the option `pick` of
+ * its first question: the view of the second page, as `response_action: update` gave it. The
+ * world's Slack answers `views.open` (a `ModalSlack` makes it keep the view).
+ */
+export async function onSecondPage(world: World, approvalId: string, pick: string): Promise<Body> {
+  await world.dispatch(answerClick(approvalId));
+  const first = (world.slack.callsTo("views.open") as Body[]).at(-1)?.view as Body;
+  const response = await world.dispatch(submitOn(first, picked(0, pick)));
+  return (response.body as Body).view as Body;
+}
+
+/** The Next or Submit of the form `view` with these values. */
+export function submitOn(view: Body, values: Body, user: Body = {}): Body {
+  const body = recorded("submit");
+  body.type = "view_submission";
+  Object.assign(body.user, user);
+  body.view.private_metadata = view.private_metadata;
+  body.view.state = { values };
+  return body;
 }
 
 /** Two stored sessions of the channel's folder: one titled, one named by its first prompt. */

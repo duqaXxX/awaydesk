@@ -88,6 +88,7 @@ export function answersFlow(deps: FlowDeps, talk: Talk): AnswersFlow {
         const resolved = approvals.resolve(requestId, ref.channel, ref.thread, {
           kind: "answer",
           answers: given.answers,
+          notes: given.notes,
         });
         if (resolved === null) {
           await talk.tell(ref, texts.APPROVAL_GONE);

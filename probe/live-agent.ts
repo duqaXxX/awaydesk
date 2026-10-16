@@ -481,7 +481,7 @@ async function main(): Promise<void> {
           const labels = question.options.map((option) => option.label);
           answers[question.text] = question.multiSelect ? labels : (labels[0] ?? "");
         }
-        return { answered: true, answers };
+        return { answered: true, answers, notes: {} };
       };
       const run = await turn(
         session,

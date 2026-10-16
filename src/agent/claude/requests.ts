@@ -104,12 +104,52 @@ export function permissionResult(answer: PermissionAnswer, input: Input): Permis
   return { behavior: "allow", updatedInput: { ...input } };
 }
 
+/** What `annotations` holds for one question: the notes and the preview of the option picked. */
+type Annotation = { notes?: string; preview?: string };
+
+/**
+ * The annotations of an answer, keyed by question text (`sdk-tools.d.ts` 0.3.301). The terminal
+ * sends the preview of the option picked with a single-select answer, and the model reads it
+ * back as `selected preview:` (measured 2026-10-16); an answer typed under Other matches no
+ * option and carries none.
+ */
+function annotationsOf(
+  answer: Extract<QuestionAnswer, { answered: true }>,
+  questions: readonly unknown[],
+): Record<string, Annotation> {
+  const found: Record<string, Annotation> = {};
+  for (const entry of questions) {
+    const question = questionOf(entry);
+    if (question === null) continue;
+    const annotation: Annotation = {};
+    const note = Object.hasOwn(answer.notes, question.text) ? answer.notes[question.text] : "";
+    if (note) annotation.notes = note;
+    const given = Object.hasOwn(answer.answers, question.text)
+      ? answer.answers[question.text]
+      : null;
+    if (typeof given === "string" && !question.multiSelect) {
+      const preview = question.options.find((option) => option.label === given)?.preview;
+      if (preview) annotation.preview = preview;
+    }
+    if (Object.keys(annotation).length > 0) found[question.text] = annotation;
+  }
+  return found;
+}
+
 /**
  * The owner's answer to a question whose call had `input`: the questions as Claude Code wrote
- * them, with the answer of each under its text.
+ * them, with the answer of each under its text, and the annotations when there are any.
  */
 export function questionResult(answer: QuestionAnswer, input: Input): PermissionResult {
   if (!answer.answered) return { behavior: "deny", message: answer.message };
   const questions = Array.isArray(input.questions) ? input.questions : [];
-  return { behavior: "allow", updatedInput: { questions, answers: answer.answers } };
+  const annotations = annotationsOf(answer, questions);
+  return {
+    behavior: "allow",
+    updatedInput: {
+      questions,
+      answers: answer.answers,
+      ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
+    },
+  };
 }

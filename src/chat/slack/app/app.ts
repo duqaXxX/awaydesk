@@ -66,6 +66,7 @@ import { describe } from "../reply/errors.ts";
 import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
+  type Draft,
   QUESTION_FORM,
   QUESTION_OPEN,
   QUESTION_SKIP,
@@ -152,6 +153,11 @@ export interface BuiltApp {
    * nothing.
    */
   close(): void;
+  /**
+   * What the owner filled in each open question form, by request id (`Requests.drafts`): read by
+   * a test.
+   */
+  readonly drafts: ReadonlyMap<string, Draft>;
   /** `!open` typed in a session's thread, for the folder the session works in. */
   openFile(channel: string, threadTs: string, folder: string, words: string): Promise<void>;
 }
@@ -341,7 +347,9 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action(SETUP_BYPASS, requests.onSetupEdit, { acknowledgeOnly: true });
   for (const actionId of [HOLD_CONTINUE, HOLD_CANCEL]) action(actionId, requests.onHoldDecision);
   for (const actionId of DECISION_ACTIONS) action(actionId, requests.onDecision);
-  action("answer", requests.onAnswer, { acknowledgeOnly: true });
+  action("answer", requests.onQuestionChoice);
+  action("other", requests.onQuestionOther);
+  action("notes", requests.onQuestionNotes);
   action(QUESTION_OPEN, requests.onQuestionOpen);
   view(QUESTION_FORM, requests.onQuestionSubmit);
 
@@ -366,7 +374,9 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   return {
     app,
     registered,
+    drafts: requests.drafts,
     close: () => {
+      requests.close();
       chat.halt();
       clips.close();
     },

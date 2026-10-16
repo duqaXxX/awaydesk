@@ -684,7 +684,9 @@ export function agentConformance(name: string, harness: AgentHarness): void {
             asked.multiSelect ? [asked.options[0] ?? ""] : (asked.options[0] ?? ""),
           ]),
         );
-        const requests = new Requests({ question: async () => ({ answered: true, answers }) });
+        const requests = new Requests({
+          question: async () => ({ answered: true, answers, notes: {} }),
+        });
         const { session, events } = await open(t, world, requests);
         await session.send(prompt());
         const turn = await events.turn();

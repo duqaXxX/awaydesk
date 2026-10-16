@@ -26,7 +26,6 @@ import {
   STATUS_ACTION,
   TODAY,
 } from "../../../../src/chat/slack/home.ts";
-import { newDraft } from "../../../../src/chat/slack/requests.ts";
 import {
   SETUP_BYPASS,
   SETUP_EFFORT,
@@ -38,6 +37,7 @@ import { fill, named } from "../../../../src/core/texts.ts";
 import { BOT, CHANNEL, OTHER_TEAM, OWNER, STRANGER, THREAD } from "../../../support/fake-slack.ts";
 import { NAMES } from "../../../support/names.ts";
 import {
+  answerClick,
   type Body,
   CLICK_THREAD,
   chooseClick,
@@ -46,12 +46,13 @@ import {
   clipInfo,
   clipMessage,
   FORM_THREAD,
-  formBody,
+  formAction,
   HOME_THREAD,
   homeAction,
   listed,
   ModalSlack,
   message,
+  openedForm,
   picked,
   put,
   QUESTIONS,
@@ -59,6 +60,7 @@ import {
   resumeClick,
   SESSION_A,
   setupState,
+  submitOn,
   submitted,
   typing,
   type World,
@@ -116,15 +118,67 @@ const CASES: readonly Case[] = [
       return { body, acted: () => world.slack.callsTo("views.open").length > 0 };
     },
   },
+  ...(["answer", "other"] as const).map(
+    (actionId): Case => ({
+      listener: `action ${actionId}`,
+      arrange: async (world, sender) => {
+        const question = QUESTIONS[0] as (typeof QUESTIONS)[number];
+        const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [question]);
+        const modal = new ModalSlack(world.slack);
+        await world.dispatch(answerClick(approvalId)); // the form on screen
+        // An option and a text both stand: the change empties the one that was not just made.
+        const values = {
+          ...picked(0, "0"),
+          o0: { other: { type: "plain_text_input", value: "mauve" } },
+        };
+        world.slack.apiCalls = []; // opening the form is the arrangement, not what the payload did
+        const body = formAction(
+          modal.view,
+          values,
+          {
+            id: actionId,
+            block: actionId === "answer" ? "q0" : "o0",
+            type: actionId === "answer" ? "radio_buttons" : "plain_text_input",
+          },
+          { hash: modal.hash },
+        );
+        return {
+          body: sentBy(body, sender),
+          acted: () => world.slack.callsTo("views.update").length > 0,
+        };
+      },
+    }),
+  ),
+  {
+    listener: "action notes",
+    arrange: async (world, sender) => {
+      const question = QUESTIONS[0] as (typeof QUESTIONS)[number];
+      const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [question]);
+      const modal = new ModalSlack(world.slack);
+      await world.dispatch(answerClick(approvalId));
+      world.slack.apiCalls = [];
+      const values = { ...picked(0, "0"), n0: { notes: { type: "plain_text_input", value: "x" } } };
+      const body = formAction(modal.view, values, {
+        id: "notes",
+        block: "n0",
+        type: "plain_text_input",
+      });
+      return {
+        body: sentBy(body, sender),
+        acted: () => world.built.drafts.get(approvalId)?.notes.size === 1,
+      };
+    },
+  },
   {
     listener: "view question_form",
     arrange: async (world, sender) => {
       const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [
         QUESTIONS[0] as (typeof QUESTIONS)[number],
       ]);
-      const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
+      const form = await openedForm(world, approvalId);
+      world.slack.apiCalls = []; // opening the form is the arrangement, not what the payload did
       return {
-        body: sentBy(formBody("view_submission", draft, picked(0, "0")), sender),
+        body: sentBy(submitOn(form, picked(0, "0")), sender),
         acted: () => pending.decided,
       };
     },
@@ -334,7 +388,6 @@ const ACKNOWLEDGE_ONLY: ReadonlyArray<
 > = [
   [`action ${SETUP_EFFORT}`, (sender) => sentBy(click(SETUP_EFFORT, "high"), sender)],
   [`action ${SETUP_BYPASS}`, (sender) => sentBy(click(SETUP_BYPASS, "bypass"), sender)],
-  ["action answer", (sender) => sentBy(click("answer", "0"), sender)],
   [
     `action ${NEW_THREAD_ACTION}`,
     (sender) => homeBy({ type: "button", action_id: NEW_THREAD_ACTION, value: "x" }, sender),
@@ -395,13 +448,12 @@ test("every listener the app registers has a row in the table, and every row a l
 test("view question_form: a stranger's Next on a two-question form is answered with nothing", async (t) => {
   const world = worldOf(t);
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
+  const form = await openedForm(world, approvalId);
+  world.slack.apiCalls = [];
   // The first question answered: for the owner this is a Next, answered with the next question.
-  const owner = await world.dispatch(formBody("view_submission", draft, picked(0, "0")));
+  const owner = await world.dispatch(submitOn(form, picked(0, "0")));
   assert.equal(owner.body?.response_action, "update");
-  const stranger = await world.dispatch(
-    sentBy(formBody("view_submission", draft, picked(0, "0")), "stranger"),
-  );
+  const stranger = await world.dispatch(sentBy(submitOn(form, picked(0, "0")), "stranger"));
   assert.equal(stranger.status, 200);
   assert.equal(stranger.body, null); // no view, no error: nothing that says the form exists
   assert.equal(pending.decided, false);
@@ -413,10 +465,10 @@ test("view question_form: the form of a channel the guard refuses resolves nothi
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [
     QUESTIONS[0] as (typeof QUESTIONS)[number],
   ]);
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
+  const form = await openedForm(world, approvalId);
   // The channel gained a member while the form was open.
   world.slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
-  const response = await world.dispatch(formBody("view_submission", draft, picked(0, "0")));
+  const response = await world.dispatch(submitOn(form, picked(0, "0")));
   await world.settle();
   assert.equal(response.status, 200);
   assert.equal(pending.decided, false);

@@ -26,9 +26,13 @@ export const APPROVAL_DENY = "approval_deny";
 export const QUESTION_OPEN = "question_open";
 export const QUESTION_SKIP = "question_skip";
 export const QUESTION_FORM = "question_form";
-// Text typed under Other, per question: four at the worst (every character escaped, `"` becoming
-// `\"`) still keep the draft under private_metadata's 3,000 characters.
+// Text typed under Other and in Notes, per question. The draft lives in the daemon's memory
+// (`Requests`), so Slack's 3,000 characters of private_metadata bound neither.
 export const TYPED_LIMIT = 300;
+export const NOTES_LIMIT = 300;
+// A block that must show empty gets a new id: Slack keeps an input's value across `views.update`
+// while its `block_id` and `action_id` stay. The revision wraps, so the ids stay short.
+const REVISIONS = 100;
 
 type Block = Record<string, unknown>;
 type Answers = Record<string, string | string[]>;
@@ -188,18 +192,43 @@ export function questionBlocks(
   ];
 }
 
+/** The two fields of a question that can be cleared while the form is open. */
+export type Field = "choice" | "other";
+
+/** The id of a question's choice or Other block at revision `rev` (0 is the plain id). */
+function blockIdOf(field: Field, at: number, rev: number): string {
+  return `${field === "choice" ? "q" : "o"}${at}${rev === 0 ? "" : `.${rev}`}`;
+}
+
+/** The id of the block that shows `field` of question `at` in a form built from `draft`. */
+export function blockIdIn(draft: Draft, field: Field, at: number): string {
+  return blockIdOf(field, at, draft.revisions.get(at)?.[field === "choice" ? 0 : 1] ?? 0);
+}
+
 /**
- * What the owner filled in the form so far, carried by the form itself (private_metadata) from
- * one question to the next: option indexes picked and text typed, per question.
+ * What the owner filled in the form so far, kept by the provider in memory (`Requests`) while
+ * the request is open: option indexes picked, text typed under Other and notes, per question; the
+ * revision of each question's two clearable blocks (`blockIdIn`); and which of the two was
+ * changed last in a single select (`settled`).
  */
 export interface Draft {
   readonly approvalId: string;
   readonly channelId: string;
   readonly threadTs: string;
-  /** The question on screen. */
+  /**
+   * The generation of the form that is valid: every Answer opens a new one and makes the older
+   * forms of the request stale (`Requests.onQuestionOpen`).
+   */
+  readonly generation: number;
+  /** The question on screen in the valid form. */
   readonly active: number;
   readonly picks: ReadonlyMap<number, readonly number[]>;
   readonly typed: ReadonlyMap<number, string>;
+  readonly notes: ReadonlyMap<number, string>;
+  /** Per question: the revision of its choice block and of its Other block in the valid form. */
+  readonly revisions: ReadonlyMap<number, readonly [choice: number, other: number]>;
+  /** Per question: the field the owner changed last. */
+  readonly last: ReadonlyMap<number, Field>;
 }
 
 /** A draft of the request `approvalId` posted in this thread, with nothing filled in unless given. */
@@ -207,58 +236,68 @@ export function newDraft(
   approvalId: string,
   channelId: string,
   threadTs: string,
-  filled: Partial<Pick<Draft, "active" | "picks" | "typed">> = {},
+  filled: Partial<
+    Pick<Draft, "generation" | "active" | "picks" | "typed" | "notes" | "revisions" | "last">
+  > = {},
 ): Draft {
   return {
     approvalId,
     channelId,
     threadTs,
+    generation: filled.generation ?? 0,
     active: filled.active ?? 0,
     picks: filled.picks ?? new Map(),
     typed: filled.typed ?? new Map(),
+    notes: filled.notes ?? new Map(),
+    revisions: filled.revisions ?? new Map(),
+    last: filled.last ?? new Map(),
   };
 }
 
-/** The draft as `private_metadata` text, compact because Slack caps it at 3,000 characters. */
-export function dumpDraft(draft: Draft): string {
-  // `JSON.stringify` keeps non-Latin text as it is: Slack counts characters, not bytes.
+/**
+ * What a form carries in its `private_metadata`: the request it answers, its generation and the
+ * page it shows. Only the newest form of a request is valid (`Draft.generation`), so everything
+ * else lives in the draft. The page names the blocks the payload's state belongs to: a late
+ * change from a page Next has left carries the old one and is ignored.
+ */
+export type FormIds = Pick<
+  Draft,
+  "approvalId" | "channelId" | "threadTs" | "generation" | "active"
+>;
+
+export function dumpIds(ids: FormIds): string {
   return JSON.stringify({
-    a: draft.approvalId,
-    c: draft.channelId,
-    h: draft.threadTs,
-    n: draft.active,
-    p: Object.fromEntries([...draft.picks].map(([k, v]) => [String(k), v])),
-    t: Object.fromEntries([...draft.typed].map(([k, v]) => [String(k), v])),
+    a: ids.approvalId,
+    c: ids.channelId,
+    h: ids.threadTs,
+    g: ids.generation,
+    n: ids.active,
   });
 }
 
-function text(value: unknown): string {
-  if (typeof value !== "string") throw new Error("malformed draft");
-  return value;
+/**
+ * The ids `dumpIds` wrote; throws on anything else. Generation and page are read when they are
+ * there: the metadata of an earlier version has no generation (0, older than any form now open)
+ * and may carry a whole draft beside the ids, which is left unread.
+ */
+export function loadIds(dumped: string): FormIds {
+  const data: unknown = JSON.parse(dumped);
+  if (!isRecord(data) || ![data.a, data.c, data.h].every((id) => typeof id === "string")) {
+    throw new Error("malformed form");
+  }
+  return {
+    approvalId: data.a as string,
+    channelId: data.c as string,
+    threadTs: data.h as string,
+    generation: data.g === undefined ? 0 : index(data.g),
+    active: data.n === undefined ? 0 : index(data.n),
+  };
 }
 
 function index(value: unknown): number {
   const found = typeof value === "string" ? value : typeof value === "number" ? String(value) : "";
-  if (!/^\d+$/.test(found)) throw new Error("malformed draft");
+  if (!/^\d+$/.test(found)) throw new Error("malformed form");
   return Number(found);
-}
-
-/** The draft `dumpDraft` wrote; throws on anything else. */
-export function loadDraft(dumped: string): Draft {
-  const data: unknown = JSON.parse(dumped);
-  if (!isRecord(data) || !isRecord(data.p) || !isRecord(data.t)) throw new Error("malformed draft");
-  const picks = new Map<number, number[]>();
-  for (const [key, value] of Object.entries(data.p)) {
-    if (!Array.isArray(value)) throw new Error("malformed draft");
-    picks.set(index(key), value.map(index));
-  }
-  const typed = new Map<number, string>();
-  for (const [key, value] of Object.entries(data.t)) typed.set(index(key), text(value));
-  return newDraft(text(data.a), text(data.c), text(data.h), {
-    active: index(data.n),
-    picks,
-    typed,
-  });
 }
 
 function fieldsOf(value: unknown): Record<string, unknown> {
@@ -266,13 +305,40 @@ function fieldsOf(value: unknown): Record<string, unknown> {
 }
 
 /**
+ * The state of the block of `field` for question `at`, whatever its revision: Slack names the
+ * blocks of the form by the ids it was given.
+ */
+function stateOf(
+  values: Record<string, unknown>,
+  field: Field,
+  at: number,
+): Record<string, unknown> {
+  const prefix = blockIdOf(field, at, 0);
+  const id = Object.keys(values).find((key) => key === prefix || key.startsWith(`${prefix}.`));
+  return fieldsOf(id === undefined ? undefined : values[id]);
+}
+
+/**
+ * The id of the block that shows `field` of question `at` in the form `stateValues` came from,
+ * which is where a field error must go; the id the draft expects when the state names none.
+ */
+export function shownBlockId(draft: Draft, stateValues: unknown, field: Field, at: number): string {
+  const values = fieldsOf(stateValues);
+  const prefix = blockIdOf(field, at, 0);
+  return (
+    Object.keys(values).find((key) => key === prefix || key.startsWith(`${prefix}.`)) ??
+    blockIdIn(draft, field, at)
+  );
+}
+
+/**
  * The draft with what the question on screen shows now: Slack sends the form's state with Next
- * and Submit, but only for the blocks on screen.
+ * and Submit, and with a dispatched action, but only for the blocks on screen.
  */
 export function absorb(draft: Draft, stateValues: unknown): Draft {
   const at = draft.active;
   const values = fieldsOf(stateValues);
-  const picked = fieldsOf(fieldsOf(values[`q${at}`]).answer);
+  const picked = fieldsOf(stateOf(values, "choice", at).answer);
   const single = fieldsOf(picked.selected_option);
   const several = picked.selected_options;
   const chosen: unknown[] =
@@ -281,8 +347,10 @@ export function absorb(draft: Draft, stateValues: unknown): Draft {
       : Object.keys(single).length > 0
         ? [single]
         : [];
-  const typedText = fieldsOf(fieldsOf(values[`o${at}`]).other).value;
+  const typedText = fieldsOf(stateOf(values, "other", at).other).value;
   const typed = typeof typedText === "string" ? strip(typedText) : "";
+  const noteText = fieldsOf(fieldsOf(values[`n${at}`]).notes).value;
+  const noted = typeof noteText === "string" ? strip(noteText) : "";
   const picks = new Map(draft.picks);
   picks.set(
     at,
@@ -290,11 +358,57 @@ export function absorb(draft: Draft, stateValues: unknown): Draft {
   );
   const texts_ = new Map(draft.typed);
   texts_.set(at, typed);
+  const notes = new Map(draft.notes);
+  notes.set(at, noted);
   return {
     ...draft,
     picks: new Map([...picks].filter(([, v]) => v.length > 0)),
     typed: new Map([...texts_].filter(([, v]) => v !== "")),
+    notes: new Map([...notes].filter(([, v]) => v !== "")),
   };
+}
+
+/** The draft with `field` of the question on screen marked as the one changed last. */
+export function touched(draft: Draft, field: Field): Draft {
+  return { ...draft, last: new Map(draft.last).set(draft.active, field) };
+}
+
+/**
+ * The draft to show when the field just changed (`changed`, read into `draft` by `absorb`) must
+ * empty the other one, or null when nothing must be cleared. A single select takes an option or
+ * a text under Other, never both (Claude Code replaces the option with the text); a multi-select
+ * takes both, so nothing is cleared there. The cleared block gets a new id, since Slack would
+ * keep its value otherwise.
+ */
+export function excluding(
+  draft: Draft,
+  questions: readonly Question[],
+  changed: Field,
+): Draft | null {
+  const at = draft.active;
+  if (questions[at]?.multiSelect !== false) return null;
+  const cleared: Field = changed === "choice" ? "other" : "choice";
+  const filled = cleared === "other" ? draft.typed.has(at) : draft.picks.has(at);
+  const changedFilled = changed === "choice" ? draft.picks.has(at) : draft.typed.has(at);
+  if (!filled || !changedFilled) return null;
+  const [choice, other] = draft.revisions.get(at) ?? [0, 0];
+  const revisions = new Map(draft.revisions).set(
+    at,
+    cleared === "choice" ? [(choice + 1) % REVISIONS, other] : [choice, (other + 1) % REVISIONS],
+  );
+  const picks = new Map(draft.picks);
+  const typed = new Map(draft.typed);
+  (cleared === "choice" ? picks : typed).delete(at);
+  return { ...draft, picks, typed, revisions };
+}
+
+/**
+ * The draft as Next or Submit reads it. A single select carries both an option and a text when
+ * the click came before the update that empties one of them: the one changed last stays (the
+ * text when no change was seen).
+ */
+export function settled(draft: Draft, questions: readonly Question[]): Draft {
+  return excluding(draft, questions, draft.last.get(draft.active) ?? "other") ?? draft;
 }
 
 function answerAt(
@@ -307,25 +421,40 @@ function answerAt(
   return answerOf(question, draft.picks.get(at) ?? [], draft.typed.get(at));
 }
 
+/** An option or a text under Other make an answer, as in the terminal. */
 export function isAnswered(draft: Draft, questions: readonly Question[], at: number): boolean {
   return answerAt(draft, questions, at) !== null;
 }
 
+/** Whether question `at` has notes and no option to add them to: a note is for an option. */
+export function notesNeedOption(draft: Draft, at: number): boolean {
+  return draft.notes.has(at) && !draft.picks.has(at);
+}
+
 /** The index of the first question with no answer, or null when every one has one. */
 export function firstUnanswered(draft: Draft, questions: readonly Question[]): number | null {
-  const found = questions.findIndex((_, at) => answerAt(draft, questions, at) === null);
+  const found = questions.findIndex((_, at) => !isAnswered(draft, questions, at));
   return found === -1 ? null : found;
 }
 
-/** Every question's answer by its text, or null while one is unanswered. */
-export function draftAnswers(draft: Draft, questions: readonly Question[]): Answers | null {
-  const entries: [string, string | string[]][] = [];
+/**
+ * Every question's answer by its text and the notes added to an option by the question's text,
+ * or null while one question is unanswered or has notes with no option.
+ */
+export function draftAnswers(
+  draft: Draft,
+  questions: readonly Question[],
+): { answers: Answers; notes: Record<string, string> } | null {
+  const answers: [string, string | string[]][] = [];
+  const notes: [string, string][] = [];
   for (const [at, question] of questions.entries()) {
     const answer = answerAt(draft, questions, at);
-    if (answer === null) return null;
-    entries.push([question.text, answer]);
+    if (answer === null || notesNeedOption(draft, at)) return null;
+    answers.push([question.text, answer]);
+    const note = draft.notes.get(at);
+    if (note !== undefined) notes.push([question.text, note]);
   }
-  return Object.fromEntries(entries);
+  return { answers: Object.fromEntries(answers), notes: Object.fromEntries(notes) };
 }
 
 /**
@@ -440,26 +569,51 @@ export function questionView(draft: Draft, questions: readonly Question[], names
   };
   const typed = draft.typed.get(at);
   if (typed) other.initial_value = typed;
+  const notes: Block = {
+    type: "plain_text_input",
+    action_id: "notes",
+    max_length: NOTES_LIMIT,
+    placeholder: { type: "plain_text", text: slackTexts.QUESTION_NOTES_HINT },
+  };
+  const noted = draft.notes.get(at);
+  if (noted) notes.initial_value = noted;
+  // Every field reports its change (`Requests.onQuestionLive`), so that a form closed with Later
+  // and opened again finds what was typed. Only a single select redraws: it takes an option or
+  // a text under Other, not both, and `excluding` empties the other one. A multi-select adds the
+  // text to the labels and clears nothing.
+  const typing = { trigger_actions_on: ["on_character_entered"] };
+  other.dispatch_action_config = typing;
+  notes.dispatch_action_config = typing;
   blocks.push(
     {
       type: "input",
-      block_id: `q${at}`,
+      block_id: blockIdIn(draft, "choice", at),
       optional: true,
+      dispatch_action: true,
       label: { type: "plain_text", text: label },
       element,
     },
     {
       type: "input",
-      block_id: `o${at}`,
+      block_id: blockIdIn(draft, "other", at),
       optional: true,
+      dispatch_action: true,
       label: { type: "plain_text", text: slackTexts.QUESTION_OTHER },
       element: other,
+    },
+    {
+      type: "input",
+      block_id: `n${at}`,
+      optional: true,
+      dispatch_action: true,
+      label: { type: "plain_text", text: slackTexts.QUESTION_NOTES },
+      element: notes,
     },
   );
   return {
     type: "modal",
     callback_id: QUESTION_FORM,
-    private_metadata: dumpDraft(draft),
+    private_metadata: dumpIds(draft),
     title: { type: "plain_text", text: named(slackTexts.QUESTION_TITLE, names) },
     submit: {
       type: "plain_text",

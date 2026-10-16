@@ -173,22 +173,103 @@ test("an answered question goes back as the questions asked and their answers", 
     "Do you also like green?": ["Yes", "Only in spring"],
   };
   assert.deepEqual(echoed.answers, answers);
-  assert.deepEqual(questionResult({ answered: true, answers }, input), {
+  assert.deepEqual(questionResult({ answered: true, answers, notes: {} }, input), {
     behavior: "allow",
     updatedInput: { questions: echoed.questions, answers },
+  });
+});
+
+const ASKED = [
+  {
+    question: "Which layout?",
+    options: [
+      { label: "grid", preview: "+--+\n|  |" },
+      { label: "list", preview: "" },
+      { label: "bare" },
+    ],
+  },
+  { question: "Which colour?", multiSelect: true, options: [{ label: "red" }, { label: "blue" }] },
+];
+
+test("notes go back as annotations beside the answers, keyed by the question", () => {
+  const answers = { "Which colour?": ["red"] };
+  const notes = { "Which colour?": "a bit darker" };
+  assert.deepEqual(questionResult({ answered: true, answers, notes }, { questions: ASKED }), {
+    behavior: "allow",
+    updatedInput: {
+      questions: ASKED,
+      answers,
+      annotations: { "Which colour?": { notes: "a bit darker" } },
+    },
+  });
+});
+
+test("the preview of the option picked rides in the annotation, as the terminal sends it", () => {
+  const notes = { "Which layout?": "tighter gaps" };
+  const answers = { "Which layout?": "grid" };
+  const result = questionResult({ answered: true, answers, notes }, { questions: ASKED });
+  assert.deepEqual((result as JsonObject).updatedInput, {
+    questions: ASKED,
+    answers,
+    annotations: { "Which layout?": { preview: "+--+\n|  |", notes: "tighter gaps" } },
+  });
+  // No notes: the preview alone still goes, as the terminal's own result for a preview question.
+  const bare = questionResult({ answered: true, answers, notes: {} }, { questions: ASKED });
+  assert.deepEqual((bare as JsonObject).updatedInput, {
+    questions: ASKED,
+    answers,
+    annotations: { "Which layout?": { preview: "+--+\n|  |" } },
+  });
+});
+
+test("no preview goes for an empty preview, a typed answer or a multi-select", () => {
+  for (const answers of [
+    { "Which layout?": "list" },
+    { "Which layout?": "bare" },
+    { "Which layout?": "grid but wider" },
+  ]) {
+    const result = questionResult({ answered: true, answers, notes: {} }, { questions: ASKED });
+    assert.deepEqual((result as JsonObject).updatedInput, { questions: ASKED, answers });
+  }
+  const several = { "Which colour?": ["red", "blue"] };
+  const result = questionResult(
+    { answered: true, answers: several, notes: {} },
+    { questions: ASKED },
+  );
+  assert.deepEqual((result as JsonObject).updatedInput, { questions: ASKED, answers: several });
+});
+
+test("a question named like an inherited key carries no annotation of its own", () => {
+  const asked = [{ question: "constructor", options: [{ label: "a" }, { label: "b" }] }];
+  const result = questionResult(
+    { answered: true, answers: { constructor: "a" }, notes: {} },
+    { questions: asked },
+  );
+  assert.deepEqual((result as JsonObject).updatedInput, {
+    questions: asked,
+    answers: { constructor: "a" },
+  });
+  const noted = questionResult(
+    { answered: true, answers: { constructor: "a" }, notes: { constructor: "why" } },
+    { questions: asked },
+  );
+  assert.deepEqual((noted as JsonObject).updatedInput, {
+    questions: asked,
+    answers: { constructor: "a" },
+    annotations: { constructor: { notes: "why" } },
   });
 });
 
 test("the questions go back as the agent wrote them, with what the seam does not carry", () => {
   const questions = [{ question: "Go on?", options: [{ label: "Yes", extra: 1 }], extra: 2 }];
   const answers = { "Go on?": "Yes" };
-  const result = questionResult({ answered: true, answers }, { questions, other: true });
+  const result = questionResult({ answered: true, answers, notes: {} }, { questions, other: true });
   assert.deepEqual(result, { behavior: "allow", updatedInput: { questions, answers } });
 });
 
 test("an answer to an input that held no question goes back with none", () => {
   const answers = { "Go on?": "Yes" };
-  assert.deepEqual(questionResult({ answered: true, answers }, {}), {
+  assert.deepEqual(questionResult({ answered: true, answers, notes: {} }, {}), {
     behavior: "allow",
     updatedInput: { questions: [], answers },
   });

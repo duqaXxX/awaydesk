@@ -9,10 +9,14 @@ import {
   approvalBlocks as approvalBlocksOf,
   type Draft,
   draftAnswers,
-  dumpDraft,
+  dumpIds,
+  excluding,
   firstUnanswered,
-  loadDraft,
+  isAnswered,
+  loadIds,
+  NOTES_LIMIT,
   newDraft,
+  notesNeedOption,
   OPTION_TEXT_LIMIT,
   QUESTION_FORM,
   QUESTION_OPEN,
@@ -20,7 +24,9 @@ import {
   questionBlocks as questionBlocksOf,
   questionView as questionViewOf,
   SECTION_LIMIT,
+  settled,
   TYPED_LIMIT,
+  touched,
 } from "../../../src/chat/slack/requests.ts";
 import { THREAD } from "../../support/fake-slack.ts";
 import { sdkJson } from "../../support/fixtures.ts";
@@ -148,13 +154,19 @@ test("the form shows one question with next until the last", () => {
   const view = questionView(draftOf(), TWO);
   assert.ok(view.type === "modal" && view.callback_id === QUESTION_FORM);
   assert.equal(view.callback_id, "question_form");
-  assert.deepEqual(loadDraft(view.private_metadata), draftOf());
+  assert.deepEqual(loadIds(view.private_metadata), {
+    approvalId: "abc",
+    channelId: "C1",
+    threadTs: THREAD,
+    generation: 0,
+    active: 0,
+  });
   assert.equal(view.submit.text, "Next (1/2)");
   assert.equal(view.blocks[0].elements[0].text, "Colour · 1 of 2");
   const inputs: Json[] = view.blocks.filter((b: Json) => b.type === "input");
   assert.deepEqual(
     inputs.map((b) => b.block_id),
-    ["q0", "o0"],
+    ["q0", "o0", "n0"],
   );
   assert.equal(inputs[0]?.element.type, "radio_buttons");
   assert.equal(inputs[0]?.element.options[0].description.text, "Warm");
@@ -175,7 +187,7 @@ test("the last question holds checkboxes and submit", () => {
   const inputs: Json[] = view.blocks.filter((b: Json) => b.type === "input");
   assert.deepEqual(
     inputs.map((b) => b.block_id),
-    ["q1", "o1"],
+    ["q1", "o1", "n1"],
   );
   const element = inputs[0]?.element;
   assert.equal(element.type, "checkboxes");
@@ -199,7 +211,7 @@ test("options that fit keep their description under the choice", () => {
     options: [{ label: "red", description: fits }],
   });
   const view = questionView(draftOf(), [asked]);
-  assert.equal(view.blocks.length, 2);
+  assert.equal(view.blocks.length, 3);
   const [choice] = view.blocks;
   assert.equal(choice.label.text, "Colour?");
   assert.equal(choice.element.options[0].description.text, fits);
@@ -216,8 +228,14 @@ test("options that say more than a choice holds are shown whole above it", () =>
   const [minimal, detailed] = asked.options as [Question["options"][0], Question["options"][0]];
   assert.ok((minimal.description as string).length > OPTION_TEXT_LIMIT && minimal.preview);
   const view = questionView(draftOf(), [asked]);
-  assert.equal(view.blocks.length, 5);
-  const [header, first, second, choice, other] = view.blocks as [Json, Json, Json, Json, Json];
+  assert.equal(view.blocks.length, 6);
+  const [header, first, second, choice, other] = view.blocks as Json[] as [
+    Json,
+    Json,
+    Json,
+    Json,
+    Json,
+  ];
   assert.deepEqual(header, {
     type: "rich_text",
     elements: [{ type: "rich_text_section", elements: [bold(asked.text)] }],
@@ -270,7 +288,7 @@ test("options shown whole are shown as written and fit slack s limits", () => {
     options: [{ label: "<a>", description: written, preview: "p".repeat(4000) }],
   });
   const blocks = questionView(draftOf(), [asked]).blocks as Json[];
-  assert.equal(blocks.length, 4);
+  assert.equal(blocks.length, 5);
   const [heading, option] = blocks as [Json, Json];
   assert.deepEqual(heading.elements[0].elements, [bold("Which *one*?")]);
   const [label, description] = option.elements[0].elements;
@@ -289,7 +307,7 @@ test("a question of several keeps its counter above the options shown whole", ()
   const view = questionView(draftOf(), [long, TWO[0] as Question]);
   assert.deepEqual(
     view.blocks.map((b: Json) => b.type),
-    ["context", "rich_text", "rich_text", "input", "input"],
+    ["context", "rich_text", "rich_text", "input", "input", "input"],
   );
   assert.equal(view.blocks[0].elements[0].text, "Why · 1 of 2");
 });
@@ -303,7 +321,7 @@ test("a header of blanks alone never leaves the choice an empty label", () => {
   const view = questionView(draftOf(), [blank, TWO[0] as Question]);
   assert.equal(view.blocks[0].elements[0].text, "1 of 2");
   const choices: Json[] = view.blocks.filter((b: Json) => b.type === "input");
-  assert.equal(choices.length, 2);
+  assert.equal(choices.length, 3);
   assert.equal(choices[0]?.label.text, "Answer");
 });
 
@@ -316,7 +334,7 @@ test("a preview or a description of blanks alone counts as none", () => {
   });
   const view = questionView(draftOf(), [asked]);
   // Nothing more to show than the choices hold: the form it always had, and no empty text.
-  assert.equal(view.blocks.length, 2);
+  assert.equal(view.blocks.length, 3);
   const [choice] = view.blocks;
   assert.equal(choice.label.text, "Colour?");
   assert.deepEqual(choice.element.options[0], {
@@ -331,7 +349,7 @@ test("a preview keeps the spaces that draw it", () => {
     options: [{ label: "one", preview: "\n  a |\n  b |\n" }],
   });
   const blocks = questionView(draftOf(), [asked]).blocks as Json[];
-  assert.equal(blocks.length, 4);
+  assert.equal(blocks.length, 5);
   assert.equal(blocks[1]?.elements[1].elements[0].text, "  a |\n  b |");
 });
 
@@ -371,7 +389,10 @@ test("answers are the labels and the typed text", () => {
       [1, "xl"],
     ]),
   });
-  assert.deepEqual(draftAnswers(draft, TWO), { "Colour?": "purple", "Sizes?": ["s", "xl"] });
+  assert.deepEqual(draftAnswers(draft, TWO), {
+    answers: { "Colour?": "purple", "Sizes?": ["s", "xl"] },
+    notes: {},
+  });
   assert.equal(firstUnanswered(draft, TWO), null);
 });
 
@@ -381,33 +402,34 @@ test("the first unanswered question is found", () => {
   assert.equal(draftAnswers(draft, TWO), null);
 });
 
-test("the draft round trips under slack s limit", () => {
-  const draft = draftOf({
-    active: 3,
-    picks: new Map(Array.from({ length: 4 }, (_, i) => [i, [0, 1, 2, 3]] as [number, number[]])),
-    typed: new Map(
-      Array.from({ length: 4 }, (_, i) => [i, '"'.repeat(TYPED_LIMIT)] as [number, string]),
-    ),
+test("the form names its request, its generation and its page", () => {
+  const form = {
+    approvalId: "abc",
+    channelId: "C1",
+    threadTs: THREAD,
+    generation: 3,
+    active: 2,
+  };
+  const text = dumpIds(form);
+  assert.deepEqual(JSON.parse(text), { a: "abc", c: "C1", h: THREAD, g: 3, n: 2 });
+  assert.deepEqual(loadIds(text), form);
+  // The metadata of the first version, ids with a whole draft beside them, names its request
+  // with generation 0, older than any form now open; so does the one of the second version.
+  const old = '{"a":"abc","c":"C1","h":"1.2","n":1,"p":{"0":[1]},"t":{"0":"x"},"r":{"0":[1,0]}}';
+  assert.deepEqual(loadIds(old), {
+    approvalId: "abc",
+    channelId: "C1",
+    threadTs: "1.2",
+    generation: 0,
+    active: 1,
   });
-  // the worst case: every char escaped
-  const text = dumpDraft(draft);
-  assert.ok(chars(text) <= 3000);
-  assert.deepEqual(loadDraft(text), draft);
-  assert.equal((JSON.parse(text) as Json).a, "abc");
+  assert.deepEqual(loadIds('{"a":"abc","c":"C1","h":"1.2"}').generation, 0);
 });
 
-test("the draft keeps non latin text as one character each", () => {
-  const text = dumpDraft(newDraft("a", "c", THREAD, { typed: new Map([[0, "日本語"]]) }));
-  assert.ok(text.includes("日本語")); // not \\u-escaped: Slack counts characters, not bytes
-});
-
-test("a draft that dump did not write is refused", () => {
-  assert.throws(() => loadDraft("{}"), /malformed draft/);
-  assert.throws(
-    () => loadDraft('{"a":"x","c":"c","h":"h","n":"one","p":{},"t":{}}'),
-    /malformed draft/,
-  );
-  assert.throws(() => loadDraft("not json"));
+test("metadata that names no request is refused", () => {
+  assert.throws(() => loadIds("{}"), /malformed form/);
+  assert.throws(() => loadIds('{"a":"x","c":"c"}'), /malformed form/);
+  assert.throws(() => loadIds("not json"));
 });
 
 /**
@@ -473,4 +495,171 @@ test("question headers are shown as written", () => {
     question({ question: "q", header: "<http://x|ok>", options: [] }),
   ]);
   assert.ok((blocks[0] as Json).text.text.includes("&lt;http://x|ok&gt;"));
+});
+
+// --- Other, Notes and the exclusion of a single select (issue #325) ---
+
+function inputsOf(view: Json): Record<string, Json> {
+  return Object.fromEntries(
+    view.blocks.filter((b: Json) => b.type === "input").map((b: Json) => [b.block_id, b]),
+  );
+}
+
+test("every question has a Notes field under Other, optional, kept in the draft", () => {
+  const view = questionView(draftOf({ notes: new Map([[0, "darker"]]) }), TWO);
+  const notes = inputsOf(view).n0 as Json;
+  assert.deepEqual(notes.label, { type: "plain_text", text: "Notes" });
+  assert.equal(notes.optional, true);
+  assert.equal(notes.dispatch_action, true);
+  assert.deepEqual(notes.element, {
+    type: "plain_text_input",
+    action_id: "notes",
+    max_length: NOTES_LIMIT,
+    placeholder: { type: "plain_text", text: "Add notes to your answer" },
+    dispatch_action_config: { trigger_actions_on: ["on_character_entered"] },
+    initial_value: "darker",
+  });
+  assert.deepEqual(Object.keys(inputsOf(view)), ["q0", "o0", "n0"]);
+  const multi = inputsOf(questionView(draftOf({ active: 1 }), TWO));
+  assert.equal(multi.n1?.element.action_id, "notes");
+});
+
+test("every field of a form reports its changes, a single select's and a multi-select's", () => {
+  for (const active of [0, 1]) {
+    const inputs = inputsOf(questionView(draftOf({ active }), TWO));
+    for (const id of [`q${active}`, `o${active}`, `n${active}`]) {
+      assert.equal(inputs[id]?.dispatch_action, true, id);
+    }
+    for (const id of [`o${active}`, `n${active}`]) {
+      assert.deepEqual(inputs[id]?.element.dispatch_action_config, {
+        trigger_actions_on: ["on_character_entered"],
+      });
+    }
+  }
+});
+
+test("absorb reads the notes and the blocks of any revision", () => {
+  const state = {
+    "q0.3": { answer: { type: "radio_buttons", selected_option: { value: "1" } } },
+    "o0.12": { other: { type: "plain_text_input", value: " mauve " } },
+    n0: { notes: { type: "plain_text_input", value: " darker " } },
+  };
+  const draft = absorb(draftOf({ revisions: new Map([[0, [3, 12]]]) }), state);
+  assert.deepEqual(draft.picks, new Map([[0, [1]]]));
+  assert.deepEqual(draft.typed, new Map([[0, "mauve"]]));
+  assert.deepEqual(draft.notes, new Map([[0, "darker"]]));
+  // Emptied notes are dropped, as the other fields are.
+  const emptied = absorb(draft, { n0: { notes: { type: "plain_text_input", value: null } } });
+  assert.deepEqual(emptied.notes, new Map());
+});
+
+test("a question is answered by an option or a text under Other, never by notes alone", () => {
+  assert.equal(isAnswered(draftOf(), TWO, 0), false);
+  assert.equal(isAnswered(draftOf({ picks: new Map([[0, [0]]]) }), TWO, 0), true);
+  assert.equal(isAnswered(draftOf({ typed: new Map([[0, "x"]]) }), TWO, 0), true);
+  const noted = draftOf({ notes: new Map([[0, "x"]]) });
+  assert.equal(isAnswered(noted, TWO, 0), false);
+  assert.equal(notesNeedOption(noted, 0), true);
+  assert.equal(notesNeedOption(draftOf({ ...noted, picks: new Map([[0, [1]]]) }), 0), false);
+  assert.equal(notesNeedOption(draftOf(), 0), false);
+});
+
+test("notes go with the answer of their question", () => {
+  const draft = draftOf({
+    notes: new Map([[1, "both"]]),
+    picks: new Map([[1, [0]]]),
+    typed: new Map([[0, "mauve"]]),
+  });
+  assert.deepEqual(draftAnswers(draft, TWO), {
+    answers: { "Colour?": "mauve", "Sizes?": ["s"] },
+    notes: { "Sizes?": "both" },
+  });
+  // Notes with no option to hold them keep the form from going on.
+  // (A text under Other answers the multi-select, so only the notes rule can refuse it.)
+  const alone = draftOf({
+    notes: new Map([[1, "both"]]),
+    typed: new Map([
+      [0, "mauve"],
+      [1, "xl"],
+    ]),
+  });
+  assert.equal(draftAnswers(alone, TWO), null);
+  assert.ok(draftAnswers({ ...alone, notes: new Map() }, TWO) !== null);
+});
+
+test("a single select carrying both keeps the one changed last", () => {
+  const both = draftOf({ picks: new Map([[0, [1]]]), typed: new Map([[0, "mauve"]]) });
+  const option = settled(touched(both, "choice"), TWO);
+  assert.deepEqual([option.picks, option.typed], [new Map([[0, [1]]]), new Map()]);
+  const text = settled(touched(both, "other"), TWO);
+  assert.deepEqual([text.picks, text.typed], [new Map(), new Map([[0, "mauve"]])]);
+  // No change seen: the text wins, as before.
+  assert.deepEqual(settled(both, TWO).picks, new Map());
+});
+
+test("the field changed last is told apart per question", () => {
+  const two = [TWO[0], { ...(TWO[0] as Question), text: "Shade?" }] as Question[];
+  const both = draftOf({
+    active: 1,
+    picks: new Map([
+      [0, [1]],
+      [1, [1]],
+    ]),
+    typed: new Map([
+      [0, "mauve"],
+      [1, "navy"],
+    ]),
+  });
+  const option = settled(touched(both, "choice"), two);
+  assert.deepEqual(
+    option.picks,
+    new Map([
+      [0, [1]],
+      [1, [1]],
+    ]),
+  );
+  assert.deepEqual(option.typed, new Map([[0, "mauve"]])); // question 1 lost its text only
+  assert.equal(touched(both, "choice").last.get(0), undefined);
+  assert.equal(touched(both, "choice").last.get(1), "choice");
+});
+
+test("a text under Other empties the option of a single select, and the option the text", () => {
+  const withBoth = draftOf({ picks: new Map([[0, [1]]]), typed: new Map([[0, "mauve"]]) });
+  const typedLast = excluding(withBoth, TWO, "other") as Draft;
+  assert.deepEqual(typedLast.picks, new Map());
+  assert.deepEqual(typedLast.typed, new Map([[0, "mauve"]]));
+  const pickedLast = excluding(withBoth, TWO, "choice") as Draft;
+  assert.deepEqual(pickedLast.picks, new Map([[0, [1]]]));
+  assert.deepEqual(pickedLast.typed, new Map());
+});
+
+test("only the field cleared gets a new block id", () => {
+  const withBoth = draftOf({ picks: new Map([[0, [1]]]), typed: new Map([[0, "mauve"]]) });
+  const typedLast = excluding(withBoth, TWO, "other") as Draft;
+  assert.deepEqual(Object.keys(inputsOf(questionView(typedLast, TWO))), ["q0.1", "o0", "n0"]);
+  const pickedLast = excluding(withBoth, TWO, "choice") as Draft;
+  assert.deepEqual(Object.keys(inputsOf(questionView(pickedLast, TWO))), ["q0", "o0.1", "n0"]);
+  // Cleared again: the revision moves on, and wraps so that the draft stays small.
+  const filled = { ...pickedLast, picks: new Map([[0, [0]]]), typed: new Map([[0, "x"]]) };
+  const again = excluding(filled, TWO, "other") as Draft;
+  assert.deepEqual(again.revisions.get(0), [1, 1]);
+  const wrapped = excluding(
+    { ...withBoth, revisions: new Map([[0, [99, 0]]]) },
+    TWO,
+    "other",
+  ) as Draft;
+  assert.deepEqual(wrapped.revisions.get(0), [0, 0]);
+});
+
+test("nothing is cleared when only one of the two is filled, or in a multi-select", () => {
+  assert.equal(excluding(draftOf({ picks: new Map([[0, [1]]]) }), TWO, "choice"), null);
+  assert.equal(excluding(draftOf({ typed: new Map([[0, "x"]]) }), TWO, "other"), null);
+  assert.equal(excluding(draftOf({ notes: new Map([[0, "x"]]) }), TWO, "other"), null);
+  const several = draftOf({
+    active: 1,
+    picks: new Map([[1, [0]]]),
+    typed: new Map([[1, "xl"]]),
+  });
+  assert.equal(excluding(several, TWO, "other"), null);
+  assert.equal(excluding(several, TWO, "choice"), null);
 });

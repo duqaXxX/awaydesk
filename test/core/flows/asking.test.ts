@@ -660,14 +660,18 @@ test("an answered question reaches the agent and the request is not removed by t
   assert.equal(open.request.type, "question");
 
   assert.equal(
-    await world.answers(open.requestId, { type: "question", answers: { "Which one?": "blue" } }),
+    await world.answers(open.requestId, {
+      type: "question",
+      answers: { "Which one?": "blue" },
+      notes: {},
+    }),
     true,
   );
   await turn.done.wait();
   const agent = world.agent as PlainAgent;
   assert.deepEqual(
     agent.sessions[0]?.answers.map((a) => a.answer),
-    [{ answered: true, answers: { "Which one?": "blue" } }],
+    [{ answered: true, answers: { "Which one?": "blue" }, notes: {} }],
   );
   assert.deepEqual(world.open(ref), []);
 });
@@ -679,7 +683,10 @@ test("a skipped question tells the agent the form was skipped and removes the re
   const turn = await session.submit("pick one");
   const open = await world.asked(ref, "question");
 
-  assert.equal(await world.answers(open.requestId, { type: "question", answers: null }), true);
+  assert.equal(
+    await world.answers(open.requestId, { type: "question", answers: null, notes: {} }),
+    true,
+  );
   await turn.done.wait();
   const agent = world.agent as PlainAgent;
   assert.deepEqual(
@@ -696,7 +703,7 @@ test("a question answered twice is refused the second time", async (t) => {
   (world.agent as PlainAgent).next(question("Which one?", ["red", "blue"]), say("Chosen."));
   const turn = await session.submit("pick one");
   const open = await world.asked(ref, "question");
-  const answer = { type: "question", answers: { "Which one?": "red" } } as const;
+  const answer = { type: "question", answers: { "Which one?": "red" }, notes: {} } as const;
   await world.inbound.answer(ref, open.requestId, answer, open.message);
   await turn.done.wait();
 
@@ -729,8 +736,8 @@ test("an answer from someone else never reaches the core, whatever the request",
       setupOpen.requestId,
       { type: "setup", selection: { model: "default", effort: "full", bypass: true } },
     ],
-    [questionOpen.requestId, { type: "question", answers: { "Which one?": "red" } }],
-    [questionOpen.requestId, { type: "question", answers: null }],
+    [questionOpen.requestId, { type: "question", answers: { "Which one?": "red" }, notes: {} }],
+    [questionOpen.requestId, { type: "question", answers: null, notes: {} }],
   ] as const;
   for (const [requestId, answer] of answers) {
     assert.equal(await world.chat.as(SOMEONE).answers(requestId, answer), null);
@@ -754,7 +761,7 @@ test("an answer from someone else never reaches the core, whatever the request",
   await setup;
   await world.answers(permission.open.requestId, { type: "permission", allow: true });
   await permission.turn.done.wait();
-  await world.answers(questionOpen.requestId, { type: "question", answers: null });
+  await world.answers(questionOpen.requestId, { type: "question", answers: null, notes: {} });
 });
 
 // --- An answer is of the kind of the request it names
@@ -850,14 +857,18 @@ test("a permission answer with a question's id is refused and the question stays
     assert.equal(world.open(ref).length, 1, "the question is still open");
   }
   assert.equal(
-    await world.answers(open.requestId, { type: "question", answers: { "Which one?": "red" } }),
+    await world.answers(open.requestId, {
+      type: "question",
+      answers: { "Which one?": "red" },
+      notes: {},
+    }),
     true,
   );
   await turn.done.wait();
   const agent = world.agent as PlainAgent;
   assert.deepEqual(
     agent.sessions[0]?.answers.map((a) => a.answer),
-    [{ answered: true, answers: { "Which one?": "red" } }],
+    [{ answered: true, answers: { "Which one?": "red" }, notes: {} }],
   );
 });
 
@@ -869,7 +880,7 @@ test("a question answer with a permission's id is refused and the permission sta
     await world.inbound.answer(
       ref,
       open.requestId,
-      { type: "question", answers: { "Which one?": "red" } },
+      { type: "question", answers: { "Which one?": "red" }, notes: {} },
       open.message,
     ),
     false,

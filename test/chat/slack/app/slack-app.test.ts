@@ -32,7 +32,7 @@ import { FALLBACK_LIMIT } from "../../../../src/chat/slack/reply/blocks.ts";
 import { take } from "../../../../src/chat/slack/reply/chars.ts";
 import {
   answeredBlocks,
-  loadDraft,
+  loadIds,
   newDraft,
   SECTION_LIMIT,
 } from "../../../../src/chat/slack/requests.ts";
@@ -59,6 +59,7 @@ import { EVERYTHING_OFFERED } from "../../../support/guide-offer.ts";
 import { NAMES } from "../../../support/names.ts";
 import { canUseToolCall, sdkMessages, splitTurns } from "../../../support/sessions.ts";
 import {
+  answerClick,
   type Body,
   buttonValue,
   CLICK_THREAD,
@@ -67,13 +68,14 @@ import {
   clickIn,
   composed,
   FORM_THREAD,
-  formBody,
   HOME_THREAD,
   homeAction,
   idleMessage,
   listed,
   ModalSlack,
   message,
+  onSecondPage,
+  openedForm,
   PERMALINK,
   picked,
   QUESTIONS,
@@ -86,6 +88,7 @@ import {
   SESSION_B,
   said,
   sharedFile,
+  submitOn,
   twoSessions,
   type World,
   worldFor,
@@ -978,16 +981,14 @@ test("answer opens the form", async (t) => {
   assert.equal(opened[0]?.trigger_id, body.trigger_id);
   const view = opened[0]?.view as Body;
   assert.equal(view.callback_id, "question_form");
-  assert.deepEqual(loadDraft(view.private_metadata), newDraft(approvalId, CHANNEL, FORM_THREAD));
+  assert.deepEqual(loadIds(view.private_metadata), {
+    approvalId,
+    channelId: CHANNEL,
+    threadTs: FORM_THREAD,
+    generation: 1,
+    active: 0,
+  });
 });
-
-/** The Answer click, recorded 2026-09-24, on the question `approvalId` names. */
-function answerClick(approvalId: string): Body {
-  const body = recorded("open-click");
-  body.actions[0].value = approvalId;
-  body.trigger_id = "0000000000.0000000000.fake"; // real clicks carry one; the scrub drops it
-  return body;
-}
 
 test("the form opens before the channel is looked up", async (t) => {
   // trigger_id lives 3 seconds: a Slack call before views.open spends them (#325).
@@ -1062,8 +1063,8 @@ for (const [index, user] of OTHER_USERS.entries()) {
 test("submit with the open question unanswered shows an error", async (t) => {
   const world = worldOf(t);
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
-  const response = await world.dispatch(formBody("view_submission", draft, {}));
+  const form = await openedForm(world, approvalId);
+  const response = await world.dispatch(submitOn(form, {}));
   assert.deepEqual(response.body, {
     response_action: "errors",
     errors: { q0: slackTexts.QUESTION_MISSING },
@@ -1074,14 +1075,19 @@ test("submit with the open question unanswered shows an error", async (t) => {
 test("next with an answer moves to the next question", async (t) => {
   const world = worldOf(t);
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
-  const response = await world.dispatch(formBody("view_submission", draft, picked(0, "0")));
+  const form = await openedForm(world, approvalId);
+  const response = await world.dispatch(submitOn(form, picked(0, "0")));
   const answer = response.body as Body;
   assert.equal(answer.response_action, "update");
   assert.deepEqual(
-    loadDraft(answer.view.private_metadata),
-    newDraft(approvalId, CHANNEL, FORM_THREAD, { active: 1, picks: new Map([[0, [0]]]) }),
+    world.built.drafts.get(approvalId),
+    newDraft(approvalId, CHANNEL, FORM_THREAD, {
+      generation: 1,
+      active: 1,
+      picks: new Map([[0, [0]]]),
+    }),
   );
+  assert.equal(answer.view.submit.text, "Submit");
   assert.ok(!pending.decided);
 });
 
@@ -1089,19 +1095,17 @@ test("a complete submit answers claude and leaves the request to the session", a
   const world = worldOf(t);
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
   pending.messageTs = "1790000000.000009";
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD, {
-    active: 1,
-    picks: new Map([[0, [1]]]),
-  });
+  const second = await onSecondPage(world, approvalId, "1");
   const values = {
     q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } },
     o1: { other: { type: "plain_text_input", value: "xl" } },
   };
-  await world.dispatch(formBody("view_submission", draft, values));
+  await world.dispatch(submitOn(second, values));
   assert.ok(pending.decided);
   assert.deepEqual(await pending.decision, {
     answered: true,
     answers: { "Colour?": "blue", "Sizes?": ["s", "xl"] },
+    notes: {},
   });
   // The session that asked decides what becomes of the request (`keepAnswers`): its reply
   // keeps the answers and the request goes, or the request itself becomes the record.
@@ -1113,13 +1117,9 @@ for (const [index, user] of OTHER_USERS.entries()) {
   test(`nobody else can submit the form [user${index}]`, async (t) => {
     const world = worldOf(t);
     const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-    const draft = newDraft(approvalId, CHANNEL, FORM_THREAD, {
-      picks: new Map([
-        [0, [0]],
-        [1, [0]],
-      ]),
-    });
-    await world.dispatch(formBody("view_submission", draft, {}, user));
+    const second = await onSecondPage(world, approvalId, "0");
+    const boxes = { q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } } };
+    await world.dispatch(submitOn(second, boxes, user));
     assert.ok(!pending.decided);
   });
 }
@@ -1151,8 +1151,9 @@ test("a form that cannot open tells the owner", async (t) => {
 test("a submit that needs more answers makes no slack call first", async (t) => {
   const world = worldOf(t);
   const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
-  await world.dispatch(formBody("view_submission", draft, {}));
+  const form = await openedForm(world, approvalId);
+  world.slack.apiCalls = [];
+  await world.dispatch(submitOn(form, {}));
   assert.deepEqual(
     world.slack.apiCalls.filter((call) => call.method.startsWith("conversations.")),
     [],

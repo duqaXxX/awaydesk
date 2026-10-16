@@ -141,7 +141,11 @@ test("to permission matches the documented shapes", () => {
     "deny",
   );
   const input = { questions: TWO };
-  const answered = toAnswer({ kind: "answer", answers: { Q: "A" } }, TWO, NAMES) as QuestionAnswer;
+  const answered = toAnswer(
+    { kind: "answer", answers: { Q: "A" }, notes: {} },
+    TWO,
+    NAMES,
+  ) as QuestionAnswer;
   assert.deepEqual(questionResult(answered, input), {
     behavior: "allow",
     updatedInput: { questions: TWO, answers: { Q: "A" } },
@@ -174,8 +178,16 @@ test("a discarded request is gone", () => {
 test("a resolved request is removed and its answer is the seam s", async () => {
   const approvals = new Approvals(NAMES);
   const [approvalId, pending] = approvals.open(CHANNEL, THREAD, "q", TWO);
-  approvals.resolve(approvalId, CHANNEL, THREAD, { kind: "answer", answers: { "Colour?": "red" } });
+  approvals.resolve(approvalId, CHANNEL, THREAD, {
+    kind: "answer",
+    answers: { "Colour?": "red" },
+    notes: {},
+  });
   assert.equal(approvals.get(approvalId), null);
   assert.equal(pending.decided, true);
-  assert.deepEqual(await pending.decision, { answered: true, answers: { "Colour?": "red" } });
+  assert.deepEqual(await pending.decision, {
+    answered: true,
+    answers: { "Colour?": "red" },
+    notes: {},
+  });
 });

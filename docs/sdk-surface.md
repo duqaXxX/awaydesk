@@ -210,8 +210,11 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SlashCommand` | `argumentHint` | field | info.ts: commandOf | reference | none |
 | `SlashCommand` | `description` | field | info.ts: commandOf | reference | none |
 | `SlashCommand` | `name` | field | info.ts: commandOf | reference | none |
+| `AskUserQuestion.input` | `annotations` | key | requests.ts: questionResult | measured | none |
 | `AskUserQuestion.input` | `answers` | key | requests.ts: questionResult | measured | none |
 | `AskUserQuestion.input` | `questions` | key | requests.ts: questionsOf, questionResult | measured | none |
+| `AskUserQuestion.input.annotations[]` | `notes` | key | requests.ts: annotationsOf | measured | none |
+| `AskUserQuestion.input.annotations[]` | `preview` | key | requests.ts: annotationsOf | measured | none |
 | `AskUserQuestion.input.questions[]` | `header` | key | requests.ts: questionOf | measured | none |
 | `AskUserQuestion.input.questions[]` | `multiSelect` | key | requests.ts: questionOf | measured | none |
 | `AskUserQuestion.input.questions[]` | `options` | key | requests.ts: questionOf | measured | none |
@@ -405,7 +408,9 @@ no check covers them here.
 - The rows under `AskUserQuestion.input` describe the input of a Claude Code tool, which the SDK
   hands to `canUseTool` as a plain record. The reference lists it under Tool Input Types and the
   package declares it in `sdk-tools.d.ts`; the checks of this table read neither, so the rows stand
-  on the recordings `ask.jsonl` and `ask-can-use-tool.json`.
+  on the recordings `ask.jsonl` and `ask-can-use-tool.json`. The rows of `annotations` stand on
+  `sdk-tools.d.ts` 0.3.301 and on what the model received through `updatedInput` (measured
+  2026-10-16): `notes` after the answer, `preview` after the selected option.
 - `"stopped"` among the values of `SDKTaskUpdatedMessage.patch.status` is in the translator's
   `TERMINAL_TASK_STATUSES`, taken from the Python SDK's list. The declaration of `patch.status`
   lacks it and the recordings show `"completed"` and `"failed"` only.

@@ -116,10 +116,14 @@ export const QUESTION_TITLE = naming("{agent} asks");
 export const QUESTION_CLOSE = "Later";
 export const QUESTION_NOT_OPENED = "The form could not open (`{error}`). Click Answer again.";
 export const QUESTION_MISSING = "Choose an option or type your own answer.";
+export const QUESTION_NOTES_NEED_OPTION = "Pick an option to add notes to it.";
+export const QUESTION_STALE = "This form was opened again. Use the newest one.";
 export const QUESTION_WHERE = "{number} of {count}";
 export const QUESTION_NEXT = "Next ({number}/{count})";
 export const QUESTION_OTHER = "Other";
 export const QUESTION_OTHER_HINT = "Or type your own answer";
+export const QUESTION_NOTES = "Notes";
+export const QUESTION_NOTES_HINT = "Add notes to your answer";
 export const APPROVAL_CUT =
   "_{count} characters of this request are not shown: Deny it unless you know them._";
 export const RESUME_EMPTY = "No sessions in `{directory}` yet.";

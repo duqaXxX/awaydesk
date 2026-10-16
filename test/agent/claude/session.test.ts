@@ -427,7 +427,7 @@ test(
       "Which colour do you prefer?": "Red",
       "Do you also like green?": ["Yes", "No"],
     };
-    const handler = handlerOf({ allow: true }, { answered: true, answers });
+    const handler = handlerOf({ allow: true }, { answered: true, answers, notes: {} });
     const { session, query, events } = await started(
       t,
       {

@@ -207,7 +207,7 @@ const REQUESTS: ReadonlyArray<{
     name: "question",
     control: "form",
     request: question,
-    answer: { type: "question", answers: { [QUESTION.text]: "red" } },
+    answer: { type: "question", answers: { [QUESTION.text]: "red" }, notes: {} },
   },
   { name: "hold", control: "click", request: hold, answer: { type: "hold", send: true } },
   {
@@ -1063,7 +1063,7 @@ export function chatConformance(
         const thread = s.provider.thread(s.ref);
         const request = question();
         const message = await thread.ask("request-skipped", request, "A question");
-        const skip: OwnerAnswer = { type: "question", answers: null };
+        const skip: OwnerAnswer = { type: "question", answers: null, notes: {} };
         await s.rig.owner.answers(
           { ref: s.ref, requestId: "request-skipped", request, message },
           skip,

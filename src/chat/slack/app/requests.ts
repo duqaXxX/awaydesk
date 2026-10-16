@@ -16,13 +16,21 @@ import {
   absorb,
   type Draft,
   draftAnswers,
+  excluding,
+  type Field,
+  type FormIds,
   firstUnanswered,
   isAnswered,
-  loadDraft,
+  loadIds,
   newDraft,
+  notesNeedOption,
+  QUESTION_FORM,
   QUESTION_SKIP,
   questionView,
   refusedView,
+  settled,
+  shownBlockId,
+  touched,
 } from "../requests.ts";
 import { readChoice, readSelection, setupBlocks } from "../setup.ts";
 import * as slackTexts from "../texts.ts";
@@ -42,10 +50,33 @@ import {
 export class Requests {
   private readonly parts: AppParts;
   private readonly answers: Answers;
+  /**
+   * What the owner filled in each open question form, by request id: kept here, not in the
+   * view's `private_metadata` (which holds the request's ids, the form's generation and its
+   * page), so Other and Notes are bound by no
+   * Slack limit and Answer reopens a closed form with the answers kept. An entry goes when its
+   * request is answered, skipped or found gone, at the next Answer for any request that ended
+   * another way, and when the app closes.
+   */
+  readonly drafts = new Map<string, Draft>();
 
   constructor(parts: AppParts, answers: Answers) {
     this.parts = parts;
     this.answers = answers;
+  }
+
+  /** Drops the drafts of requests that no longer wait for an answer. */
+  private sweep(): void {
+    for (const [approvalId, draft] of this.drafts) {
+      if (this.parts.approvals.questions(approvalId, draft.channelId, draft.threadTs) === null) {
+        this.drafts.delete(approvalId);
+      }
+    }
+  }
+
+  /** Gives up the drafts: the daemon is stopping. */
+  close(): void {
+    this.drafts.clear();
   }
 
   // Issue #142: the facts that tell apart the paths that answer `texts.HOLD_GONE`, for the click
@@ -161,8 +192,9 @@ export class Requests {
     const action = firstAction(body);
     const answer: OwnerAnswer =
       action.action_id === QUESTION_SKIP
-        ? { type: "question", answers: null }
+        ? { type: "question", answers: null, notes: {} }
         : { type: "permission", allow: action.action_id === APPROVAL_ALLOW };
+    if (action.action_id === QUESTION_SKIP) this.drafts.delete(str(action.value));
     await this.parts.inbound.answer(
       { channel, thread: threadTs },
       str(action.value),
@@ -171,10 +203,83 @@ export class Requests {
     );
   };
 
-  /** A menu inside a question: its value is read when Submit is clicked. */
-  onAnswer = async (ack: Ack): Promise<void> => {
+  /**
+   * A change in the question form, dispatched by Slack with the form's state (block reference,
+   * input block `dispatch_action` and `dispatch_action_config`; block_actions payload reference;
+   * `views.update`, all read 2026-10-16). Every field reports, so the draft holds what is on
+   * screen when the form is closed with Later. Only a single select redraws: an option picked
+   * while a text stands under Other, or a character typed there while an option stands, empties
+   * the one that was not just changed in a single `views.update`; typing then goes on with no
+   * further call. `hash` makes a stale payload (the keystroke after the first) a
+   * `hash_conflict`, which is ignored. Submit reads the state again, so a missed update costs a
+   * second click on the right field. Only the newest form of a request counts (`Draft.generation`)
+   * and only the page it shows now (`FormIds`); anything else is ignored.
+   */
+  private onQuestionLive = async (
+    ack: Ack,
+    body: Payload,
+    changed: Field | "notes",
+  ): Promise<void> => {
     await ack();
+    const { approvals, identity, slack } = this.parts;
+    const [user, team] = interactionActor(body);
+    // (sync) The owner and the workspace, as on Next; the channel is checked at Submit.
+    if (!isOwner(identity, user, team)) {
+      logger.info("ignored an inbound event from someone other than the owner");
+      return;
+    }
+    const view = record(body.view);
+    if (view.callback_id !== QUESTION_FORM) return;
+    let ids: FormIds;
+    try {
+      ids = loadIds(str(view.private_metadata));
+    } catch {
+      return;
+    }
+    const questions = approvals.questions(ids.approvalId, ids.channelId, ids.threadTs);
+    if (questions === null) {
+      this.drafts.delete(ids.approvalId);
+      return;
+    }
+    // Only the newest form of the request counts, and only the page it shows now: a late change
+    // from an older form, or from a page Next has left, writes nothing.
+    const kept = this.drafts.get(ids.approvalId);
+    if (kept === undefined || kept.generation !== ids.generation || kept.active !== ids.active) {
+      return;
+    }
+    // (sync) Kept before any await: a payload handled next finds what this one saw.
+    const read = absorb(kept, record(view.state).values);
+    const draft = changed === "notes" ? read : touched(read, changed);
+    const cleared = changed === "notes" ? null : excluding(draft, questions, changed);
+    this.drafts.set(ids.approvalId, cleared ?? draft);
+    const viewId = text(view.id);
+    if (cleared === null || viewId === null || this.answers.stopped) return;
+    const hash = text(view.hash);
+    try {
+      await slack.views.update({
+        view_id: viewId,
+        ...(hash === null ? {} : { hash }),
+        view: questionView(cleared, questions, this.parts.names) as unknown as ModalView,
+      });
+    } catch (error) {
+      if (isCancelled(error)) throw error;
+      // hash_conflict (a newer payload moved the form on) or not_found (closed): Submit reads
+      // the state as it stands.
+      logger.warning(`could not update the question form: ${describe(error)}`);
+    }
   };
+
+  /** An option picked, or a box ticked, in the question form. */
+  onQuestionChoice = (ack: Ack, body: Payload): Promise<void> =>
+    this.onQuestionLive(ack, body, "choice");
+
+  /** A character typed under Other in the question form. */
+  onQuestionOther = (ack: Ack, body: Payload): Promise<void> =>
+    this.onQuestionLive(ack, body, "other");
+
+  /** A character typed in Notes in the question form. */
+  onQuestionNotes = (ack: Ack, body: Payload): Promise<void> =>
+    this.onQuestionLive(ack, body, "notes");
 
   /**
    * Answer, on a question of Claude's: opens the form, then checks the channel. The form shows
@@ -190,12 +295,18 @@ export class Requests {
     if (!this.answers.fromOwner(user, team, channel) || channel === null) return;
     const approvalId = str(firstAction(body).value);
     const questions = approvals.questions(approvalId, channel, threadTs);
+    this.sweep();
     if (questions === null) {
       await this.answers.tellOwner(channel, threadTs, texts.APPROVAL_GONE);
       return;
     }
+    // A form closed with Later and opened again shows what was given, on the page it was left
+    // on. Every Answer opens a new generation, and the older forms of the request go stale.
+    const kept = this.drafts.get(approvalId) ?? newDraft(approvalId, channel, threadTs);
+    const draft = { ...kept, generation: kept.generation + 1 };
+    this.drafts.set(approvalId, draft);
     // trigger_id lives 3 seconds: no network call before this one (#325).
-    const view = questionView(newDraft(approvalId, channel, threadTs), questions, names);
+    const view = questionView(draft, questions, names);
     let opened: { id?: string; hash?: string } | undefined;
     try {
       const trigger = text(body.trigger_id);
@@ -207,7 +318,9 @@ export class Requests {
       opened = answer.view;
     } catch (error) {
       if (isCancelled(error)) throw error;
-      // an expired trigger_id, say: the turn must not wait unseen
+      // an expired trigger_id, say: the turn must not wait unseen. The form did not open, so
+      // the one still on screen stays the valid one.
+      if (this.drafts.get(approvalId) === draft) this.drafts.set(approvalId, kept);
       const message = fill(slackTexts.QUESTION_NOT_OPENED, { error: describe(error) });
       await this.answers.tellOwner(channel, threadTs, message);
       return;
@@ -241,9 +354,9 @@ export class Requests {
     const { approvals, identity } = this.parts;
     const [user, team] = interactionActor(body);
     const view = record(body.view);
-    let draft: Draft;
+    let ids: FormIds;
     try {
-      draft = loadDraft(str(view.private_metadata));
+      ids = loadIds(str(view.private_metadata));
     } catch {
       await ack();
       return;
@@ -253,17 +366,34 @@ export class Requests {
       logger.info("ignored an inbound event from someone other than the owner");
       return;
     }
-    const questions = approvals.questions(draft.approvalId, draft.channelId, draft.threadTs);
+    const questions = approvals.questions(ids.approvalId, ids.channelId, ids.threadTs);
     if (questions === null) {
+      this.drafts.delete(ids.approvalId);
       await ack();
-      await this.answers.tellOwner(draft.channelId, draft.threadTs, texts.APPROVAL_GONE);
+      await this.answers.tellOwner(ids.channelId, ids.threadTs, texts.APPROVAL_GONE);
       return;
     }
-    draft = absorb(draft, record(view.state).values);
-    if (!isAnswered(draft, questions, draft.active)) {
+    const state = record(view.state).values;
+    const kept = this.drafts.get(ids.approvalId);
+    if (kept === undefined || kept.generation !== ids.generation) {
+      // An older form: it sends nothing, and the newest one is told apart from it.
+      const older = kept ?? newDraft(ids.approvalId, ids.channelId, ids.threadTs);
       await ack({
         response_action: "errors",
-        errors: { [`q${draft.active}`]: slackTexts.QUESTION_MISSING },
+        errors: { [shownBlockId(older, state, "choice", ids.active)]: slackTexts.QUESTION_STALE },
+      });
+      return;
+    }
+    const draft = settled(absorb({ ...kept, active: ids.active }, state), questions);
+    this.drafts.set(ids.approvalId, draft);
+    const at = draft.active;
+    if (notesNeedOption(draft, at) || !isAnswered(draft, questions, at)) {
+      const error = notesNeedOption(draft, at)
+        ? slackTexts.QUESTION_NOTES_NEED_OPTION
+        : slackTexts.QUESTION_MISSING;
+      await ack({
+        response_action: "errors",
+        errors: { [shownBlockId(draft, state, "choice", at)]: error },
       });
       return;
     }
@@ -272,23 +402,26 @@ export class Requests {
       // Next: the following question, or one left unanswered (never, since each Next checks
       // its own; kept so a draft cannot reach Claude incomplete).
       const following = draft.active + 1 < questions.length ? draft.active + 1 : missing;
+      const next = { ...draft, active: following };
+      this.drafts.set(ids.approvalId, next);
       await ack({
         response_action: "update",
-        view: questionView({ ...draft, active: following }, questions, this.parts.names),
+        view: questionView(next, questions, this.parts.names),
       });
       return;
     }
 
     await ack();
-    if (!(await this.answers.admitted(user, team, draft.channelId, draft.threadTs))) return;
-    const answers = draftAnswers(draft, questions);
-    if (answers === null) throw new Error("a draft with every question answered has no answers");
+    if (!(await this.answers.admitted(user, team, ids.channelId, ids.threadTs))) return;
+    const given = draftAnswers(draft, questions);
+    if (given === null) throw new Error("a draft with every question answered has no answers");
+    this.drafts.delete(ids.approvalId);
     // The form is no message of the thread: the session that asked decides what becomes of the
     // request message (`ThreadSession` keeps the answers in the reply, or in the request).
     await this.parts.inbound.answer(
-      { channel: draft.channelId, thread: draft.threadTs },
-      draft.approvalId,
-      { type: "question", answers },
+      { channel: ids.channelId, thread: ids.threadTs },
+      ids.approvalId,
+      { type: "question", ...given },
       null,
     );
   };

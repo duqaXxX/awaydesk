@@ -15,16 +15,17 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import { newDraft } from "../../../../src/chat/slack/requests.ts";
 import { setLevel, setWriter } from "../../../../src/log.ts";
 import { CHANNEL, OTHER_THREAD, STRANGER, THREAD } from "../../../support/fake-slack.ts";
 import { type Item, sdkMessages } from "../../../support/sessions.ts";
 import {
   type Body,
-  formBody,
+  FORM_THREAD,
   message,
+  onSecondPage,
   QUESTIONS,
   reply,
+  submitOn,
   worldOf,
 } from "../../../support/slack-app.ts";
 
@@ -77,16 +78,18 @@ test("no log line at any level holds a prompt, a reply or an owner's word", asyn
   await world.dispatch(message(`!bind ${join(world.root, FOLDER)}`));
   await world.dispatch(message(`!help ${FILTER}`));
 
-  const [approvalId, pending] = world.approvals.open(CHANNEL, THREAD, "Colour", QUESTIONS);
-  const draft = newDraft(approvalId, CHANNEL, THREAD, { active: 1, picks: new Map([[0, [1]]]) });
+  const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
+  const second = await onSecondPage(world, approvalId, "1");
   const values = {
     q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } },
     o1: { other: { type: "plain_text_input", value: OTHER } },
   };
-  await world.dispatch(formBody("view_submission", draft, values));
+  await world.dispatch(submitOn(second, values));
+  assert.ok(pending.decided); // fails here, not at the 300 s timeout, when the form is not read
   assert.deepEqual(await pending.decision, {
     answered: true,
     answers: { "Colour?": "blue", "Sizes?": ["s", OTHER] },
+    notes: {},
   });
   await world.idle();
 

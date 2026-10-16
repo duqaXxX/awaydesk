@@ -659,7 +659,20 @@ once the form is open, and a refused channel replaces the form with the reason
 (`requests.refusedView`), since Slack lets an app close a modal only in answer to a submission.
 The update carries the hash the form opened with; when the owner closed the form or moved on in
 it meanwhile, the reason goes to the thread as a line only the owner sees. The
-form shows the owner alone what the request already shows. The question form's Next and Submit
+form shows the owner alone what the request already shows. In the question form every field reports its change as a `block_actions` payload
+(`Requests.onQuestionLive`: an option, a box, Other, Notes) and updates the draft. In a single
+select a change of the option, or a character typed under Other, also empties the other field with one `views.update` that carries the
+hash of the view it came from; the emptied block gets a new `block_id` (`Draft.revisions`),
+because Slack keeps an input's value while its `block_id` and `action_id` stay. A `hash_conflict`
+or `not_found` is logged and ignored: Submit reads the state as it stands. What the owner filled
+stays in the provider's memory (`Requests.drafts`) and the view's `private_metadata` holds the
+request's ids, the form's generation and its page. Only the newest form of a request is valid:
+every Answer (`Requests.onQuestionOpen`) opens a new generation from the draft, an older form's
+changes are ignored, and its Next or Submit answers `texts.QUESTION_STALE` as a field error and
+sends nothing. A form an earlier version opened has no generation, or carries a whole draft
+beside the ids: it is read for the ids and the generation, so once its request is gone
+`texts.APPROVAL_GONE` answers (checked first), and while the request is open it is stale. The same owner and
+workspace check applies, and the channel is checked at Submit. The question form's Next and Submit
 answer Slack after checks that make no network call, since a missing answer can only be shown in
 that answer, and Submit checks the channel before the answer reaches the core. A
 failure after the checks reaches the owner as a line of its own (`Talk.replyOnFailure` for what a

@@ -866,7 +866,7 @@ its code block. A clarifying question (Claude Code's `AskUserQuestion` tool, 1 t
 arrives the same way and is posted as one line naming the questions, with **Answer** and **Skip**.
 Answer opens a modal (`requests.questionView`) that shows one question at a time, since Slack has no
 tabs: radio buttons, or checkboxes when several may be picked, each option with its description, and
-an **Other** field, as the terminal offers. Slack caps an option object's text and description at 75
+an **Other** field and a **Notes** field, as the terminal offers. Slack caps an option object's text and description at 75
 characters each and gives it no place for the option's `preview`. When an option says more than
 that, the page shows the question in bold, then every option whole in a `rich_text` block: its label
 in bold, its full description, and its preview in a preformatted element, which keeps its line
@@ -874,10 +874,34 @@ breaks. Rich text shows its text as written, so nothing Claude wrote is read as 
 under them keeps the labels alone, titled with the question's header. The modal's own button reads
 `Next (1/3)` and moves on (`response_action: update`) only once the question has an answer,
 otherwise the question gets an error (`response_action: errors`); it reads `Submit` on the last.
-What was filled travels in the view's `private_metadata` (`requests.Draft`, under Slack's 3,000
-characters) from one question to the next. The picked labels, with the text typed under Other as the
-answer itself, go back as the tool's answers, a multi-select's as a list (measured: "Multi-select
-answer as a list"). The modal carries no channel or thread: each click in it is checked against the
+What was filled is kept by the Slack provider in memory (`Requests.drafts`, `requests.Draft`), by
+request id, with the page on screen and the revision of each question's clearable blocks; the
+view's `private_metadata` holds only the request's id, channel and thread, the form's generation
+and the page it shows (`requests.FormIds`), so Other and Notes take 300 characters each
+(`TYPED_LIMIT`, `NOTES_LIMIT`) with no Slack cap to fit. Only the newest form of a request is
+valid: every Answer opens a new generation (Later then Answer, a second click, a second device),
+and the older forms are stale (a form whose `views.open` fails does not count: the older one
+stays valid). A stale form's changes are ignored, and its Next or Submit answers
+`response_action: errors` with `texts.QUESTION_STALE` on the question's block and sends nothing;
+a change from a page Next has already left is ignored too. Every field of the valid form
+reports each change (an option picked, a box ticked, a character typed under Other or in Notes:
+`dispatch_action`), and the draft is updated from it, with no `views.update` except the single
+select's exclusion below. An entry goes when its request is answered, skipped or found gone, at
+the next Answer for a request that ended another way, and when the app closes. Answer after Later
+reopens the form on the page left, with the pages already submitted and what each field of the
+open page held at its last change. The picked labels,
+with the text typed under Other as the answer itself, go back as the tool's answers, a
+multi-select's as a list (measured: "Multi-select answer as a list"). In a single select an
+option and a text under Other exclude each other, as in the terminal, where the typed text
+replaces the option: the two blocks dispatch an action on every change and the provider empties
+the other one (`requests.excluding`); a click on Next that still carries both (it came before
+that update) keeps the one changed last (`requests.settled`). A multi-select adds the text to the
+labels and clears nothing. Notes are optional and belong to an option: with no option picked,
+Next and Submit show `Pick an option to add notes to it.` under the question, whatever else is
+filled. Notes travel to the agent as that question's `notes`, in the tool's `annotations` beside
+the answers (`requests.questionResult`); with a single-select option that has a preview, the
+annotation carries the preview too, as the terminal does. The record of the answers does not
+show notes, as the terminal's does not. The modal carries no channel or thread: each click in it is checked against the
 owner, the workspace, and the channel and thread its request was posted in (`Draft.threadTs`,
 alongside its `private_metadata`). Each request has a random id that only its buttons carry
 (`Approvals.open`). The listener reads a click or a form into an `OwnerAnswer` and, after the
