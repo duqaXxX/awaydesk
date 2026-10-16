@@ -148,6 +148,7 @@ function taskUpdate(value: Json | undefined): TaskUpdate {
       body: text(view.body, "preview.body"),
       language: text(view.language, "preview.language") as Preview["language"],
       plain: view.plain === true,
+      record: view.record === true,
     };
   }
   return {

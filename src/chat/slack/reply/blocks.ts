@@ -7,6 +7,7 @@
  */
 import { NESTED, STOPPED, shownPreview } from "../../../core/port.ts";
 import type { RunningList, TaskStatus, TaskUpdate } from "../../seam.ts";
+import { RECORD_MARK } from "../texts.ts";
 import { at, lastNewline, len, take } from "./chars.ts";
 import { shownAsWritten } from "./escape.ts";
 import { markdownBlocks } from "./markdown.ts";
@@ -186,10 +187,12 @@ export function noticeText(text: string): string {
 
 /**
  * A preview's lines of words as one context element's text: each indented under its card and
- * shown as written, the whole cut with `…` past the element's limit.
+ * shown as written, the whole cut with `…` past the element's limit. A record has no card: its
+ * title leads, marked, with the lines under it.
  */
-export function plainLines(body: string): string {
+export function plainLines(body: string, title: string | null = null): string {
   const lines = body.split("\n").map((line) => NESTED + shownAsWritten(line));
+  if (title !== null) lines.unshift(RECORD_MARK + shownAsWritten(title));
   return noticeText(lines.join("\n"));
 }
 

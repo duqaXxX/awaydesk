@@ -11,22 +11,6 @@
       "folded": null,
       "id": "toolu_01KUZwgzwcuiX6bQPhxHr2r6",
       "name": "AskUserQuestion",
-      "output": null,
-      "preview": null,
-      "startedAt": null,
-      "status": "in_progress",
-      "task": false,
-      "title": "AskUserQuestion"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "toolu_01KUZwgzwcuiX6bQPhxHr2r6",
-      "name": "AskUserQuestion",
       "output": "The user answered: \"Which color do you prefer?\"=\"Blue\", \"Do you also like green?\"=\"Yes,Only in spring\". Read the answers carefully — they may request clarification, changes, or that you not proceed —…",
       "preview": null,
       "startedAt": null,
@@ -85,22 +69,6 @@
  ],
  "whole": {
   "calls": [
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01KUZwgzwcuiX6bQPhxHr2r6",
-     "name": "AskUserQuestion",
-     "output": null,
-     "preview": null,
-     "startedAt": null,
-     "status": "in_progress",
-     "task": false,
-     "title": "AskUserQuestion"
-    }
-   },
    {
     "call": "task",
     "update": {

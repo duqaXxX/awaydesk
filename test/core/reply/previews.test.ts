@@ -55,6 +55,7 @@ test("a new file shows its first ten lines as the terminal", () => {
     body: `${numbered.join("\n")}\n… +5 lines`,
     language: "",
     plain: false,
+    record: false,
   });
 });
 
@@ -174,6 +175,7 @@ test("an answered question shows each answer as the terminal", () => {
     body: "· Colour? → blue\n· Sizes? → s, xl",
     language: "",
     plain: true,
+    record: true,
   });
 });
 
@@ -243,6 +245,7 @@ test("an empty new file is a preview with no line", () => {
     body: "",
     language: "",
     plain: false,
+    record: false,
   });
 });
 

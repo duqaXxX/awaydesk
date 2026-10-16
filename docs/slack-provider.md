@@ -113,8 +113,10 @@ streamed or posted. One that failed joins its run as a call that ended, with the
 title; one that was stopped has a card of its own; one whose preview has no lines (an empty new
 file) has a card that says the sentence. A card the sink already drew for the call stays
 (`Tool.cardless`), and the diff under it is then titled with the sentence alone. An answered
-`AskUserQuestion` shows its answers the same way, as a `context` block of words (`Preview.plain`).
-Its lines come from the questions and answers the daemon sent back, so they depend on no
+`AskUserQuestion` is held until it ends (`previews.ASKERS`) and shows its answers as a record
+(`Preview.record`, always with `Preview.plain`): one `context` block of words whose first line is
+the title behind `texts.RECORD_MARK` (`✓ `), with no card and no gap under the heading. The
+request message rewritten by `requests.answeredBlocks` has the same first line. Its lines come from the questions and answers the daemon sent back, so they depend on no
 undocumented field. The preview is built from the event's `FileChange`, which the back end reads
 from the `tool_use_result` of the `user` record (`translate.fileChange`). The SDK types that field
 as `unknown` and does not document it; any shape other than the one measured gives no `FileChange`

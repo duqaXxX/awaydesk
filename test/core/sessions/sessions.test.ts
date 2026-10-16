@@ -506,10 +506,12 @@ test("an answered question stays in the reply and its request goes", async (t) =
   );
   assert.ok(h.slack.callsTo("chat.update").every((args) => args.ts !== requestTs));
   assert.deepEqual(thread(h).requests, []);
+  // The record is one block with no card of its own, headed by the title.
   const cards = h.slack.messageCards().flat();
-  const [card, ...more] = cards.filter((c) => c.title === texts.named(texts.ANSWERED, NAMES));
-  assert.equal(more.length, 0);
-  assert.equal(card?.status, "complete");
+  assert.deepEqual(
+    cards.filter((c) => c.title === texts.named(texts.ANSWERED, NAMES)),
+    [],
+  );
   const shown = h.slack.apiCalls
     .flatMap((call) => (call.args.chunks ?? []) as JsonObject[])
     .filter((chunk) => chunk.type === "blocks")
@@ -518,7 +520,11 @@ test("an answered question stays in the reply and its request goes", async (t) =
     .map((block) => String(at(block.elements as JsonObject[], 0).text));
   const first = at(questions, 0);
   const label = at(first.options as JsonObject[], 0).label;
-  assert.ok(shown[0]?.includes(`· ${first.question} → ${label}`));
+  assert.ok(
+    shown[0]?.startsWith(
+      `✓ ${texts.named(texts.ANSWERED, NAMES)}\n${NESTED}· ${first.question} → ${label}`,
+    ),
+  );
 });
 
 test("answers the reply cannot show stay in the request", async (t) => {
@@ -538,7 +544,7 @@ test("answers the reply cannot show stay in the request", async (t) => {
   const text = String(at(at(blocksOf(update), 0).elements as JsonObject[], 0).text);
   const first = at(recorded.questions, 0);
   assert.ok(
-    text.startsWith(`${texts.named(texts.ANSWERED, NAMES)}\n${NESTED}· ${first.question} → `),
+    text.startsWith(`✓ ${texts.named(texts.ANSWERED, NAMES)}\n${NESTED}· ${first.question} → `),
   );
   assert.deepEqual(
     blocksOf(update).map((block) => block.type),

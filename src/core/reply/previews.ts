@@ -44,6 +44,9 @@ export const NEW_FILE_LINES = 10;
 // The tools `preview` reads. A reply shows a call of one only once it has ended: a stream cannot
 // take back a card, and a call that ended well is its preview alone.
 export const PREVIEWED: ReadonlySet<string> = new Set(["Edit", "Write"]);
+// The tools whose call a reply holds until it ends, as for `PREVIEWED`: a question the owner
+// answers leaves a record in place of its card (`answered`).
+export const ASKERS: ReadonlySet<string> = new Set(["AskUserQuestion"]);
 // The tools that start an agent. A reply holds a call of one until its task says how it runs: in
 // the background the terminal writes a line and no more (`launched`), and a stream cannot take
 // back a card.
@@ -259,6 +262,7 @@ export function answered(
     body: lines.join("\n"),
     language: "",
     plain: true,
+    record: true,
   };
 }
 
@@ -287,6 +291,7 @@ export function preview(
       body: body.join("\n"),
       language: "",
       plain: false,
+      record: false,
     };
   }
   if (PREVIEWED.has(name) && change.hunks.length > 0) {
@@ -299,6 +304,7 @@ export function preview(
       body: numbered.body.join("\n"),
       language: "diff",
       plain: false,
+      record: false,
     };
   }
   return null;

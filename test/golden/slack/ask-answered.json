@@ -47,7 +47,7 @@
     "chunks": [
      {
       "id": "fold:toolu_01KUZwgzwcuiX6bQPhxHr2r6",
-      "status": "in_progress",
+      "status": "complete",
       "title": "AskUserQuestion",
       "type": "task_update"
      }
@@ -65,22 +65,6 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01KUZwgzwcuiX6bQPhxHr2r6",
-      "status": "complete",
-      "title": "AskUserQuestion",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 2,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
       "text": "You prefe",
       "type": "markdown_text"
      }
@@ -90,7 +74,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 3,
+   "after_sink_call": 2,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -104,7 +88,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 4,
+   "after_sink_call": 3,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -118,7 +102,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 5,
+   "after_sink_call": 4,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -132,7 +116,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 6,
+   "after_sink_call": 5,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -146,7 +130,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 7,
+   "after_sink_call": 6,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -160,7 +144,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 9,
+   "after_sink_call": 8,
    "args": {
     "channel": "C000CHAN",
     "ts": "1790000000.000001"
@@ -168,7 +152,7 @@
    "method": "chat.stopStream"
   },
   {
-   "after_sink_call": 9,
+   "after_sink_call": 8,
    "args": {
     "blocks": [
      {
@@ -192,7 +176,7 @@
    "method": "chat.update"
   },
   {
-   "after_sink_call": 9,
+   "after_sink_call": 8,
    "args": {
     "blocks": [
      {

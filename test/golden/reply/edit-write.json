@@ -76,6 +76,7 @@
        "body": " 1 1\n 2 2\n 3 3\n 4 4\n 5 5\n 6 6\n 7 7\n 8 8\n 9 9\n10 10\n… +5 lines",
        "language": "",
        "plain": false,
+       "record": false,
        "summary": "Wrote 15 lines to /home/dev/project/new.txt",
        "title": "Write(/home/dev/project/new.txt)"
       },
@@ -248,6 +249,7 @@
        "body": "    1 alpha\n-🟥 2 beta\n+🟩 2 gamma\n    3 delta",
        "language": "diff",
        "plain": false,
+       "record": false,
        "summary": "Added 1 line, removed 1 line",
        "title": "Update(/home/dev/project/notes.txt)"
       },
@@ -306,6 +308,7 @@
        "body": "-🟥 1 alpha\n-🟥 2 gamma\n-🟥 3 delta\n+🟩 1 one\n+🟩 2 two",
        "language": "diff",
        "plain": false,
+       "record": false,
        "summary": "Added 2 lines, removed 3 lines",
        "title": "Write(/home/dev/project/notes.txt)"
       },
@@ -408,6 +411,7 @@
       "body": " 1 1\n 2 2\n 3 3\n 4 4\n 5 5\n 6 6\n 7 7\n 8 8\n 9 9\n10 10\n… +5 lines",
       "language": "",
       "plain": false,
+      "record": false,
       "summary": "Wrote 15 lines to /home/dev/project/new.txt",
       "title": "Write(/home/dev/project/new.txt)"
      },
@@ -580,6 +584,7 @@
       "body": "    1 alpha\n-🟥 2 beta\n+🟩 2 gamma\n    3 delta",
       "language": "diff",
       "plain": false,
+      "record": false,
       "summary": "Added 1 line, removed 1 line",
       "title": "Update(/home/dev/project/notes.txt)"
      },
@@ -638,6 +643,7 @@
       "body": "-🟥 1 alpha\n-🟥 2 gamma\n-🟥 3 delta\n+🟩 1 one\n+🟩 2 two",
       "language": "diff",
       "plain": false,
+      "record": false,
       "summary": "Added 2 lines, removed 3 lines",
       "title": "Write(/home/dev/project/notes.txt)"
      },

@@ -11,22 +11,6 @@
       "folded": null,
       "id": "toolu_01P24zAVmj8jzZshmnA3vd6n",
       "name": "AskUserQuestion",
-      "output": null,
-      "preview": null,
-      "startedAt": null,
-      "status": "in_progress",
-      "task": false,
-      "title": "AskUserQuestion"
-     }
-    },
-    {
-     "call": "task",
-     "update": {
-      "calls": 0,
-      "details": null,
-      "folded": null,
-      "id": "toolu_01P24zAVmj8jzZshmnA3vd6n",
-      "name": "AskUserQuestion",
       "output": "recording only",
       "preview": null,
       "startedAt": null,
@@ -397,22 +381,6 @@
  ],
  "whole": {
   "calls": [
-   {
-    "call": "task",
-    "update": {
-     "calls": 0,
-     "details": null,
-     "folded": null,
-     "id": "toolu_01P24zAVmj8jzZshmnA3vd6n",
-     "name": "AskUserQuestion",
-     "output": null,
-     "preview": null,
-     "startedAt": null,
-     "status": "in_progress",
-     "task": false,
-     "title": "AskUserQuestion"
-    }
-   },
    {
     "call": "task",
     "update": {

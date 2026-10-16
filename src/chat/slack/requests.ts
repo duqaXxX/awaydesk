@@ -155,7 +155,7 @@ export function answeredBlocks(
   answers: Readonly<Record<string, string | readonly string[]>>,
   names: Names,
 ): Block[] {
-  const lines = [named(texts.ANSWERED, names)];
+  const lines = [slackTexts.RECORD_MARK + named(texts.ANSWERED, names)];
   for (const q of questions) {
     const answer = Object.hasOwn(answers, q.text) ? (answers[q.text] as string | string[]) : "";
     const shown = typeof answer === "string" ? answer : answer.join(", ");

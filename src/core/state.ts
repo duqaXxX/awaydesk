@@ -35,6 +35,19 @@ export interface StateModules {
  */
 export type SessionsChange = (changed: readonly ThreadRef[]) => void;
 
+/**
+ * What a request message is, one word stored beside its id for the crash repair: a question or an
+ * approval of a turn, the session's setup form, the same-folder hold.
+ */
+export type RequestKind = "question" | "approval" | "setup" | "hold";
+
+const REQUEST_KINDS: ReadonlySet<unknown> = new Set<RequestKind>([
+  "question",
+  "approval",
+  "setup",
+  "hold",
+]);
+
 export interface ThreadState {
   /** The folder the thread was opened in. */
   readonly directory: string;
@@ -55,8 +68,11 @@ export interface ThreadState {
   // known to have landed. A sink that gave up on that write leaves its entry: the next start's
   // crash repair (`repairCrash`) finishes the message and removes it.
   readonly openReplies: readonly string[];
-  /** ts of every approval, question or same-folder hold request still carrying buttons. */
+  /** ts of every approval, question, setup form or same-folder hold request still carrying buttons. */
   readonly requests: readonly string[];
+  // The kind of each request, by its ts. An entry written before the kinds existed has none; the
+  // repair treats it as a request to delete.
+  readonly requestKinds: Readonly<Record<string, RequestKind>>;
   // The root's status while it is working or waiting; cleared once done or error is requested.
   readonly status: SessionStatus | null;
   // The root's status once done or error is requested, cleared when it turns working or waiting
@@ -85,6 +101,7 @@ export function threadState(
     effort: null,
     openReplies: [],
     requests: [],
+    requestKinds: {},
     status: null,
     ended: null,
     ...fields,
@@ -177,6 +194,20 @@ function stringList(value: unknown): readonly string[] {
     : [];
 }
 
+/** The kinds stored beside `requests`: only a known word for an id that is in the list. */
+function requestKinds(
+  value: unknown,
+  requests: readonly string[],
+): Readonly<Record<string, RequestKind>> {
+  const kinds: Record<string, RequestKind> = {};
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return kinds;
+  for (const id of requests) {
+    const kind: unknown = Object.hasOwn(value, id) ? (value as Raw)[id] : undefined;
+    if (REQUEST_KINDS.has(kind)) kinds[id] = kind as RequestKind;
+  }
+  return kinds;
+}
+
 function parseBypass(raw: Raw): boolean | null {
   if (raw.bypass === true) return true;
   return raw.bypass_off === true ? false : null;
@@ -198,13 +229,15 @@ function dumpBypass(bypass: boolean | null): Record<string, boolean> {
  * none at all: that key is not looked at.
  */
 export function parseThread(raw: Raw): ThreadState {
+  const requests = stringList(raw.requests);
   return {
     directory: requiredString(raw, "directory"),
     sessionId: stringOrNull(raw.session_id),
     bypass: parseBypass(raw),
     effort: stringOrNull(raw.effort),
     openReplies: stringList(raw.open_replies),
-    requests: stringList(raw.requests),
+    requests,
+    requestKinds: requestKinds(raw.request_kinds, requests),
     status: statusOrNull(raw.status),
     ended: statusOrNull(raw.ended),
   };
@@ -432,15 +465,16 @@ export class StateStore {
   }
 
   /**
-   * Record a request message still carrying buttons (crash repair); a no-op for a thread that
-   * does not exist or already has it.
+   * Record a request message still carrying buttons, with its kind (crash repair); a no-op for a
+   * thread that does not exist or already has it.
    */
-  addRequest(channelId: string, threadId: string, messageTs: string): void {
+  addRequest(channelId: string, threadId: string, messageTs: string, kind: RequestKind): void {
     const current = this.thread(channelId, threadId);
     if (current !== null && !current.requests.includes(messageTs)) {
       this.setThread(channelId, threadId, {
         ...current,
         requests: [...current.requests, messageTs],
+        requestKinds: { ...current.requestKinds, [messageTs]: kind },
       });
     }
   }
@@ -453,7 +487,12 @@ export class StateStore {
     const current = this.thread(channelId, threadId);
     if (current?.requests.includes(messageTs)) {
       const remaining = current.requests.filter((t) => t !== messageTs);
-      this.setThread(channelId, threadId, { ...current, requests: remaining });
+      const { [messageTs]: _gone, ...kinds } = current.requestKinds;
+      this.setThread(channelId, threadId, {
+        ...current,
+        requests: remaining,
+        requestKinds: kinds,
+      });
     }
   }
 
@@ -512,6 +551,7 @@ export class StateStore {
       ...current,
       openReplies: replies,
       requests: [],
+      requestKinds: {},
       status,
     });
   }
@@ -729,6 +769,7 @@ export class StateStore {
                   effort: t.effort,
                   open_replies: [...t.openReplies],
                   requests: [...t.requests],
+                  request_kinds: { ...t.requestKinds },
                   status: t.status,
                   ended: t.ended,
                 },

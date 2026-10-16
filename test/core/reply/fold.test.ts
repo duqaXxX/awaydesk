@@ -27,7 +27,7 @@ function call(
 }
 
 function preview(title: string, summary: string, body: string, language: "" | "diff"): Preview {
-  return { title, summary, body, language, plain: false };
+  return { title, summary, body, language, plain: false, record: false };
 }
 
 function shown(cards: TaskUpdate[]): [string, string, string][] {

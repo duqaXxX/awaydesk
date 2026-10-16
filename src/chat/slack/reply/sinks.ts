@@ -215,12 +215,14 @@ export class Tool {
       this.shownPieces = [];
     } else if (view.plain) {
       // One context block, as it is drawn: a piece counts for what the message holds.
-      this.shownPieces = [plainLines(view.body)];
+      this.shownPieces = [plainLines(view.body, view.record ? view.title : null)];
     } else {
       this.shownPieces = split(view.body).filter((chunk) => chunk !== "");
     }
     this.sizes = this.shownPieces.map(len);
-    if (view === null || view.plain || this.shownPieces.length === 0) this.carded = true;
+    if (view === null || (view.plain && !view.record) || this.shownPieces.length === 0) {
+      this.carded = true;
+    }
   }
 
   /**

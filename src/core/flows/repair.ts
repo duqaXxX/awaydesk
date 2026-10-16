@@ -7,10 +7,11 @@
  * stop clears these same fields itself, so a second start finds nothing to do. What the chat
  * did not repair stays in the state, and the next start asks again (issue #264).
  */
-import type { ChatProvider, SessionStatus } from "../../chat/seam.ts";
+import type { ChatProvider, MessageId, SessionStatus, ThreadChat } from "../../chat/seam.ts";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import type { ThreadsState } from "../port/threads.ts";
+import type { RequestKind } from "../state.ts";
 import * as texts from "../texts.ts";
 
 export const logger = getLogger("awaydesk.core.flows.repair");
@@ -32,15 +33,25 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
   for (const [channelId, threadId, thread] of state.repairsPending()) {
     try {
       const chatThread = chat.thread({ channel: channelId, thread: threadId });
+      // Read before the replies are repaired: a turn with no reply message (a question or an
+      // approval opened it, and a reply starts on its first write) leaves its request as the
+      // only trace in the thread.
+      const hadReply = thread.openReplies.length > 0;
       for (const messageId of thread.openReplies) {
         if (await chatThread.endReply(messageId, texts.STOPPED_BEFORE_ANSWER)) {
           safe(() => state.replaceOpenReply(channelId, threadId, messageId, null));
         } else left(channelId, threadId, "a reply");
       }
+      // One stopped line per thread: the first request rewritten says it, the others go.
+      let lined = hadReply;
       for (const messageId of thread.requests) {
-        if (await chatThread.withdraw(messageId)) {
+        const asksForLine = !lined && isTurnRequest(thread.requestKinds[messageId]);
+        const outcome = await settleRequest(chatThread, messageId, asksForLine);
+        if (outcome === "kept") left(channelId, threadId, "a request");
+        else {
+          if (outcome === "rewritten") lined = true;
           safe(() => state.removeRequest(channelId, threadId, messageId));
-        } else left(channelId, threadId, "a request");
+        }
       }
       if (thread.status !== null) {
         const { status } = thread;
@@ -60,6 +71,36 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
       );
     }
   }
+}
+
+/**
+ * Only a question or an approval stands for a turn the owner's message started; the setup form
+ * and the hold wait before that message is sent, and an entry with no kind (a file written
+ * before the kinds) is taken for neither.
+ */
+function isTurnRequest(kind: RequestKind | undefined): boolean {
+  return kind === "question" || kind === "approval";
+}
+
+/**
+ * A request the crash left open. With `line` the request is rewritten into the stopped line (no
+ * controls, and no notification: an edit); it goes when `line` is false or the chat refuses the
+ * rewrite. "kept" when it still shows.
+ */
+async function settleRequest(
+  chatThread: ThreadChat,
+  messageId: MessageId,
+  line: boolean,
+): Promise<"rewritten" | "withdrawn" | "kept"> {
+  if (line) {
+    try {
+      await chatThread.rewrite(messageId, texts.STOPPED_BEFORE_ANSWER);
+      return "rewritten";
+    } catch (error) {
+      logger.warning(`could not rewrite a stale request: ${errorName(error)}`);
+    }
+  }
+  return (await chatThread.withdraw(messageId)) ? "withdrawn" : "kept";
 }
 
 /** One line for what stays in the state for the next start: ids and the kind only. */

@@ -16,6 +16,7 @@
        "body": "1 hello",
        "language": "",
        "plain": false,
+       "record": false,
        "summary": "Wrote 1 line to /home/dev/project/notes.txt",
        "title": "Write(/home/dev/project/notes.txt)"
       },
@@ -77,6 +78,7 @@
       "body": "1 hello",
       "language": "",
       "plain": false,
+      "record": false,
       "summary": "Wrote 1 line to /home/dev/project/notes.txt",
       "title": "Write(/home/dev/project/notes.txt)"
      },

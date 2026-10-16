@@ -3289,7 +3289,12 @@ export class ThreadSession {
         // the message is already live either way, so a failed write here is logged loudly
         // rather than left silently unrecorded.
         try {
-          this.deps.state.addRequest(this.channelId, this.threadId, messageTs);
+          this.deps.state.addRequest(
+            this.channelId,
+            this.threadId,
+            messageTs,
+            questions === null ? "approval" : "question",
+          );
         } catch (error) {
           logger.error(
             `posted a request in ${this.where} that state.json could not record: ${errorName(error)}`,

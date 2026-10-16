@@ -7,6 +7,29 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A crash while a question or an approval that opened the turn waits no longer leaves the thread
+  with the owner's message alone (issue #325). The turn had no reply message (a reply starts on
+  its first write), so the repair on the next start deleted the request and nothing said the turn
+  stopped. It now rewrites the request into `awaydesk stopped before this answer.` with an edit, so
+  no notification and no control is left; a turn that had a reply behaves as before. A rewrite
+  Slack refuses falls back to the deletion. Only a question or an approval gets the line, and
+  only one line per thread at each start (a second can appear at a later start, when a deletion
+  was refused at the previous one): the setup form and the same-folder hold are still deleted (the
+  owner's message was never sent for them), and so are the other requests of the thread. For
+  that, `state.json` stores one word beside each request id, `request_kinds` (`question`,
+  `approval`, `setup` or `hold`; never content). The key is additive, the version stays 3, and an
+  entry written before it has no kind and is deleted.
+
+- The record of answered questions is one block with no gap under its heading (issue #325). It
+  was a task card titled `User answered Claude's questions:` with the rows in a `context` block
+  under it, and Slack draws a space between the two. It is now a single `context` block:
+  `✓ User answered Claude's questions:`, then a `⎿ · question → answer` row for each question. The
+  reply no longer draws a card for a question while it waits (a stream cannot take a card back, so
+  the call's line is held until it ends, as an Edit's or a Write's is); a question that ends
+  skipped, denied, failed or stopped still gets its card then. The request message rewritten for a
+  question asked inside a subagent starts with the same `✓ `. New `Preview.record` on the chat
+  seam.
+
 - The question form has a way back and a review page (issue #325). With several questions the
   `1 of 3` line becomes the terminal's tab row (`☒ Colour  *☐ Sizes*  ☐ Shape  ✔ Submit`:
   answered, open, the page on screen in bold). From the second question on a button named for
