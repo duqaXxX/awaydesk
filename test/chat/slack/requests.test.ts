@@ -6,17 +6,17 @@ import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
   absorb,
-  answeredBlocks as answeredBlocksOf,
   approvalBlocks as approvalBlocksOf,
   type Draft,
   draftAnswers,
-  dumpDraft,
+  dumpIds,
   excluding,
   firstUnanswered,
   isAnswered,
-  loadDraft,
+  loadIds,
   NOTES_LIMIT,
   newDraft,
+  notesNeedOption,
   OPTION_TEXT_LIMIT,
   QUESTION_FORM,
   QUESTION_OPEN,
@@ -24,7 +24,9 @@ import {
   questionBlocks as questionBlocksOf,
   questionView as questionViewOf,
   SECTION_LIMIT,
+  settled,
   TYPED_LIMIT,
+  touched,
 } from "../../../src/chat/slack/requests.ts";
 import { THREAD } from "../../support/fake-slack.ts";
 import { sdkJson } from "../../support/fixtures.ts";
@@ -152,7 +154,11 @@ test("the form shows one question with next until the last", () => {
   const view = questionView(draftOf(), TWO);
   assert.ok(view.type === "modal" && view.callback_id === QUESTION_FORM);
   assert.equal(view.callback_id, "question_form");
-  assert.deepEqual(loadDraft(view.private_metadata), draftOf());
+  assert.deepEqual(loadIds(view.private_metadata), {
+    approvalId: "abc",
+    channelId: "C1",
+    threadTs: THREAD,
+  });
   assert.equal(view.submit.text, "Next (1/2)");
   assert.equal(view.blocks[0].elements[0].text, "Colour · 1 of 2");
   const inputs: Json[] = view.blocks.filter((b: Json) => b.type === "input");
@@ -394,35 +400,20 @@ test("the first unanswered question is found", () => {
   assert.equal(draftAnswers(draft, TWO), null);
 });
 
-test("the draft round trips under slack s limit", () => {
-  // The worst case: four questions, every field full of characters JSON escapes (`"` becomes
-  // `\\"`), the longest ids and the widest revisions.
-  const four = <T>(value: T) => new Map(Array.from({ length: 4 }, (_, i) => [i, value] as const));
-  const draft = newDraft("a".repeat(22), "C0123456789", "1790285951.735939", {
-    active: 3,
-    picks: four([0, 1, 2, 3]),
-    typed: four('"'.repeat(TYPED_LIMIT)),
-    notes: four('"'.repeat(NOTES_LIMIT)),
-    revisions: four([99, 99] as const),
-  });
-  const text = dumpDraft(draft);
-  assert.ok(chars(text) <= 3000, `the worst draft is ${chars(text)} characters`);
-  assert.deepEqual(loadDraft(text), draft);
-  assert.equal((JSON.parse(text) as Json).a, "a".repeat(22));
+test("the form names its request by ids alone", () => {
+  const ids = { approvalId: "abc", channelId: "C1", threadTs: THREAD };
+  const text = dumpIds(ids);
+  assert.deepEqual(JSON.parse(text), { a: "abc", c: "C1", h: THREAD });
+  assert.deepEqual(loadIds(text), ids);
+  // The metadata of the previous version, ids with a whole draft beside them, still names it.
+  const old = '{"a":"abc","c":"C1","h":"1.2","n":1,"p":{"0":[1]},"t":{"0":"x"}}';
+  assert.deepEqual(loadIds(old), { approvalId: "abc", channelId: "C1", threadTs: "1.2" });
 });
 
-test("the draft keeps non latin text as one character each", () => {
-  const text = dumpDraft(newDraft("a", "c", THREAD, { typed: new Map([[0, "日本語"]]) }));
-  assert.ok(text.includes("日本語")); // not \\u-escaped: Slack counts characters, not bytes
-});
-
-test("a draft that dump did not write is refused", () => {
-  assert.throws(() => loadDraft("{}"), /malformed draft/);
-  assert.throws(
-    () => loadDraft('{"a":"x","c":"c","h":"h","n":"one","p":{},"t":{}}'),
-    /malformed draft/,
-  );
-  assert.throws(() => loadDraft("not json"));
+test("metadata that names no request is refused", () => {
+  assert.throws(() => loadIds("{}"), /malformed form/);
+  assert.throws(() => loadIds('{"a":"x","c":"c"}'), /malformed form/);
+  assert.throws(() => loadIds("not json"));
 });
 
 /**
@@ -545,26 +536,40 @@ test("absorb reads the notes and the blocks of any revision", () => {
   assert.deepEqual(emptied.notes, new Map());
 });
 
-test("a question is answered by an option, a text under Other or notes alone", () => {
+test("a question is answered by an option or a text under Other, never by notes alone", () => {
   assert.equal(isAnswered(draftOf(), TWO, 0), false);
   assert.equal(isAnswered(draftOf({ picks: new Map([[0, [0]]]) }), TWO, 0), true);
   assert.equal(isAnswered(draftOf({ typed: new Map([[0, "x"]]) }), TWO, 0), true);
-  assert.equal(isAnswered(draftOf({ notes: new Map([[0, "x"]]) }), TWO, 0), true);
+  const noted = draftOf({ notes: new Map([[0, "x"]]) });
+  assert.equal(isAnswered(noted, TWO, 0), false);
+  assert.equal(notesNeedOption(noted, 0), true);
+  assert.equal(notesNeedOption(draftOf({ ...noted, picks: new Map([[0, [1]]]) }), 0), false);
+  assert.equal(notesNeedOption(draftOf(), 0), false);
 });
 
-test("notes alone leave the question out of the answers and in the notes", () => {
+test("notes go with the answer of their question", () => {
   const draft = draftOf({
-    notes: new Map([
-      [0, "something else"],
-      [1, "both"],
-    ]),
+    notes: new Map([[1, "both"]]),
     picks: new Map([[1, [0]]]),
+    typed: new Map([[0, "mauve"]]),
   });
   assert.deepEqual(draftAnswers(draft, TWO), {
-    answers: { "Sizes?": ["s"] },
-    notes: { "Colour?": "something else", "Sizes?": "both" },
+    answers: { "Colour?": "mauve", "Sizes?": ["s"] },
+    notes: { "Sizes?": "both" },
   });
-  assert.equal(firstUnanswered(draft, TWO), null);
+  // Notes with no option to hold them keep the form from going on.
+  const alone = draftOf({ ...draft, picks: new Map(), notes: new Map([[1, "both"]]) });
+  assert.equal(draftAnswers(alone, TWO), null);
+});
+
+test("a single select carrying both keeps the one changed last", () => {
+  const both = draftOf({ picks: new Map([[0, [1]]]), typed: new Map([[0, "mauve"]]) });
+  const option = settled(touched(both, "choice"), TWO);
+  assert.deepEqual([option.picks, option.typed], [new Map([[0, [1]]]), new Map()]);
+  const text = settled(touched(both, "other"), TWO);
+  assert.deepEqual([text.picks, text.typed], [new Map(), new Map([[0, "mauve"]])]);
+  // No change seen: the text wins, as before.
+  assert.deepEqual(settled(both, TWO).picks, new Map());
 });
 
 test("a text under Other empties the option of a single select, and the option the text", () => {
@@ -606,17 +611,4 @@ test("nothing is cleared when only one of the two is filled, or in a multi-selec
   });
   assert.equal(excluding(several, TWO, "other"), null);
   assert.equal(excluding(several, TWO, "choice"), null);
-});
-
-test("the record says a question with notes alone was answered with (notes only)", () => {
-  const blocks = answeredBlocksOf(
-    TWO,
-    { "Sizes?": ["s"] },
-    { "Colour?": "something else", "Sizes?": "both" },
-    NAMES,
-  ) as Json[];
-  const lines = String(blocks[0]?.elements[0]?.text).split("\n");
-  assert.ok(lines[1]?.endsWith("· Colour? → (notes only)"));
-  assert.ok(lines[2]?.endsWith("· Sizes? → s")); // notes are not shown beside an answer
-  assert.equal(lines.length, 3);
 });

@@ -79,11 +79,13 @@ test("no log line at any level holds a prompt, a reply or an owner's word", asyn
 
   const [approvalId, pending] = world.approvals.open(CHANNEL, THREAD, "Colour", QUESTIONS);
   const draft = newDraft(approvalId, CHANNEL, THREAD, { active: 1, picks: new Map([[0, [1]]]) });
+  world.built.drafts.set(approvalId, draft);
   const values = {
     q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } },
     o1: { other: { type: "plain_text_input", value: OTHER } },
   };
   await world.dispatch(formBody("view_submission", draft, values));
+  assert.ok(pending.decided); // fails here, not at the 300 s timeout, when the form is not read
   assert.deepEqual(await pending.decision, {
     answered: true,
     answers: { "Colour?": "blue", "Sizes?": ["s", OTHER] },

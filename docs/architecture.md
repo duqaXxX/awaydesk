@@ -874,19 +874,24 @@ breaks. Rich text shows its text as written, so nothing Claude wrote is read as 
 under them keeps the labels alone, titled with the question's header. The modal's own button reads
 `Next (1/3)` and moves on (`response_action: update`) only once the question has an answer,
 otherwise the question gets an error (`response_action: errors`); it reads `Submit` on the last.
-What was filled travels in the view's `private_metadata` (`requests.Draft`, under Slack's 3,000
-characters) from one question to the next, with Other limited to `TYPED_LIMIT` and Notes to
-`NOTES_LIMIT` characters so that four full questions fit. The picked labels, with the text typed
-under Other as the answer itself, go back as the tool's answers, a multi-select's as a list
-(measured: "Multi-select answer as a list"). In a single select an option and a text under Other
-exclude each other, as in the terminal, where the typed text replaces the option: the two blocks
-dispatch an action on every change and the provider empties the other one (`requests.excluding`),
-while a multi-select adds the text to the labels and clears nothing. Notes are optional and travel
-to the agent as that question's `notes`, in the tool's `annotations` beside the answers
-(`requests.questionResult`); with a single-select option that has a preview, the annotation
-carries the preview too, as the terminal does. A question counts as answered with an option, a
-text under Other or notes alone, and a question answered with notes alone reads
-`(notes only)` in the record. The modal carries no channel or thread: each click in it is checked against the
+What was filled is kept by the Slack provider in memory (`Requests.drafts`, `requests.Draft`), by
+request id, and the view's `private_metadata` names the request alone (its id, channel and
+thread), so Other and Notes take 300 characters each (`TYPED_LIMIT`, `NOTES_LIMIT`) with no
+Slack cap to fit. An entry goes when its request is answered, skipped or found gone, at the next
+Answer for a request that ended another way, and when the app closes; closing the form with
+Later and clicking Answer again reopens it with the answers already given. The picked labels,
+with the text typed under Other as the answer itself, go back as the tool's answers, a
+multi-select's as a list (measured: "Multi-select answer as a list"). In a single select an
+option and a text under Other exclude each other, as in the terminal, where the typed text
+replaces the option: the two blocks dispatch an action on every change and the provider empties
+the other one (`requests.excluding`); a click on Next that still carries both (it came before
+that update) keeps the one changed last (`requests.settled`). A multi-select adds the text to the
+labels and clears nothing. Notes are optional and belong to an option: with no option picked,
+Next and Submit show `Pick an option to add notes to it.` under the question, whatever else is
+filled. Notes travel to the agent as that question's `notes`, in the tool's `annotations` beside
+the answers (`requests.questionResult`); with a single-select option that has a preview, the
+annotation carries the preview too, as the terminal does. The record of the answers does not
+show notes, as the terminal's does not. The modal carries no channel or thread: each click in it is checked against the
 owner, the workspace, and the channel and thread its request was posted in (`Draft.threadTs`,
 alongside its `private_metadata`). Each request has a random id that only its buttons carry
 (`Approvals.open`). The listener reads a click or a form into an `OwnerAnswer` and, after the

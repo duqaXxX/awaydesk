@@ -664,7 +664,11 @@ option, or a character typed under Other, arrives as a `block_actions` payload
 (`Requests.onQuestionLive`) and empties the other field with one `views.update` that carries the
 hash of the view it came from; the emptied block gets a new `block_id` (`Draft.revisions`),
 because Slack keeps an input's value while its `block_id` and `action_id` stay. A `hash_conflict`
-or `not_found` is logged and ignored: Submit reads the state as it stands. The same owner and
+or `not_found` is logged and ignored: Submit reads the state as it stands. What the owner filled
+stays in the provider's memory (`Requests.drafts`) and the view's `private_metadata` holds the
+request's ids alone; a form the previous version opened carries a whole draft beside the ids,
+which is read for the ids only, so its request is looked up and, once gone, `texts.APPROVAL_GONE`
+answers. The same owner and
 workspace check applies, and the channel is checked at Submit. The question form's Next and Submit
 answer Slack after checks that make no network call, since a missing answer can only be shown in
 that answer, and Submit checks the channel before the answer reaches the core. A

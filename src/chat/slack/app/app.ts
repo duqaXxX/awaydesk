@@ -66,6 +66,7 @@ import { describe } from "../reply/errors.ts";
 import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
+  type Draft,
   QUESTION_FORM,
   QUESTION_OPEN,
   QUESTION_SKIP,
@@ -152,6 +153,11 @@ export interface BuiltApp {
    * nothing.
    */
   close(): void;
+  /**
+   * What the owner filled in each open question form, by request id (`Requests.drafts`): read by
+   * a test, which also seeds a form that is already on its second page.
+   */
+  readonly drafts: Map<string, Draft>;
   /** `!open` typed in a session's thread, for the folder the session works in. */
   openFile(channel: string, threadTs: string, folder: string, words: string): Promise<void>;
 }
@@ -367,7 +373,9 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   return {
     app,
     registered,
+    drafts: requests.drafts,
     close: () => {
+      requests.close();
       chat.halt();
       clips.close();
     },

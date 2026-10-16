@@ -3311,13 +3311,7 @@ export class ThreadSession {
     // request gone and the root free to settle on done.
     if (givenUp && !withdrawn) await this.deleteRequest(messageTs);
     if (questions !== null && "answered" in decision && decision.answered) {
-      await this.keepAnswers(
-        request.callId,
-        messageTs,
-        questions,
-        decision.answers,
-        decision.notes,
-      );
+      await this.keepAnswers(request.callId, messageTs, questions, decision.answers);
     }
     return decision;
   }
@@ -3334,15 +3328,14 @@ export class ThreadSession {
     messageTs: MessageId,
     questions: readonly Question[],
     answers: Readonly<Record<string, string | readonly string[]>>,
-    notes: Readonly<Record<string, string>>,
   ): Promise<void> {
     const active = this.active;
-    if (callId !== null && active?.renderer.answered(callId, questions, answers, notes)) {
+    if (callId !== null && active?.renderer.answered(callId, questions, answers)) {
       await this.deleteRequest(messageTs);
       return;
     }
     try {
-      await this.thread.keepAnswers(messageTs, questions, answers, notes);
+      await this.thread.keepAnswers(messageTs, questions, answers);
     } catch (error) {
       // The request must not keep buttons that no longer work: remove it.
       logger.warning(`could not record an answer in ${this.where}: ${errorName(error)}`);

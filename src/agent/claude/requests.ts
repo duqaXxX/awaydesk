@@ -122,7 +122,7 @@ function annotationsOf(
     const question = questionOf(entry);
     if (question === null) continue;
     const annotation: Annotation = {};
-    const note = answer.notes[question.text];
+    const note = Object.hasOwn(answer.notes, question.text) ? answer.notes[question.text] : "";
     if (note) annotation.notes = note;
     const given = Object.hasOwn(answer.answers, question.text)
       ? answer.answers[question.text]

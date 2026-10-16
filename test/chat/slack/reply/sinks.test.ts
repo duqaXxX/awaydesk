@@ -1952,7 +1952,6 @@ test("an answered question shows in the reply where it was answered", async () =
           call.callId,
           call.questions,
           answers as Record<string, string | string[]>,
-          {},
         ),
       );
     }
@@ -1977,7 +1976,7 @@ test("an answered question shows in the reply where it was answered", async () =
 
 test("answers to a call the reply has no line for are not kept", () => {
   const renderer = new TurnRenderer(reply(new FakeSlack()), NAMES);
-  assert.ok(!renderer.answered("toolu_unseen", [{ text: "Colour?" }], { "Colour?": "blue" }, {}));
+  assert.ok(!renderer.answered("toolu_unseen", [{ text: "Colour?" }], { "Colour?": "blue" }));
 });
 
 test("a stopped message shows the answers under their card", async () => {

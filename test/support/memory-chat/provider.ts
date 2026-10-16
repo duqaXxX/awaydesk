@@ -31,7 +31,7 @@ import {
   type ThreadChat,
   type ThreadRef,
 } from "../../../src/chat/seam.ts";
-import { isLast, isOvertaken, texts } from "../../../src/core/port.ts";
+import { isLast, isOvertaken } from "../../../src/core/port.ts";
 import { DAEMON, type MessageKind, type Placed, type Room, type StoredMessage } from "./room.ts";
 
 const CAPABILITIES: ChatCapabilities = {
@@ -244,14 +244,11 @@ class MemoryReply implements Reply, Placed {
 function answered(
   questions: readonly Question[],
   answers: Readonly<Record<string, string | readonly string[]>>,
-  notes: Readonly<Record<string, string>>,
 ): string {
   return questions
     .flatMap((question) => {
       const answer = answers[question.text];
-      if (answer === undefined) {
-        return question.text in notes ? [`${question.text}: ${texts.NOTES_ONLY}`] : [];
-      }
+      if (answer === undefined) return [];
       return [`${question.text}: ${typeof answer === "string" ? answer : answer.join(", ")}`];
     })
     .join("\n");
@@ -314,9 +311,8 @@ class MemoryThread implements ThreadChat {
     request: MessageId,
     questions: readonly Question[],
     answers: Readonly<Record<string, string | readonly string[]>>,
-    notes: Readonly<Record<string, string>>,
   ): Promise<void> {
-    rewritten(this.#room, request, answered(questions, answers, notes));
+    rewritten(this.#room, request, answered(questions, answers));
   }
 
   async rewrite(message: MessageId, text: string): Promise<void> {

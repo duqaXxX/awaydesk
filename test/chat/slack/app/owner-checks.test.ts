@@ -38,6 +38,7 @@ import { fill, named } from "../../../../src/core/texts.ts";
 import { BOT, CHANNEL, OTHER_TEAM, OWNER, STRANGER, THREAD } from "../../../support/fake-slack.ts";
 import { NAMES } from "../../../support/names.ts";
 import {
+  answerClick,
   type Body,
   CLICK_THREAD,
   chooseClick,
@@ -123,17 +124,24 @@ const CASES: readonly Case[] = [
       arrange: async (world, sender) => {
         const question = QUESTIONS[0] as (typeof QUESTIONS)[number];
         const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [question]);
-        new ModalSlack(world.slack);
+        const modal = new ModalSlack(world.slack);
+        await world.dispatch(answerClick(approvalId)); // the form on screen
         // An option and a text both stand: the change empties the one that was not just made.
         const values = {
           ...picked(0, "0"),
           o0: { other: { type: "plain_text_input", value: "mauve" } },
         };
-        const body = formAction(newDraft(approvalId, CHANNEL, FORM_THREAD), [question], values, {
-          id: actionId,
-          block: actionId === "answer" ? "q0" : "o0",
-          type: actionId === "answer" ? "radio_buttons" : "plain_text_input",
-        });
+        world.slack.apiCalls = []; // opening the form is the arrangement, not what the payload did
+        const body = formAction(
+          modal.view,
+          values,
+          {
+            id: actionId,
+            block: actionId === "answer" ? "q0" : "o0",
+            type: actionId === "answer" ? "radio_buttons" : "plain_text_input",
+          },
+          { hash: modal.hash },
+        );
         return {
           body: sentBy(body, sender),
           acted: () => world.slack.callsTo("views.update").length > 0,

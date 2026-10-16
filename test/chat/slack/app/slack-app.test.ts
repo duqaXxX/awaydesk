@@ -32,7 +32,7 @@ import { FALLBACK_LIMIT } from "../../../../src/chat/slack/reply/blocks.ts";
 import { take } from "../../../../src/chat/slack/reply/chars.ts";
 import {
   answeredBlocks,
-  loadDraft,
+  loadIds,
   newDraft,
   SECTION_LIMIT,
 } from "../../../../src/chat/slack/requests.ts";
@@ -978,7 +978,11 @@ test("answer opens the form", async (t) => {
   assert.equal(opened[0]?.trigger_id, body.trigger_id);
   const view = opened[0]?.view as Body;
   assert.equal(view.callback_id, "question_form");
-  assert.deepEqual(loadDraft(view.private_metadata), newDraft(approvalId, CHANNEL, FORM_THREAD));
+  assert.deepEqual(loadIds(view.private_metadata), {
+    approvalId,
+    channelId: CHANNEL,
+    threadTs: FORM_THREAD,
+  });
 });
 
 /** The Answer click, recorded 2026-09-24, on the question `approvalId` names. */
@@ -1079,9 +1083,10 @@ test("next with an answer moves to the next question", async (t) => {
   const answer = response.body as Body;
   assert.equal(answer.response_action, "update");
   assert.deepEqual(
-    loadDraft(answer.view.private_metadata),
+    world.built.drafts.get(approvalId),
     newDraft(approvalId, CHANNEL, FORM_THREAD, { active: 1, picks: new Map([[0, [0]]]) }),
   );
+  assert.equal(answer.view.submit.text, "Submit");
   assert.ok(!pending.decided);
 });
 
@@ -1093,6 +1098,7 @@ test("a complete submit answers claude and leaves the request to the session", a
     active: 1,
     picks: new Map([[0, [1]]]),
   });
+  world.built.drafts.set(approvalId, draft); // the second page, as Next left it
   const values = {
     q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } },
     o1: { other: { type: "plain_text_input", value: "xl" } },
@@ -1120,6 +1126,7 @@ for (const [index, user] of OTHER_USERS.entries()) {
         [1, [0]],
       ]),
     });
+    world.built.drafts.set(approvalId, draft); // answered, were it the owner's
     await world.dispatch(formBody("view_submission", draft, {}, user));
     assert.ok(!pending.decided);
   });
@@ -2149,7 +2156,7 @@ test("long answers fit slack s limit", () => {
     options: [],
   }));
   const answers = { ["q".repeat(900)]: "a".repeat(300) };
-  const blocks = answeredBlocks(questions, answers, {}, NAMES) as Body[];
+  const blocks = answeredBlocks(questions, answers, NAMES) as Body[];
   assert.equal(blocks.length, 1);
   assert.ok(Array.from(blocks[0]?.elements[0].text as string).length <= SECTION_LIMIT);
 });

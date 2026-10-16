@@ -596,7 +596,7 @@ export function chatConformance(
       check("keepAnswers leaves the record of the answers and nothing to press", async (s) => {
         const thread = s.provider.thread(s.ref);
         const id = await thread.ask("request-answered", question(), "A question");
-        await thread.keepAnswers(id, [QUESTION], { [QUESTION.text]: "blue" }, {});
+        await thread.keepAnswers(id, [QUESTION], { [QUESTION.text]: "blue" });
         const shown = s.rig.read(s.ref).find((m) => m.id === id);
         assert.ok(shown, "the record stays in the thread");
         assert.equal(shown.pressable, false);

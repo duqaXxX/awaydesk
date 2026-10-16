@@ -204,19 +204,6 @@ test("notes go back as annotations beside the answers, keyed by the question", (
   });
 });
 
-test("a question answered with notes alone has an annotation and no answer", () => {
-  const notes = { "Which colour?": "something else" };
-  const result = questionResult({ answered: true, answers: {}, notes }, { questions: ASKED });
-  assert.deepEqual(result, {
-    behavior: "allow",
-    updatedInput: {
-      questions: ASKED,
-      answers: {},
-      annotations: { "Which colour?": { notes: "something else" } },
-    },
-  });
-});
-
 test("the preview of the option picked rides in the annotation, as the terminal sends it", () => {
   const notes = { "Which layout?": "tighter gaps" };
   const answers = { "Which layout?": "grid" };
@@ -250,6 +237,27 @@ test("no preview goes for an empty preview, a typed answer or a multi-select", (
     { questions: ASKED },
   );
   assert.deepEqual((result as JsonObject).updatedInput, { questions: ASKED, answers: several });
+});
+
+test("a question named like an inherited key carries no annotation of its own", () => {
+  const asked = [{ question: "constructor", options: [{ label: "a" }, { label: "b" }] }];
+  const result = questionResult(
+    { answered: true, answers: { constructor: "a" }, notes: {} },
+    { questions: asked },
+  );
+  assert.deepEqual((result as JsonObject).updatedInput, {
+    questions: asked,
+    answers: { constructor: "a" },
+  });
+  const noted = questionResult(
+    { answered: true, answers: { constructor: "a" }, notes: { constructor: "why" } },
+    { questions: asked },
+  );
+  assert.deepEqual((noted as JsonObject).updatedInput, {
+    questions: asked,
+    answers: { constructor: "a" },
+    annotations: { constructor: { notes: "why" } },
+  });
 });
 
 test("the questions go back as the agent wrote them, with what the seam does not carry", () => {

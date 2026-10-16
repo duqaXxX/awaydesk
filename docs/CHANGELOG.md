@@ -10,12 +10,14 @@ All notable changes to this project are documented here. The format follows
 - The question form takes a text under Other and optional Notes in every question (issue #325).
   In a single select an option and a text under Other exclude each other, live, as in the
   terminal where the typed text replaces the option: picking an option empties Other and typing
-  there empties the radio, in one `views.update`. A multi-select clears nothing. Notes reach the
-  agent as that question's `annotations` entry beside the answers, with the preview of the option
-  picked for a single select; a question answered with notes alone has no answer and reads
-  `(notes only)` in the record. A question counts as answered with an option, a text or notes.
-  Other holds 150 characters (300 before) and Notes 150, so that four full questions stay under
-  the 3,000 characters Slack allows `private_metadata`.
+  there empties the radio, in one `views.update`; a Next that carries both keeps the one changed
+  last. A multi-select clears nothing. Notes belong to an option: with none picked, Next and
+  Submit show `Pick an option to add notes to it.`. They reach the agent as that question's
+  `annotations` entry beside the answers, with the preview of the option picked for a single
+  select; the record of the answers does not show them. What the owner filled now lives in the
+  daemon's memory, not in the form's `private_metadata`, so Other and Notes hold 300 characters
+  each, and closing the form with Later and clicking Answer again reopens it with the answers
+  kept. A restart still loses an open form, as it loses the request.
 
 ### Fixed
 

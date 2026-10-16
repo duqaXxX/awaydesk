@@ -253,7 +253,6 @@ export interface ThreadChat {
     request: MessageId,
     questions: readonly Question[],
     answers: Readonly<Record<string, string | readonly string[]>>,
-    notes: Readonly<Record<string, string>>,
   ): Promise<void>;
   /**
    * Rewrites a message of the daemon's into a notice that says `text`, with nothing left to
@@ -337,9 +336,9 @@ export type OwnerRequest = PermissionRequest | QuestionRequest | HoldRequest | S
 export type OwnerAnswer =
   | { readonly type: "permission"; readonly allow: boolean }
   /**
-   * The answer to each question by its text, or null for a skip, and the notes added to a
-   * question by its text (only the non-empty ones). A question answered with notes alone has no
-   * answer.
+   * The answer to each question by its text, or null for a skip, and the notes added to the
+   * option picked in a question, by its text (only the non-empty ones, each for a question that
+   * has an answer).
    */
   | {
       readonly type: "question";

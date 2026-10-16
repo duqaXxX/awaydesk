@@ -261,8 +261,6 @@ export const BYPASS_OFF_THREAD = naming(
 export const STOPPED = "Stopped the current turn.";
 // An answered question, as the terminal keeps it in the transcript.
 export const ANSWERED = naming("User answered {author}'s questions:");
-/** The terminal's record of a question answered with notes alone. */
-export const NOTES_ONLY = "(notes only)";
 // Slack drops plain spaces at the start of a line; no-break spaces stay and make the indent.
 export const NESTED = `${"\u00a0".repeat(4)}⎿ `;
 export const STOPPED_CHANNEL = "Stopped what was running in this channel.";

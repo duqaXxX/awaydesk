@@ -26,13 +26,12 @@ export const APPROVAL_DENY = "approval_deny";
 export const QUESTION_OPEN = "question_open";
 export const QUESTION_SKIP = "question_skip";
 export const QUESTION_FORM = "question_form";
-// Text typed under Other and in Notes, per question: four questions with both fields full at the
-// worst (every character escaped, `"` becoming `\"`) still keep the draft under
-// private_metadata's 3,000 characters (`dumpDraft`).
-export const TYPED_LIMIT = 150;
-export const NOTES_LIMIT = 150;
+// Text typed under Other and in Notes, per question. The draft lives in the daemon's memory
+// (`Requests`), so Slack's 3,000 characters of private_metadata bound neither.
+export const TYPED_LIMIT = 300;
+export const NOTES_LIMIT = 300;
 // A block that must show empty gets a new id: Slack keeps an input's value across `views.update`
-// while its `block_id` and `action_id` stay. The revision wraps, so the draft stays small.
+// while its `block_id` and `action_id` stay. The revision wraps, so the ids stay short.
 const REVISIONS = 100;
 
 type Block = Record<string, unknown>;
@@ -152,14 +151,12 @@ export function approvalBlocks(
 export function answeredBlocks(
   questions: readonly Question[],
   answers: Readonly<Record<string, string | readonly string[]>>,
-  notes: Readonly<Record<string, string>>,
   names: Names,
 ): Block[] {
   const lines = [named(texts.ANSWERED, names)];
   for (const q of questions) {
     const answer = Object.hasOwn(answers, q.text) ? (answers[q.text] as string | string[]) : "";
-    let shown = typeof answer === "string" ? answer : answer.join(", ");
-    if (shown === "" && Object.hasOwn(notes, q.text)) shown = texts.NOTES_ONLY;
+    const shown = typeof answer === "string" ? answer : answer.join(", ");
     lines.push(`${texts.NESTED}· ${shownAsWritten(q.text)} → ${shownAsWritten(shown)}`);
   }
   // A context element holds at most 3,000 characters; long questions and answers are cut.
@@ -209,9 +206,10 @@ export function blockIdIn(draft: Draft, field: Field, at: number): string {
 }
 
 /**
- * What the owner filled in the form so far, carried by the form itself (private_metadata) from
- * one question to the next: option indexes picked, text typed under Other and notes, per
- * question; and the revision of each question's two clearable blocks (`blockIdIn`).
+ * What the owner filled in the form so far, kept by the provider in memory (`Requests`) while
+ * the request is open: option indexes picked, text typed under Other and notes, per question; the
+ * revision of each question's two clearable blocks (`blockIdIn`); and which of the two was
+ * changed last in a single select (`settled`).
  */
 export interface Draft {
   readonly approvalId: string;
@@ -224,6 +222,8 @@ export interface Draft {
   readonly notes: ReadonlyMap<number, string>;
   /** Per question: the revision of its choice block and of its Other block. */
   readonly revisions: ReadonlyMap<number, readonly [choice: number, other: number]>;
+  /** Per question: the field the owner changed last. */
+  readonly last: ReadonlyMap<number, Field>;
 }
 
 /** A draft of the request `approvalId` posted in this thread, with nothing filled in unless given. */
@@ -231,7 +231,7 @@ export function newDraft(
   approvalId: string,
   channelId: string,
   threadTs: string,
-  filled: Partial<Pick<Draft, "active" | "picks" | "typed" | "notes" | "revisions">> = {},
+  filled: Partial<Pick<Draft, "active" | "picks" | "typed" | "notes" | "revisions" | "last">> = {},
 ): Draft {
   return {
     approvalId,
@@ -242,63 +242,34 @@ export function newDraft(
     typed: filled.typed ?? new Map(),
     notes: filled.notes ?? new Map(),
     revisions: filled.revisions ?? new Map(),
+    last: filled.last ?? new Map(),
   };
 }
 
-/** The draft as `private_metadata` text, compact because Slack caps it at 3,000 characters. */
-export function dumpDraft(draft: Draft): string {
-  // `JSON.stringify` keeps non-Latin text as it is: Slack counts characters, not bytes.
-  return JSON.stringify({
-    a: draft.approvalId,
-    c: draft.channelId,
-    h: draft.threadTs,
-    n: draft.active,
-    p: Object.fromEntries([...draft.picks].map(([k, v]) => [String(k), v])),
-    t: Object.fromEntries([...draft.typed].map(([k, v]) => [String(k), v])),
-    s: Object.fromEntries([...draft.notes].map(([k, v]) => [String(k), v])),
-    v: Object.fromEntries([...draft.revisions].map(([k, v]) => [String(k), v])),
-  });
+/** What names the request in a form: the ids alone, as `private_metadata` text. */
+export type RequestIds = Pick<Draft, "approvalId" | "channelId" | "threadTs">;
+
+export function dumpIds(ids: RequestIds): string {
+  return JSON.stringify({ a: ids.approvalId, c: ids.channelId, h: ids.threadTs });
 }
 
-function text(value: unknown): string {
-  if (typeof value !== "string") throw new Error("malformed draft");
-  return value;
+/**
+ * The ids `dumpIds` wrote; throws on anything else. Only the ids are read, so the metadata of a
+ * form the previous version opened (the ids with a whole draft beside them) names its request
+ * too, and the lookup that follows finds none.
+ */
+export function loadIds(dumped: string): RequestIds {
+  const data: unknown = JSON.parse(dumped);
+  if (!isRecord(data) || ![data.a, data.c, data.h].every((id) => typeof id === "string")) {
+    throw new Error("malformed form");
+  }
+  return { approvalId: data.a as string, channelId: data.c as string, threadTs: data.h as string };
 }
 
 function index(value: unknown): number {
   const found = typeof value === "string" ? value : typeof value === "number" ? String(value) : "";
-  if (!/^\d+$/.test(found)) throw new Error("malformed draft");
+  if (!/^\d+$/.test(found)) throw new Error("malformed form");
   return Number(found);
-}
-
-/** The draft `dumpDraft` wrote; throws on anything else. */
-export function loadDraft(dumped: string): Draft {
-  const data: unknown = JSON.parse(dumped);
-  if (!isRecord(data) || !isRecord(data.p) || !isRecord(data.t) || !isRecord(data.s)) {
-    throw new Error("malformed draft");
-  }
-  if (!isRecord(data.v)) throw new Error("malformed draft");
-  const picks = new Map<number, number[]>();
-  for (const [key, value] of Object.entries(data.p)) {
-    if (!Array.isArray(value)) throw new Error("malformed draft");
-    picks.set(index(key), value.map(index));
-  }
-  const typed = new Map<number, string>();
-  for (const [key, value] of Object.entries(data.t)) typed.set(index(key), text(value));
-  const notes = new Map<number, string>();
-  for (const [key, value] of Object.entries(data.s)) notes.set(index(key), text(value));
-  const revisions = new Map<number, readonly [number, number]>();
-  for (const [key, value] of Object.entries(data.v)) {
-    if (!Array.isArray(value) || value.length !== 2) throw new Error("malformed draft");
-    revisions.set(index(key), [index(value[0]), index(value[1])]);
-  }
-  return newDraft(text(data.a), text(data.c), text(data.h), {
-    active: index(data.n),
-    picks,
-    typed,
-    notes,
-    revisions,
-  });
 }
 
 function fieldsOf(value: unknown): Record<string, unknown> {
@@ -356,6 +327,11 @@ export function absorb(draft: Draft, stateValues: unknown): Draft {
   };
 }
 
+/** The draft with `field` of the question on screen marked as the one changed last. */
+export function touched(draft: Draft, field: Field): Draft {
+  return { ...draft, last: new Map(draft.last).set(draft.active, field) };
+}
+
 /**
  * The draft to show when the field just changed (`changed`, read into `draft` by `absorb`) must
  * empty the other one, or null when nothing must be cleared. A single select takes an option or
@@ -385,6 +361,15 @@ export function excluding(
   return { ...draft, picks, typed, revisions };
 }
 
+/**
+ * The draft as Next or Submit reads it. A single select carries both an option and a text when
+ * the click came before the update that empties one of them: the one changed last stays (the
+ * text when no change was seen).
+ */
+export function settled(draft: Draft, questions: readonly Question[]): Draft {
+  return excluding(draft, questions, draft.last.get(draft.active) ?? "other") ?? draft;
+}
+
 function answerAt(
   draft: Draft,
   questions: readonly Question[],
@@ -395,9 +380,14 @@ function answerAt(
   return answerOf(question, draft.picks.get(at) ?? [], draft.typed.get(at));
 }
 
-/** An option, a text under Other or notes make an answer, as in the terminal. */
+/** An option or a text under Other make an answer, as in the terminal. */
 export function isAnswered(draft: Draft, questions: readonly Question[], at: number): boolean {
-  return answerAt(draft, questions, at) !== null || draft.notes.has(at);
+  return answerAt(draft, questions, at) !== null;
+}
+
+/** Whether question `at` has notes and no option to add them to: a note is for an option. */
+export function notesNeedOption(draft: Draft, at: number): boolean {
+  return draft.notes.has(at) && !draft.picks.has(at);
 }
 
 /** The index of the first question with no answer, or null when every one has one. */
@@ -407,8 +397,8 @@ export function firstUnanswered(draft: Draft, questions: readonly Question[]): n
 }
 
 /**
- * Every question's answer by its text and its notes by its text, or null while one question has
- * neither. A question with notes alone has no answer.
+ * Every question's answer by its text and the notes added to an option by the question's text,
+ * or null while one question is unanswered or has notes with no option.
  */
 export function draftAnswers(
   draft: Draft,
@@ -417,9 +407,9 @@ export function draftAnswers(
   const answers: [string, string | string[]][] = [];
   const notes: [string, string][] = [];
   for (const [at, question] of questions.entries()) {
-    if (!isAnswered(draft, questions, at)) return null;
     const answer = answerAt(draft, questions, at);
-    if (answer !== null) answers.push([question.text, answer]);
+    if (answer === null || notesNeedOption(draft, at)) return null;
+    answers.push([question.text, answer]);
     const note = draft.notes.get(at);
     if (note !== undefined) notes.push([question.text, note]);
   }
@@ -579,7 +569,7 @@ export function questionView(draft: Draft, questions: readonly Question[], names
   return {
     type: "modal",
     callback_id: QUESTION_FORM,
-    private_metadata: dumpDraft(draft),
+    private_metadata: dumpIds(draft),
     title: { type: "plain_text", text: named(slackTexts.QUESTION_TITLE, names) },
     submit: {
       type: "plain_text",

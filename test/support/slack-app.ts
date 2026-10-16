@@ -54,12 +54,7 @@ import {
 } from "../../src/chat/slack/openfile/modal.ts";
 import { type Limiter, UpdateLimiter } from "../../src/chat/slack/reply/limiter.ts";
 import { resetStatusFlags } from "../../src/chat/slack/reply/status.ts";
-import {
-  type Draft,
-  dumpDraft,
-  QUESTION_FORM,
-  questionView,
-} from "../../src/chat/slack/requests.ts";
+import { type Draft, QUESTION_FORM } from "../../src/chat/slack/requests.ts";
 import {
   SETUP_BLOCK,
   SETUP_BYPASS,
@@ -731,11 +726,21 @@ export const QUESTIONS: readonly Question[] = [
 ];
 
 /** The form's recorded Submit (view_submission, 2026-09-24), carrying this draft and state. */
-export function formBody(kind: string, draft: Draft, values: Body, user: Body = {}): Body {
+export function formBody(
+  kind: string,
+  ids: Pick<Draft, "approvalId" | "channelId" | "threadTs">,
+  values: Body,
+  user: Body = {},
+): Body {
   const body = recorded("submit");
   body.type = kind;
   Object.assign(body.user, user);
-  body.view.private_metadata = dumpDraft(draft);
+  // What `questionView` names its request with: the ids alone.
+  body.view.private_metadata = JSON.stringify({
+    a: ids.approvalId,
+    c: ids.channelId,
+    h: ids.threadTs,
+  });
   body.view.state = { values };
   return body;
 }
@@ -747,19 +752,18 @@ export function picked(index: number, value: string): Body {
 /**
  * What Slack sends when a control of the question form dispatches an action (the block_actions
  * payload of a modal, from the reference read 2026-10-16: `container.type` "view", the `view`
- * with `id`, `hash`, `private_metadata` and `state.values`, and the action that fired). `blocks`
- * are the form's own, as it stands on screen.
+ * with `id`, `hash`, `private_metadata` and `state.values`, and the action that fired). `view` is
+ * the form as it stands on screen, as `views.open` or the last `views.update` gave it.
  */
 export function formAction(
-  draft: Draft,
-  questions: readonly Question[],
+  view: Body,
   values: Body,
   action: { readonly id: string; readonly block: string; readonly type: string },
   options: { readonly hash?: string; readonly user?: Body } = {},
 ): Body {
   const body = viewEvent("block_actions", values, {
-    metadata: dumpDraft(draft),
-    blocks: questionView(draft, questions, NAMES).blocks as Body[],
+    metadata: view.private_metadata,
+    blocks: view.blocks as Body[],
     viewHash: options.hash ?? "1790000000.h0",
   });
   body.view.callback_id = QUESTION_FORM;
@@ -772,6 +776,14 @@ export function formAction(
     },
   ];
   Object.assign(body.user, options.user ?? {});
+  return body;
+}
+
+/** The Answer click, recorded 2026-09-24, on the question `approvalId` names. */
+export function answerClick(approvalId: string): Body {
+  const body = recorded("open-click");
+  body.actions[0].value = approvalId;
+  body.trigger_id = "0000000000.0000000000.fake"; // real clicks carry one; the scrub drops it
   return body;
 }
 

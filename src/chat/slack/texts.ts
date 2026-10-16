@@ -116,6 +116,7 @@ export const QUESTION_TITLE = naming("{agent} asks");
 export const QUESTION_CLOSE = "Later";
 export const QUESTION_NOT_OPENED = "The form could not open (`{error}`). Click Answer again.";
 export const QUESTION_MISSING = "Choose an option or type your own answer.";
+export const QUESTION_NOTES_NEED_OPTION = "Pick an option to add notes to it.";
 export const QUESTION_WHERE = "{number} of {count}";
 export const QUESTION_NEXT = "Next ({number}/{count})";
 export const QUESTION_OTHER = "Other";
