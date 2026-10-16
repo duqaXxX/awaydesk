@@ -429,6 +429,7 @@ export class SlackThread implements ThreadChat {
       botUserId: identity.botUserId,
       limiter: this.options.limiter,
       clock: this.clock,
+      ...(this.options.steady !== undefined && { steady: this.options.steady }),
       onOpenReply: onOpenMessage,
       onWrite: () => this.line.wrote(),
       places,

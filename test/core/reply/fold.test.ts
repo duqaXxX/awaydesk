@@ -21,6 +21,7 @@ function call(
     calls: 0,
     preview: null,
     folded: null,
+    startedAt: null,
     ...fields,
   };
 }
@@ -259,4 +260,36 @@ test("a counted call that stops folding leaves the line to the calls that remain
     cards.map((card) => [card.title, card.folded]),
     [["Read 1 file", "Read 1 file"]],
   );
+});
+
+// A shell command is timed (issue #315): its card carries when the running call began, and the
+// commands of the run under it.
+
+test("the card follows the running call: its start, and one command line per timed call", () => {
+  const fold = new Fold();
+  const [first] = fold.task(
+    call("a", "Bash", "in_progress", { startedAt: 100, details: "$ sleep 1" }),
+  );
+  assert.equal(first?.startedAt, 100);
+  assert.equal(first?.details, "$ sleep 1");
+  fold.task(call("a", "Bash", "complete", { startedAt: 100, details: "$ sleep 1" }));
+  const [second] = fold.task(
+    call("b", "Bash", "in_progress", { startedAt: 140, details: "$ make test" }),
+  );
+  assert.equal(second?.startedAt, 140);
+  assert.equal(second?.details, "$ sleep 1\n$ make test");
+});
+
+test("a call that is not timed adds no line and leaves the start null", () => {
+  const fold = new Fold();
+  const [card] = fold.task(call("a", "Read"));
+  assert.equal(card?.startedAt, null);
+  assert.equal(card?.details, null);
+});
+
+test("an ended run keeps no start: the counts line is not timed", () => {
+  const fold = new Fold();
+  fold.task(call("a", "Bash", "in_progress", { startedAt: 100, details: "$ ls" }));
+  const [card] = fold.task(call("a", "Bash", "complete", { startedAt: 100, details: "$ ls" }));
+  assert.equal(card?.startedAt, null);
 });

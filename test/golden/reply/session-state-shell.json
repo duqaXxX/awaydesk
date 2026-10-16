@@ -7,12 +7,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 25",
       "folded": null,
       "id": "toolu_01EW2531ZDptrHYYHXJxmz55",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Wait 25 seconds in background"
@@ -28,12 +29,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 25",
       "folded": null,
       "id": "toolu_01EW2531ZDptrHYYHXJxmz55",
       "name": "Bash",
       "output": "Command running in background with ID: barbmqsk1. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/barbmqsk1.output. You will be notified when it completes. To check interim outpu…",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Wait 25 seconds in background"
@@ -70,6 +72,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "barbmqsk1"
@@ -85,6 +88,7 @@
       "name": "task",
       "output": "Background command \"Wait 25 seconds in background\" completed (exit code 0)",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "barbmqsk1"
@@ -133,12 +137,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 25",
      "folded": null,
      "id": "toolu_01EW2531ZDptrHYYHXJxmz55",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "Wait 25 seconds in background"
@@ -154,12 +159,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 25",
      "folded": null,
      "id": "toolu_01EW2531ZDptrHYYHXJxmz55",
      "name": "Bash",
      "output": "Command running in background with ID: barbmqsk1. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/barbmqsk1.output. You will be notified when it completes. To check interim outpu…",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Wait 25 seconds in background"

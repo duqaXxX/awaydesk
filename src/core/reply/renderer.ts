@@ -10,17 +10,21 @@
  */
 import type { Question, SessionEvent } from "../../agent/seam.ts";
 import type { Preview, ReplySink, TaskStatus, TaskUpdate } from "../../chat/seam.ts";
+import { monotonicClock } from "../../clock.ts";
 import { blank } from "../../text.ts";
 import { formatTokens } from "../footer.ts";
 import * as texts from "../texts.ts";
 import {
   answered,
+  commandLine,
+  continued,
   described,
   LAUNCHERS,
   type Launch,
   launchedTogether,
   PREVIEWED,
   preview,
+  resuming,
 } from "./previews.ts";
 import { BACKGROUND, oneLine, STOPPED, splitLines, TITLE_LIMIT } from "./words.ts";
 
@@ -53,6 +57,7 @@ function line(
     calls: 0,
     preview: null,
     folded: null,
+    startedAt: null,
     ...fields,
   };
 }
@@ -180,6 +185,13 @@ export class TurnRenderer {
   readonly #startedBefore: (taskId: string) => boolean;
   /** The name of a model by its id, for the model an agent ran on. */
   readonly #modelName: (id: string) => string;
+  /** Whether the session saw the task start in an earlier reply and it has ended since. */
+  readonly #endedBefore: (taskId: string) => boolean;
+  /** Seconds on the clock the chat compares `TaskUpdate.startedAt` with. */
+  readonly #now: () => number;
+  // Calls that continue an agent that has ended: a line of words and no card, kept by id so that a
+  // call that fails can still draw the card that says why.
+  readonly #resumed = new Map<string, TaskUpdate>();
 
   constructor(
     sink: Sink,
@@ -188,6 +200,8 @@ export class TurnRenderer {
     streaming = true,
     startedBefore: (taskId: string) => boolean = () => false,
     modelName: (id: string) => string = (id) => id,
+    endedBefore: (taskId: string) => boolean = () => false,
+    now: () => number = () => monotonicClock.time(),
   ) {
     this.#sink = sink;
     this.#names = names;
@@ -195,6 +209,8 @@ export class TurnRenderer {
     this.#streaming = streaming;
     this.#startedBefore = startedBefore;
     this.#modelName = modelName;
+    this.#endedBefore = endedBefore;
+    this.#now = now;
   }
 
   /** One event of the session into the reply. An event that shows nothing is left out. */
@@ -549,6 +565,14 @@ export class TurnRenderer {
     if (root !== null && (this.#lines.has(root) || this.#launched.has(root))) {
       this.#rootOf.set(event.callId, root);
       await this.#child(root, title);
+    } else if (this.#continues(event)) {
+      // The terminal draws no line for a message to an agent it knows: it writes under the agent
+      // that it resumes. The task that starts again under this call finds no card (`#taskStarted`).
+      this.#resumed.set(
+        event.callId,
+        line(event.callId, title, "in_progress", { name: event.toolName }),
+      );
+      await this.feedLine(resuming(continued(event.toolName, event.input) as string));
     } else if (PREVIEWED.has(event.toolName) || LAUNCHERS.has(event.toolName)) {
       // Kept from the sink until it ends: what shows it then is its preview with no card, or
       // a card that says why it failed. An approval has a message of its own. A call that
@@ -560,8 +584,27 @@ export class TurnRenderer {
       );
       this.#afterText = false;
     } else {
-      await this.#set(line(event.callId, title, "in_progress", { name: event.toolName }));
+      await this.#set(line(event.callId, title, "in_progress", this.#timed(event)));
     }
+  }
+
+  /**
+   * Whether the call continues an agent that has ended, which is the case the terminal was seen
+   * to word (2026-10-16); a message to one that still runs keeps its card.
+   */
+  #continues(event: EventOf<"call_started">): boolean {
+    const task = continued(event.toolName, event.input);
+    if (task === null) return false;
+    return this.#lineOfTask.has(task) ? !this.#running.has(task) : this.#endedBefore(task);
+  }
+
+  /**
+   * A call's fields: its name, and for a call the terminal times, when it began and its command.
+   */
+  #timed(event: EventOf<"call_started">): Partial<TaskUpdate> {
+    const command = commandLine(event.toolName, event.input);
+    if (command === null) return { name: event.toolName };
+    return { name: event.toolName, details: command, startedAt: this.#now() };
   }
 
   async #callEnded(event: EventOf<"call_ended">): Promise<void> {
@@ -574,6 +617,11 @@ export class TurnRenderer {
     }
     const entry = this.#lines.get(event.callId);
     if (entry === undefined) {
+      const resumed = this.#resumed.get(event.callId);
+      if (resumed !== undefined && event.isError) {
+        // The words were drawn; a call that failed says why on a card, as any failed call does.
+        await this.#set({ ...resumed, status: "error", output: resultSummary(event.output) });
+      }
       await this.#settleLaunches();
       return;
     }
@@ -638,6 +686,14 @@ export class TurnRenderer {
     // its later events must reach it, or its end would never close its line.
     this.#inside.delete(event.taskId);
     const call = event.callId;
+    if (call !== null && this.#resumed.has(call)) {
+      // The agent a message continues runs again: no card and no launch line, as the terminal
+      // draws none. It is bound to the message's call, a line nothing draws, so that the card
+      // it first had (an agent the call waited for) is never reopened by this reply's close.
+      this.#launched.add(call);
+      this.#bind(event.taskId, call);
+      return;
+    }
     if (call !== null && this.#launched.has(call)) {
       // The agent of a call already written as a line of text starts again, under that call
       // (recorded: `subagent-nested-background.jsonl`, where the end of a command it left

@@ -79,6 +79,7 @@
        "summary": "Wrote 15 lines to /home/dev/project/new.txt",
        "title": "Write(/home/dev/project/new.txt)"
       },
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "Write: /home/dev/project/new.txt"
@@ -124,6 +125,7 @@
       "name": "Read",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "Read: /home/dev/project/notes.txt"
@@ -139,6 +141,7 @@
       "name": "Read",
       "output": "1 alpha",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "Read: /home/dev/project/notes.txt"
@@ -190,6 +193,7 @@
       "name": "Edit",
       "output": "<tool_use_error>String to replace not found in file.",
       "preview": null,
+      "startedAt": null,
       "status": "error",
       "task": false,
       "title": "Edit: /home/dev/project/notes.txt"
@@ -247,6 +251,7 @@
        "summary": "Added 1 line, removed 1 line",
        "title": "Update(/home/dev/project/notes.txt)"
       },
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "Edit: /home/dev/project/notes.txt"
@@ -304,6 +309,7 @@
        "summary": "Added 2 lines, removed 3 lines",
        "title": "Write(/home/dev/project/notes.txt)"
       },
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "Write: /home/dev/project/notes.txt"
@@ -405,6 +411,7 @@
       "summary": "Wrote 15 lines to /home/dev/project/new.txt",
       "title": "Write(/home/dev/project/new.txt)"
      },
+     "startedAt": null,
      "status": "complete",
      "task": false,
      "title": "Write: /home/dev/project/new.txt"
@@ -450,6 +457,7 @@
      "name": "Read",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": false,
      "title": "Read: /home/dev/project/notes.txt"
@@ -465,6 +473,7 @@
      "name": "Read",
      "output": "1 alpha",
      "preview": null,
+     "startedAt": null,
      "status": "complete",
      "task": false,
      "title": "Read: /home/dev/project/notes.txt"
@@ -516,6 +525,7 @@
      "name": "Edit",
      "output": "<tool_use_error>String to replace not found in file.",
      "preview": null,
+     "startedAt": null,
      "status": "error",
      "task": false,
      "title": "Edit: /home/dev/project/notes.txt"
@@ -573,6 +583,7 @@
       "summary": "Added 1 line, removed 1 line",
       "title": "Update(/home/dev/project/notes.txt)"
      },
+     "startedAt": null,
      "status": "complete",
      "task": false,
      "title": "Edit: /home/dev/project/notes.txt"
@@ -630,6 +641,7 @@
       "summary": "Added 2 lines, removed 3 lines",
       "title": "Write(/home/dev/project/notes.txt)"
      },
+     "startedAt": null,
      "status": "complete",
      "task": false,
      "title": "Write: /home/dev/project/notes.txt"

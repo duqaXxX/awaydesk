@@ -13,6 +13,7 @@
       "name": "Agent",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "Agent: Synthetic subtask"
@@ -28,6 +29,7 @@
       "name": "Agent",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "error",
       "task": false,
       "title": "Agent: Synthetic subtask"
@@ -43,6 +45,7 @@
       "name": "Agent",
       "output": "Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check your inference gateway (127.0.0.1:…",
       "preview": null,
+      "startedAt": null,
       "status": "error",
       "task": false,
       "title": "Agent: Synthetic subtask"
@@ -58,6 +61,7 @@
       "name": "Agent",
       "output": "Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check your inference gateway (127.0.0.1:…",
       "preview": null,
+      "startedAt": null,
       "status": "error",
       "task": false,
       "title": "Agent: Synthetic subtask"
@@ -93,6 +97,7 @@
      "name": "Agent",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": false,
      "title": "Agent: Synthetic subtask"
@@ -108,6 +113,7 @@
      "name": "Agent",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "error",
      "task": false,
      "title": "Agent: Synthetic subtask"
@@ -123,6 +129,7 @@
      "name": "Agent",
      "output": "Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check your inference gateway (127.0.0.1:…",
      "preview": null,
+     "startedAt": null,
      "status": "error",
      "task": false,
      "title": "Agent: Synthetic subtask"
@@ -138,6 +145,7 @@
      "name": "Agent",
      "output": "Agent terminated early due to an API error: API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check your inference gateway (127.0.0.1:…",
      "preview": null,
+     "startedAt": null,
      "status": "error",
      "task": false,
      "title": "Agent: Synthetic subtask"

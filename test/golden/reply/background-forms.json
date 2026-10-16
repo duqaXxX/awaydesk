@@ -13,6 +13,7 @@
       "name": "ToolSearch",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "ToolSearch: select:Monitor,TaskStop"
@@ -28,6 +29,7 @@
       "name": "ToolSearch",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "ToolSearch: select:Monitor,TaskStop"
@@ -43,6 +45,7 @@
       "name": "Monitor",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "Monitor: echo tick one; sleep 6; echo tick two; sleep 600"
@@ -58,6 +61,7 @@
       "name": "Monitor",
       "output": "Monitor started (task b2p882lpn, expires in 11m unless the source ends first; you get one notice at expiry — re-arm if you still need the watch). You will be notified on each event. Keep working — do…",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "Monitor: echo tick one; sleep 6; echo tick two; sleep 600"
@@ -67,12 +71,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 12; echo done",
       "folded": null,
       "id": "toolu_01HZa1LoQkDD69cxv5di4PfR",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Sleep 12 seconds then print done"
@@ -82,12 +87,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 12; echo done",
       "folded": null,
       "id": "toolu_01HZa1LoQkDD69cxv5di4PfR",
       "name": "Bash",
       "output": "Command running in background with ID: bhrffi78m. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bhrffi78m.output. You will be notified when it completes. To check interim outpu…",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep 12 seconds then print done"
@@ -174,6 +180,7 @@
       "name": "TaskStop",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "TaskStop: b2p882lpn"
@@ -189,6 +196,7 @@
       "name": "task",
       "output": "Stopped",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "b2p882lpn"
@@ -204,6 +212,7 @@
       "name": "task",
       "output": "Stopped",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "b2p882lpn"
@@ -219,6 +228,7 @@
       "name": "TaskStop",
       "output": "{\"message\":\"Successfully stopped task: b2p882lpn (echo tick one; sleep 6; echo tick two; sleep 600)\",\"task_id\":\"b2p882lpn\",\"task_type\":\"local_bash\",\"command\":\"echo tick one; sleep 6; echo tick two; s…",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": false,
       "title": "TaskStop: b2p882lpn"
@@ -285,6 +295,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "bhrffi78m"
@@ -300,6 +311,7 @@
       "name": "task",
       "output": "Background command \"Sleep 12 seconds then print done\" completed (exit code 0)",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "bhrffi78m"
@@ -358,6 +370,7 @@
       "name": "task",
       "output": "Pause for 20 seconds",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "Pause for 20 seconds"
@@ -373,6 +386,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "a5c51d4eb4f3f9602"
@@ -388,6 +402,7 @@
       "name": "task",
       "output": "ok",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "a5c51d4eb4f3f9602"
@@ -460,6 +475,7 @@
      "name": "ToolSearch",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": false,
      "title": "ToolSearch: select:Monitor,TaskStop"
@@ -475,6 +491,7 @@
      "name": "ToolSearch",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "complete",
      "task": false,
      "title": "ToolSearch: select:Monitor,TaskStop"
@@ -490,6 +507,7 @@
      "name": "Monitor",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": false,
      "title": "Monitor: echo tick one; sleep 6; echo tick two; sleep 600"
@@ -505,6 +523,7 @@
      "name": "Monitor",
      "output": "Monitor started (task b2p882lpn, expires in 11m unless the source ends first; you get one notice at expiry — re-arm if you still need the watch). You will be notified on each event. Keep working — do…",
      "preview": null,
+     "startedAt": null,
      "status": "complete",
      "task": false,
      "title": "Monitor: echo tick one; sleep 6; echo tick two; sleep 600"
@@ -514,12 +533,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 12; echo done",
      "folded": null,
      "id": "toolu_01HZa1LoQkDD69cxv5di4PfR",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "Sleep 12 seconds then print done"
@@ -529,12 +549,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 12; echo done",
      "folded": null,
      "id": "toolu_01HZa1LoQkDD69cxv5di4PfR",
      "name": "Bash",
      "output": "Command running in background with ID: bhrffi78m. Output is being written to: /tmp/claude-1000/-home-dev-project/tasks/bhrffi78m.output. You will be notified when it completes. To check interim outpu…",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Sleep 12 seconds then print done"
@@ -604,6 +625,7 @@
      "name": "TaskStop",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": false,
      "title": "TaskStop: b2p882lpn"
@@ -619,6 +641,7 @@
      "name": "TaskStop",
      "output": "{\"message\":\"Successfully stopped task: b2p882lpn (echo tick one; sleep 6; echo tick two; sleep 600)\",\"task_id\":\"b2p882lpn\",\"task_type\":\"local_bash\",\"command\":\"echo tick one; sleep 6; echo tick two; s…",
      "preview": null,
+     "startedAt": null,
      "status": "complete",
      "task": false,
      "title": "TaskStop: b2p882lpn"

@@ -732,6 +732,10 @@ has something to show: its first words, or the card of the first tool it uses. T
 the order it is written. The tool calls between two pieces of text show as one card, as the terminal
 draws one line for them: it names the call that runs now, a command by its description, and once
 the calls have ended it counts them in the terminal's words (`Ran 2 shell commands, read 1 file`).
+A command that has run 30 seconds adds its time to the title (`· 30s`, `· 1m 0s`), refreshed every
+30 seconds for the first 280 seconds of the reply and after that only when the reply is written
+again; opening the card lists the run's commands, `$ <command>`. A message Claude sends to a
+subagent that has ended shows as one grey line, `⎿ Resuming agent <id>`, as in the terminal.
 A command that failed is counted with the others, as in the terminal; a failed call of another
 tool keeps a card that says why. A task Claude Code starts in the background has no card, whatever
 its kind: it is two lines of text, its name in bold and what it does, `Monitor(ticks)` or

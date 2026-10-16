@@ -13,6 +13,7 @@
       "name": "Skill",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": false,
       "title": "Skill: list-files"
@@ -28,6 +29,7 @@
       "name": "Skill",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": true,
       "title": "Skill: list-files"
@@ -43,6 +45,7 @@
       "name": "Skill",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "in_progress",
       "task": true,
       "title": "Skill: list-files"
@@ -58,6 +61,7 @@
       "name": "Skill",
       "output": "/list-files",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "Skill: list-files"
@@ -73,6 +77,7 @@
       "name": "Skill",
       "output": "Skill \"list-files\" completed (forked execution).",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "Skill: list-files"
@@ -318,6 +323,7 @@
      "name": "Skill",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": false,
      "title": "Skill: list-files"
@@ -333,6 +339,7 @@
      "name": "Skill",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": true,
      "title": "Skill: list-files"
@@ -348,6 +355,7 @@
      "name": "Skill",
      "output": null,
      "preview": null,
+     "startedAt": null,
      "status": "in_progress",
      "task": true,
      "title": "Skill: list-files"
@@ -363,6 +371,7 @@
      "name": "Skill",
      "output": "/list-files",
      "preview": null,
+     "startedAt": null,
      "status": "complete",
      "task": true,
      "title": "Skill: list-files"
@@ -378,6 +387,7 @@
      "name": "Skill",
      "output": "Skill \"list-files\" completed (forked execution).",
      "preview": null,
+     "startedAt": null,
      "status": "complete",
      "task": true,
      "title": "Skill: list-files"

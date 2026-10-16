@@ -86,7 +86,17 @@ class RecordingSink implements Sink {
 /** One renderer fed `events`, then closed as a finished turn is. */
 async function replayReply(events: readonly SessionEvent[]): Promise<unknown> {
   const sink = new RecordingSink();
-  const renderer = new TurnRenderer(sink, NAMES);
+  // A fixed clock: a golden holds the same `startedAt` on every run.
+  const renderer = new TurnRenderer(
+    sink,
+    NAMES,
+    null,
+    true,
+    () => false,
+    (id) => id,
+    () => false,
+    () => 0,
+  );
   for (const event of events) await renderer.feed(event);
   await renderer.close();
   await renderer.closeOut();
@@ -151,6 +161,7 @@ function taskUpdate(value: Json | undefined): TaskUpdate {
     calls: Number(fields.calls),
     preview,
     folded: optional(fields.folded, "folded"),
+    startedAt: typeof fields.startedAt === "number" ? fields.startedAt : null,
   };
 }
 

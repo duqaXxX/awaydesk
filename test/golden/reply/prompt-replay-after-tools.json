@@ -7,12 +7,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 20",
       "folded": null,
       "id": "toolu_01GBTKp9jR39XLL37JVEGSNr",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Background sleep for 20 seconds"
@@ -28,12 +29,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 20",
       "folded": null,
       "id": "toolu_01GBTKp9jR39XLL37JVEGSNr",
       "name": "Bash",
       "output": "Command running in background with ID: buf66xdmn. Output is being written to: /private/tmp/claude-502/-home-dev-project/dc931eb9-f4dc-4863-b76e-1f3df1583438/tasks/buf66xdmn.output. You will be notifi…",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Background sleep for 20 seconds"
@@ -70,6 +72,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "buf66xdmn"
@@ -85,6 +88,7 @@
       "name": "task",
       "output": "Background command \"Background sleep for 20 seconds\" completed (exit code 0)",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "buf66xdmn"
@@ -94,12 +98,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 5",
       "folded": null,
       "id": "toolu_016SUJeNXySPmqVDGuy53ARY",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Foreground sleep for 5 seconds"
@@ -115,6 +120,7 @@
       "name": "Bash",
       "output": "Foreground sleep for 5 seconds",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Foreground sleep for 5 seconds"
@@ -130,6 +136,7 @@
       "name": "Bash",
       "output": "(Bash completed with no output)",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Foreground sleep for 5 seconds"
@@ -1931,12 +1938,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 20",
      "folded": null,
      "id": "toolu_01GBTKp9jR39XLL37JVEGSNr",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "Background sleep for 20 seconds"
@@ -1952,12 +1960,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 20",
      "folded": null,
      "id": "toolu_01GBTKp9jR39XLL37JVEGSNr",
      "name": "Bash",
      "output": "Command running in background with ID: buf66xdmn. Output is being written to: /private/tmp/claude-502/-home-dev-project/dc931eb9-f4dc-4863-b76e-1f3df1583438/tasks/buf66xdmn.output. You will be notifi…",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Background sleep for 20 seconds"
@@ -1973,12 +1982,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 5",
      "folded": null,
      "id": "toolu_016SUJeNXySPmqVDGuy53ARY",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "Foreground sleep for 5 seconds"
@@ -1994,6 +2004,7 @@
      "name": "Bash",
      "output": "Foreground sleep for 5 seconds",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Foreground sleep for 5 seconds"
@@ -2009,6 +2020,7 @@
      "name": "Bash",
      "output": "(Bash completed with no output)",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Foreground sleep for 5 seconds"

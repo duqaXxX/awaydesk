@@ -327,6 +327,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
+      "details": "$ python3 -c \"import time; time.sleep(40)\"",
       "id": "fold:toolu_01QpTjiHn9CtQiYmXdMKovV8",
       "status": "in_progress",
       "title": "Run 40-second sleep in Python",

@@ -7,12 +7,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 5; echo done",
       "folded": null,
       "id": "toolu_01LiZwhcy5g12fYSVLgAq5TS",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Sleep for 5 seconds then print done"
@@ -28,12 +29,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 5; echo done",
       "folded": null,
       "id": "toolu_01LiZwhcy5g12fYSVLgAq5TS",
       "name": "Bash",
       "output": "Command running in background with ID: bny2rux7d. Output is being written to: /private/tmp/claude-502/-home-dev-project/93f0c865-cbfb-4117-963b-cbcd8c9be267/tasks/bny2rux7d.output. You will be notifi…",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep for 5 seconds then print done"
@@ -70,6 +72,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "bny2rux7d"
@@ -85,6 +88,7 @@
       "name": "task",
       "output": "Background command \"Sleep for 5 seconds then print done\" completed (exit code 0)",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "bny2rux7d"
@@ -252,12 +256,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 5; echo done",
      "folded": null,
      "id": "toolu_01LiZwhcy5g12fYSVLgAq5TS",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "Sleep for 5 seconds then print done"
@@ -273,12 +278,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 5; echo done",
      "folded": null,
      "id": "toolu_01LiZwhcy5g12fYSVLgAq5TS",
      "name": "Bash",
      "output": "Command running in background with ID: bny2rux7d. Output is being written to: /private/tmp/claude-502/-home-dev-project/93f0c865-cbfb-4117-963b-cbcd8c9be267/tasks/bny2rux7d.output. You will be notifi…",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Sleep for 5 seconds then print done"

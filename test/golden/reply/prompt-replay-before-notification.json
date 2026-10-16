@@ -7,12 +7,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 20",
       "folded": null,
       "id": "toolu_01KgcQcyjyseGa1UtXHoTTKL",
       "name": "Bash",
       "output": null,
       "preview": null,
+      "startedAt": 0,
       "status": "in_progress",
       "task": false,
       "title": "Sleep for 20 seconds in background"
@@ -28,12 +29,13 @@
      "call": "task",
      "update": {
       "calls": 0,
-      "details": null,
+      "details": "$ sleep 20",
       "folded": null,
       "id": "toolu_01KgcQcyjyseGa1UtXHoTTKL",
       "name": "Bash",
       "output": "Command running in background with ID: b1xjk2uep. Output is being written to: /private/tmp/claude-502/-home-dev-project/78b79c13-ec59-4dbc-b2cc-920358ac4f56/tasks/b1xjk2uep.output. You will be notifi…",
       "preview": null,
+      "startedAt": 0,
       "status": "complete",
       "task": false,
       "title": "Sleep for 20 seconds in background"
@@ -70,6 +72,7 @@
       "name": "task",
       "output": null,
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "b1xjk2uep"
@@ -85,6 +88,7 @@
       "name": "task",
       "output": "Background command \"Sleep for 20 seconds in background\" completed (exit code 0)",
       "preview": null,
+      "startedAt": null,
       "status": "complete",
       "task": true,
       "title": "b1xjk2uep"
@@ -1886,12 +1890,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 20",
      "folded": null,
      "id": "toolu_01KgcQcyjyseGa1UtXHoTTKL",
      "name": "Bash",
      "output": null,
      "preview": null,
+     "startedAt": 0,
      "status": "in_progress",
      "task": false,
      "title": "Sleep for 20 seconds in background"
@@ -1907,12 +1912,13 @@
     "call": "task",
     "update": {
      "calls": 0,
-     "details": null,
+     "details": "$ sleep 20",
      "folded": null,
      "id": "toolu_01KgcQcyjyseGa1UtXHoTTKL",
      "name": "Bash",
      "output": "Command running in background with ID: b1xjk2uep. Output is being written to: /private/tmp/claude-502/-home-dev-project/78b79c13-ec59-4dbc-b2cc-920358ac4f56/tasks/b1xjk2uep.output. You will be notifi…",
      "preview": null,
+     "startedAt": 0,
      "status": "complete",
      "task": false,
      "title": "Sleep for 20 seconds in background"

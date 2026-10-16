@@ -201,7 +201,8 @@ test("a report turn in the daemon that saw the first call opens its own reply be
   // The agent's launch line, then what the turn that started it said.
   assert.ok(started.startsWith("**Agent**(") && started.includes("\n\nSTARTED"), started);
   assert.equal(noted, "NOTED"); // the waiting reply's ending, posted when it ended
-  assert.equal(continued, "SENT");
+  // The call that continues the agent draws no card; the terminal writes `Resuming agent` instead.
+  assert.equal(continued, "⎿ Resuming agent a0d6cae\n\nSENT");
   assert.ok(report.includes("REPORTED") && !report.includes("SENT"), report);
   assert.equal(answered, "KIWI");
   // Only the waiting reply's ending was posted; the others ended in place.

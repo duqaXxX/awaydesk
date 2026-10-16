@@ -21,10 +21,8 @@
      "type": "context"
     },
     {
-     "status": "complete",
-     "task_id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
-     "title": "SendMessage: a0d6caecc437a1298",
-     "type": "task_card"
+     "text": "⎿ Resuming agent a0d6cae",
+     "type": "markdown"
     },
     {
      "text": "SENT",
@@ -58,16 +56,10 @@
    ]
   ],
   "message_cards": [
-   [
-    {
-     "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
-     "status": "complete",
-     "title": "SendMessage: a0d6caecc437a1298"
-    }
-   ]
+   []
   ],
   "message_texts": [
-   "**Agent**(Test background agent)\n⎿ Running in background\n\nSTARTED\n\nNOTED\n\nSENT\n\nREPORTED\nPINEAPPLE\n\nKIWI"
+   "**Agent**(Test background agent)\n⎿ Running in background\n\nSTARTED\n\nNOTED\n\n⎿ Resuming agent a0d6cae\n\nSENT\n\nREPORTED\nPINEAPPLE\n\nKIWI"
   ],
   "pushes": 1
  },
@@ -156,10 +148,8 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01EN71a4pBQzXL4JEZkr5vEN",
-      "status": "in_progress",
-      "title": "SendMessage: a0d6caecc437a1298",
-      "type": "task_update"
+      "text": "\n\n⎿ Resuming agent a0d6cae",
+      "type": "markdown_text"
      }
     ],
     "ts": "1790000000.000001"
@@ -172,17 +162,8 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "id": "fold:toolu_01EN71a4pBQzXL4JEZkr5vEN",
-      "status": "complete",
-      "title": "ToolSearch",
-      "type": "task_update"
-     },
-     {
-      "details": "Running in background",
-      "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
-      "status": "in_progress",
-      "title": "SendMessage: a0d6caecc437a1298",
-      "type": "task_update"
+      "text": "\n\nSENT",
+      "type": "markdown_text"
      }
     ],
     "ts": "1790000000.000001"
@@ -195,53 +176,7 @@
     "channel": "C000CHAN",
     "chunks": [
      {
-      "text": "SENT",
-      "type": "markdown_text"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 8,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "details": "\nRunning sleep 20",
-      "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
-      "status": "in_progress",
-      "title": "SendMessage: a0d6caecc437a1298",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 9,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
-      "id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
-      "status": "complete",
-      "title": "SendMessage: a0d6caecc437a1298",
-      "type": "task_update"
-     }
-    ],
-    "ts": "1790000000.000001"
-   },
-   "method": "chat.appendStream"
-  },
-  {
-   "after_sink_call": 11,
-   "args": {
-    "channel": "C000CHAN",
-    "chunks": [
-     {
+      "details": "$ sleep 15",
       "id": "fold:toolu_01H5wwXkRKqXrGbowxTuLKMV",
       "status": "in_progress",
       "title": "Bash: sleep 15",
@@ -253,7 +188,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 12,
+   "after_sink_call": 8,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -269,7 +204,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 14,
+   "after_sink_call": 10,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -283,7 +218,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 15,
+   "after_sink_call": 11,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -297,7 +232,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 16,
+   "after_sink_call": 12,
    "args": {
     "channel": "C000CHAN",
     "chunks": [
@@ -311,7 +246,7 @@
    "method": "chat.appendStream"
   },
   {
-   "after_sink_call": 18,
+   "after_sink_call": 14,
    "args": {
     "channel": "C000CHAN",
     "ts": "1790000000.000001"
@@ -319,7 +254,7 @@
    "method": "chat.stopStream"
   },
   {
-   "after_sink_call": 18,
+   "after_sink_call": 14,
    "args": {
     "blocks": [
      {
@@ -340,10 +275,8 @@
       "type": "context"
      },
      {
-      "status": "complete",
-      "task_id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
-      "title": "SendMessage: a0d6caecc437a1298",
-      "type": "task_card"
+      "text": "⎿ Resuming agent a0d6cae",
+      "type": "markdown"
      },
      {
       "text": "SENT",
@@ -370,7 +303,7 @@
    "method": "chat.update"
   },
   {
-   "after_sink_call": 18,
+   "after_sink_call": 14,
    "args": {
     "blocks": [
      {
@@ -391,10 +324,8 @@
       "type": "context"
      },
      {
-      "status": "complete",
-      "task_id": "toolu_01VeajTuo9DEtDtcPrarZiKB",
-      "title": "SendMessage: a0d6caecc437a1298",
-      "type": "task_card"
+      "text": "⎿ Resuming agent a0d6cae",
+      "type": "markdown"
      },
      {
       "text": "SENT",

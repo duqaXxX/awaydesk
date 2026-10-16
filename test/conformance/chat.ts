@@ -246,6 +246,7 @@ function line(id: string, title: string, status: TaskUpdate["status"]): TaskUpda
     calls: 0,
     preview: null,
     folded: null,
+    startedAt: null,
   };
 }
 
