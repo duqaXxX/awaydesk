@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { DELETE_ACTION } from "../../../../src/chat/slack/home.ts";
-import { AsyncEvent, CHANNEL, OWNER, THREAD } from "../../../support/fake-slack.ts";
+import { AsyncEvent, BOT, CHANNEL, OWNER, STRANGER, THREAD } from "../../../support/fake-slack.ts";
 import {
   type Body,
   CLICK_THREAD,
@@ -21,6 +21,7 @@ import {
   FORM_THREAD,
   homeAction,
   listed,
+  ModalSlack,
   message,
   QUESTIONS,
   reply,
@@ -153,11 +154,17 @@ const CLICKS: ReadonlyArray<readonly [string, (world: World) => Body, (world: Wo
       "question_open",
       (world) => {
         const [approvalId] = world.approvals.open(CHANNEL, CLICK_THREAD, "Colour", QUESTIONS);
+        // The form opens before the channel check (#325); a refused channel would replace it.
+        new ModalSlack(world.slack);
+        world.slack.responses["conversations.members"] = {
+          ok: true,
+          members: [OWNER, BOT, STRANGER],
+        };
         const body = click("question_open", approvalId);
         body.trigger_id = "0000000000.0000000000.fake";
         return body;
       },
-      (world) => world.slack.callsTo("views.open").length > 0,
+      (world) => world.slack.callsTo("views.update").length > 0,
     ],
     [
       "folder_bind",

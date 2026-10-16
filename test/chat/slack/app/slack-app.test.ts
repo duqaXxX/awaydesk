@@ -71,6 +71,7 @@ import {
   homeAction,
   idleMessage,
   listed,
+  ModalSlack,
   message,
   PERMALINK,
   picked,
@@ -977,6 +978,43 @@ test("answer opens the form", async (t) => {
   const view = opened[0]?.view as Body;
   assert.equal(view.callback_id, "question_form");
   assert.deepEqual(loadDraft(view.private_metadata), newDraft(approvalId, CHANNEL, FORM_THREAD));
+});
+
+/** The Answer click, recorded 2026-09-24, on the question `approvalId` names. */
+function answerClick(approvalId: string): Body {
+  const body = recorded("open-click");
+  body.actions[0].value = approvalId;
+  body.trigger_id = "0000000000.0000000000.fake"; // real clicks carry one; the scrub drops it
+  return body;
+}
+
+test("the form opens before the channel is looked up", async (t) => {
+  // trigger_id lives 3 seconds: a Slack call before views.open spends them (#325).
+  const world = worldOf(t);
+  const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
+  new ModalSlack(world.slack);
+  await world.dispatch(answerClick(approvalId));
+  const methods = world.slack.apiCalls.map((call) => call.method);
+  assert.ok(methods.includes("conversations.info"), "the channel is still checked");
+  assert.ok(methods.indexOf("views.open") < methods.indexOf("conversations.info"));
+});
+
+test("in a refused channel the opened form shows why and nothing else", async (t) => {
+  const world = worldOf(t);
+  const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
+  const modal = new ModalSlack(world.slack);
+  world.slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
+  await world.dispatch(answerClick(approvalId));
+  assert.equal(modal.written.length, 1);
+  const view = modal.view;
+  assert.equal(view.submit, undefined);
+  assert.equal(view.private_metadata, undefined);
+  assert.deepEqual(
+    (view.blocks as Body[]).map((block) => block.text?.text),
+    [fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS })],
+  );
+  assert.deepEqual(world.ephemerals(), []);
+  assert.ok(!pending.decided);
 });
 
 for (const [index, user] of OTHER_USERS.entries()) {

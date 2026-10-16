@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Answer on a question opens its form before the channel check (issue #325). The check makes
+  two calls to Slack (`conversations.info`, `conversations.members`), and they ran inside the
+  3 seconds a click's `trigger_id` lives. The `expired_trigger_id` the owner saw was not
+  reproduced, so whether those calls caused it is not measured; the form now opens after the owner and workspace check alone; the
+  channel is checked once it is open, and a refused channel replaces the form with the reason.
+  Submit still checks the channel before the answer reaches the core.
 - A close while the session's own worker is waiting for the agent to start no longer ends before
   that process is closed (issue #240): the session keeps the start the worker gave up, and
   `close` and `doneClosing` wait for it, so a session built next on the same id cannot resume

@@ -652,8 +652,14 @@ the setup message, the question form's pages, `!open`, the Home tab's controls a
  Bolt acknowledges an event before its listener runs, and a
 click's listener acknowledges first; each then checks the owner, the workspace and the channel
 itself; a control of the session index, and a character typed in `!open`'s modal, come with no
-channel and check the owner and the workspace. The question form's Next and Submit answer Slack
-after checks that make no network call, since a missing answer can only be shown in that answer. A
+channel and check the owner and the workspace. Answer, on a question, opens its form
+(`Requests.onQuestionOpen`) after the owner and workspace check alone, since the click's
+`trigger_id` lives 3 seconds and the channel check makes two calls to Slack; the channel is checked
+once the form is open, and a refused channel replaces the form with the reason
+(`requests.refusedView`), since Slack lets an app close a modal only in answer to a submission. The
+form shows the owner alone what the request already shows. The question form's Next and Submit
+answer Slack after checks that make no network call, since a missing answer can only be shown in
+that answer, and Submit checks the channel before the answer reaches the core. A
 failure after the checks reaches the owner as a line of its own (`Talk.replyOnFailure` for what a
 flow does, `Answers.replyOnFailure` for what a listener does itself): a post in the thread for a
 prompt, where a word's failure goes for a word. A listener that throws past that
