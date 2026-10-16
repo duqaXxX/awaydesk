@@ -44,7 +44,7 @@ All notable changes to this project are documented here. The format follows
   `auto`. The core keeps the setting
   (`ThreadSession.effortSetting`) apart from the observed level; `FooterFields.effortObserved`
   crosses the chat seam beside `effort`, the provider draws the parentheses, and `!status` writes
-  the same text. An agent that declares no `effortDefault` is unchanged. `!status` before the
+  the same text. An agent that declares no `effortDefault` shows the observed level as before, and `not supported` in place of `default`. `!status` before the
   first turn now shows `Effort: auto` where it left the line out.
 - The core no longer reads the effort an `/effort` or `/model` command set from the turn's
   result text (issue #246). The agent seam has a new event, `effort_changed`, said before the

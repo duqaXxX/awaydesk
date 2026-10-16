@@ -970,8 +970,8 @@ the observed level in `FooterFields.effortObserved`, which the Slack footer draw
 reported that the model takes no effort (`effort_observed` with a null level), the footer shows
 `not supported` (`texts.EFFORT_NOT_SUPPORTED`) whatever the setting, until a turn reports a level
 or a command changes the effort or the model. An agent with no default word shows the observed level
-alone, left out until reported, unless the daemon itself just set a stored level, and `default`
-for a model that takes none. The limits come from the agent (`AgentBackend.usageLimits`, present with the
+alone, left out until reported, unless the daemon itself just set a stored level, and `not supported` once a
+turn reports a model that takes none. The limits come from the agent (`AgentBackend.usageLimits`, present with the
 capability `usageLimits`); for Claude they are Claude Code's `/usage`, sent on a long-lived session
 of its own, started in the home directory with none of the owner's setting sources, without the
 permission to bypass and without the Chrome flag (`UsageProbe`, over `ClaudeBackend.startBare`).
