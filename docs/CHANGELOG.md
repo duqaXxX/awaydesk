@@ -19,21 +19,22 @@ All notable changes to this project are documented here. The format follows
   Other is chosen and its field is not on screen, or the draft holds a note and the form draws a
   Notes field that is not on screen (a redraw Slack refused). Any other difference between the
   screen and the draft sends the draft, so a fast Next passes at once. A text of spaces alone in Other is a field error. With several
-  questions the `1 of 3` line becomes the terminal's tab row, as buttons: one per question with
-  `☒` once answered and `☐` before, the page on screen in the primary style, then `✔ Submit`. A tap
-  jumps to that page and keeps every answer; the fields of the page it leaves are kept first, and
-  a tab checks nothing. The tab of the page on screen does nothing, and `✔ Submit` opens the review
-  page when every question has an answer, else the first question without one. Next always moves to the next page,
-  also when every question already has an answer; the last question's button reads `Review` and
-  opens a page that lists each question with its answer and the notes of an answered one, whose `Submit answers`
-  alone sends. One question is unchanged. Notes reach the agent as that question's `annotations`
+  questions the `1 of 3` line becomes the terminal's tab row, one line of text: `☒` once answered
+  and `☐` before, the page on screen in bold, then `✔ Submit`. Next moves to the next page,
+  also when every question already has an answer, and the last question's button reads `Review`:
+  it opens a page that lists each question with its answer and the notes of an answered one, each
+  with an `Edit` button, and goes to the first question without an answer when one is missing, with
+  no error text. `Edit` opens that question's page with its answers as stored; from then on, and on
+  every page once the review was reached, the button reads `Review` and leads back to the review
+  page (or to the first question without an answer). `Submit answers` alone sends. The form's
+  close button reads `Close`, and the field shown for Other is labelled `Your answer`. One question is unchanged. Notes reach the agent as that question's `annotations`
   entry beside the answers, with the preview of the option picked for a single select; the
   record of the answers does not show them. What the owner filled now lives in the daemon's
   memory and the form's `private_metadata` holds only the request, the form's generation and its
   page, so Other and Notes hold 300 characters each. Only the newest form of a request is valid:
-  Answer again (Later then Answer, a second click, a second device) opens a new generation, and
+  Answer again (Close then Answer, a second click, a second device) opens a new generation, and
   the older form's Next shows `This form was opened again. Use the newest one.` and sends nothing
-  (on the review page the whole form is replaced by that sentence). Later then Answer reopens the
+  (on the review page the whole form is replaced by that sentence). Close then Answer reopens the
   form with the answers submitted and what each field of the open page held at its last change.
   A restart still loses an open form, as it loses the request.
 

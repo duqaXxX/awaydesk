@@ -672,17 +672,18 @@ or `not_found` is logged and ignored: Submit reads the state as it stands. What 
 stays in the provider's memory (`Requests.drafts`) and the view's `private_metadata` holds the
 request's ids, the form's generation and its page. Only the newest form of a request is valid:
 every Answer (`Requests.onQuestionOpen`) opens a new generation from the draft, an older form's
-changes and its tabs are ignored, and its Next or Submit answers `texts.QUESTION_STALE` as a field
+changes and its Edit are ignored, and its Next or Submit answers `texts.QUESTION_STALE` as a field
 error (on the review page, as the whole form replaced by that sentence) and sends nothing. A form an earlier version opened has no generation, or carries a whole draft
 beside the ids: it is read for the ids and the generation, so once its request is gone
 `texts.APPROVAL_GONE` answers (checked first), and while the request is open it is stale. The same owner and
-workspace check applies, and the channel is checked at Submit. The tab buttons of the question form
-(`question_tab_{n}`, one listener, `Requests.onQuestionTab`) check the owner and the workspace
-before anything else, never reach the core, and when Slack refuses their `views.update`
-(`hash_conflict`, `not_found`) log a warning and drop it; the draft's page, moved before the call,
-is rolled back to the page still on screen unless a Next or another tab has moved it on
-meanwhile. The tab of the page on screen does nothing, and the `✔ Submit` tab goes to the review
-page or to the first question with no answer. The question form's Next, Review and Submit answer Slack after checks that make no network call, since a missing answer can only be shown in
+workspace check applies, and the channel is checked at Submit. The Edit buttons of the review page
+(`question_edit_{n}`, one listener, `Requests.onQuestionEdit`) check the owner and the workspace
+before anything else, act only from the newest form while it shows the review page, never reach
+the core, and when Slack refuses their `views.update` (`hash_conflict`, `not_found`) log a warning
+and put the draft back as it was, unless a Next has moved it on meanwhile. Next, Review and
+Submit answers go through `Requests.onQuestionSubmit`: before the review was reached Next moves
+to the next page, and on the last page, and on every page after the review, `Review` goes to the
+review page when every question has an answer, else to the first one without. The question form's Next, Review and Submit answer Slack after checks that make no network call, since a missing answer can only be shown in
 that answer, and Submit checks the channel before the answer reaches the core. A
 failure after the checks reaches the owner as a line of its own (`Talk.replyOnFailure` for what a
 flow does, `Answers.replyOnFailure` for what a listener does itself): a post in the thread for a

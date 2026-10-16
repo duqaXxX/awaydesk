@@ -441,10 +441,10 @@ test("a change of the choice after the daemon stopped redraws nothing", async (t
   assert.deepEqual(draftOf(o)?.other, new Set([0])); // read before the stop check, as kept
 });
 
-test("Later then Answer reopens the form with the answers already given", async (t) => {
+test("Close then Answer reopens the form with the answers already given", async (t) => {
   const o = await openForm(t, [...QUESTIONS]);
   await o.world.dispatch(submit(o, radio("q0", "1"))); // Next: page two is on screen
-  // The owner closes the form (Later) and clicks Answer again.
+  // The owner closes the form (Close) and clicks Answer again.
   await o.world.dispatch(answerClick(o.approvalId));
   const reopened = o.modal.view;
   assert.equal(o.world.built.drafts.size, 1);
@@ -582,7 +582,7 @@ test("Answer on a request that is gone leaves another request's draft alone", as
   assert.deepEqual([...o.world.built.drafts.keys()], [o.approvalId]);
 });
 
-test("Later then Answer finds the boxes ticked, the text under Other and the notes typed", async (t) => {
+test("Close then Answer finds the boxes ticked, the text under Other and the notes typed", async (t) => {
   const o = await openForm(t, [MULTI]);
   const tick = (...values: string[]): Body => ({
     q0: {
@@ -604,7 +604,7 @@ test("Later then Answer finds the boxes ticked, the text under Other and the not
   assert.equal(inputs[2]?.element.initial_value, "both");
 });
 
-test("Later then Answer finds the notes of a single select too", async (t) => {
+test("Close then Answer finds the notes of a single select too", async (t) => {
   const o = await openForm(t);
   await o.world.dispatch(choose(o, radio("q0", "1")));
   await o.world.dispatch(typeIn(o, "notes", "n0", { ...radio("q0", "1"), ...notes("darker") }));

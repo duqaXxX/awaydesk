@@ -21,9 +21,9 @@ import {
   isAnswered,
   loadIds,
   newDraft,
+  QUESTION_EDIT,
   QUESTION_FORM,
   QUESTION_SKIP,
-  QUESTION_TAB,
   questionView,
   refusedView,
 } from "../requests.ts";
@@ -211,7 +211,7 @@ export class Requests {
    * A change in the question form, dispatched by Slack with the form's state (block reference,
    * input block `dispatch_action` and `dispatch_action_config`; block_actions payload reference;
    * `views.update`, all read 2026-10-16). Every field reports, so the draft holds what is on
-   * screen when the form is closed with Later. Only a change of the choice redraws, with Other's
+   * screen when the form is closed with Close. Only a change of the choice redraws, with Other's
    * field and Notes as the new choice needs them, in one `views.update`; typing never does. `hash`
    * makes a stale payload a `hash_conflict`, which is ignored. Submit reads the state again. Only
    * the newest form of a request counts (`Draft.generation`) and only the page it shows now
@@ -274,18 +274,16 @@ export class Requests {
     this.onQuestionLive(ack, body, false);
 
   /**
-   * A tab, in the question form: a jump to that question, or Submit, with every answer kept. The
-   * payload's state holds what the page on screen shows, so it is absorbed into the draft first
-   * (a tab never validates), then the form is redrawn with `views.update` (block_actions payload
-   * and `views.update` references, read 2026-10-16). Submit goes to the review page when every
-   * question has an answer and to the first question without one otherwise, with no error text.
-   * The tab of the page on screen does nothing. It checks the owner and the workspace like any
-   * inbound path, follows the newest-form rule of `onQuestionLive` and never reaches the core.
-   * The draft's page moves before the call so that a late change from the page left is ignored;
-   * when Slack refuses the update (`hash_conflict`: the form moved on, `not_found`: it closed)
-   * the page goes back to the one still on screen, unless another click moved the draft since.
+   * Edit, on the review page of the question form: that question's page, with its answers as
+   * stored (`views.update` with the payload's view id and hash, block_actions payload and
+   * `views.update` references, read 2026-10-16). The review page has no field, so nothing is
+   * absorbed or validated. It checks the owner and the workspace like any inbound path, follows
+   * the newest-form rule of `onQuestionLive`, acts only from the review page and never reaches
+   * the core. The draft's page moves before the call so that a late change from the page left is
+   * ignored; when Slack refuses the update (`hash_conflict`: the form moved on, `not_found`: it
+   * closed) the draft is put back, unless another click moved it since.
    */
-  onQuestionTab = async (ack: Ack, body: Payload): Promise<void> => {
+  onQuestionEdit = async (ack: Ack, body: Payload): Promise<void> => {
     await ack();
     const { approvals, identity, slack } = this.parts;
     const [user, team] = interactionActor(body);
@@ -307,27 +305,21 @@ export class Requests {
       this.drafts.delete(ids.approvalId);
       return;
     }
-    const count = questions.length;
-    const target = Number(QUESTION_TAB.exec(str(firstAction(body).action_id))?.[1] ?? Number.NaN);
+    const target = Number(QUESTION_EDIT.exec(str(firstAction(body).action_id))?.[1] ?? Number.NaN);
     const kept = this.drafts.get(ids.approvalId);
     if (
       kept === undefined ||
       kept.generation !== ids.generation ||
       kept.active !== ids.active ||
-      count < 2 ||
+      questions.length < 2 ||
+      ids.active !== questions.length ||
       !Number.isInteger(target) ||
-      target > count ||
-      target === ids.active
+      target >= questions.length
     ) {
       return;
     }
-    // (sync) Kept before any await: a payload handled next finds what this one saw. The review
-    // page has no field to read.
-    const here = ids.active === count ? kept : absorb(kept, record(view.state).values);
-    this.drafts.set(ids.approvalId, here);
-    const to = target === count ? (firstIncomplete(here, questions) ?? count) : target;
-    if (to === ids.active) return;
-    const moved = { ...here, active: to };
+    // (sync) Kept before any await: a payload handled next finds what this one saw.
+    const moved = { ...kept, active: target };
     this.drafts.set(ids.approvalId, moved);
     const viewId = text(view.id);
     if (viewId === null || this.answers.stopped) return;
@@ -340,9 +332,9 @@ export class Requests {
       });
     } catch (error) {
       if (isCancelled(error)) throw error;
-      // The form on screen is still the page the click came from.
-      if (this.drafts.get(ids.approvalId) === moved) this.drafts.set(ids.approvalId, here);
-      logger.warning(`could not change the page of the question form: ${describe(error)}`);
+      // The form on screen is still the review page.
+      if (this.drafts.get(ids.approvalId) === moved) this.drafts.set(ids.approvalId, kept);
+      logger.warning(`could not open a question from the review page: ${describe(error)}`);
     }
   };
 
@@ -365,7 +357,7 @@ export class Requests {
       await this.answers.tellOwner(channel, threadTs, texts.APPROVAL_GONE);
       return;
     }
-    // A form closed with Later and opened again shows what was given, on the page it was left
+    // A form closed with Close and opened again shows what was given, on the page it was left
     // on. Every Answer opens a new generation, and the older forms of the request go stale.
     const kept = this.drafts.get(approvalId) ?? newDraft(approvalId, channel, threadTs);
     const draft = { ...kept, generation: kept.generation + 1 };
@@ -492,14 +484,20 @@ export class Requests {
         return;
       }
     }
-    // A form of several questions sends from its review page alone; every other page, the last
-    // question included, moves on, whether or not the rest have an answer already.
+    // A form of several questions sends from its review page alone; every other page moves on.
+    // Before the review was reached Next goes to the next page; on the last page, and on every
+    // page once the review was reached, Review goes to it, or to the first question with no
+    // answer, which shows no error text.
     const sends = reviewing || questions.length === 1;
     const missing = sends ? firstIncomplete(draft, questions) : null;
     if (!sends || missing !== null) {
-      // Each Next checks its own page, so `missing` is never set unless the draft changed under
-      // the form; kept so that a draft cannot reach the agent incomplete.
-      const next = { ...draft, active: missing ?? at + 1 };
+      const toReview =
+        questions.length > 1 && !reviewing && (draft.reviewed || at === questions.length - 1);
+      // `missing` is set only when the draft changed under the review page or a one-question
+      // form; kept so that a draft cannot reach the agent incomplete.
+      const to =
+        missing ?? (toReview ? (firstIncomplete(draft, questions) ?? questions.length) : at + 1);
+      const next = { ...draft, active: to, reviewed: draft.reviewed || to === questions.length };
       this.drafts.set(ids.approvalId, next);
       await ack({
         response_action: "update",

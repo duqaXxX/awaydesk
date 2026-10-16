@@ -67,10 +67,10 @@ import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
   type Draft,
+  QUESTION_EDIT,
   QUESTION_FORM,
   QUESTION_OPEN,
   QUESTION_SKIP,
-  QUESTION_TAB,
 } from "../requests.ts";
 import { RESUME_ACTION } from "../resume.ts";
 import { SETUP_BYPASS, SETUP_EFFORT, SETUP_MODEL, SETUP_START } from "../setup.ts";
@@ -351,7 +351,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action("answer", requests.onQuestionChoice);
   action("other", requests.onQuestionTyping);
   action("notes", requests.onQuestionTyping);
-  action(QUESTION_TAB, requests.onQuestionTab);
+  action(QUESTION_EDIT, requests.onQuestionEdit);
   action(QUESTION_OPEN, requests.onQuestionOpen);
   view(QUESTION_FORM, requests.onQuestionSubmit);
 

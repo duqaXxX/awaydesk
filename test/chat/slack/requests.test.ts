@@ -17,10 +17,10 @@ import {
   NOTES_LIMIT,
   newDraft,
   OPTION_TEXT_LIMIT,
+  QUESTION_EDIT,
   QUESTION_FORM,
   QUESTION_OPEN,
   QUESTION_SKIP,
-  QUESTION_TAB,
   questionBlocks as questionBlocksOf,
   questionView as questionViewOf,
   SECTION_LIMIT,
@@ -181,7 +181,7 @@ test("the form shows one question with next until the last", () => {
     active: 0,
   });
   assert.equal(view.submit.text, "Next (1/2)");
-  assert.equal(tabsOf(view), "[☐ Colour] | ☐ Sizes | ✔ Submit");
+  assert.equal(tabsOf(view), "*☐ Colour*   ☐ Sizes   ✔ Submit");
   const inputs: Json[] = view.blocks.filter((b: Json) => b.type === "input");
   assert.deepEqual(
     inputs.map((b) => b.block_id),
@@ -189,11 +189,8 @@ test("the form shows one question with next until the last", () => {
   );
   assert.equal(inputs[0]?.element.type, "radio_buttons");
   assert.equal(inputs[0]?.element.options[0].description.text, "Warm");
-  // the tab row is the only row of buttons
-  assert.deepEqual(
-    view.blocks.filter((b: Json) => b.type === "actions").map((b: Json) => b.block_id),
-    ["tabs"],
-  );
+  // no buttons above or beside the question
+  assert.ok(view.blocks.every((b: Json) => b.type !== "actions"));
 });
 
 const THREE: readonly Question[] = [
@@ -201,45 +198,36 @@ const THREE: readonly Question[] = [
   question({ question: "Shape?", header: "Shape", options: [{ label: "round" }] }),
 ];
 
-/** The buttons of a view's tab row, their texts joined, the primary one in brackets. */
-const tabsOf = (view: Json): string =>
-  view.blocks[0].elements
-    .map((b: Json) => (b.style === "primary" ? `[${b.text.text}]` : b.text.text))
-    .join(" | ");
+/** The tab row of a view: its first block's text. */
+const tabsOf = (view: Json): string => view.blocks[0].elements[0].text;
 
-test("the tab row is a row of buttons: a mark and the header, the page on screen primary", () => {
+test("the tab row is a context line: marks, the page on screen in bold, then Submit", () => {
   const picks = new Map([[0, [0]]]);
   const view = questionView(draftOf({ active: 1, picks }), THREE);
-  assert.equal(view.blocks[0].type, "actions");
-  assert.equal(tabsOf(view), "☒ Colour | [☐ Sizes] | ☐ Shape | ✔ Submit");
+  assert.equal(view.blocks[0].type, "context");
+  assert.equal(tabsOf(view), "☒ Colour   *☐ Sizes*   ☐ Shape   ✔ Submit");
   // An answer typed under Other counts as one.
   const typed = new Map([[2, "oval"]]);
   const other = new Set([2]);
   assert.equal(
     tabsOf(questionView(draftOf({ active: 2, picks, other, typed }), THREE)),
-    "☒ Colour | ☐ Sizes | [☒ Shape] | ✔ Submit",
+    "☒ Colour   ☐ Sizes   *☒ Shape*   ✔ Submit",
   );
-});
-
-test("each tab button names its target in its action id, Submit last", () => {
-  const view = questionView(draftOf({ active: 1 }), THREE);
-  const ids: string[] = view.blocks[0].elements.map((b: Json) => b.action_id);
-  assert.deepEqual(ids, ["question_tab_0", "question_tab_1", "question_tab_2", "question_tab_3"]);
-  assert.ok(ids.every((id) => QUESTION_TAB.test(id)));
-  assert.ok(view.blocks[0].elements.every((b: Json) => b.type === "button"));
 });
 
 test("a header the model wrote is shown as written in its tab", () => {
   const odd = question({ question: "Why?", header: "a<b&c", options: [{ label: "a" }] });
-  // A button's text is plain text: nothing in it is read as markup, so nothing is escaped.
-  assert.equal(tabsOf(questionView(draftOf(), [odd, odd])), "[☐ a<b&c] | ☐ a<b&c | ✔ Submit");
+  assert.equal(
+    tabsOf(questionView(draftOf(), [odd, odd])),
+    "*☐ a&lt;b&amp;c*   ☐ a&lt;b&amp;c   ✔ Submit",
+  );
 });
 
 test("a question with no header is named by its number in the tab", () => {
   const nameless = question({ question: "Why?", header: "  ", options: [{ label: "a" }] });
   assert.equal(
     tabsOf(questionView(draftOf(), [nameless, TWO[1] as Question])),
-    "[☐ Question 1] | ☐ Sizes | ✔ Submit",
+    "*☐ Question 1*   ☐ Sizes   ✔ Submit",
   );
 });
 
@@ -249,17 +237,23 @@ test("one question has no tab row and sends with Submit", () => {
   assert.ok(view.blocks.every((b: Json) => b.type === "input"));
 });
 
-test("no page of the form has a Previous button", () => {
-  for (const active of [0, 1, 2, 3]) {
+test("no page of the form has a Previous button, or a button in its body", () => {
+  for (const active of [0, 1, 2]) {
     const view = questionView(draftOf({ active }), THREE);
-    const buttons = view.blocks.flatMap((b: Json) => (b.type === "actions" ? b.elements : []));
-    assert.equal(buttons.length, 4, `page ${active}: the four tabs alone`);
-    assert.ok(buttons.every((b: Json) => QUESTION_TAB.test(b.action_id)));
+    assert.ok(view.blocks.every((b: Json) => b.type !== "actions" && !b.accessory));
     assert.ok(!JSON.stringify(view).includes("Previous"));
+    assert.ok(!JSON.stringify(view).includes("question_tab"));
   }
 });
 
-test("the review page lists every answer, with Submit answers and the tabs to go back", () => {
+test("the close button reads Close on every page", () => {
+  for (const active of [0, 1, 2, 3]) {
+    assert.equal(questionView(draftOf({ active }), THREE).close.text, "Close");
+  }
+  assert.equal(questionView(draftOf(), TWO.slice(0, 1)).close.text, "Close");
+});
+
+test("the review page lists every answer, each with an Edit button, and Submit answers", () => {
   const draft = draftOf({
     active: 3,
     picks: new Map([
@@ -276,13 +270,28 @@ test("the review page lists every answer, with Submit answers and the tabs to go
   assert.equal(view.callback_id, QUESTION_FORM);
   assert.equal(loadIds(view.private_metadata).active, 3);
   assert.equal(view.submit.text, "Submit answers");
-  assert.equal(view.close.text, "Later");
-  assert.equal(tabsOf(view), "☒ Colour | ☒ Sizes | ☒ Shape | [✔ Submit]");
+  assert.equal(view.close.text, "Close");
+  assert.equal(tabsOf(view), "☒ Colour   ☒ Sizes   ☒ Shape   *✔ Submit*");
   assert.deepEqual(
     view.blocks.slice(1).map((b: Json) => b.text?.text),
     ["*Review your answers*", "● Colour?\n→ blue", "● Sizes?\n→ s, l, xl", "● Shape?\n→ a&lt;b"],
   );
+  const sections = view.blocks.slice(2);
+  assert.deepEqual(
+    sections.map((b: Json) => b.accessory.action_id),
+    ["question_edit_0", "question_edit_1", "question_edit_2"],
+  );
+  assert.ok(sections.every((b: Json) => QUESTION_EDIT.test(b.accessory.action_id)));
+  assert.ok(sections.every((b: Json) => b.accessory.type === "button"));
+  assert.ok(sections.every((b: Json) => b.accessory.text.text === "Edit"));
   assert.ok(view.blocks.every((b: Json) => b.type !== "input"));
+});
+
+test("the footer reads Review on any page once the Review was reached", () => {
+  assert.equal(questionView(draftOf({ active: 0 }), THREE).submit.text, "Next (1/3)");
+  assert.equal(questionView(draftOf({ active: 0, reviewed: true }), THREE).submit.text, "Review");
+  assert.equal(questionView(draftOf({ active: 1, reviewed: true }), THREE).submit.text, "Review");
+  assert.equal(questionView(draftOf({ active: 2 }), THREE).submit.text, "Review");
 });
 
 test("the review page shows the notes of a question under its answer, and only then", () => {
@@ -328,7 +337,7 @@ test("the review page leaves out a note kept for a question with no answer", () 
 test("a header is cut at the tab limit in the tab row", () => {
   const long = question({ question: "Why?", header: "h".repeat(60), options: [{ label: "a" }] });
   const view = questionView(draftOf({ active: 1 }), [long, TWO[1] as Question]);
-  assert.equal(tabsOf(view), `☐ ${"h".repeat(39)}… | [☐ Sizes] | ✔ Submit`);
+  assert.equal(tabsOf(view), `☐ ${"h".repeat(39)}…   *☐ Sizes*   ✔ Submit`);
 });
 
 test("a review section is cut to Slack's limit and ends on the cut mark", () => {
@@ -482,9 +491,9 @@ test("a question of several keeps its counter above the options shown whole", ()
   const view = questionView(draftOf(), [long, TWO[0] as Question]);
   assert.deepEqual(
     view.blocks.map((b: Json) => b.type),
-    ["actions", "rich_text", "rich_text", "input"],
+    ["context", "rich_text", "rich_text", "input"],
   );
-  assert.equal(tabsOf(view), "[☐ Why] | ☐ Colour | ✔ Submit");
+  assert.equal(tabsOf(view), "*☐ Why*   ☐ Colour   ✔ Submit");
 });
 
 test("a header of blanks alone never leaves the choice an empty label", () => {
@@ -494,7 +503,7 @@ test("a header of blanks alone never leaves the choice an empty label", () => {
     options: [{ label: "a", description: "d".repeat(76) }],
   });
   const view = questionView(draftOf(), [blank, TWO[0] as Question]);
-  assert.equal(tabsOf(view), "[☐ Question 1] | ☐ Colour | ✔ Submit");
+  assert.equal(tabsOf(view), "*☐ Question 1*   ☐ Colour   ✔ Submit");
   const choices: Json[] = view.blocks.filter((b: Json) => b.type === "input");
   assert.equal(choices.length, 1);
   assert.equal(choices[0]?.label.text, "Answer");
@@ -701,7 +710,7 @@ test("the Other field shows while Other is chosen, required, with its text from 
   assert.deepEqual(Object.keys(inputs), ["q0", "o0"]);
   assert.deepEqual(inputs.q0?.element.initial_option, OTHER_OPTION);
   const other = inputs.o0 as Json;
-  assert.deepEqual(other.label, { type: "plain_text", text: "Other" });
+  assert.deepEqual(other.label, { type: "plain_text", text: "Your answer" });
   assert.equal(other.optional, undefined);
   assert.deepEqual(other.element, {
     type: "plain_text_input",

@@ -27,8 +27,8 @@ export const APPROVAL_DENY = "approval_deny";
 export const QUESTION_OPEN = "question_open";
 export const QUESTION_SKIP = "question_skip";
 export const QUESTION_FORM = "question_form";
-/** The tab buttons: `question_tab_{n}`, n a question's index, or the question count for Submit. */
-export const QUESTION_TAB = /^question_tab_(\d+)$/;
+/** The Edit buttons of the review page: `question_edit_{n}`, n a question's index. */
+export const QUESTION_EDIT = /^question_edit_(\d+)$/;
 // Text typed under Other and in Notes, per question. The draft lives in the daemon's memory
 // (`Requests`), so Slack's 3,000 characters of private_metadata bound neither.
 export const TYPED_LIMIT = 300;
@@ -211,6 +211,8 @@ export interface Draft {
   readonly generation: number;
   /** The question on screen in the valid form. */
   readonly active: number;
+  /** Whether the review page was reached: from then on the footer reads Review on every page. */
+  readonly reviewed: boolean;
   readonly picks: ReadonlyMap<number, readonly number[]>;
   /** The questions whose Other option is chosen. */
   readonly other: ReadonlySet<number>;
@@ -224,7 +226,7 @@ export function newDraft(
   channelId: string,
   threadTs: string,
   filled: Partial<
-    Pick<Draft, "generation" | "active" | "picks" | "other" | "typed" | "notes">
+    Pick<Draft, "generation" | "active" | "reviewed" | "picks" | "other" | "typed" | "notes">
   > = {},
 ): Draft {
   return {
@@ -233,6 +235,7 @@ export function newDraft(
     threadTs,
     generation: filled.generation ?? 0,
     active: filled.active ?? 0,
+    reviewed: filled.reviewed ?? false,
     picks: filled.picks ?? new Map(),
     other: filled.other ?? new Set(),
     typed: filled.typed ?? new Map(),
@@ -458,30 +461,18 @@ function tabName(question: Question, at: number): string {
   return header !== "" ? header : texts.fill(slackTexts.QUESTION_TAB_UNNAMED, { number: at + 1 });
 }
 
-/** The tab for `target` (a question's index, or the question count for Submit). */
-function tabButton(text: string, target: number, onScreen: boolean): Block {
-  return {
-    type: "button",
-    action_id: `question_tab_${target}`,
-    text: { type: "plain_text", text },
-    ...(onScreen ? { style: "primary" } : {}),
-  };
-}
-
 /**
- * The terminal's tab row, as buttons that jump to a page: one per question, its header with `☒`
- * once answered and `☐` before, then `✔ Submit`; the page on screen is the primary one. A button's
- * text is plain text, so the header goes in as written.
+ * The terminal's tab row, as one context line: each question's header with `☒` once answered
+ * and `☐` before, the page on screen in bold, then `✔ Submit` (bold on the review page).
  */
 function tabRow(draft: Draft, questions: readonly Question[]): Block {
-  const tabs = questions.map((question, at) => {
-    const mark = isAnswered(draft, questions, at) ? "☒" : "☐";
-    return tabButton(`${mark} ${tabName(question, at)}`, at, at === draft.active);
+  const cells = questions.map((question, at) => {
+    const cell = `${isAnswered(draft, questions, at) ? "☒" : "☐"} ${shownAsWritten(tabName(question, at))}`;
+    return at === draft.active ? `*${cell}*` : cell;
   });
-  tabs.push(
-    tabButton(slackTexts.QUESTION_TAB_SUBMIT, questions.length, draft.active === questions.length),
-  );
-  return { type: "actions", block_id: "tabs", elements: tabs };
+  const review = draft.active === questions.length;
+  cells.push(review ? `*${slackTexts.QUESTION_TAB_SUBMIT}*` : slackTexts.QUESTION_TAB_SUBMIT);
+  return context(cells.join("   "));
 }
 
 /** The page that ends a form of several questions: every answer, to read before it is sent. */
@@ -499,7 +490,9 @@ function reviewView(draft: Draft, questions: readonly Question[], names: Names):
     // Cut as written, on the room the escaped text takes, so no escape is split.
     const [first = "", ...rest] = codeChunks(lines, SECTION_LIMIT - 1);
     const text = `${shownAsWritten(first)}${rest.length > 0 ? "…" : ""}`;
-    return { type: "section", text: { type: "mrkdwn", text } };
+    // One action id per question: Slack wants them unique within a view.
+    const edit = button(`question_edit_${at}`, slackTexts.QUESTION_EDIT, String(at));
+    return { type: "section", text: { type: "mrkdwn", text }, accessory: edit };
   });
   return {
     type: "modal",
@@ -517,20 +510,19 @@ function reviewView(draft: Draft, questions: readonly Question[], names: Names):
 }
 
 /**
- * The form, one question at a time, as the terminal's tabs: with several questions a row of tab
- * buttons names them, tells which are answered and jumps to any page or to Submit
- * (`Requests.onQuestionTab`), the button reads `Next (1/3)` and leads to the next question
- * (whether or not the others have an answer), and `Review` on the last opens a page that lists
- * every answer (`reviewView`), whose `Submit answers` sends. One question has none of that and
- * its `Submit` sends. Each question needs an answer before the next. The question shows as radio
- * buttons, or checkboxes when several may be picked, each option with its description, and Other
- * as the last option, as the terminal's list ends with its own row for a typed answer (tools
- * reference: "type your own text through the Other row"). The choice is required. While Other is
- * chosen its text field shows, required too; Notes shows while a real option is chosen, not for
- * Other alone. When an
- * option says more than a choice holds (`saysMore`), the question and every option are shown
- * whole above the choice, which keeps the labels alone under the question's
- * header (issue #47).
+ * The form, one question at a time, as the terminal's tabs: with several questions a tab row
+ * (one context line) names them and tells which are answered, the button reads `Next (1/3)` and
+ * leads to the next question (whether or not the others have an answer), and `Review` on the
+ * last opens a page that lists every answer with an Edit button (`reviewView`), whose `Submit
+ * answers` sends. Once the review was reached (`Draft.reviewed`) every page's button reads
+ * `Review`. One question has none of that and its `Submit` sends. Each question needs an answer
+ * before the next. The question shows as radio buttons, or checkboxes when several may be
+ * picked, each option with its description, and Other as the last option, as the terminal's list
+ * ends with its own row for a typed answer (tools reference: "type your own text through the
+ * Other row"). The choice is required. While Other is chosen its text field shows, required too;
+ * Notes shows while a real option is chosen, not for Other alone. When an option says more than
+ * a choice holds (`saysMore`), the question and every option are shown whole above the choice,
+ * which keeps the labels alone under the question's header (issue #47).
  */
 export function questionView(draft: Draft, questions: readonly Question[], names: Names): Block {
   const blocks: Block[] = [];
@@ -571,7 +563,7 @@ export function questionView(draft: Draft, questions: readonly Question[], names
   }
   // A change of the choice redraws the form (`Requests.onQuestionChoice`): Other's field and
   // Notes come and go with it. The two text fields only report to the draft, so that a form
-  // closed with Later and opened again finds what was typed.
+  // closed with Close and opened again finds what was typed.
   blocks.push({
     type: "input",
     block_id: `q${at}`,
@@ -594,7 +586,7 @@ export function questionView(draft: Draft, questions: readonly Question[], names
       type: "input",
       block_id: `o${at}`,
       dispatch_action: true,
-      label: { type: "plain_text", text: slackTexts.QUESTION_OTHER },
+      label: { type: "plain_text", text: slackTexts.QUESTION_YOUR_ANSWER },
       element: other,
     });
   }
@@ -625,11 +617,12 @@ export function questionView(draft: Draft, questions: readonly Question[], names
     title: { type: "plain_text", text: named(slackTexts.QUESTION_TITLE, names) },
     submit: {
       type: "plain_text",
-      text: !last
-        ? texts.fill(slackTexts.QUESTION_NEXT, { number: at + 1, count })
-        : count > 1
-          ? slackTexts.QUESTION_REVIEW
-          : "Submit",
+      text:
+        count === 1
+          ? "Submit"
+          : last || draft.reviewed
+            ? slackTexts.QUESTION_REVIEW
+            : texts.fill(slackTexts.QUESTION_NEXT, { number: at + 1, count }),
     },
     close: { type: "plain_text", text: slackTexts.QUESTION_CLOSE },
     blocks,
