@@ -309,6 +309,20 @@ class ClaudeWorld implements AgentWorld {
     });
   }
 
+  hangModelChange(): void {
+    // The command's `running` state and nothing after it.
+    this.#plays.push({
+      kind: "hang",
+      batch: withSession(MODEL_COMMAND.slice(0, 1), this.#sessionId()),
+    });
+  }
+
+  async modelChangeTaken(): Promise<void> {
+    while ((this.#sdk.queries.at(-1)?.sent.length ?? 0) === 0) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+
   failTurn(): string {
     this.#plays.push({
       kind: "other",

@@ -1176,13 +1176,19 @@ closed when the start returns (`ThreadSession.connect`).
   which loses nothing since no prompt has been sent. A non-default model is `AgentSession.setModel`
   on the live session (not stored: it survives a resume and leaves the owner's default alone,
   measured: "Model survives resume"). The Claude back end types `/model <model>` into the idle
-  session and reads that turn itself: the thread shows nothing of it and the core gets none of it
-  (no event, no state, no `turn_ended`, no hook), though the command stays in the session, so the
-  model sees it and its transcript holds it. It resolves at the turn's `result`, the records that
-  trail it (`command_lifecycle`, the `idle`) stay hidden, and `!stop` during it reaches
-  `interrupt()`, which makes it reject, so the setup is undone and the owner gets `Not sent.`; the
-  first prompt runs on the chosen model. It does not call the SDK's `setModel`, which leaves an override a later `/model` to the
-  startup model's alias does not undo (issue #333, `docs/limits.md`), and bypass goes through `ThreadSession.setBypass` when the
+  session, under a uuid of its own, and reads that turn itself: the thread shows nothing of it,
+  though the command stays in the session, so the model sees it and its transcript holds it. Every
+  record from the push to the `command_lifecycle` `completed` that names the uuid (the replayed
+  command, its states, its output, its `result`, a status, the hooks that fire in it) stays in the
+  back end and no event of it reaches the core; the caller resolves at the `result`, or at that
+  `completed` when no result came. The `idle` the session says after it is read as any state: the
+  core takes it while already idle, and the activity line stays as it was. An `interrupt()` while
+  the command runs (`!stop`, which `ThreadSession.stop` forwards while a Start is applied) makes
+  `setModel` reject and closes the session, so `ThreadSession.applySetup` undoes the setup and the
+  owner gets `Not sent.`; the first prompt of a setup that went through runs on the chosen model.
+  It does not call the SDK's `setModel`, which leaves an override that a later `/model` to the
+  startup model's alias does not undo (issue #333, `docs/limits.md`). Bypass goes through
+  `ThreadSession.setBypass` when the
   choice differs from what the live session effectively runs (`ThreadSession.clientBypass`: the
   choice, or the folder's own bypass). The message then becomes one summary line, written inside the
   same wait (a cancel that already deleted the message skips the edit), and stays; the held message

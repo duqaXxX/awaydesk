@@ -89,6 +89,13 @@ export interface AgentWorld {
    * of its own (a command the agent runs) plays that turn; one that sets it directly does nothing.
    */
   modelChange(): void;
+  /**
+   * The next model change never ends by itself: the agent has begun it and says nothing more.
+   * Needed with `models`.
+   */
+  hangModelChange?(): void;
+  /** Resolves once the agent has taken the model change that `setModel` started. Needed with `hangModelChange`. */
+  modelChangeTaken?(): Promise<void>;
   /** The next prompt fails as a request of the agent's own does. Returns a word its message holds. */
   failTurn(): string;
   /** The agent's process dies now. */
@@ -943,6 +950,30 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         assert.equal(written(turn).includes("after the change"), true);
         assertWellFormed(turn);
         assertDeclared(turn, caps);
+      },
+    );
+
+    check(
+      "interrupting a model change rejects it and closes the session",
+      lacks(caps.models, "models"),
+      async (world, t) => {
+        assert.ok(world.hangModelChange !== undefined && world.modelChangeTaken !== undefined);
+        world.hangModelChange();
+        const { session, events } = await open(t, world);
+        const [first] = (await session.info()).models;
+        assert.ok(first !== undefined);
+        const change = session.setModel(first.value);
+        // The rejection is read at once, so that it is never left unhandled while the test waits.
+        const rejected = assert.rejects(change);
+        await world.modelChangeTaken();
+        await session.interrupt();
+        await rejected;
+        await events.finished;
+        // Closed by the agent, as `close` leaves it: no process is left, no prompt is taken, and
+        // nothing of the interrupted change reached the owner, not even a loss.
+        assert.equal(world.running(), 0);
+        await assert.rejects(session.send(prompt()));
+        assert.deepEqual(events.seen, []);
       },
     );
 

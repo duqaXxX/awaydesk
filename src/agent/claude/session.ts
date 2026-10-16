@@ -217,16 +217,15 @@ function modeOf(mode: PermissionMode): SdkPermissionMode {
 }
 
 /**
- * A local command's turn being read and hidden: Claude Code writes it as `running`, the command's
- * records, a `result`, `command_lifecycle` completed, then `idle` (recorded 2026-10-16, Claude
- * Code 2.1.301, with the state events on). The caller's wait ends at the result, the SDK's end of
- * a turn; the records that trail it stay hidden until that `idle`, or until the first record of
- * another turn.
+ * The model command's turn, read and hidden. The command is pushed under a uuid of its own, which
+ * Claude Code replays on the user record and names in `command_lifecycle` (recorded 2026-10-16,
+ * Claude Code 2.1.301, `test/fixtures/sdk/model-command.json`): every record from the push to the
+ * `completed` of that uuid is the command's, and none of them reaches the core. The caller's wait
+ * ends at the command's `result`, or at that `completed` when no result came.
  */
 interface CommandTurn {
-  running: boolean;
-  resulted: boolean;
-  /** The wait is over: what is left is the hidden tail. */
+  readonly id: string;
+  /** The wait is over; what is left is the hidden tail up to `completed`. */
   settled: boolean;
   readonly settle: (error?: unknown) => void;
 }
@@ -328,29 +327,21 @@ export class ClaudeSession implements AgentSession {
   }
 
   /**
-   * Reads a record while the model command's turn is hidden, since the owner never typed the
-   * command: not its states, its output or its result. Settles the wait at the result. Returns
-   * whether the record is the command's own; one that is not (the first record of another turn)
-   * ends the command and is read as any record.
+   * Reads a record of the hidden model command: none reaches the core. The `result` settles the
+   * wait, the command's own `completed` settles it too (a no-op after the result) and ends the
+   * hiding.
    */
-  #readCommand(command: CommandTurn, record: unknown): boolean {
-    if (!isRecord(record)) return true;
-    const state = record.type === "system" && record.subtype === "session_state_changed";
-    if (!command.resulted) {
-      if (state && record.state === "running") command.running = true;
-      if (record.type === "result") {
-        command.resulted = true;
-        command.settle();
-      }
-      return true;
-    }
-    if (state && record.state === "idle") {
+  #readCommand(command: CommandTurn, record: unknown): void {
+    if (!isRecord(record)) return;
+    if (record.type === "result") command.settle();
+    if (
+      record.type === "command_lifecycle" &&
+      record.state === "completed" &&
+      record.command_uuid === command.id
+    ) {
+      command.settle();
       this.#command = null;
-      return true;
     }
-    if (record.type === "command_lifecycle") return true;
-    this.#command = null;
-    return false;
   }
 
   /** Reads the query's stream until it ends, whatever ends it; never rejects. */
@@ -361,7 +352,10 @@ export class ClaudeSession implements AgentSession {
         if (!this.#started && isRecord(record) && record.type === "result") {
           this.#startRefused = record.is_error === true;
         }
-        if (this.#command !== null && this.#readCommand(this.#command, record)) continue;
+        if (this.#command !== null) {
+          this.#readCommand(this.#command, record);
+          continue;
+        }
         try {
           for (const event of this.#translator.translate(record)) this.#queue.push(event);
         } catch (error) {
@@ -425,12 +419,13 @@ export class ClaudeSession implements AgentSession {
   }
 
   async interrupt(): Promise<void> {
-    // The model command's wait ends with the interrupt, which is the owner's `!stop`. Its turn
-    // is still read to its end, but one that never began leaves nothing to wait for.
+    // An interrupt while the model command runs rejects `setModel` and closes the session (the
+    // seam's contract): what the command's turn would still write is never read for a state.
     const command = this.#command;
     if (command !== null && !command.settled) {
       command.settle(new Error("the model command was interrupted"));
-      if (!command.running) this.#command = null;
+      await this.close();
+      return;
     }
     await this.#ask(() => this.#query.interrupt());
   }
@@ -463,10 +458,10 @@ export class ClaudeSession implements AgentSession {
     if (this.#command !== null && !this.#command.settled) {
       throw new Error("a model command is already running");
     }
+    const id = randomUUID();
     const done = new Promise<void>((resolve, reject) => {
       const command: CommandTurn = {
-        running: false,
-        resulted: false,
+        id,
         settled: false,
         settle: (error) => {
           if (command.settled) return;
@@ -477,7 +472,7 @@ export class ClaudeSession implements AgentSession {
       };
       this.#command = command;
     });
-    this.#input.push(userMessage({ id: randomUUID(), content: `/model ${model ?? "default"}` }));
+    this.#input.push(userMessage({ id, content: `/model ${model ?? "default"}` }));
     await done;
   }
 

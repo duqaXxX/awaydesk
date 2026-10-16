@@ -283,6 +283,16 @@ export const CLAIMS: readonly Claim[] = [
       "runs on the startup model the limit is gone: take its row out of `docs/limits.md` and say " +
       "so in the issue it names",
   ),
+  claim(
+    "P28",
+    "gesture",
+    "a `/model` sent under a uuid ends its turn with a `command_lifecycle` record in the state " +
+      "`completed` whose `command_uuid` is that uuid",
+    "src/agent/claude/session.ts#ClaudeSession.setModel",
+    "the daemon hides the command's turn up to that record and the first prompt waits for its " +
+      "result: with the record gone, set a model in the setup and press Start, then reply in the " +
+      "thread: the reply never shows. Read `docs/sdk-surface.md` for the rows that name it",
+  ),
 ];
 
 if (new Set(CLAIMS.map((c) => c.id)).size !== CLAIMS.length) {

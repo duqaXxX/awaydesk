@@ -164,8 +164,9 @@ export class FakeQuery implements QueryHandle {
     const content = message.message.content;
     const wanted =
       this.options.extraArgs !== undefined && "replay-user-messages" in this.options.extraArgs;
-    if (!wanted || typeof content !== "string" || content.trimStart().startsWith("/")) return batch;
-    if (message.uuid === undefined) return batch;
+    if (message.uuid === undefined || typeof content !== "string") return batch;
+    if (content.trimStart().startsWith("/")) return this.#commanded(batch, message.uuid);
+    if (!wanted) return batch;
     const at = batch.findIndex((item) => "type" in item && WORDED.has(String(item.type)));
     const replay: JsonObject = {
       type: "user",
@@ -176,6 +177,18 @@ export class FakeQuery implements QueryHandle {
     };
     const index = at === -1 ? batch.length : at;
     return [...batch.slice(0, index), replay, ...batch.slice(index)];
+  }
+
+  /**
+   * A command's recorded turn carries its own replay, and names the command's uuid in its
+   * lifecycle records: both are the uuid the command was sent under, as Claude Code writes them.
+   */
+  #commanded(batch: Batch, id: string): Batch {
+    return batch.map((item) => {
+      if ("command_uuid" in item) return { ...item, command_uuid: id };
+      if ("isReplay" in item && item.type === "user") return { ...item, uuid: id };
+      return item;
+    });
   }
 
   /** Deliver the turn of the last prompt sent, with its replay, when the test holds that turn. */

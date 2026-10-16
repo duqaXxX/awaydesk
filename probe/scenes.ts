@@ -13,7 +13,7 @@
  * is in play, and each works in a temporary folder whose transcripts the run removes again.
  */
 import { spawnSync } from "node:child_process";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, type UUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
@@ -98,7 +98,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   resume: ["P6", "P7"],
   "model and effort resume": ["P15", "P16"],
   "setup model resume": ["P18"],
-  "model command after setModel": ["P27"],
+  "model command after setModel": ["P27", "P28"],
   bypass: ["P9"],
   "working folder": ["P14"],
   replay: ["P19"],
@@ -720,13 +720,21 @@ async function setupModelResume(s: Stage): Promise<Seen> {
  * leaves the next request on the `setModel` model (issue #333). The daemon no longer calls
  * `setModel`, so the scene reads the raw SDK. The startup model, which is not Haiku, runs no
  * request: the two commands cost nothing and the one-word turn runs on Haiku while the limit
- * stands.
+ * stands. P28 rides on the same run: the command is sent under a uuid of its own, as the daemon
+ * sends it, and Claude Code ends its turn with a `command_lifecycle` `completed` naming it.
  */
 async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
   const input = new AsyncQueue<SDKUserMessage>();
   const raw = query({ prompt: input, options: { cwd: s.workdir, settingSources: [] } });
-  const say = (content: string) =>
-    input.push({ type: "user", message: { role: "user", content }, parent_tool_use_id: null });
+  const say = (content: string, uuid?: UUID) =>
+    input.push({
+      type: "user",
+      message: { role: "user", content },
+      parent_tool_use_id: null,
+      ...(uuid !== undefined && { uuid }),
+    });
+  const commandId = randomUUID();
+  let completed = false;
   let late = false;
   const timer = setTimeout(() => {
     late = true;
@@ -742,16 +750,19 @@ async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
     )?.value;
     if (startup.includes("haiku") || typeof alias !== "string") {
       const detail = `no alias other than Haiku names the startup model ${startup}`;
-      return { P27: observation(false, false, detail) };
+      return { P27: observation(false, false, detail), P28: observation(false, false, detail) };
     }
     await raw.setModel(PROBE_MODEL);
-    say(`/model ${alias}`);
+    say(`/model ${alias}`, commandId);
     let results = 0;
     const ranOn: string[] = [];
     try {
       for await (const record of raw) {
         const seen: unknown = record;
         if (!isRecord(seen)) continue;
+        if (seen.type === "command_lifecycle" && seen.state === "completed") {
+          completed ||= seen.command_uuid === commandId;
+        }
         if (seen.type === "assistant" && results === 1 && isRecord(seen.message)) {
           if (typeof seen.message.model === "string") ranOn.push(seen.message.model);
         }
@@ -764,9 +775,15 @@ async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
       if (!late) throw error;
     }
     if (late) throw new ProbeTimeout("the turns did not end in time");
-    if (ranOn.length === 0) return { P27: observation(false, false, "the turn named no model") };
+    const ended = observation(true, completed, completed ? "" : "no completed named the command");
+    if (ranOn.length === 0) {
+      return { P27: observation(false, false, "the turn named no model"), P28: ended };
+    }
     const holds = ranOn.every((model) => model.includes("haiku"));
-    return { P27: observation(true, holds, holds ? "" : `the turn ran on ${ranOn.join(", ")}`) };
+    return {
+      P27: observation(true, holds, holds ? "" : `the turn ran on ${ranOn.join(", ")}`),
+      P28: ended,
+    };
   } finally {
     clearTimeout(timer);
     input.end();
