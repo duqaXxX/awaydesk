@@ -126,9 +126,9 @@ const CASES: readonly Case[] = [
         const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [question]);
         const modal = new ModalSlack(world.slack);
         await world.dispatch(answerClick(approvalId)); // the form on screen
-        // An option and a text both stand: the change empties the one that was not just made.
+        // Other chosen and a text typed: a choice redraws the form, typing reaches the draft.
         const values = {
-          ...picked(0, "0"),
+          ...picked(0, "other"),
           o0: { other: { type: "plain_text_input", value: "mauve" } },
         };
         world.slack.apiCalls = []; // opening the form is the arrangement, not what the payload did
@@ -144,7 +144,10 @@ const CASES: readonly Case[] = [
         );
         return {
           body: sentBy(body, sender),
-          acted: () => world.slack.callsTo("views.update").length > 0,
+          acted:
+            actionId === "answer"
+              ? () => world.slack.callsTo("views.update").length > 0
+              : () => world.built.drafts.get(approvalId)?.typed.size === 1,
         };
       },
     }),

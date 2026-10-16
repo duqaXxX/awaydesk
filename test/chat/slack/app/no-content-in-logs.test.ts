@@ -80,7 +80,9 @@ test("no log line at any level holds a prompt, a reply or an owner's word", asyn
 
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
   const values = {
-    q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } },
+    q1: {
+      answer: { type: "checkboxes", selected_options: [{ value: "0" }, { value: "other" }] },
+    },
     o1: { other: { type: "plain_text_input", value: OTHER } },
   };
   const review = await onReviewPage(world, approvalId, "1", values);

@@ -878,7 +878,11 @@ backtick (`escape.shownAsWritten`), so no `<url|label>` can hide what it links a
 its code block. A clarifying question (Claude Code's `AskUserQuestion` tool, 1 to 4 questions)
 arrives the same way and is posted as one line naming the questions, with **Answer** and **Skip**.
 Answer opens a modal (`requests.questionView`) that shows one question at a time: radio buttons, or checkboxes when several may be picked, each option with its description, and
-an **Other** field and a **Notes** field, as the terminal offers. Slack caps an option object's text and description at 75
+**Other** as the last option of the list, as the terminal's list ends with its own row for a typed
+answer. The choice is required (no `optional`, so Slack shows no `(optional)` beside the question).
+While Other is chosen an input block under the choice, **Other** (required, placeholder
+`Type your own answer`), takes the text; **Notes** (optional) shows once an option or Other is
+chosen. Slack caps an option object's text and description at 75
 characters each and gives it no place for the option's `preview`. When an option says more than
 that, the page shows the question in bold, then every option whole in a `rich_text` block: its label
 in bold, its full description, and its preview in a preformatted element, which keeps its line
@@ -895,14 +899,14 @@ row with `✔ Submit` in bold, `Review your answers`, a section `● question` a
 question (a multi-select's joined with `, `) and, when the question has notes, a line
 `Notes: …` under it; each text goes through `escape.shownAsWritten`, which escapes `&`, `<`, `>`
 and backticks (so `*` and `_` still format), and a section is cut to 3,000 characters before the
-escape, never inside one. `Submit answers` alone sends. From the second question on, and on the review page, a **← header** button
+escape, never inside one. `Submit answers` alone sends. From the second question on, and on the review page, a **Previous** button
 (`question_back`, `Requests.onQuestionBack`) goes back one page: it absorbs the fields of the page
 on screen into the draft first, validates nothing, and redraws the previous page with
-`views.update` on the click's view id and `hash`, every answer kept. The button's text is plain
-text: the header goes in as written, cut to 40 characters, not escaped. One question has none of this
-and its `Submit` sends.
+`views.update` on the click's view id and `hash`, every answer kept. The button is an `actions`
+block in the body: a modal's footer holds only submit and close (modals reference, read
+2026-10-16). One question has none of this and its `Submit` sends.
 What was filled is kept by the Slack provider in memory (`Requests.drafts`, `requests.Draft`), by
-request id, with the page on screen and the revision of each question's clearable blocks; the
+request id, with the page on screen; the
 view's `private_metadata` holds only the request's id, channel and thread, the form's generation
 and the page it shows (`requests.FormIds`), so Other and Notes take 300 characters each
 (`TYPED_LIMIT`, `NOTES_LIMIT`) with no Slack cap to fit. Only the newest form of a request is
@@ -913,20 +917,21 @@ stays valid). A stale form's changes and its Back are ignored, and its Next or S
 which has no field, the form is replaced by that sentence) and sends nothing; a change or a Back
 from a page Next has already left is ignored too. Every field of the valid form
 reports each change (an option picked, a box ticked, a character typed under Other or in Notes:
-`dispatch_action`), and the draft is updated from it, with no `views.update` except the single
-select's exclusion below. An entry goes when its request is answered, skipped or found gone, at
+`dispatch_action`), and the draft is updated from it. Only a change of the choice redraws the
+form with `views.update` (Other's field and Notes come and go with it); typing never does. A
+block keeps its `block_id` (`q0`, `o0`, `n0`) while it stays on screen, so Slack keeps what is
+typed in it. An entry goes when its request is answered, skipped or found gone, at
 the next Answer for a request that ended another way, and when the app closes. Answer after Later
 reopens the form on the page left, with the pages already submitted and what each field of the
 open page held at its last change. The picked labels,
 with the text typed under Other as the answer itself, go back as the tool's answers, a
-multi-select's as a list (measured: "Multi-select answer as a list"). In a single select an
-option and a text under Other exclude each other, as in the terminal, where the typed text
-replaces the option: the two blocks dispatch an action on every change and the provider empties
-the other one (`requests.excluding`); a click on Next that still carries both (it came before
-that update) keeps the one changed last (`requests.settled`). A multi-select adds the text to the
-labels and clears nothing. Notes are optional and belong to an option: with no option picked,
-Next and Submit show `Pick an option to add notes to it.` under the question, whatever else is
-filled. Notes travel to the agent as that question's `notes`, in the tool's `annotations` beside
+multi-select's as a list (measured: "Multi-select answer as a list"). In a single select Other
+is one option among the others, so an option and a text never stand together; a multi-select
+adds the text to the labels when Other is ticked. A text kept in the draft is sent only while
+Other is chosen, and the Review page shows it as the answer. With nothing chosen Next and Submit
+show `Choose an option or type your own answer.` under the question; Other chosen with no text
+draws the form again with its field (Slack checks the required field first). A note kept in the
+draft is not sent without a choice. Notes travel to the agent as that question's `notes`, in the tool's `annotations` beside
 the answers (`requests.questionResult`); with a single-select option that has a preview, the
 annotation carries the preview too, as the terminal does. The record of the answers does not
 show notes, as the terminal's does not. The modal carries no channel or thread: each click in it is checked against the

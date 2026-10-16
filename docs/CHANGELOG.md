@@ -7,6 +7,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The question form lists Other as its last option and shows fields only when they apply (issue
+  #325, changes after the owner's first live test). Other is the last option of the radio buttons
+  and of the checkboxes (`Other`, `Type your own answer`), as the terminal's list ends with its
+  own row. Its text field, required, shows only while Other is chosen, and Notes only once
+  something is chosen; text and notes kept in the draft are sent only with a choice (Other's text
+  only while Other is chosen). The choice is required, so Slack shows no `(optional)` beside the
+  question. The form redraws only when the choice changes; typing in Other or Notes reaches the
+  draft and redraws nothing. The single select's live exclusion, its `block_id` revisions and the
+  `Pick an option to add notes to it.` error are gone: an option and Other can no longer both be
+  chosen, and a note needs no option of its own. The back button reads `Previous` on the question
+  pages and on the review page.
+
 - A crash while a question or an approval that opened the turn waits no longer leaves the thread
   with the owner's message alone (issue #325). The turn had no reply message (a reply starts on
   its first write), so the repair on the next start deleted the request and nothing said the turn

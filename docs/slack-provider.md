@@ -662,9 +662,11 @@ once the form is open, and a refused channel replaces the form with the reason
 The update carries the hash the form opened with; when the owner closed the form or moved on in
 it meanwhile, the reason goes to the thread as a line only the owner sees. The
 form shows the owner alone what the request already shows. In the question form every field reports its change as a `block_actions` payload
-(`Requests.onQuestionLive`: an option, a box, Other, Notes) and updates the draft. In a single
-select a change of the option, or a character typed under Other, also empties the other field with one `views.update` that carries the
-hash of the view it came from; the emptied block gets a new `block_id` (`Draft.revisions`),
+(`Requests.onQuestionLive`: an option, a box, Other, Notes) and updates the draft. A change of
+the choice (`onQuestionChoice`) also redraws the form with one `views.update` that carries the
+hash of the view it came from: Other is the last option, its text field shows only while Other
+is chosen, and Notes only once something is chosen. Typing in Other or in Notes
+(`onQuestionTyping`) redraws nothing. A block keeps its `block_id` while it stays on screen,
 because Slack keeps an input's value while its `block_id` and `action_id` stay. A `hash_conflict`
 or `not_found` is logged and ignored: Submit reads the state as it stands. What the owner filled
 stays in the provider's memory (`Requests.drafts`) and the view's `private_metadata` holds the

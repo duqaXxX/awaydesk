@@ -87,19 +87,19 @@ test("Back keeps the answers of both pages, Other, Notes and a multi-select incl
   const o = await openForm(t, QUESTIONS);
   await forward(o, { ...radio("q0", "1"), ...noted("n0", "darker") });
   // Nothing was reported live on page two: Back itself carries what is typed there.
-  const state = { ...boxes("q1", "0", "1"), ...typed("o1", "xl"), ...noted("n1", "both") };
+  const state = { ...boxes("q1", "0", "other"), ...typed("o1", "xl"), ...noted("n1", "both") };
   await o.world.dispatch(backClick(o, state));
   assert.equal(o.modal.written.length, 1);
   const first = inputs(o.modal.view);
   assert.equal(first[0]?.element.initial_option.value, "1");
-  assert.equal(first[2]?.element.initial_value, "darker");
+  assert.equal(first[1]?.element.initial_value, "darker");
   assert.equal(tabs(o.modal.view), "*☒ Colour*   ☒ Sizes   ✔ Submit");
   // Forward again: page two shows what it had when Back was clicked.
   const second = await forward(o, radio("q0", "1"));
   const again = inputs(second);
   assert.deepEqual(
     again[0]?.element.initial_options.map((option: Body) => option.value),
-    ["0", "1"],
+    ["0", "other"],
   );
   assert.equal(again[1]?.element.initial_value, "xl");
   assert.equal(again[2]?.element.initial_value, "both");
@@ -139,7 +139,7 @@ test("Next moves on even when every question already has an answer", async (t) =
 test("the last question's Review opens the review page and sends nothing", async (t) => {
   const o = await openForm(t, QUESTIONS);
   await forward(o, radio("q0", "1"));
-  const review = await forward(o, { ...boxes("q1", "0", "1"), ...typed("o1", "xl") });
+  const review = await forward(o, { ...boxes("q1", "0", "other"), ...typed("o1", "xl") });
   await o.world.idle();
   assert.ok(!o.pending.decided);
   assert.equal(JSON.parse(review.private_metadata as string).n, 2);
@@ -149,7 +149,7 @@ test("the last question's Review opens the review page and sends nothing", async
   assert.deepEqual(texts.slice(0, 3), [
     "*Review your answers*",
     "● Colour?\n→ blue",
-    "● Sizes?\n→ s, l, xl",
+    "● Sizes?\n→ s, xl",
   ]);
 });
 
@@ -179,7 +179,7 @@ test("Back from the review page returns to the last question with its answer", a
   assert.equal(JSON.parse(last.private_metadata as string).n, 2);
   assert.equal(inputs(last)[0]?.element.initial_option.value, "1");
   assert.equal(last.submit.text, "Review");
-  assert.equal((last.blocks as Body[]).at(-1)?.elements[0].text.text, "← Sizes");
+  assert.equal((last.blocks as Body[]).at(-1)?.elements[0].text.text, "Previous");
 });
 
 test("going back from the third question to the first, a change shows in the review", async (t) => {

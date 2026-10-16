@@ -349,8 +349,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   for (const actionId of [HOLD_CONTINUE, HOLD_CANCEL]) action(actionId, requests.onHoldDecision);
   for (const actionId of DECISION_ACTIONS) action(actionId, requests.onDecision);
   action("answer", requests.onQuestionChoice);
-  action("other", requests.onQuestionOther);
-  action("notes", requests.onQuestionNotes);
+  action("other", requests.onQuestionTyping);
+  action("notes", requests.onQuestionTyping);
   action(QUESTION_BACK, requests.onQuestionBack);
   action(QUESTION_OPEN, requests.onQuestionOpen);
   view(QUESTION_FORM, requests.onQuestionSubmit);
