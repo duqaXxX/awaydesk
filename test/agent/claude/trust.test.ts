@@ -18,7 +18,7 @@ import {
 import { open } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { afterEach, beforeEach, mock, test as nodeTest } from "node:test";
+import { afterEach, beforeEach, mock, test } from "node:test";
 import { logger, trustedRepository, workspaceTrusted } from "../../../src/agent/claude/trust.ts";
 import {
   addWorktree,
@@ -31,9 +31,6 @@ import {
   gitTakesItFor,
   trust,
 } from "../../support/git-layouts.ts";
-import { GIT_LAYOUT } from "../../support/platform.ts";
-
-const test = GIT_LAYOUT.skip ? nodeTest.skip : nodeTest;
 
 let tmp = "";
 let home = "";

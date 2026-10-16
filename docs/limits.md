@@ -171,6 +171,6 @@ it they cannot be done.
 - A thread older than 90 days on Slack's free plan, where older messages are hidden (Slack's help
   pages, read 2026-10-08). What awaydesk does when the first message of a thread is hidden has
   not been measured ([#196](https://github.com/duqaXxX/awaydesk/issues/196)).
-- The daemon has never run on a Linux or a Windows host. Its tests run on both in CI, where the
-  ones that build a git layout are skipped on Windows
+- The daemon has never run on a Linux or a Windows host. Its tests run on both in CI, apart from
+  the ones that need symlinks, FIFOs, POSIX modes or a trailing space in a file name on Windows
   ([#197](https://github.com/duqaXxX/awaydesk/issues/197)).

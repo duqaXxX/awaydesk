@@ -19,7 +19,6 @@ import { projectFiles } from "../../../src/core/files/listing.ts";
 import { newestFirst } from "../../../src/core/files/read.ts";
 import { FakeClock } from "../../support/fake-clock.ts";
 import { commitAt, committed, git, gitAt, gitInit } from "../../support/git-layouts.ts";
-import { GIT_LAYOUT } from "../../support/platform.ts";
 import {
   commitAll,
   commitOf,
@@ -53,7 +52,7 @@ function fakeRepository(root: string): Repository {
 
 // --- the start commit and the changed files ---
 
-test("the start is where head was when the thread started", GIT_LAYOUT, async () => {
+test("the start is where head was when the thread started", async () => {
   const repo = dated(join(tmp.dir, "dated"));
   const found = await repository(repo);
   assert.equal(await startCommit(found, started(T0 + 250)), commitOf(repo, 1));
@@ -64,7 +63,7 @@ test("the start is where head was when the thread started", GIT_LAYOUT, async ()
   assert.equal(await startCommit(found, started(T0 + 9999)), commitOf(repo, 0));
 });
 
-test("a reflog that does not go back that far gives its oldest entry", GIT_LAYOUT, async () => {
+test("a reflog that does not go back that far gives its oldest entry", async () => {
   // What `git reflog expire` leaves: the first entry gone. git answers the oldest it has (and
   // warns on stderr, which the daemon never reads).
   const repo = dated(join(tmp.dir, "dated"));
@@ -74,7 +73,7 @@ test("a reflog that does not go back that far gives its oldest entry", GIT_LAYOU
   assert.equal(await startCommit(await repository(repo), started(T0 + 10)), commitOf(repo, 2));
 });
 
-test("a repository made after the thread began counts every file", GIT_LAYOUT, async () => {
+test("a repository made after the thread began counts every file", async () => {
   // git answers the first commit itself for a time before the log began, so the first commit's
   // files would never be listed: the start is the empty tree.
   const repo = dated(join(tmp.dir, "dated"));
@@ -92,7 +91,7 @@ test("a repository made after the thread began counts every file", GIT_LAYOUT, a
   assert.deepEqual(await changedIn(repo, [found], started(T0 + 10)), ["c1.py", "c2.py", "c3.py"]);
 });
 
-test("a clone made after the thread began counts every file", GIT_LAYOUT, async () => {
+test("a clone made after the thread began counts every file", async () => {
   // The log of a clone starts with `clone: from ...`, whose old value is null as well.
   const source = dated(join(tmp.dir, "dated"));
   const clone = join(tmp.dir, "clone");
@@ -102,7 +101,7 @@ test("a clone made after the thread began counts every file", GIT_LAYOUT, async 
   assert.equal(await startCommit(found, started(T0 + 600)), commitOf(clone, 0));
 });
 
-test("the empty tree is the one of the repository s hash algorithm", GIT_LAYOUT, async () => {
+test("the empty tree is the one of the repository s hash algorithm", async () => {
   const repo = join(tmp.dir, "sha256");
   mkdirSync(repo);
   git(repo, "init", "-q", "-b", "main", "--object-format=sha256");
@@ -112,7 +111,7 @@ test("the empty tree is the one of the repository s hash algorithm", GIT_LAYOUT,
   assert.equal((start ?? "").length, 64);
 });
 
-test("without a reflog there is no start", GIT_LAYOUT, async () => {
+test("without a reflog there is no start", async () => {
   const repo = gitInit(join(tmp.dir, "unlogged"));
   git(repo, "config", "core.logAllRefUpdates", "false");
   commitAt(repo, "a.py", T0 + 100);
@@ -125,7 +124,7 @@ test("without a reflog there is no start", GIT_LAYOUT, async () => {
   assert.deepEqual(await changedIn(repo, [await repository(repo)], started(T0 + 150)), ["d.py"]);
 });
 
-test("a repository with no commit has no start and lists what is staged", GIT_LAYOUT, async () => {
+test("a repository with no commit has no start and lists what is staged", async () => {
   const fresh = gitInit(join(tmp.dir, "fresh"));
   write(fresh, "staged.py");
   git(fresh, "add", "staged.py");
@@ -135,7 +134,7 @@ test("a repository with no commit has no start and lists what is staged", GIT_LA
   assert.deepEqual(found.toSorted(), ["staged.py", "untracked.py"]);
 });
 
-test("a linked worktree has its own start", GIT_LAYOUT, async () => {
+test("a linked worktree has its own start", async () => {
   const main = gitInit(join(tmp.dir, "main"));
   commitAt(main, "a.py", T0 + 100);
   const second = commitAt(main, "b.py", T0 + 200);
@@ -152,35 +151,31 @@ test("a linked worktree has its own start", GIT_LAYOUT, async () => {
   assert.deepEqual(await changedSince(found, wt, second), ["c.py"]);
 });
 
-test(
-  "a thread that started before a branch switch counts from where it began",
-  GIT_LAYOUT,
-  async () => {
-    const repo = gitInit(join(tmp.dir, "switching"));
-    commitAt(repo, "base.py", T0 + 100);
-    const mainTip = commitAt(repo, "on_main.py", T0 + 200);
-    gitAt(repo, T0 + 300, "switch", "-q", "-c", "feature");
-    commitAt(repo, "on_feature.py", T0 + 400);
-    // Begun on main, now on feature: what feature holds beyond main's tip is what changed.
-    const start = await startCommit(await repository(repo), started(T0 + 250));
-    assert.equal(start, mainTip);
-    assert.deepEqual(await changedSince(await repository(repo), repo, start), ["on_feature.py"]);
-    // Begun on feature, now back on main: the files of feature are not there to be opened.
-    gitAt(repo, T0 + 500, "switch", "-q", "main");
-    const begunOnFeature = await startCommit(await repository(repo), started(T0 + 450));
-    assert.equal(begunOnFeature, git(repo, "rev-parse", "feature"));
-    assert.deepEqual(await changedSince(await repository(repo), repo, begunOnFeature), []);
-  },
-);
+test("a thread that started before a branch switch counts from where it began", async () => {
+  const repo = gitInit(join(tmp.dir, "switching"));
+  commitAt(repo, "base.py", T0 + 100);
+  const mainTip = commitAt(repo, "on_main.py", T0 + 200);
+  gitAt(repo, T0 + 300, "switch", "-q", "-c", "feature");
+  commitAt(repo, "on_feature.py", T0 + 400);
+  // Begun on main, now on feature: what feature holds beyond main's tip is what changed.
+  const start = await startCommit(await repository(repo), started(T0 + 250));
+  assert.equal(start, mainTip);
+  assert.deepEqual(await changedSince(await repository(repo), repo, start), ["on_feature.py"]);
+  // Begun on feature, now back on main: the files of feature are not there to be opened.
+  gitAt(repo, T0 + 500, "switch", "-q", "main");
+  const begunOnFeature = await startCommit(await repository(repo), started(T0 + 450));
+  assert.equal(begunOnFeature, git(repo, "rev-parse", "feature"));
+  assert.deepEqual(await changedSince(await repository(repo), repo, begunOnFeature), []);
+});
 
-test("a start that git cannot read is none", GIT_LAYOUT, async () => {
+test("a start that git cannot read is none", async () => {
   const repo = dated(join(tmp.dir, "dated"));
   const found = await repository(repo);
   const broken = { ...found, gitDir: join(repo, "no-such-git-dir") };
   assert.equal(await startCommit(broken, started(T0 + 250)), null);
 });
 
-test("the changed files are those added or modified since the start", GIT_LAYOUT, async () => {
+test("the changed files are those added or modified since the start", async () => {
   const folder = app();
   write(folder, "kept.py");
   write(folder, "gone.py");
@@ -224,7 +219,7 @@ test("the changed files are those added or modified since the start", GIT_LAYOUT
   ]);
 });
 
-test("without a start commit only the uncommitted files count", GIT_LAYOUT, async () => {
+test("without a start commit only the uncommitted files count", async () => {
   const folder = app();
   write(folder, "untracked.py");
   write(folder, "README", "edited\n");
@@ -232,7 +227,7 @@ test("without a start commit only the uncommitted files count", GIT_LAYOUT, asyn
   assert.deepEqual((found ?? []).toSorted(), ["README", "untracked.py"]);
 });
 
-test("the changed files of a subfolder are relative to it", GIT_LAYOUT, async () => {
+test("the changed files of a subfolder are relative to it", async () => {
   const folder = app();
   write(folder, "sub/a.py");
   commitAll(folder);
@@ -277,7 +272,7 @@ function settled(repo: string): void {
 
 // Only a touched file makes git want to refresh the index: a clean, an edited or an untracked
 // one cannot tell a command that writes it from one that does not.
-test("no command of open writes the index or leaves a lock", GIT_LAYOUT, async () => {
+test("no command of open writes the index or leaves a lock", async () => {
   const folder = app();
   write(folder, "sub/more.py");
   commitAll(folder);
@@ -304,7 +299,7 @@ test("no command of open writes the index or leaves a lock", GIT_LAYOUT, async (
   assert.ok(!existsSync(join(folder, ".git", "index.lock")));
 });
 
-test("a file that was only touched is not reported as changed", GIT_LAYOUT, async () => {
+test("a file that was only touched is not reported as changed", async () => {
   const folder = app();
   settled(folder);
   touched(folder);
@@ -318,7 +313,7 @@ test("a file that was only touched is not reported as changed", GIT_LAYOUT, asyn
   assert.equal(git(folder, "diff-files", "--name-only"), "README");
 });
 
-test("the measurement would notice a write", GIT_LAYOUT, () => {
+test("the measurement would notice a write", () => {
   // A control: `git status` without `--no-optional-locks` refreshes the index of a touched
   // file, which is what the assertions above are made to catch.
   const folder = app();
@@ -361,7 +356,7 @@ test("git runs in at most a few repositories at once", async () => {
   assert.equal(peak, 3);
 });
 
-test("the changes of nested repositories are relative to the folder", GIT_LAYOUT, async () => {
+test("the changes of nested repositories are relative to the folder", async () => {
   const folder = work();
   const one = datedRepo(join(folder, "one"));
   const two = datedRepo(join(folder, "group", "two"));
@@ -376,7 +371,7 @@ test("the changes of nested repositories are relative to the folder", GIT_LAYOUT
   assert.deepEqual(found.toSorted(), ["group/two/b.py", "group/two/c.py", "one/a.py"]);
 });
 
-test("each repository is counted from where its own head was", GIT_LAYOUT, async () => {
+test("each repository is counted from where its own head was", async () => {
   const folder = work();
   const one = datedRepo(join(folder, "one"));
   const two = datedRepo(join(folder, "two"));
@@ -392,7 +387,7 @@ test("each repository is counted from where its own head was", GIT_LAYOUT, async
   assert.deepEqual(found.toSorted(), ["one/during_one.py", "two/during_two.py"]);
 });
 
-test("a repository whose git fails adds no changes", GIT_LAYOUT, async () => {
+test("a repository whose git fails adds no changes", async () => {
   const folder = work();
   const one = datedRepo(join(folder, "one"));
   write(one, "a.py");

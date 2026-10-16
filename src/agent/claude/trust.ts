@@ -40,7 +40,7 @@
 import { type BigIntStats, constants, type Stats } from "node:fs";
 import { lstat, open, readFile, readlink, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, parse, resolve, sep } from "node:path";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import type { Repository } from "../seam.ts";
@@ -116,16 +116,25 @@ function sameStat(a: BigIntStats, b: BigIntStats): boolean {
   return a.dev === b.dev && a.ino === b.ino;
 }
 
+// What separates the parts of a path: both slashes on Windows, where `/` is accepted too (git
+// writes `gitdir: C:/...`), and `/` alone on POSIX, where a backslash is a file name character.
+const SEPARATOR = sep === "\\" ? /[\\/]/ : /\//;
+const ENDS_WITH_SEPARATOR = sep === "\\" ? /[\\/]$/ : /\/$/;
+
 /** `base / name` as pathlib joins it: an absolute name replaces the base, `.` parts go, `..` stays. */
 function joinPath(base: string, name: string): string {
-  const joined = isAbsolute(name) ? name : `${base}/${name}`;
-  const parts = joined.split("/").filter((part) => part !== "" && part !== ".");
-  return (joined.startsWith("/") ? "/" : "") + parts.join("/");
+  const joined = isAbsolute(name) ? name : `${base}${sep}${name}`;
+  const { root } = parse(joined);
+  const parts = joined
+    .slice(root.length)
+    .split(SEPARATOR)
+    .filter((part) => part !== "" && part !== ".");
+  return root + parts.join(sep);
 }
 
 /** `posixpath.join` for a name that is not absolute. */
 function joinSlash(path: string, name: string): string {
-  return path.endsWith("/") ? path + name : `${path}/${name}`;
+  return ENDS_WITH_SEPARATOR.test(path) ? path + name : `${path}${sep}${name}`;
 }
 
 /** The folder and every folder above it, nearest first. */
@@ -148,12 +157,13 @@ async function joinRealpath(
   }
   let path = start;
   let rest = target;
-  if (rest.startsWith("/")) {
-    rest = rest.slice(1);
-    path = "/";
+  const { root } = parse(rest);
+  if (root !== "") {
+    rest = rest.slice(root.length);
+    path = root;
   }
   while (rest) {
-    const cut = rest.indexOf("/");
+    const cut = rest.search(SEPARATOR);
     const name = cut === -1 ? rest : rest.slice(0, cut);
     rest = cut === -1 ? "" : rest.slice(cut + 1);
     if (name === "" || name === ".") {
@@ -204,8 +214,8 @@ async function joinRealpath(
 async function realpath(filename: string): Promise<string> {
   // The path goes to the walk as it is, never through `resolve`: that would fold a `..` into the
   // component before it, and the kernel, git and Python's `_joinrealpath` follow the symlink first.
-  const absolute = isAbsolute(filename) ? filename : `${process.cwd()}/${filename}`;
-  const [path] = await joinRealpath("/", absolute, new Map(), 0);
+  const absolute = isAbsolute(filename) ? filename : `${process.cwd()}${sep}${filename}`;
+  const [path] = await joinRealpath(parse(absolute).root, absolute, new Map(), 0);
   // Python's `abspath` at the end: lexical, as `resolve` is.
   return resolve(path);
 }
@@ -378,7 +388,7 @@ async function locateFolder(folder: string): Promise<Repository | null> {
   let gitDirPassed: string | null = null; // the first on the way up, where git would stop
   let found: { root: string; entry: string; mode: Stats } | null = null;
   for (const root of withParents(folder)) {
-    const entry = `${root === "/" ? "" : root}/.git`;
+    const entry = join(root, ".git");
     const mode = await entryStat(entry);
     // git walks past a `.git` directory that is no git dir.
     if (mode !== null && !(mode.isDirectory() && !(await gitDirLike(entry)))) {

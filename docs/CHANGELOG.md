@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Folder trust reads paths by the host's own rules (issue #197): `src/agent/claude/trust.ts`
+  split every path on `/` and started its walk at `/`, so on Windows no folder could be matched
+  to a trust record or a repository, and the footer's git and the file lists found none. The
+  walk now starts at the path's own root and splits on the host's separators. The behaviour on
+  macOS and Linux is unchanged. The tests that build a git layout run on Windows in CI, except
+  the ones that name a folder with a trailing space.
 - A second `Start` on a session's setup while the first is applied, and a model picked just
   before `Start` but handled after it, no longer add `This question is no longer open: it was
   already answered, or awaydesk restarted.` under the summary (issue #142): the summary says
