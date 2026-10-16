@@ -16,6 +16,7 @@ function fields(known: Partial<FooterFields> = {}): FooterFields {
     bypass: false,
     model: null,
     effort: null,
+    effortObserved: null,
     folder: null,
     branch: null,
     changes: null,
@@ -75,6 +76,7 @@ test("status fields hold the values the footer shows", () => {
     sessionLimit: { percent: 3, resetsAt: NOW + 2 * HOUR + 10 * MINUTE },
     weekLimit: { percent: 25, resetsAt: null },
     effort: "high",
+    effortObserved: null,
   });
   const shown = formatFooter(data, NOW);
   const lines = formatStatusFields(data, NOW);
@@ -82,6 +84,11 @@ test("status fields hold the values the footer shows", () => {
   for (const line of lines) {
     assert.ok(shown.includes(line.split("`")[1] as string));
   }
+});
+
+test("the footer draws the level a default effort ran at in parentheses", () => {
+  const data = fields({ model: "claude-opus-5-5", effort: "auto", effortObserved: "medium" });
+  assert.equal(formatFooter(data, NOW), "claude-opus-5-5 · *effort* auto (medium)");
 });
 
 test("the footer shows the effort after the model", () => {

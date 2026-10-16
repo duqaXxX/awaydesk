@@ -34,6 +34,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The footer's effort follows the terminal's `/effort` (issue #246, PR #331). A level you fixed
+  shows as it is (`effort low`). When none is fixed, which is the terminal's `auto`, it shows
+  `effort auto` and then `effort auto (medium)`, the level each turn's Stop hook reported; it
+  used to show that level alone, so `!effort auto` read `auto` and the next turn `medium`. A
+  model that takes no effort shows `auto` where it showed `default`. The core keeps the setting
+  (`ThreadSession.effortSetting`) apart from the observed level; `FooterFields.effortObserved`
+  crosses the chat seam beside `effort`, the provider draws the parentheses, and `!status` writes
+  the same text. An agent that declares no `effortDefault` is unchanged. `!status` before the
+  first turn now shows `Effort: auto` where it left the line out.
 - The core no longer reads the effort an `/effort` or `/model` command set from the turn's
   result text (issue #246). The agent seam has a new event, `effort_changed`, said before the
   `turn_ended` of the command's turn, and the Claude back end emits it: it takes the level from

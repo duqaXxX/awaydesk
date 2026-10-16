@@ -619,7 +619,7 @@ test("a report turn is not read as the output of an effort command that waits", 
   await h.sleep(0.05);
   h.clients[0]?.inject(withResult(c.report, "Set effort level to low (this session only): Quick"));
   await h.until(() => inside(session).active === null && inside(session).settled.isSet);
-  assert.equal(inside(session).effort, null);
+  assert.equal(inside(session).effortSetting, null);
 });
 
 test("an effort command s output is read in a turn guessed to be a report", async (t) => {
@@ -633,7 +633,7 @@ test("an effort command s output is read in a turn guessed to be a report", asyn
   const output = "Set effort level to high (this session only): Comprehensive";
   h.clients[0]?.inject(withResult(sdkMessages("usage"), output, "effort"));
   await command.done.wait();
-  assert.equal(inside(session).effort, "high");
+  assert.equal(inside(session).effortSetting, "high");
 });
 
 test("a turn with no replay and no notification waiting is the prompt s", async (t) => {

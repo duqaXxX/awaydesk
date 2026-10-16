@@ -225,6 +225,7 @@ const FOOTER: FooterFields = {
   bypass: false,
   model: "model-a",
   effort: null,
+  effortObserved: null,
   folder: FOLDER,
   branch: null,
   changes: null,

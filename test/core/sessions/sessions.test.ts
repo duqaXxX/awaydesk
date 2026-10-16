@@ -2014,24 +2014,85 @@ test("the footer shows the effort claude code reports", async (t) => {
   writeFileSync(join(h.tmpPath, ".claude", "settings.json"), '{"effortLevel": "high"}');
   await (await h.session().submit("list the files")).done.wait();
   await h.idle(); // the footer is drawn once the session has ended
-  assert.ok(statuses(h).at(-1)?.includes("*effort* medium"));
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto (medium)"));
 });
 
-test("the footer leaves out the effort until claude code reports it", async (t) => {
-  // A local command's turn (`/usage`) runs no Stop hook: the level is not known yet.
+test("the footer says auto, with no level, until claude code reports one", async (t) => {
+  // A local command's turn (`/usage`) runs no Stop hook: the level is not known yet. A session
+  // that never fixed a level is at the terminal's `auto`.
   const h = harnessFor(t)({ turns: [sdkMessages("usage")] });
   await (await h.session().submit("/usage")).done.wait();
   await h.idle(); // the footer is drawn once the session has ended
-  assert.ok(statuses(h).length > 0 && !statuses(h).at(-1)?.includes("effort"));
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto"));
+  assert.ok(!statuses(h).at(-1)?.includes("auto ("));
 });
 
-test("the footer says default when claude code reports no effort", async (t) => {
+test("the footer says auto alone when claude code reports no effort", async (t) => {
   // Claude Code leaves the field out when the model takes no effort parameter.
   const { effort: _effort, ...hookInput } = sdkJson("stop-hook") as JsonObject;
   const h = harnessFor(t)({ turns: [withStopHook(sdkMessages("tools"), hookInput)] });
   await (await h.session().submit("list the files")).done.wait();
   await h.idle(); // the footer is drawn once the session has ended
-  assert.ok(statuses(h).at(-1)?.includes("*effort* default"));
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto"));
+  assert.ok(!statuses(h).at(-1)?.includes("auto ("));
+});
+
+test("a session that never fixed a level shows the level of each turn after auto", async (t) => {
+  const hookInput = sdkJson("stop-hook") as JsonObject; // reports medium
+  const h = harnessFor(t)({ turns: [withStopHook(sdkMessages("tools"), hookInput)] });
+  await (await h.session().submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto (medium)"));
+});
+
+test("the footer follows the effort commands and the level a turn ran at", async (t) => {
+  // The sequence seen in Slack on 2026-10-16: setup low, /effort medium, /effort auto, then a prompt whose
+  // Stop hook reports medium. The terminal reads `auto (currently medium)` for the last.
+  const command = (output: string) => withResult(sdkMessages("usage"), output, "effort");
+  const h = harnessFor(t)({
+    turns: [
+      command("Set effort level to medium (this session only): Balanced"),
+      command("Effort level set to auto (this session only)"),
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  h.state.setEffort(CHANNEL, THREAD, "low");
+  await session.ensureConnected();
+  assert.ok((await session.status()).includes("Effort: `low`"));
+  await (await session.submit("/effort medium")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* medium"));
+  await (await session.submit("/effort auto")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto"));
+  assert.ok(!statuses(h).at(-1)?.includes("auto ("));
+  await (await session.submit("next")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto (medium)"));
+  assert.ok((await session.status()).includes("Effort: `auto (medium)`"));
+});
+
+test("a fixed level survives a turn that reports it", async (t) => {
+  const hookInput = { ...(sdkJson("stop-hook") as JsonObject), effort: { level: "high" } };
+  const h = harnessFor(t)({ turns: [withStopHook(sdkMessages("tools"), hookInput)] });
+  const session = h.session();
+  h.state.setEffort(CHANNEL, THREAD, "high");
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* high"));
+  assert.ok(!statuses(h).at(-1)?.includes("high ("));
+});
+
+test("a resumed session with no stored level shows auto, then auto with the level", async (t) => {
+  const h = harnessFor(t)({
+    turns: [withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject)],
+  });
+  const session = h.session();
+  assert.ok((await session.status()).includes("Effort: `auto`"));
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok((await session.status()).includes("Effort: `auto (medium)`"));
 });
 
 test("an effort set before a restart is not carried over", async (t) => {
@@ -2488,7 +2549,7 @@ test("status lists the footer s values of the latest reply", async (t) => {
   const lines = text.split("\n");
   assert.deepEqual(lines.slice(lines.indexOf("Now: idle") + 1), [
     "Model: `Haiku 4.5`",
-    "Effort: `medium`",
+    "Effort: `auto (medium)`",
     `Session tokens: \`${tokens?.[1]}\``,
     "Context: `7%`",
     "5h limit: `5%`",
@@ -2503,7 +2564,7 @@ test("status before any turn starts the client and leaves out the tokens", async
   assert.ok(text.includes(`Claude Code: \`${texts.VERSION_PENDING}\``));
   assert.ok(text.includes("Model: `Haiku 4.5`") && text.includes("Context: `7%`"));
   // Only a turn's Stop hook, or `/effort`, reports the level: the settings do not say it.
-  assert.ok(!text.includes("Session tokens") && !text.includes("Effort"));
+  assert.ok(!text.includes("Session tokens") && !text.includes("auto ("));
   // No session exists yet, so there is nothing the terminal could fork (#12).
   assert.ok(text.includes("Session: `new`\nMode: ") && !text.includes("Terminal:"));
 });
@@ -2664,12 +2725,12 @@ test("status after claude code restarts leaves out the old process s tokens", as
   const session = h.session();
   await (await session.submit("list the files")).done.wait();
   let text = await session.status();
-  assert.ok(text.includes("Session tokens") && text.includes("Effort: `medium`"));
+  assert.ok(text.includes("Session tokens") && text.includes("Effort: `auto (medium)`"));
   h.clients[0]?.inject([END_OF_STREAM]);
   await h.until(() => inside(session).client === null);
   text = await session.status();
   assert.ok(h.clients.length === 2 && text.includes("Context: `7%`"));
-  assert.ok(!text.includes("Session tokens") && !text.includes("Effort"));
+  assert.ok(!text.includes("Session tokens") && !text.includes("auto ("));
 });
 
 test("status says claude code s error when it fails to start", async (t) => {

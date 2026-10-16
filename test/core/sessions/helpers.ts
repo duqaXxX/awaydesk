@@ -41,7 +41,7 @@ export interface Inside {
   unlanded: Set<Reply>;
   waiting: Set<string>;
   settled: Event;
-  effort: string | null;
+  effortSetting: string | null;
   injectedExpected: boolean;
   notificationWaits: boolean;
   reportDue: boolean;

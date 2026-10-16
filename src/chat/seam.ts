@@ -81,7 +81,13 @@ export interface TaskUpdate {
 export interface FooterFields {
   readonly bypass: boolean;
   readonly model: string | null;
+  /** A fixed level, or the agent's word for its default. */
   readonly effort: string | null;
+  /**
+   * The level the last turn ran at, set only when `effort` is the agent's word for its default:
+   * a provider draws it beside that word. Null when no turn has reported one.
+   */
+  readonly effortObserved: string | null;
   /** The folder the thread was opened in. */
   readonly folder: string | null;
   readonly branch: string | null;

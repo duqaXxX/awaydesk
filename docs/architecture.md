@@ -960,9 +960,16 @@ hook (`effort.level`, the event `effort_observed`); `/effort` and `/model` run n
 of them the footer follows the event `effort_changed`, which the Claude back end reads from the
 output of the command (`Set effort level to ...`, `translate.effortChanged`) in the result that
 names the command in `local_command`. A model change that names no level says null.
-Until Claude Code reports a level on the running process the footer leaves it out, unless the daemon
-itself just set a stored level, which shows at once; when the model takes no effort parameter it
-shows `default`. The limits come from the agent (`AgentBackend.usageLimits`, present with the
+The core keeps the owner's setting (`ThreadSession.effortSetting`: a fixed level, or null for the
+agent's default) apart from the level the last turn ran at (`ThreadSession.effort`), and
+`ThreadSession.effortFields` builds the footer from both. A fixed level shows as itself (the level
+a turn reports instead, if it differs, since that ran). With the default, the footer shows the
+agent's word for it (`Capabilities.effortDefault`; Claude: `auto`) in `FooterFields.effort`, and
+the observed level in `FooterFields.effortObserved`, which the Slack footer draws as
+`auto (medium)`, as the terminal's `/effort` reads `auto (currently medium)`; a model that takes
+no effort parameter leaves `auto` alone. An agent with no default word shows the observed level
+alone, left out until reported, unless the daemon itself just set a stored level, and `default`
+for a model that takes none. The limits come from the agent (`AgentBackend.usageLimits`, present with the
 capability `usageLimits`); for Claude they are Claude Code's `/usage`, sent on a long-lived session
 of its own, started in the home directory with none of the owner's setting sources, without the
 permission to bypass and without the Chrome flag (`UsageProbe`, over `ClaudeBackend.startBare`).

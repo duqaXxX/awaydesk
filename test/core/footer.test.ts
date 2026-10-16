@@ -41,6 +41,7 @@ function fields(known: Partial<FooterFields> = {}): FooterFields {
     bypass: false,
     model: null,
     effort: null,
+    effortObserved: null,
     folder: null,
     branch: null,
     changes: null,
@@ -72,6 +73,7 @@ test("status fields list the footer s values one per line", () => {
     sessionLimit: { percent: 3, resetsAt: NOW + 2 * HOUR + 10 * MINUTE },
     weekLimit: { percent: 25, resetsAt: null },
     effort: "high",
+    effortObserved: null,
     folder: "/work/personal/app",
   });
   // Bypass and the folder are left out: the status's Mode and Directory lines show them.
@@ -292,4 +294,9 @@ test("git is bounded by one time limit for all its calls", async () => {
   const started = Date.now();
   assert.deepEqual(await gitState(join(tmp, "folder"), () => never, 50), [null, null]);
   assert.ok(Date.now() - started < 2_000);
+});
+
+test("status fields write a default effort with the level it ran at", () => {
+  const data = fields({ effort: "auto", effortObserved: "medium" });
+  assert.deepEqual(formatStatusFields(data, NOW), ["Effort: `auto (medium)`"]);
 });

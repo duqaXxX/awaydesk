@@ -47,6 +47,8 @@ export interface FooterField {
   readonly key: FooterKey;
   readonly label: string;
   readonly value: string;
+  /** What a provider draws beside the value (the level a default effort ran at); null for none. */
+  readonly detail?: string | null;
 }
 
 /**
@@ -336,7 +338,12 @@ export function footerFields(data: FooterFields, now: number): FooterField[] {
     fields.push({ key: "model", label: "Model", value: data.model });
   }
   if (data.effort) {
-    fields.push({ key: "effort", label: "Effort", value: data.effort });
+    fields.push({
+      key: "effort",
+      label: "Effort",
+      value: data.effort,
+      detail: data.effortObserved,
+    });
   }
   if (data.branch) {
     fields.push({ key: "branch", label: "Branch", value: data.branch });
@@ -375,10 +382,15 @@ export function footerFields(data: FooterFields, now: number): FooterField[] {
   return fields;
 }
 
+/** `auto (medium)`: a value and what it ran at, or the value alone. */
+export function valueWithDetail(field: FooterField): string {
+  return !field.detail ? field.value : `${field.value} (${field.detail})`;
+}
+
 /**
  * The footer's values as `!status` lines, one per field; bypass and the folder are left out,
  * since the status's Mode and Directory lines already show them.
  */
 export function formatStatusFields(data: FooterFields, now: number): string[] {
-  return footerFields(data, now).map((field) => `${field.label}: \`${field.value}\``);
+  return footerFields(data, now).map((field) => `${field.label}: \`${valueWithDetail(field)}\``);
 }

@@ -307,11 +307,16 @@ export class ThreadSession {
   // then whatever the agent reports (`dispatch`).
   mode: string;
   cliVersion: string | null = null;
-  // The effort level the agent last reported (`effort_observed`, or `effort_changed` after a
-  // command of the owner's). Null for a model without effort.
+  // The level the owner fixed (setup, `/effort`, `/model ... with X effort`, the stored one), or
+  // null for the agent's default. Kept apart from `effort`: a default setting still runs at some
+  // level, and the footer says both (`auto (medium)`), as the terminal's `/effort` does.
+  effortSetting: string | null = null;
+  // The level the last turn ran at (`effort_observed`), cleared by a command that sets the
+  // effort. Null for a model without effort, and until a turn has reported one.
   effort: string | null = null;
-  // Whether the agent has reported the level since the client started: until then it is not
-  // known, since the settings do not decide it (measured 2026-09-25).
+  // Whether an agent without a word for its default has said anything about the level since the
+  // client started (a report or a command): until then it is not known, since the settings do
+  // not decide it (measured 2026-09-25).
   effortReported = false;
   // Where the session works as its hooks last reported (`cwd` follows a `cd` and a worktree;
   // Stop and PostToolUse measured 2026-09-27 on 2.1.283); null until then: `directory`.
@@ -889,7 +894,8 @@ export class ThreadSession {
       // unless the daemon itself just asked for a stored level: that request is shown at once,
       // until the agent's own report (every turn ends with one) corrects it.
       const requested = this.validEffort(effort);
-      this.effort = requested;
+      this.effortSetting = requested;
+      this.effort = null;
       this.effortReported = requested !== null;
       this.workingDirectory = null; // the new process starts in the bound folder
       this.sessionTokens = null; // counted by the client process, which starts at zero
@@ -1034,7 +1040,8 @@ export class ThreadSession {
     }
     await client.setEffort(level);
     this.clientEffort = effort;
-    this.effort = level;
+    this.effortSetting = level;
+    this.effort = null;
     this.effortReported = level !== null;
   }
 
@@ -1693,7 +1700,8 @@ export class ThreadSession {
         this.effortReported = true;
         return;
       case "effort_changed":
-        this.effort = event.level;
+        // What ran before the command is no longer what runs: the next turn reports the level.
+        this.effort = null;
         this.effortReported = true;
         // Stored so the next connect can pass it back (a model set by command survives a
         // resume by itself; effort does not). A null level means "unknown" (a model change
@@ -1702,7 +1710,8 @@ export class ThreadSession {
         // stored as none.
         if (event.level !== null) {
           const reset = event.level === this.deps.agent.capabilities.effortDefault;
-          this.deps.state.setEffort(this.channelId, this.threadId, reset ? null : event.level);
+          this.effortSetting = reset ? null : event.level;
+          this.deps.state.setEffort(this.channelId, this.threadId, this.effortSetting);
         }
         return;
       case "folder_changed":
@@ -3106,6 +3115,25 @@ export class ThreadSession {
   }
 
   /**
+   * What the footer says of the effort. A fixed level shows as it is, unless a turn ran at
+   * another one (that is what ran). The default shows as the agent's word for it, with the level
+   * of the last turn beside it once there is one, as the terminal's `/effort` reads
+   * `auto (currently medium)`. An agent with no such word shows the level alone, once known, and
+   * `default` for a model that takes none.
+   */
+  private effortFields(): Pick<FooterFields, "effort" | "effortObserved"> {
+    const word = this.deps.agent.capabilities.effortDefault;
+    if (this.effortSetting !== null) {
+      return { effort: this.effort ?? this.effortSetting, effortObserved: null };
+    }
+    if (word !== null) return { effort: word, effortObserved: this.effort };
+    return {
+      effort: this.effortReported ? this.effort || "default" : null,
+      effortObserved: null,
+    };
+  }
+
+  /**
    * The footer's values from what the session knows now and `tokens`: the one source for both
    * the footer and `!status`, so the two never disagree.
    */
@@ -3127,7 +3155,7 @@ export class ThreadSession {
     return {
       bypass: this.bypass,
       model: context.model === null ? null : modelName(this.models, context.model),
-      effort: this.effortReported ? this.effort || "default" : null,
+      ...this.effortFields(),
       folder: this.directory,
       branch,
       changes,
