@@ -866,7 +866,7 @@ its code block. A clarifying question (Claude Code's `AskUserQuestion` tool, 1 t
 arrives the same way and is posted as one line naming the questions, with **Answer** and **Skip**.
 Answer opens a modal (`requests.questionView`) that shows one question at a time, since Slack has no
 tabs: radio buttons, or checkboxes when several may be picked, each option with its description, and
-an **Other** field, as the terminal offers. Slack caps an option object's text and description at 75
+an **Other** field and a **Notes** field, as the terminal offers. Slack caps an option object's text and description at 75
 characters each and gives it no place for the option's `preview`. When an option says more than
 that, the page shows the question in bold, then every option whole in a `rich_text` block: its label
 in bold, its full description, and its preview in a preformatted element, which keeps its line
@@ -875,9 +875,18 @@ under them keeps the labels alone, titled with the question's header. The modal'
 `Next (1/3)` and moves on (`response_action: update`) only once the question has an answer,
 otherwise the question gets an error (`response_action: errors`); it reads `Submit` on the last.
 What was filled travels in the view's `private_metadata` (`requests.Draft`, under Slack's 3,000
-characters) from one question to the next. The picked labels, with the text typed under Other as the
-answer itself, go back as the tool's answers, a multi-select's as a list (measured: "Multi-select
-answer as a list"). The modal carries no channel or thread: each click in it is checked against the
+characters) from one question to the next, with Other limited to `TYPED_LIMIT` and Notes to
+`NOTES_LIMIT` characters so that four full questions fit. The picked labels, with the text typed
+under Other as the answer itself, go back as the tool's answers, a multi-select's as a list
+(measured: "Multi-select answer as a list"). In a single select an option and a text under Other
+exclude each other, as in the terminal, where the typed text replaces the option: the two blocks
+dispatch an action on every change and the provider empties the other one (`requests.excluding`),
+while a multi-select adds the text to the labels and clears nothing. Notes are optional and travel
+to the agent as that question's `notes`, in the tool's `annotations` beside the answers
+(`requests.questionResult`); with a single-select option that has a preview, the annotation
+carries the preview too, as the terminal does. A question counts as answered with an option, a
+text under Other or notes alone, and a question answered with notes alone reads
+`(notes only)` in the record. The modal carries no channel or thread: each click in it is checked against the
 owner, the workspace, and the channel and thread its request was posted in (`Draft.threadTs`,
 alongside its `private_metadata`). Each request has a random id that only its buttons carry
 (`Approvals.open`). The listener reads a click or a form into an `OwnerAnswer` and, after the

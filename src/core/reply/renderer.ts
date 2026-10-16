@@ -365,8 +365,9 @@ export class TurnRenderer {
     callId: string,
     questions: readonly Pick<Question, "text">[],
     answers: Readonly<Record<string, string | readonly string[]>>,
+    notes: Readonly<Record<string, string>>,
   ): boolean {
-    const shown = answered(questions, answers, this.#names);
+    const shown = answered(questions, answers, notes, this.#names);
     if (shown === null || !this.#lines.has(callId)) return false;
     this.#answers.set(callId, shown);
     return true;

@@ -207,7 +207,7 @@ const REQUESTS: ReadonlyArray<{
     name: "question",
     control: "form",
     request: question,
-    answer: { type: "question", answers: { [QUESTION.text]: "red" } },
+    answer: { type: "question", answers: { [QUESTION.text]: "red" }, notes: {} },
   },
   { name: "hold", control: "click", request: hold, answer: { type: "hold", send: true } },
   {
@@ -596,7 +596,7 @@ export function chatConformance(
       check("keepAnswers leaves the record of the answers and nothing to press", async (s) => {
         const thread = s.provider.thread(s.ref);
         const id = await thread.ask("request-answered", question(), "A question");
-        await thread.keepAnswers(id, [QUESTION], { [QUESTION.text]: "blue" });
+        await thread.keepAnswers(id, [QUESTION], { [QUESTION.text]: "blue" }, {});
         const shown = s.rig.read(s.ref).find((m) => m.id === id);
         assert.ok(shown, "the record stays in the thread");
         assert.equal(shown.pressable, false);
@@ -1063,7 +1063,7 @@ export function chatConformance(
         const thread = s.provider.thread(s.ref);
         const request = question();
         const message = await thread.ask("request-skipped", request, "A question");
-        const skip: OwnerAnswer = { type: "question", answers: null };
+        const skip: OwnerAnswer = { type: "question", answers: null, notes: {} };
         await s.rig.owner.answers(
           { ref: s.ref, requestId: "request-skipped", request, message },
           skip,

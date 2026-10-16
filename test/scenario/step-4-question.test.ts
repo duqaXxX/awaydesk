@@ -38,7 +38,7 @@ test("the agent asks a question with two options, the owner answers and the agen
 
   const answer = { "Which colour?": "blue" };
   assert.equal(
-    await world.owner.answers(asked.requestId, { type: "question", answers: answer }),
+    await world.owner.answers(asked.requestId, { type: "question", answers: answer, notes: {} }),
     true,
   );
   await world.ended(thread);
@@ -46,7 +46,7 @@ test("the agent asks a question with two options, the owner answers and the agen
   // The agent got the answer, once, as the owner gave it.
   assert.deepEqual(
     world.plain.sessions[1]?.answers.map((a) => a.answer),
-    [{ answered: true, answers: answer }],
+    [{ answered: true, answers: answer, notes: {} }],
   );
 
   // The request is gone and the answer stays in the reply, under the line of the call that asked.
@@ -66,7 +66,7 @@ test("a question the owner skips ends the call with the daemon's words", async (
   const thread = await world.open("pick one");
   const asked = await world.request("question", thread);
 
-  await world.owner.answers(asked.requestId, { type: "question", answers: null });
+  await world.owner.answers(asked.requestId, { type: "question", answers: null, notes: {} });
   await world.ended(thread);
 
   assert.deepEqual(

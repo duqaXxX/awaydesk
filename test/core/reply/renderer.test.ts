@@ -1453,11 +1453,11 @@ test("a reply keeps the answers of a question it holds the line of, and shows th
   const renderer = new TurnRenderer(sink, NAMES);
   const questions = [{ text: "Which color do you prefer?" }];
   const answers = { "Which color do you prefer?": "Blue" };
-  assert.equal(renderer.answered("toolu_unseen", questions, answers), false);
+  assert.equal(renderer.answered("toolu_unseen", questions, answers, {}), false);
   for (const event of events) {
     if (event.type === "call_ended") {
-      assert.equal(renderer.answered(event.callId, questions, {}), false); // no answer to show
-      assert.equal(renderer.answered(event.callId, questions, answers), true);
+      assert.equal(renderer.answered(event.callId, questions, {}, {}), false); // no answer to show
+      assert.equal(renderer.answered(event.callId, questions, answers, {}), true);
     }
     await renderer.feed(event);
   }

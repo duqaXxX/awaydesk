@@ -46,6 +46,7 @@ import {
   clipInfo,
   clipMessage,
   FORM_THREAD,
+  formAction,
   formBody,
   HOME_THREAD,
   homeAction,
@@ -116,6 +117,30 @@ const CASES: readonly Case[] = [
       return { body, acted: () => world.slack.callsTo("views.open").length > 0 };
     },
   },
+  ...(["answer", "other"] as const).map(
+    (actionId): Case => ({
+      listener: `action ${actionId}`,
+      arrange: async (world, sender) => {
+        const question = QUESTIONS[0] as (typeof QUESTIONS)[number];
+        const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [question]);
+        new ModalSlack(world.slack);
+        // An option and a text both stand: the change empties the one that was not just made.
+        const values = {
+          ...picked(0, "0"),
+          o0: { other: { type: "plain_text_input", value: "mauve" } },
+        };
+        const body = formAction(newDraft(approvalId, CHANNEL, FORM_THREAD), [question], values, {
+          id: actionId,
+          block: actionId === "answer" ? "q0" : "o0",
+          type: actionId === "answer" ? "radio_buttons" : "plain_text_input",
+        });
+        return {
+          body: sentBy(body, sender),
+          acted: () => world.slack.callsTo("views.update").length > 0,
+        };
+      },
+    }),
+  ),
   {
     listener: "view question_form",
     arrange: async (world, sender) => {
@@ -334,7 +359,6 @@ const ACKNOWLEDGE_ONLY: ReadonlyArray<
 > = [
   [`action ${SETUP_EFFORT}`, (sender) => sentBy(click(SETUP_EFFORT, "high"), sender)],
   [`action ${SETUP_BYPASS}`, (sender) => sentBy(click(SETUP_BYPASS, "bypass"), sender)],
-  ["action answer", (sender) => sentBy(click("answer", "0"), sender)],
   [
     `action ${NEW_THREAD_ACTION}`,
     (sender) => homeBy({ type: "button", action_id: NEW_THREAD_ACTION, value: "x" }, sender),

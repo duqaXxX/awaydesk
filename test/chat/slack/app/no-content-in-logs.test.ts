@@ -87,6 +87,7 @@ test("no log line at any level holds a prompt, a reply or an owner's word", asyn
   assert.deepEqual(await pending.decision, {
     answered: true,
     answers: { "Colour?": "blue", "Sizes?": ["s", OTHER] },
+    notes: {},
   });
   await world.idle();
 

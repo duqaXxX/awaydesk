@@ -120,6 +120,8 @@ export const QUESTION_WHERE = "{number} of {count}";
 export const QUESTION_NEXT = "Next ({number}/{count})";
 export const QUESTION_OTHER = "Other";
 export const QUESTION_OTHER_HINT = "Or type your own answer";
+export const QUESTION_NOTES = "Notes";
+export const QUESTION_NOTES_HINT = "Add notes to your answer";
 export const APPROVAL_CUT =
   "_{count} characters of this request are not shown: Deny it unless you know them._";
 export const RESUME_EMPTY = "No sessions in `{directory}` yet.";

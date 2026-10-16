@@ -1102,6 +1102,7 @@ test("a complete submit answers claude and leaves the request to the session", a
   assert.deepEqual(await pending.decision, {
     answered: true,
     answers: { "Colour?": "blue", "Sizes?": ["s", "xl"] },
+    notes: {},
   });
   // The session that asked decides what becomes of the request (`keepAnswers`): its reply
   // keeps the answers and the request goes, or the request itself becomes the record.
@@ -2148,7 +2149,7 @@ test("long answers fit slack s limit", () => {
     options: [],
   }));
   const answers = { ["q".repeat(900)]: "a".repeat(300) };
-  const blocks = answeredBlocks(questions, answers, NAMES) as Body[];
+  const blocks = answeredBlocks(questions, answers, {}, NAMES) as Body[];
   assert.equal(blocks.length, 1);
   assert.ok(Array.from(blocks[0]?.elements[0].text as string).length <= SECTION_LIMIT);
 });

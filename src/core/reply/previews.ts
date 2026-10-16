@@ -15,6 +15,7 @@ import {
   ANSWERED,
   fill,
   type Names,
+  NOTES_ONLY,
   named,
   TASK_LAUNCHED,
   TASKS_LAUNCHED,
@@ -235,18 +236,21 @@ function changed(added: number, removed: number): string {
 
 /**
  * The answers to a question as the terminal keeps them: a line per question that has one,
- * `· question → answer`, a multi-select's answers joined by commas. Null with no answer.
- * `names` fill the title, which names who wrote the questions.
+ * `· question → answer`, a multi-select's answers joined by commas, and `(notes only)` for a
+ * question that has notes and no answer. Null with nothing to show. `names` fill the title,
+ * which names who wrote the questions.
  */
 export function answered(
   questions: readonly Pick<Question, "text">[],
   answers: Readonly<Record<string, string | readonly string[]>>,
+  notes: Readonly<Record<string, string>>,
   names: Names,
 ): Preview | null {
   const lines: string[] = [];
   for (const question of questions) {
     const answer = Object.hasOwn(answers, question.text) ? (answers[question.text] ?? "") : "";
-    const said = typeof answer === "string" ? answer : answer.join(", ");
+    let said = typeof answer === "string" ? answer : answer.join(", ");
+    if (said === "" && Object.hasOwn(notes, question.text)) said = NOTES_ONLY;
     if (said !== "") {
       // One line each, however the question or a typed answer was written.
       lines.push(`· ${spaced(question.text)} → ${spaced(said)}`);

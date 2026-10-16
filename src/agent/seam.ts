@@ -479,13 +479,15 @@ export interface QuestionRequest {
 }
 
 /**
- * The answer to each question by its text: one answer, or the several of a multi-select. Or
- * skipped, with what the agent is told.
+ * The answer to each question by its text: one answer, or the several of a multi-select; and the
+ * notes the owner added to a question, only the non-empty ones. A question answered with notes
+ * alone has a key in `notes` and none in `answers`. Or skipped, with what the agent is told.
  */
 export type QuestionAnswer =
   | {
       readonly answered: true;
       readonly answers: Readonly<Record<string, string | readonly string[]>>;
+      readonly notes: Readonly<Record<string, string>>;
     }
   | { readonly answered: false; readonly message: string };
 

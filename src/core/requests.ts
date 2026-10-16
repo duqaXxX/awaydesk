@@ -17,6 +17,7 @@ export type Outcome =
   | {
       readonly kind: "answer";
       readonly answers: Readonly<Record<string, string | readonly string[]>>;
+      readonly notes: Readonly<Record<string, string>>;
     };
 
 export const APPROVE: Outcome = { kind: "approve" };
@@ -36,7 +37,7 @@ export function toAnswer(
 ): Decision {
   switch (outcome.kind) {
     case "answer":
-      return { answered: true, answers: outcome.answers };
+      return { answered: true, answers: outcome.answers, notes: outcome.notes };
     case "approve":
       return { allow: true };
     case "deny":

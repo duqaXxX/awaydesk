@@ -54,7 +54,12 @@ import {
 } from "../../src/chat/slack/openfile/modal.ts";
 import { type Limiter, UpdateLimiter } from "../../src/chat/slack/reply/limiter.ts";
 import { resetStatusFlags } from "../../src/chat/slack/reply/status.ts";
-import { type Draft, dumpDraft } from "../../src/chat/slack/requests.ts";
+import {
+  type Draft,
+  dumpDraft,
+  QUESTION_FORM,
+  questionView,
+} from "../../src/chat/slack/requests.ts";
 import {
   SETUP_BLOCK,
   SETUP_BYPASS,
@@ -737,6 +742,37 @@ export function formBody(kind: string, draft: Draft, values: Body, user: Body = 
 
 export function picked(index: number, value: string): Body {
   return { [`q${index}`]: { answer: { type: "radio_buttons", selected_option: { value } } } };
+}
+
+/**
+ * What Slack sends when a control of the question form dispatches an action (the block_actions
+ * payload of a modal, from the reference read 2026-10-16: `container.type` "view", the `view`
+ * with `id`, `hash`, `private_metadata` and `state.values`, and the action that fired). `blocks`
+ * are the form's own, as it stands on screen.
+ */
+export function formAction(
+  draft: Draft,
+  questions: readonly Question[],
+  values: Body,
+  action: { readonly id: string; readonly block: string; readonly type: string },
+  options: { readonly hash?: string; readonly user?: Body } = {},
+): Body {
+  const body = viewEvent("block_actions", values, {
+    metadata: dumpDraft(draft),
+    blocks: questionView(draft, questions, NAMES).blocks as Body[],
+    viewHash: options.hash ?? "1790000000.h0",
+  });
+  body.view.callback_id = QUESTION_FORM;
+  body.actions = [
+    {
+      type: action.type,
+      block_id: action.block,
+      action_id: action.id,
+      action_ts: "1790000100.000000",
+    },
+  ];
+  Object.assign(body.user, options.user ?? {});
+  return body;
 }
 
 /** Two stored sessions of the channel's folder: one titled, one named by its first prompt. */

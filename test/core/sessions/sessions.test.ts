@@ -452,7 +452,7 @@ test("ask user question returns answers", async (t) => {
   const turn = await h.session().submit("ask me");
   await h.until(() => pending(h.approvals).length > 0);
   const answers = firstOptions(recorded.questions);
-  resolve(h, { kind: "answer", answers });
+  resolve(h, { kind: "answer", answers, notes: {} });
   await turn.done.wait();
   const result = at(h.clients[0]?.permissionResults ?? [], 0);
   assert.ok("answered" in result && result.answered);
@@ -498,7 +498,7 @@ test("an answered question stays in the reply and its request goes", async (t) =
   await h.until(() => pending(h.approvals).length > 0);
   const requestTs = at(h.slack.postedTs, -1);
   assert.deepEqual(thread(h).requests, [requestTs]);
-  resolve(h, { kind: "answer", answers: firstOptions(questions) });
+  resolve(h, { kind: "answer", answers: firstOptions(questions), notes: {} });
   await turn.done.wait();
   assert.deepEqual(
     h.slack.callsTo("chat.delete").map((args) => args.ts),
@@ -530,7 +530,7 @@ test("answers the reply cannot show stay in the request", async (t) => {
   const turn = await h.session().submit("ask me");
   await h.until(() => pending(h.approvals).length > 0);
   const requestTs = at(h.slack.postedTs, -1);
-  resolve(h, { kind: "answer", answers: firstOptions(recorded.questions) });
+  resolve(h, { kind: "answer", answers: firstOptions(recorded.questions), notes: {} });
   await turn.done.wait();
   assert.deepEqual(h.slack.callsTo("chat.delete"), []);
   const [update, ...more] = h.slack.callsTo("chat.update").filter((args) => args.ts === requestTs);
@@ -555,7 +555,7 @@ test("a record slack refuses removes the request", async (t) => {
   await h.until(() => pending(h.approvals).length > 0);
   const requestTs = at(h.slack.postedTs, -1);
   h.slack.responses["chat.update"] = { ok: false, error: "msg_too_long" };
-  resolve(h, { kind: "answer", answers: firstOptions(recorded.questions) });
+  resolve(h, { kind: "answer", answers: firstOptions(recorded.questions), notes: {} });
   await h.until(() => h.slack.callsTo("chat.delete").length > 0);
   // Its buttons would no longer work: the request goes.
   assert.deepEqual(
@@ -659,7 +659,7 @@ test("no reply ever carries a channel mention", async (t) => {
   const approvalId = at(pending(h.approvals), 0);
   resolve(h, APPROVE);
   await h.until(() => pending(h.approvals).some((id) => id !== approvalId));
-  resolve(h, { kind: "answer", answers: firstOptions(recorded.questions) });
+  resolve(h, { kind: "answer", answers: firstOptions(recorded.questions), notes: {} });
   await turn.done.wait();
   for (const call of h.slack.apiCalls) {
     assert.ok(!JSON.stringify(call.args).includes("<!channel>"));
@@ -682,7 +682,7 @@ test("a turn with a task an approval and a question is one stream, two requests 
   const approvalId = at(pending(h.approvals), 0);
   resolve(h, APPROVE);
   await h.until(() => pending(h.approvals).some((id) => id !== approvalId));
-  resolve(h, { kind: "answer", answers: firstOptions(recorded.questions) });
+  resolve(h, { kind: "answer", answers: firstOptions(recorded.questions), notes: {} });
   await turn.done.wait();
   await h.until(() => h.slack.callsTo("chat.stopStream").length > 0);
   h.clients[0]?.inject([...notice, ...injected]);

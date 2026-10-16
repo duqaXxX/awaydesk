@@ -14,12 +14,16 @@ import { describe } from "../reply/errors.ts";
 import {
   APPROVAL_ALLOW,
   absorb,
+  blockIdIn,
   type Draft,
   draftAnswers,
+  excluding,
+  type Field,
   firstUnanswered,
   isAnswered,
   loadDraft,
   newDraft,
+  QUESTION_FORM,
   QUESTION_SKIP,
   questionView,
   refusedView,
@@ -161,7 +165,7 @@ export class Requests {
     const action = firstAction(body);
     const answer: OwnerAnswer =
       action.action_id === QUESTION_SKIP
-        ? { type: "question", answers: null }
+        ? { type: "question", answers: null, notes: {} }
         : { type: "permission", allow: action.action_id === APPROVAL_ALLOW };
     await this.parts.inbound.answer(
       { channel, thread: threadTs },
@@ -171,10 +175,62 @@ export class Requests {
     );
   };
 
-  /** A menu inside a question: its value is read when Submit is clicked. */
-  onAnswer = async (ack: Ack): Promise<void> => {
+  /**
+   * A change in the form of a single select, dispatched by Slack with the form's state (block
+   * reference, input block `dispatch_action` and `dispatch_action_config`; block_actions payload
+   * reference; `views.update`, all read 2026-10-16): an option picked while a text stands under
+   * Other, or a character typed there while an option stands. The one that was not just changed
+   * is emptied in a single `views.update`; typing then goes on with no further call. `hash`
+   * makes a stale payload (the keystroke after the first) a `hash_conflict`, which is ignored.
+   * Submit reads the state again, so a missed update costs a second click on the right field.
+   */
+  private onQuestionLive = async (ack: Ack, body: Payload, changed: Field): Promise<void> => {
     await ack();
+    const { approvals, identity, slack } = this.parts;
+    const [user, team] = interactionActor(body);
+    // (sync) The owner and the workspace, as on Next; the channel is checked at Submit.
+    if (!isOwner(identity, user, team)) {
+      logger.info("ignored an inbound event from someone other than the owner");
+      return;
+    }
+    const view = record(body.view);
+    if (view.callback_id !== QUESTION_FORM) return;
+    let draft: Draft;
+    try {
+      draft = loadDraft(str(view.private_metadata));
+    } catch {
+      return;
+    }
+    const questions = approvals.questions(draft.approvalId, draft.channelId, draft.threadTs);
+    if (questions === null) return;
+    const cleared = excluding(absorb(draft, record(view.state).values), questions, changed);
+    const viewId = text(view.id);
+    if (cleared === null || viewId === null || this.answers.stopped) return;
+    const hash = text(view.hash);
+    try {
+      await slack.views.update({
+        view_id: viewId,
+        ...(hash === null ? {} : { hash }),
+        view: questionView(cleared, questions, this.parts.names) as unknown as ModalView,
+      });
+    } catch (error) {
+      if (isCancelled(error)) throw error;
+      // hash_conflict (a newer payload moved the form on) or not_found (closed): Submit reads
+      // the state as it stands.
+      logger.warning(`could not update the question form: ${describe(error)}`);
+    }
   };
+
+  /**
+   * An option picked in a single select's form. A multi-select's checkboxes dispatch nothing;
+   * their values are read when Submit is clicked.
+   */
+  onQuestionChoice = (ack: Ack, body: Payload): Promise<void> =>
+    this.onQuestionLive(ack, body, "choice");
+
+  /** A character typed under Other in a single select's form. */
+  onQuestionOther = (ack: Ack, body: Payload): Promise<void> =>
+    this.onQuestionLive(ack, body, "other");
 
   /**
    * Answer, on a question of Claude's: opens the form, then checks the channel. The form shows
@@ -263,7 +319,7 @@ export class Requests {
     if (!isAnswered(draft, questions, draft.active)) {
       await ack({
         response_action: "errors",
-        errors: { [`q${draft.active}`]: slackTexts.QUESTION_MISSING },
+        errors: { [blockIdIn(draft, "choice", draft.active)]: slackTexts.QUESTION_MISSING },
       });
       return;
     }
@@ -281,14 +337,14 @@ export class Requests {
 
     await ack();
     if (!(await this.answers.admitted(user, team, draft.channelId, draft.threadTs))) return;
-    const answers = draftAnswers(draft, questions);
-    if (answers === null) throw new Error("a draft with every question answered has no answers");
+    const given = draftAnswers(draft, questions);
+    if (given === null) throw new Error("a draft with every question answered has no answers");
     // The form is no message of the thread: the session that asked decides what becomes of the
     // request message (`ThreadSession` keeps the answers in the reply, or in the request).
     await this.parts.inbound.answer(
       { channel: draft.channelId, thread: draft.threadTs },
       draft.approvalId,
-      { type: "question", answers },
+      { type: "question", ...given },
       null,
     );
   };

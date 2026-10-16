@@ -90,7 +90,7 @@ test("a thread's answered question names the agent the provider was given", asyn
     questions,
   } as const;
   const ts = await thread.ask("request-1", request, "a question");
-  await thread.keepAnswers(ts, questions, { "Colour?": "Red" });
+  await thread.keepAnswers(ts, questions, { "Colour?": "Red" }, {});
   const [asked] = slack.callsTo("chat.postMessage");
   assert.match(JSON.stringify(asked?.blocks), /Other Agent has a question/);
   const [update] = slack.callsTo("chat.update");

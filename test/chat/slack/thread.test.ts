@@ -263,14 +263,14 @@ test("an answered question is rewritten on the budget every reply draws from", a
   const { slack, limiter, thread } = made();
   const ts = await thread.ask("approval-2", QUESTION, "AskUserQuestion");
   const answers = { "Which colour?": "Red" };
-  await thread.keepAnswers(ts, QUESTION.questions, answers);
+  await thread.keepAnswers(ts, QUESTION.questions, answers, {});
   const [update, ...more] = slack.callsTo("chat.update");
   assert.equal(more.length, 0);
   assert.deepEqual(update, {
     channel: CHANNEL,
     ts,
     text: named(texts.ANSWERED, NAMES),
-    blocks: JSON.parse(JSON.stringify(answeredBlocks(QUESTION.questions, answers, NAMES))),
+    blocks: JSON.parse(JSON.stringify(answeredBlocks(QUESTION.questions, answers, {}, NAMES))),
   });
   // One token, taken before the update was sent.
   assert.equal(limiter.acquired, 1);
@@ -282,7 +282,7 @@ test("a rewrite slack refuses rejects with a chat error named by slacks code", a
   const ts = await thread.ask("approval-2", QUESTION, "AskUserQuestion");
   slack.responses["chat.update"] = rejected("msg_too_long");
   await assert.rejects(
-    thread.keepAnswers(ts, QUESTION.questions, { "Which colour?": "Red" }),
+    thread.keepAnswers(ts, QUESTION.questions, { "Which colour?": "Red" }, {}),
     (error: unknown) => error instanceof ChatError && error.name === "msg_too_long",
   );
 });

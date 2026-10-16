@@ -5,6 +5,18 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- The question form takes a text under Other and optional Notes in every question (issue #325).
+  In a single select an option and a text under Other exclude each other, live, as in the
+  terminal where the typed text replaces the option: picking an option empties Other and typing
+  there empties the radio, in one `views.update`. A multi-select clears nothing. Notes reach the
+  agent as that question's `annotations` entry beside the answers, with the preview of the option
+  picked for a single select; a question answered with notes alone has no answer and reads
+  `(notes only)` in the record. A question counts as answered with an option, a text or notes.
+  Other holds 150 characters (300 before) and Notes 150, so that four full questions stay under
+  the 3,000 characters Slack allows `private_metadata`.
+
 ### Fixed
 
 - Answer on a question opens its form before the channel check (issue #325). The check makes

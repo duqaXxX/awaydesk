@@ -556,6 +556,7 @@ export class SlackThread implements ThreadChat {
     request: MessageId,
     questions: readonly Question[],
     answers: Readonly<Record<string, string | readonly string[]>>,
+    notes: Readonly<Record<string, string>>,
   ): Promise<void> {
     try {
       // One more chat.update against the app's budget, which every reply draws from.
@@ -564,7 +565,7 @@ export class SlackThread implements ThreadChat {
         channel: this.channel,
         ts: request,
         text: named(texts.ANSWERED, this.names()),
-        blocks: answeredBlocks(questions, answers, this.names()) as unknown as KnownBlock[],
+        blocks: answeredBlocks(questions, answers, notes, this.names()) as unknown as KnownBlock[],
       });
     } catch (error) {
       throw new ChatError(describe(error), { cause: error });

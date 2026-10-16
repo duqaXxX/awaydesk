@@ -341,7 +341,8 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action(SETUP_BYPASS, requests.onSetupEdit, { acknowledgeOnly: true });
   for (const actionId of [HOLD_CONTINUE, HOLD_CANCEL]) action(actionId, requests.onHoldDecision);
   for (const actionId of DECISION_ACTIONS) action(actionId, requests.onDecision);
-  action("answer", requests.onAnswer, { acknowledgeOnly: true });
+  action("answer", requests.onQuestionChoice);
+  action("other", requests.onQuestionOther);
   action(QUESTION_OPEN, requests.onQuestionOpen);
   view(QUESTION_FORM, requests.onQuestionSubmit);
 
