@@ -1050,8 +1050,8 @@ closed when the start returns (`ThreadSession.connect`).
   record that passes through a symlink trusts nothing. An untrusted folder starts nothing, and the
   reply says to open `claude` there in the terminal once and accept the dialog. A `!bind` runs the
   same checks (`directory.checkDirectory`: missing, unreadable, untrusted): the channel is bound,
-  and the answer gives the reason instead of promising a session. Not verified: folder trust and the
-  footer's git on Windows, where the tests that build a git layout are skipped.
+  and the answer gives the reason instead of promising a session. Not verified: the daemon on Windows;
+  folder trust and the footer's git are exercised there by the tests in CI alone.
 - The session asks the back end for a start with the thread's own directory, the thread's stored
   session id to resume, its stored effort level and the owner's own settings sources (user, project
   and local): the `StartOptions` built in `ThreadSession.connect`. `ClaudeSession` makes the SDK's

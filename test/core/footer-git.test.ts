@@ -17,14 +17,11 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, beforeEach, test as nodeTest } from "node:test";
+import { afterEach, beforeEach, test } from "node:test";
 import { trustedRepository } from "../../src/agent/claude/trust.ts";
 import type { Repository } from "../../src/agent/seam.ts";
 import { gitState } from "../../src/core/footer.ts";
 import { addWorktree, bareLayout, committed, git, gitEnv, trust } from "../support/git-layouts.ts";
-import { GIT_LAYOUT } from "../support/platform.ts";
-
-const test = GIT_LAYOUT.skip ? nodeTest.skip : nodeTest;
 
 type Lookup = (directory: string) => Promise<Repository | null>;
 
@@ -148,6 +145,12 @@ function aGitfileBorrowingTheTrustedGitDir(): string {
   return join(app, "dep");
 }
 
+// Windows removes a trailing space from a file name, so a folder or git dir named with one
+// cannot exist there.
+const NO_TRAILING_SPACE = {
+  skip: process.platform === "win32" && "Windows drops a trailing space from a file name",
+};
+
 const PLANTED: readonly [string, () => string][] = [
   ["a_repository_under_a_trusted_folder", aRepositoryUnderATrustedFolder],
   ["an_embedded_bare_layout", anEmbeddedBareLayout],
@@ -172,7 +175,8 @@ function gitDiffsThere(folder: string): void {
 }
 
 for (const [name, plant] of PLANTED) {
-  test(`no filter runs where the owner trusted no repository [${name}]`, async () => {
+  const options = name.endsWith("trailing_space") ? NO_TRAILING_SPACE : {};
+  test(`no filter runs where the owner trusted no repository [${name}]`, options, async () => {
     const folder = plant();
     filterRan(); // building the folder ran it once
     // The control: git, left to find the repository from the folder, runs the filter.
@@ -249,7 +253,7 @@ test("a file named head at the root does not change the count", async () => {
   assert.deepEqual(await gitState(join(app, "src"), repository), ["main", [0, 0]]);
 });
 
-test("a gitfile s trailing space belongs to the path", async () => {
+test("a gitfile s trailing space belongs to the path", NO_TRAILING_SPACE, async () => {
   // As git reads it (setup.c, read_gitfile_gently): only the line end is dropped.
   const code = dirname(app);
   for (const [name, branch] of [
@@ -285,7 +289,10 @@ test("git is given the repository and never looks for one", async () => {
   assert.ok(!filterRan());
 });
 
-test("every git call shares one time limit", async () => {
+// The stub is a shell script found through a `:` separated PATH.
+test("every git call shares one time limit", {
+  skip: process.platform === "win32" && "the stub git is a shell script",
+}, async () => {
   // The reply waits for its footer. Each call here answers within the limit, and the limit
   // still ends the second one: it is for all of them together.
   const stub = join(tmp, "bin", "git");

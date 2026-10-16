@@ -517,7 +517,7 @@ export function worldFor(t: TestContext): ((options?: WorldOptions) => World) & 
 } {
   const made: World[] = [];
   const slack = new FakeSlack();
-  const tmpPath = realpathSync(mkdtempSync(join(tmpdir(), "awd-app-")));
+  const tmpPath = realpathSync.native(mkdtempSync(join(tmpdir(), "awd-app-")));
   // The two "stop for the rest of the run" flags are the process's: each test starts clear.
   resetStatusFlags();
   // The daemon's log stays out of the test report: a test that reads a line
@@ -991,7 +991,7 @@ export function pickerPosts(world: World): Body[] {
 export function madeBeforeTheThread(path: string): string {
   gitInit(path);
   commitAt(path, "README", Number(THREAD.split(".")[0]) - 1000);
-  return realpathSync(path);
+  return realpathSync.native(path);
 }
 
 /** The channel's folder as a repository with one commit, `README`. */

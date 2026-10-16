@@ -61,7 +61,6 @@ import {
 } from "../../support/fake-slack.ts";
 import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
 import { NAMES } from "../../support/names.ts";
-import { GIT_LAYOUT } from "../../support/platform.ts";
 import {
   canUseToolCall,
   END_OF_STREAM,
@@ -2398,7 +2397,7 @@ function literal(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-test("the footer follows the folder the session works in", GIT_LAYOUT, async (t) => {
+test("the footer follows the folder the session works in", async (t) => {
   // The layout where the bound folder's branch was always missing (#37). The folder shown
   // stays the channel's, where the owner bound it; the branch is the session's.
   const make = harnessFor(t);
@@ -2421,7 +2420,7 @@ test("the footer follows the folder the session works in", GIT_LAYOUT, async (t)
   assert.ok(values.includes("Branch: `feature-x`") && values.includes("Uncommitted: `(+0,-0)`"));
 });
 
-test("a tool s hook moves the branch when no stop hook runs", GIT_LAYOUT, async (t) => {
+test("a tool s hook moves the branch when no stop hook runs", async (t) => {
   // A turn stopped or failed runs no Stop hook; PostToolUse still reports where the session
   // went after the tool (measured 2026-09-27 on 2.1.283), so the footer is not left behind.
   const make = harnessFor(t);
@@ -2447,7 +2446,7 @@ test("a tool s hook moves the branch when no stop hook runs", GIT_LAYOUT, async 
   assert.equal(session.workingDirectory, repo);
 });
 
-test("the footer leaves out the branch of a repository not trusted", GIT_LAYOUT, async (t) => {
+test("the footer leaves out the branch of a repository not trusted", async (t) => {
   // The session went into a repo the owner never trusted in Claude Code: no git runs there,
   // and neither the footer nor `!status` says anything in its place.
   const make = harnessFor(t);
@@ -2463,7 +2462,7 @@ test("the footer leaves out the branch of a repository not trusted", GIT_LAYOUT,
   assert.ok(!text.includes("Branch:") && !text.includes("Uncommitted:"));
 });
 
-test("a restarted client starts again in the bound folder", GIT_LAYOUT, async (t) => {
+test("a restarted client starts again in the bound folder", async (t) => {
   const make = harnessFor(t);
   const repo = repoUnder(make.tmpPath);
   const moved = { ...(sdkJson("stop-hook") as JsonObject), cwd: repo };
