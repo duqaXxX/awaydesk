@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A release workflow, `.github/workflows/release.yml`: a tag `vX.Y.Z` pushed to GitHub is
+  checked against `package.json`'s version and `docs/CHANGELOG.md`'s dated section
+  (`.github/scripts/release.mjs`) and against `main`, then lint and types run on Linux and the tests on Linux, macOS
+  and Windows, the package is published to the npm registry through trusted publishing (no npm
+  token, with provenance), and the GitHub Release is created with the version's section as notes.
+  The procedure and the one-time setup on npmjs.com are in `CONTRIBUTING.md`, Releases.
 - `awaydesk --version` prints the installed version (the `version` of the package's own
   `package.json`, `host/version.installedVersion`) and `awaydesk --help` the usage; both end
   without reading `.env` or taking the lock. Any other argument is refused with the usage and

@@ -19,6 +19,10 @@ awaydesk runs Claude Code on the owner's machine on behalf of one Slack user. In
 - a session started in a folder the owner has not trusted in Claude Code;
 - the daemon's own git (the footer, `!status`, `!open`) run in a repository the owner has not
   trusted in Claude Code.
+- a version of the npm package `awaydesk` that the Release workflow
+  (`.github/workflows/release.yml`) did not publish from a tag of this repository, apart from the
+  first, published by hand (see CONTRIBUTING.md, Releases), or a way to publish one without the
+  workflow's own OIDC token.
 
 Out of scope: what Claude Code does once the owner approves it, and whoever controls the owner's
 Slack account, who controls the machine by design. [docs/setup.md](docs/setup.md) lists the
