@@ -18,7 +18,6 @@ import { systemClock } from "../../../src/clock.ts";
 import { FakeSdk, fail } from "../../support/fake-query.ts";
 import { type JsonObject, sdkRecords } from "../../support/fixtures.ts";
 import { gitInit, trust } from "../../support/git-layouts.ts";
-import { GIT_LAYOUT } from "../../support/platform.ts";
 
 const LIMIT = { timeout: 10_000 };
 const START: StartOptions = {
@@ -133,7 +132,7 @@ test("a start where Claude Code refuses the resume rejects with ResumeRefused", 
   assert.equal(sdk.only.closed, true);
 });
 
-test("a folder is trusted as Claude Code's record says", { ...LIMIT, ...GIT_LAYOUT }, async () => {
+test("a folder is trusted as Claude Code's record says", LIMIT, async () => {
   const trusted = join(tmp, "trusted");
   const other = join(tmp, "other");
   await mkdir(trusted);
@@ -144,7 +143,7 @@ test("a folder is trusted as Claude Code's record says", { ...LIMIT, ...GIT_LAYO
   assert.equal(await backend.folderTrusted(other), false);
 });
 
-test("only a repository the owner trusted may run the daemon's git", GIT_LAYOUT, async () => {
+test("only a repository the owner trusted may run the daemon's git", async () => {
   const folder = join(tmp, "session");
   const repository = join(folder, "app");
   await mkdir(folder);

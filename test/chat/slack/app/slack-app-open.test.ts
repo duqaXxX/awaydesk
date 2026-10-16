@@ -59,7 +59,6 @@ import {
 } from "../../../support/fake-slack.ts";
 import { commitAt, committed, git, gitInit, trust } from "../../../support/git-layouts.ts";
 import { NAMES } from "../../../support/names.ts";
-import { GIT_LAYOUT } from "../../../support/platform.ts";
 import {
   askedOpen,
   type Body,
@@ -190,47 +189,43 @@ function threeFiles(project: string): void {
   for (const name of ["one.py", "onetwo.py", "onetwothree.py"]) put(project, name);
 }
 
-test(
-  "two replies sent together reach the queue in the order they were sent",
-  GIT_LAYOUT,
-  async (t) => {
-    // Nothing of `!open` runs when a prompt arrives: a slow repository lookup (a cold cache, a
-    // slow git) must not hold a prompt, or let a later one overtake it. With a lookup awaited
-    // before the arrival lock, the first reply here is overtaken by the second.
-    const world = openWorld(t);
-    projectOf(world);
-    await inAThread(world);
-    const session = world.sessions.get(CHANNEL, THREAD);
-    assert.ok(session !== null);
-    const queued: string[] = [];
-    const submit = session.submit.bind(session);
-    session.submit = async (prompt) => {
-      queued.push(String(prompt));
-      return submit(prompt);
-    };
-    const asked = counted(world);
-    const real = world.backend.repository;
-    const slow = new AsyncEvent();
-    let first = true;
-    world.backend.repository = async (directory) => {
-      if (first) {
-        first = false;
-        await slow.wait();
-      }
-      return real(directory);
-    };
-    await world.dispatch(reply("first", THREAD));
-    await world.dispatch(reply("second", THREAD));
-    slow.set();
-    await world.settle();
-    assert.deepEqual(queued, ["first", "second"]);
-    const lookedUp = asked.length; // the replies' own footers look a repository up when they end
-    await askedOpen(world, "!open zzz");
-    assert.ok(asked.length > lookedUp); // the control: the lookup is counted, and a name makes one
-  },
-);
+test("two replies sent together reach the queue in the order they were sent", async (t) => {
+  // Nothing of `!open` runs when a prompt arrives: a slow repository lookup (a cold cache, a
+  // slow git) must not hold a prompt, or let a later one overtake it. With a lookup awaited
+  // before the arrival lock, the first reply here is overtaken by the second.
+  const world = openWorld(t);
+  projectOf(world);
+  await inAThread(world);
+  const session = world.sessions.get(CHANNEL, THREAD);
+  assert.ok(session !== null);
+  const queued: string[] = [];
+  const submit = session.submit.bind(session);
+  session.submit = async (prompt) => {
+    queued.push(String(prompt));
+    return submit(prompt);
+  };
+  const asked = counted(world);
+  const real = world.backend.repository;
+  const slow = new AsyncEvent();
+  let first = true;
+  world.backend.repository = async (directory) => {
+    if (first) {
+      first = false;
+      await slow.wait();
+    }
+    return real(directory);
+  };
+  await world.dispatch(reply("first", THREAD));
+  await world.dispatch(reply("second", THREAD));
+  slow.set();
+  await world.settle();
+  assert.deepEqual(queued, ["first", "second"]);
+  const lookedUp = asked.length; // the replies' own footers look a repository up when they end
+  await askedOpen(world, "!open zzz");
+  assert.ok(asked.length > lookedUp); // the control: the lookup is counted, and a name makes one
+});
 
-test("open alone posts a button and reads nothing of the folder", GIT_LAYOUT, async (t) => {
+test("open alone posts a button and reads nothing of the folder", async (t) => {
   const world = openWorld(t);
   projectOf(world);
   await inAThread(world);
@@ -248,7 +243,7 @@ test("open alone posts a button and reads nothing of the folder", GIT_LAYOUT, as
   assert.ok(asked.length === 0 && calls(world, "views.open").length === 0);
 });
 
-test("the button opens the modal with the files changed in the session", GIT_LAYOUT, async (t) => {
+test("the button opens the modal with the files changed in the session", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -274,7 +269,7 @@ test("the button opens the modal with the files changed in the session", GIT_LAY
   assert.deepEqual(world.ephemerals(), []);
 });
 
-test("a session that changed nothing gets the line that says to type", GIT_LAYOUT, async (t) => {
+test("a session that changed nothing gets the line that says to type", async (t) => {
   const world = openWorld(t);
   projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -285,45 +280,37 @@ test("a session that changed nothing gets the line that says to type", GIT_LAYOU
   assert.deepEqual(modal.labels(), [slackTexts.OPEN_TYPE_A_NAME]);
 });
 
-test(
-  "the changes are counted from where head was when the thread started",
-  GIT_LAYOUT,
-  async (t) => {
-    // Nothing is remembered by the daemon: HEAD's log says where the repository stood at THREAD's
-    // time (an epoch second), so a daemon restarted since gives the same answer.
-    const world = openWorld(t);
-    const modal = new ModalSlack(world.slack);
-    const folder = join(world.root, "app");
-    const start = Number(THREAD.split(".")[0]);
-    const repo = realpathSync(gitInit(join(folder, "workspace")));
-    commitAt(repo, "base.py", start - 1000);
-    commitAt(repo, "before.py", start - 500); // moved HEAD before the thread began
-    commitAt(repo, "made_by_claude.py", start + 500);
-    put(repo, "uncommitted.py");
-    await inAThread(world);
-    await world.dispatch(chooseClick());
-    await world.settle();
-    assert.deepEqual(modal.rows().toSorted(), [
-      "workspace/made_by_claude.py",
-      "workspace/uncommitted.py",
-    ]);
-  },
-);
+test("the changes are counted from where head was when the thread started", async (t) => {
+  // Nothing is remembered by the daemon: HEAD's log says where the repository stood at THREAD's
+  // time (an epoch second), so a daemon restarted since gives the same answer.
+  const world = openWorld(t);
+  const modal = new ModalSlack(world.slack);
+  const folder = join(world.root, "app");
+  const start = Number(THREAD.split(".")[0]);
+  const repo = realpathSync.native(gitInit(join(folder, "workspace")));
+  commitAt(repo, "base.py", start - 1000);
+  commitAt(repo, "before.py", start - 500); // moved HEAD before the thread began
+  commitAt(repo, "made_by_claude.py", start + 500);
+  put(repo, "uncommitted.py");
+  await inAThread(world);
+  await world.dispatch(chooseClick());
+  await world.settle();
+  assert.deepEqual(modal.rows().toSorted(), [
+    "workspace/made_by_claude.py",
+    "workspace/uncommitted.py",
+  ]);
+});
 
-test(
-  "a repository made after the thread began lists every file as changed",
-  GIT_LAYOUT,
-  async (t) => {
-    const world = openWorld(t);
-    const modal = new ModalSlack(world.slack);
-    await inAThread(world);
-    const made = committed(join(world.root, "app")); // THREAD is long past: the first commit is the session's
-    put(made, "new.py");
-    await world.dispatch(chooseClick());
-    await world.settle();
-    assert.deepEqual(modal.rows().toSorted(), ["README", "new.py"]);
-  },
-);
+test("a repository made after the thread began lists every file as changed", async (t) => {
+  const world = openWorld(t);
+  const modal = new ModalSlack(world.slack);
+  await inAThread(world);
+  const made = committed(join(world.root, "app")); // THREAD is long past: the first commit is the session's
+  put(made, "new.py");
+  await world.dispatch(chooseClick());
+  await world.settle();
+  assert.deepEqual(modal.rows().toSorted(), ["README", "new.py"]);
+});
 
 test("a folder that is not a repository has no changed files", async (t) => {
   const world = openWorld(t);
@@ -336,7 +323,7 @@ test("a folder that is not a repository has no changed files", async (t) => {
   assert.deepEqual(modal.labels(), [slackTexts.OPEN_TYPE_A_NAME]);
 });
 
-test("the repositories of a folder are looked up once for a short while", GIT_LAYOUT, async (t) => {
+test("the repositories of a folder are looked up once for a short while", async (t) => {
   // The listings keep them for REPOSITORIES_TTL seconds: of a clock that does not move, so
   // that a slow machine cannot make the second click come too late.
   const world = worldWith(t, (lookup) => new Listings(lookup, { clock: new FakeClock() }));
@@ -354,7 +341,7 @@ test("the repositories of a folder are looked up once for a short while", GIT_LA
   assert.equal(asked.length, first); // the second click found them kept
 });
 
-test("the changes of a repository inside the folder are listed", GIT_LAYOUT, async (t) => {
+test("the changes of a repository inside the folder are listed", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -372,7 +359,7 @@ test("the changes of a repository inside the folder are listed", GIT_LAYOUT, asy
   assert.deepEqual(modal.labels(), ["Changed in this session (1), newest first"]);
 });
 
-test("a name that matches several files posts the count and the button", GIT_LAYOUT, async (t) => {
+test("a name that matches several files posts the count and the button", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   await inAThread(world);
@@ -388,7 +375,7 @@ test("a name that matches several files posts the count and the button", GIT_LAY
   assert.deepEqual(calls(world, "views.open"), []); // the rows come when it is clicked
 });
 
-test("the button of several matches opens the modal on them", GIT_LAYOUT, async (t) => {
+test("the button of several matches opens the modal on them", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -415,7 +402,7 @@ test("the modal of a plain folder lists what its disk holds", async (t) => {
   assert.deepEqual(modal.rows().toSorted(), ["a/setup.md", "b/setup.py"]);
 });
 
-test("more than ten matches list ten and say so", GIT_LAYOUT, async (t) => {
+test("more than ten matches list ten and say so", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -430,7 +417,7 @@ test("more than ten matches list ten and say so", GIT_LAYOUT, async (t) => {
   ]);
 });
 
-test("a listing that comes late fills the modal after it opens", GIT_LAYOUT, async (t) => {
+test("a listing that comes late fills the modal after it opens", async (t) => {
   // The click's trigger_id lives 3 seconds (views.open reference): the modal opens without
   // the rows when they are not ready, and an update fills it.
   const world = openWorld(t);
@@ -454,33 +441,29 @@ test("a listing that comes late fills the modal after it opens", GIT_LAYOUT, asy
   assert.ok(!("initial_value" in modal.view.blocks[0].element)); // what was typed stays
 });
 
-test(
-  "a keystroke typed while the modal is still filling is not overwritten",
-  GIT_LAYOUT,
-  async (t) => {
-    const world = openWorld(t);
-    const project = projectOf(world);
-    const modal = new ModalSlack(world.slack);
-    await inAThread(world);
-    put(project, "src/parser.py");
-    put(project, "src/lexer.py");
-    const release = new AsyncEvent();
-    slowLookup(world, release);
-    await world.dispatch(chooseClick("src"));
-    await world.appClock.advance(OPEN_WAIT);
-    await world.idle();
-    await world.dispatch(typing("lex", 1790000100.0, { viewHash: modal.hash }));
-    release.set();
-    await world.settle();
-    assert.deepEqual(modal.rows(), ["src/lexer.py"]);
-    assert.deepEqual(
-      modal.calls.map(([, view]) => modal.rows(view)),
-      [["src/lexer.py"]],
-    );
-  },
-);
+test("a keystroke typed while the modal is still filling is not overwritten", async (t) => {
+  const world = openWorld(t);
+  const project = projectOf(world);
+  const modal = new ModalSlack(world.slack);
+  await inAThread(world);
+  put(project, "src/parser.py");
+  put(project, "src/lexer.py");
+  const release = new AsyncEvent();
+  slowLookup(world, release);
+  await world.dispatch(chooseClick("src"));
+  await world.appClock.advance(OPEN_WAIT);
+  await world.idle();
+  await world.dispatch(typing("lex", 1790000100.0, { viewHash: modal.hash }));
+  release.set();
+  await world.settle();
+  assert.deepEqual(modal.rows(), ["src/lexer.py"]);
+  assert.deepEqual(
+    modal.calls.map(([, view]) => modal.rows(view)),
+    [["src/lexer.py"]],
+  );
+});
 
-test("the files are listed while the channel is checked", GIT_LAYOUT, async (t) => {
+test("the files are listed while the channel is checked", async (t) => {
   // The checks before the modal make two calls to Slack; the listing does not wait for them.
   const world = openWorld(t);
   projectOf(world);
@@ -507,46 +490,42 @@ test("the files are listed while the channel is checked", GIT_LAYOUT, async (t) 
   assert.ok(asked.trigger_id);
 });
 
-test(
-  "the wait for the rows counts from the click and not from the channel check",
-  GIT_LAYOUT,
-  async (t) => {
-    // The click's trigger_id lives 3 seconds: the check, the wait and views.open share them.
-    const world = openWorld(t);
-    const project = projectOf(world);
-    const modal = new ModalSlack(world.slack);
-    await inAThread(world);
-    put(project, "src/parser.py");
-    const release = new AsyncEvent();
-    slowLookup(world, release);
-    const openedAt: number[] = [];
-    const opening = world.slack.responses["views.open"];
-    assert.equal(typeof opening, "function");
-    world.slack.responses["views.open"] = (args: Args) => {
-      openedAt.push(world.appClock.time());
-      return (opening as (args: Args) => Args)(args);
-    };
-    const gate = new AsyncEvent();
-    world.slack.gate = gate;
-    world.slack.gateMethod = "conversations.info";
-    await world.dispatch(chooseClick("parser"));
-    await world.appClock.advance(0.25); // the channel check takes this long
-    gate.set();
-    await world.idle();
-    // The wait is what is left of OPEN_WAIT, not a whole one from the check.
-    await world.appClock.advance(0.5);
-    assert.deepEqual(openedAt, []);
-    await world.appClock.advance(0.25);
-    await world.idle();
-    assert.deepEqual(openedAt, [OPEN_WAIT]);
-    release.set();
-    await world.settle();
-    assert.deepEqual(modal.labels(), ["1 file matches"]);
-    assert.deepEqual(modal.rows(), ["src/parser.py"]);
-  },
-);
+test("the wait for the rows counts from the click and not from the channel check", async (t) => {
+  // The click's trigger_id lives 3 seconds: the check, the wait and views.open share them.
+  const world = openWorld(t);
+  const project = projectOf(world);
+  const modal = new ModalSlack(world.slack);
+  await inAThread(world);
+  put(project, "src/parser.py");
+  const release = new AsyncEvent();
+  slowLookup(world, release);
+  const openedAt: number[] = [];
+  const opening = world.slack.responses["views.open"];
+  assert.equal(typeof opening, "function");
+  world.slack.responses["views.open"] = (args: Args) => {
+    openedAt.push(world.appClock.time());
+    return (opening as (args: Args) => Args)(args);
+  };
+  const gate = new AsyncEvent();
+  world.slack.gate = gate;
+  world.slack.gateMethod = "conversations.info";
+  await world.dispatch(chooseClick("parser"));
+  await world.appClock.advance(0.25); // the channel check takes this long
+  gate.set();
+  await world.idle();
+  // The wait is what is left of OPEN_WAIT, not a whole one from the check.
+  await world.appClock.advance(0.5);
+  assert.deepEqual(openedAt, []);
+  await world.appClock.advance(0.25);
+  await world.idle();
+  assert.deepEqual(openedAt, [OPEN_WAIT]);
+  release.set();
+  await world.settle();
+  assert.deepEqual(modal.labels(), ["1 file matches"]);
+  assert.deepEqual(modal.rows(), ["src/parser.py"]);
+});
 
-test("a form that cannot open tells the owner of the picker", GIT_LAYOUT, async (t) => {
+test("a form that cannot open tells the owner of the picker", async (t) => {
   const world = openWorld(t);
   projectOf(world);
   await inAThread(world);
@@ -559,27 +538,23 @@ test("a form that cannot open tells the owner of the picker", GIT_LAYOUT, async 
 });
 
 for (const [user, team] of ANYONE_ELSE) {
-  test(
-    `the button clicked by anyone else opens nothing [${user}-${team}]`,
-    GIT_LAYOUT,
-    async (t) => {
-      const world = openWorld(t);
-      projectOf(world);
-      new ModalSlack(world.slack);
-      await inAThread(world);
-      const asked = counted(world);
-      const body = chooseClick("", { id: user });
-      body.team.id = team;
-      await world.dispatch(body);
-      await world.settle();
-      assert.deepEqual(calls(world, "views.open"), []);
-      assert.deepEqual(world.ephemerals(), []);
-      assert.deepEqual(asked, []); // the listing that starts early is the owner's alone
-    },
-  );
+  test(`the button clicked by anyone else opens nothing [${user}-${team}]`, async (t) => {
+    const world = openWorld(t);
+    projectOf(world);
+    new ModalSlack(world.slack);
+    await inAThread(world);
+    const asked = counted(world);
+    const body = chooseClick("", { id: user });
+    body.team.id = team;
+    await world.dispatch(body);
+    await world.settle();
+    assert.deepEqual(calls(world, "views.open"), []);
+    assert.deepEqual(world.ephemerals(), []);
+    assert.deepEqual(asked, []); // the listing that starts early is the owner's alone
+  });
 }
 
-test("the button in a thread that holds no session opens nothing", GIT_LAYOUT, async (t) => {
+test("the button in a thread that holds no session opens nothing", async (t) => {
   const world = openWorld(t);
   projectOf(world);
   new ModalSlack(world.slack);
@@ -588,7 +563,7 @@ test("the button in a thread that holds no session opens nothing", GIT_LAYOUT, a
   assert.deepEqual(world.ephemerals(), [texts.NOT_A_SESSION]);
 });
 
-test("the button in a refused channel opens nothing", GIT_LAYOUT, async (t) => {
+test("the button in a refused channel opens nothing", async (t) => {
   const world = openWorld(t);
   projectOf(world);
   new ModalSlack(world.slack);
@@ -601,7 +576,7 @@ test("the button in a refused channel opens nothing", GIT_LAYOUT, async (t) => {
   ]);
 });
 
-test("typing puts the files that match into the rows", GIT_LAYOUT, async (t) => {
+test("typing puts the files that match into the rows", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -626,7 +601,7 @@ test("typing puts the files that match into the rows", GIT_LAYOUT, async (t) => 
   assert.deepEqual(modal.labels(), ["0 files match"]);
 });
 
-test("the typed text is read from the state when the action has none", GIT_LAYOUT, async (t) => {
+test("the typed text is read from the state when the action has none", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -639,7 +614,7 @@ test("the typed text is read from the state when the action has none", GIT_LAYOU
   assert.deepEqual(modal.rows(), ["src/parser.py"]);
 });
 
-test("an emptied field lists the changed files again", GIT_LAYOUT, async (t) => {
+test("an emptied field lists the changed files again", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -651,7 +626,7 @@ test("an emptied field lists the changed files again", GIT_LAYOUT, async (t) => 
   assert.deepEqual(modal.labels(), ["Changed in this session (1), newest first"]);
 });
 
-test("typing checks the disk only until the rows are full", GIT_LAYOUT, async (t) => {
+test("typing checks the disk only until the rows are full", async (t) => {
   // The listings are asked to check ranked paths on disk through an iterable that notes each path
   // it hands out, one for each path checked.
   const checked: string[] = [];
@@ -683,7 +658,7 @@ test("typing checks the disk only until the rows are full", GIT_LAYOUT, async (t
   ]);
 });
 
-test("a count below the rows is exact even when a match is gone", GIT_LAYOUT, async (t) => {
+test("a count below the rows is exact even when a match is gone", async (t) => {
   // `git ls-files` still names a tracked file deleted from the work tree.
   const world = openWorld(t);
   const project = projectOf(world);
@@ -699,7 +674,7 @@ test("a count below the rows is exact even when a match is gone", GIT_LAYOUT, as
   assert.deepEqual(modal.labels(), ["2 files match"]);
 });
 
-test("typing leaves out a file whose path is too long for a value", GIT_LAYOUT, async (t) => {
+test("typing leaves out a file whose path is too long for a value", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -724,24 +699,20 @@ test("typing in a folder with no repository reads the disk", async (t) => {
   assert.deepEqual(modal.rows().toSorted(), ["plain.txt", "sub/deep/plain-too.txt"]);
 });
 
-test(
-  "typing in a repository inside the folder leaves out what git ignores",
-  GIT_LAYOUT,
-  async (t) => {
-    const world = openWorld(t);
-    const modal = new ModalSlack(world.slack);
-    const folder = join(world.root, "app");
-    const nested = realpathSync(committed(join(folder, "workspace")));
-    put(nested, ".gitignore", ".venv/\n");
-    put(nested, "docs/setup.md");
-    put(nested, ".venv/lib/setup_tools.py");
-    put(folder, "setup-notes.txt");
-    await inAThread(world);
-    await world.dispatch(typing("setup", 1790000100.0, { viewHash: modal.hash }));
-    await world.settle();
-    assert.deepEqual(modal.rows().toSorted(), ["setup-notes.txt", "workspace/docs/setup.md"]);
-  },
-);
+test("typing in a repository inside the folder leaves out what git ignores", async (t) => {
+  const world = openWorld(t);
+  const modal = new ModalSlack(world.slack);
+  const folder = join(world.root, "app");
+  const nested = realpathSync.native(committed(join(folder, "workspace")));
+  put(nested, ".gitignore", ".venv/\n");
+  put(nested, "docs/setup.md");
+  put(nested, ".venv/lib/setup_tools.py");
+  put(folder, "setup-notes.txt");
+  await inAThread(world);
+  await world.dispatch(typing("setup", 1790000100.0, { viewHash: modal.hash }));
+  await world.settle();
+  assert.deepEqual(modal.rows().toSorted(), ["setup-notes.txt", "workspace/docs/setup.md"]);
+});
 
 /**
  * A repository inside the channel's folder whose config names a `clean` filter, in a world where
@@ -750,7 +721,7 @@ test(
  */
 function plantedBelow(world: World, ...command: string[]): { nested: string; marker: string } {
   const folder = join(world.root, "app");
-  const nested = realpathSync(committed(join(folder, "workspace")));
+  const nested = realpathSync.native(committed(join(folder, "workspace")));
   const marker = join(world.root, "filter-ran");
   git(nested, "config", "filter.planted.clean", `sh -c 'touch "${marker}"; cat'`);
   put(nested, ".git/info/attributes", "* filter=planted\n");
@@ -761,30 +732,26 @@ function plantedBelow(world: World, ...command: string[]): { nested: string; mar
   rmSync(marker);
   const home = join(world.root, "home");
   mkdirSync(home);
-  trust(home, [realpathSync(folder)]);
+  trust(home, [realpathSync.native(folder)]);
   world.backend.repository = (directory) => trustedRepository(directory, home);
   return { nested, marker };
 }
 
-test(
-  "the picker runs no git in a nested repository the owner did not trust",
-  GIT_LAYOUT,
-  async (t) => {
-    // The changed files come from `git status`, which reads a changed file through the `clean`
-    // filter the repository's config names. One click would run it in every repository below the
-    // folder, also where the agent never went.
-    const world = openWorld(t);
-    const modal = new ModalSlack(world.slack);
-    const { marker } = plantedBelow(world, "status", "--porcelain");
-    await inAThread(world);
-    await world.dispatch(chooseClick());
-    await world.settle();
-    assert.ok(modal.rows().every((row) => !row.startsWith("workspace/")));
-    assert.ok(!existsSync(marker));
-  },
-);
+test("the picker runs no git in a nested repository the owner did not trust", async (t) => {
+  // The changed files come from `git status`, which reads a changed file through the `clean`
+  // filter the repository's config names. One click would run it in every repository below the
+  // folder, also where the agent never went.
+  const world = openWorld(t);
+  const modal = new ModalSlack(world.slack);
+  const { marker } = plantedBelow(world, "status", "--porcelain");
+  await inAThread(world);
+  await world.dispatch(chooseClick());
+  await world.settle();
+  assert.ok(modal.rows().every((row) => !row.startsWith("workspace/")));
+  assert.ok(!existsSync(marker));
+});
 
-test("typing runs no git in a nested repository the owner did not trust", GIT_LAYOUT, async (t) => {
+test("typing runs no git in a nested repository the owner did not trust", async (t) => {
   // The folder is trusted, the repository inside it is not: git would read the repository's own
   // config. Its files come from the walk of the disk, the ones its `.gitignore` names too.
   const world = openWorld(t);
@@ -803,7 +770,7 @@ test("typing runs no git in a nested repository the owner did not trust", GIT_LA
   assert.ok(!existsSync(marker));
 });
 
-test("typing makes no call to slack about the channel", GIT_LAYOUT, async (t) => {
+test("typing makes no call to slack about the channel", async (t) => {
   // Each character comes here: the checks are the owner and the workspace alone.
   const world = openWorld(t);
   projectOf(world);
@@ -818,7 +785,7 @@ test("typing makes no call to slack about the channel", GIT_LAYOUT, async (t) =>
 });
 
 for (const [user, team] of ANYONE_ELSE) {
-  test(`typing by anyone else updates nothing [${user}-${team}]`, GIT_LAYOUT, async (t) => {
+  test(`typing by anyone else updates nothing [${user}-${team}]`, async (t) => {
     const world = openWorld(t);
     projectOf(world);
     const modal = new ModalSlack(world.slack);
@@ -837,22 +804,18 @@ for (const [name, metadata] of [
   ["a thread of another channel", new Target("C000ELSEWHERE", THREAD).dump()],
   ["a thread that is no session", new Target(CHANNEL, "1790000000.999999").dump()],
 ] as const) {
-  test(
-    `typing in a modal whose thread is not a session updates nothing [${name}]`,
-    GIT_LAYOUT,
-    async (t) => {
-      const world = openWorld(t);
-      projectOf(world);
-      const modal = new ModalSlack(world.slack);
-      await inAThread(world);
-      await world.dispatch(typing("READ", 1790000100.0, { metadata, viewHash: modal.hash }));
-      await world.settle();
-      assert.equal(modal.calls.length, 0);
-    },
-  );
+  test(`typing in a modal whose thread is not a session updates nothing [${name}]`, async (t) => {
+    const world = openWorld(t);
+    projectOf(world);
+    const modal = new ModalSlack(world.slack);
+    await inAThread(world);
+    await world.dispatch(typing("READ", 1790000100.0, { metadata, viewHash: modal.hash }));
+    await world.settle();
+    assert.equal(modal.calls.length, 0);
+  });
 }
 
-test("typing resolves in the folder of the thread s own session", GIT_LAYOUT, async (t) => {
+test("typing resolves in the folder of the thread s own session", async (t) => {
   // The channel was bound to another folder after the thread began.
   const world = openWorld(t);
   const project = projectOf(world);
@@ -867,40 +830,36 @@ test("typing resolves in the folder of the thread s own session", GIT_LAYOUT, as
   assert.deepEqual(modal.rows(), ["only_here.py"]);
 });
 
-test(
-  "a slow update is followed by the newest text and never by an older one",
-  GIT_LAYOUT,
-  async (t) => {
-    // Two keystrokes whose payloads carry the same hash: the first update is slow, the second
-    // waits behind it and lands after it, and the view's last word is the newest text. No update
-    // is rejected: none carries a hash.
-    const world = openWorld(t);
-    const project = projectOf(world);
-    const modal = new ModalSlack(world.slack);
-    await inAThread(world);
-    threeFiles(project);
-    const gate = new AsyncEvent();
-    world.slack.gate = gate;
-    world.slack.gateMethod = "views.update";
-    const shown = modal.hash;
-    await world.dispatch(typing("one", 1790000100.0, { viewHash: shown }));
-    assert.ok(world.slack.gated.isSet());
-    await world.dispatch(typing("onetwot", 1790000100.5, { viewHash: shown }));
-    await world.settle();
-    assert.equal(modal.calls.length, 0); // the first is still in flight
-    gate.set();
-    await world.settle();
-    assert.deepEqual(
-      modal.calls.map(([, view]) => modal.rows(view)),
-      [["one.py", "onetwo.py", "onetwothree.py"], ["onetwothree.py"]],
-    );
-    assert.deepEqual(modal.rows(), ["onetwothree.py"]);
-    assert.equal(modal.written.length, 2);
-    assert.deepEqual(new Set(modal.calls.map(([sent]) => sent)), new Set([null]));
-  },
-);
+test("a slow update is followed by the newest text and never by an older one", async (t) => {
+  // Two keystrokes whose payloads carry the same hash: the first update is slow, the second
+  // waits behind it and lands after it, and the view's last word is the newest text. No update
+  // is rejected: none carries a hash.
+  const world = openWorld(t);
+  const project = projectOf(world);
+  const modal = new ModalSlack(world.slack);
+  await inAThread(world);
+  threeFiles(project);
+  const gate = new AsyncEvent();
+  world.slack.gate = gate;
+  world.slack.gateMethod = "views.update";
+  const shown = modal.hash;
+  await world.dispatch(typing("one", 1790000100.0, { viewHash: shown }));
+  assert.ok(world.slack.gated.isSet());
+  await world.dispatch(typing("onetwot", 1790000100.5, { viewHash: shown }));
+  await world.settle();
+  assert.equal(modal.calls.length, 0); // the first is still in flight
+  gate.set();
+  await world.settle();
+  assert.deepEqual(
+    modal.calls.map(([, view]) => modal.rows(view)),
+    [["one.py", "onetwo.py", "onetwothree.py"], ["onetwothree.py"]],
+  );
+  assert.deepEqual(modal.rows(), ["onetwothree.py"]);
+  assert.equal(modal.written.length, 2);
+  assert.deepEqual(new Set(modal.calls.map(([sent]) => sent)), new Set([null]));
+});
 
-test("an update waiting behind a newer keystroke is never made", GIT_LAYOUT, async (t) => {
+test("an update waiting behind a newer keystroke is never made", async (t) => {
   const watched = { listings: null as WatchedListings | null };
   const world = worldWith(t, (lookup) => {
     watched.listings = new WatchedListings(lookup);
@@ -928,7 +887,7 @@ test("an update waiting behind a newer keystroke is never made", GIT_LAYOUT, asy
   assert.equal(watched.listings?.listed.length, 2); // the first keystroke and the last
 });
 
-test("a keystroke that arrives after a newer one is dropped", GIT_LAYOUT, async (t) => {
+test("a keystroke that arrives after a newer one is dropped", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -943,7 +902,7 @@ test("a keystroke that arrives after a newer one is dropped", GIT_LAYOUT, async 
   assert.deepEqual(modal.rows(), ["onetwothree.py"]);
 });
 
-test("a keystroke delivered twice is written once", GIT_LAYOUT, async (t) => {
+test("a keystroke delivered twice is written once", async (t) => {
   // Slack sends an interaction again when its acknowledgement was missed.
   const world = openWorld(t);
   const project = projectOf(world);
@@ -956,21 +915,17 @@ test("a keystroke delivered twice is written once", GIT_LAYOUT, async (t) => {
   assert.equal(modal.calls.length, 1);
 });
 
-test(
-  "an update that slack rejects for any other reason is dropped quietly",
-  GIT_LAYOUT,
-  async (t) => {
-    const world = openWorld(t);
-    projectOf(world);
-    const modal = new ModalSlack(world.slack);
-    await inAThread(world);
-    world.slack.responses["views.update"] = { ok: false, error: "not_found" };
-    await world.dispatch(typing("read", 1790000100.0, { viewHash: modal.hash }));
-    await world.settle();
-    assert.equal(calls(world, "views.update").length, 1);
-    assert.deepEqual(world.ephemerals(), []);
-  },
-);
+test("an update that slack rejects for any other reason is dropped quietly", async (t) => {
+  const world = openWorld(t);
+  projectOf(world);
+  const modal = new ModalSlack(world.slack);
+  await inAThread(world);
+  world.slack.responses["views.update"] = { ok: false, error: "not_found" };
+  await world.dispatch(typing("read", 1790000100.0, { viewHash: modal.hash }));
+  await world.settle();
+  assert.equal(calls(world, "views.update").length, 1);
+  assert.deepEqual(world.ephemerals(), []);
+});
 
 test("an interaction is dated by its action ts", () => {
   const now = () => Date.now() / 1000;
@@ -981,26 +936,22 @@ test("an interaction is dated by its action ts", () => {
   }
 });
 
-test(
-  "a keystroke that arrives after the modal was submitted updates nothing",
-  GIT_LAYOUT,
-  async (t) => {
-    const world = openWorld(t);
-    const project = projectOf(world);
-    const modal = new ModalSlack(world.slack);
-    await inAThread(world);
-    put(project, "src/app.py");
-    await world.dispatch(typing("src", 1790000100.0));
-    await world.settle();
-    assert.equal(modal.calls.length, 1);
-    await world.dispatch(submitted("src/app.py"));
-    await world.dispatch(typing("src/a", 1790000101.0)); // sent before the submit, delivered after
-    await world.settle();
-    assert.equal(modal.calls.length, 1); // no update of a view that is closed
-  },
-);
+test("a keystroke that arrives after the modal was submitted updates nothing", async (t) => {
+  const world = openWorld(t);
+  const project = projectOf(world);
+  const modal = new ModalSlack(world.slack);
+  await inAThread(world);
+  put(project, "src/app.py");
+  await world.dispatch(typing("src", 1790000100.0));
+  await world.settle();
+  assert.equal(modal.calls.length, 1);
+  await world.dispatch(submitted("src/app.py"));
+  await world.dispatch(typing("src/a", 1790000101.0)); // sent before the submit, delivered after
+  await world.settle();
+  assert.equal(modal.calls.length, 1); // no update of a view that is closed
+});
 
-test("open shares the chosen file and closes the modal", GIT_LAYOUT, async (t) => {
+test("open shares the chosen file and closes the modal", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   new ModalSlack(world.slack);
@@ -1015,46 +966,36 @@ test("open shares the chosen file and closes the modal", GIT_LAYOUT, async (t) =
   assert.deepEqual(world.ephemerals(), []);
 });
 
-test(
-  "open with no row chosen shows the error on the rows and shares nothing",
-  GIT_LAYOUT,
-  async (t) => {
-    const world = openWorld(t);
-    projectOf(world);
-    await inAThread(world);
-    const before = world.slack.apiCalls.length;
-    const response = await world.dispatch(submitted(null, { rows: ["a.py"] }));
-    const rowsBlock = shownChoiceId(
-      modalView(OPEN_TARGET, "", ["a.py"]).blocks as unknown as Body[],
-    );
-    assert.deepEqual(response.body, {
-      response_action: "errors",
-      errors: { [rowsBlock]: slackTexts.OPEN_NONE_CHOSEN },
-    });
-    assert.deepEqual(opened(world), []);
-    // The answer is the first thing sent, and nothing is sent after it.
-    assert.equal(world.slack.apiCalls.length, before);
-  },
-);
+test("open with no row chosen shows the error on the rows and shares nothing", async (t) => {
+  const world = openWorld(t);
+  projectOf(world);
+  await inAThread(world);
+  const before = world.slack.apiCalls.length;
+  const response = await world.dispatch(submitted(null, { rows: ["a.py"] }));
+  const rowsBlock = shownChoiceId(modalView(OPEN_TARGET, "", ["a.py"]).blocks as unknown as Body[]);
+  assert.deepEqual(response.body, {
+    response_action: "errors",
+    errors: { [rowsBlock]: slackTexts.OPEN_NONE_CHOSEN },
+  });
+  assert.deepEqual(opened(world), []);
+  // The answer is the first thing sent, and nothing is sent after it.
+  assert.equal(world.slack.apiCalls.length, before);
+});
 
-test(
-  "open with no rows to choose from shows the error on the search field",
-  GIT_LAYOUT,
-  async (t) => {
-    const world = openWorld(t);
-    projectOf(world);
-    await inAThread(world);
-    const blocks = modalView(OPEN_TARGET, "zz", []).blocks as unknown as Body[]; // no radio group in the view
-    const response = await world.dispatch(submitted(null, { blocks }));
-    assert.deepEqual(response.body, {
-      response_action: "errors",
-      errors: { [QUERY_BLOCK]: slackTexts.OPEN_NONE_CHOSEN },
-    });
-    assert.deepEqual(opened(world), []);
-  },
-);
+test("open with no rows to choose from shows the error on the search field", async (t) => {
+  const world = openWorld(t);
+  projectOf(world);
+  await inAThread(world);
+  const blocks = modalView(OPEN_TARGET, "zz", []).blocks as unknown as Body[]; // no radio group in the view
+  const response = await world.dispatch(submitted(null, { blocks }));
+  assert.deepEqual(response.body, {
+    response_action: "errors",
+    errors: { [QUERY_BLOCK]: slackTexts.OPEN_NONE_CHOSEN },
+  });
+  assert.deepEqual(opened(world), []);
+});
 
-test("a row chosen before the rows changed is never opened", GIT_LAYOUT, async (t) => {
+test("a row chosen before the rows changed is never opened", async (t) => {
   // Slack keeps the state of an input block whose ids do not change across an update, so the
   // Submit can carry a row the view no longer shows. Both ways it can: under the id the older
   // rows had, and under the id of the rows now shown with a value that is not among them.
@@ -1084,7 +1025,7 @@ test("a row chosen before the rows changed is never opened", GIT_LAYOUT, async (
 });
 
 for (const [user, team] of ANYONE_ELSE) {
-  test(`open by anyone else shares nothing [${user}-${team}]`, GIT_LAYOUT, async (t) => {
+  test(`open by anyone else shares nothing [${user}-${team}]`, async (t) => {
     const world = openWorld(t);
     const project = projectOf(world);
     await inAThread(world);
@@ -1098,7 +1039,7 @@ for (const [user, team] of ANYONE_ELSE) {
   });
 }
 
-test("open in a modal with metadata that is not ours shares nothing", GIT_LAYOUT, async (t) => {
+test("open in a modal with metadata that is not ours shares nothing", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   await inAThread(world);
@@ -1109,7 +1050,7 @@ test("open in a modal with metadata that is not ours shares nothing", GIT_LAYOUT
   assert.ok(opened(world).length === 0 && world.slack.uploaded.length === 0);
 });
 
-test("open in a thread that holds no session shares nothing", GIT_LAYOUT, async (t) => {
+test("open in a thread that holds no session shares nothing", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   put(project, "a.py");
@@ -1118,7 +1059,7 @@ test("open in a thread that holds no session shares nothing", GIT_LAYOUT, async 
   assert.deepEqual(world.ephemerals(), [texts.NOT_A_SESSION]);
 });
 
-test("open in a refused channel shares nothing", GIT_LAYOUT, async (t) => {
+test("open in a refused channel shares nothing", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   await inAThread(world);
@@ -1133,7 +1074,6 @@ test("open in a refused channel shares nothing", GIT_LAYOUT, async (t) => {
 
 for (const value of ["../outside.txt", "link.txt", "dir-link/secret.txt", "/etc/hosts", "docs"]) {
   test(`a value that leaves the folder or is no file is refused [${value}]`, {
-    ...GIT_LAYOUT,
     ...SYMLINKS,
   }, async (t) => {
     const world = openWorld(t);
@@ -1161,7 +1101,6 @@ function loggedInfo(t: TestContext): string[] {
 }
 
 test("a file the daemon may not read is told as no file, and the log names the code", {
-  ...GIT_LAYOUT,
   skip: process.platform === "win32" || process.getuid?.() === 0 ? "no closed file" : false,
 }, async (t) => {
   const world = openWorld(t);
@@ -1181,7 +1120,7 @@ test("a file the daemon may not read is told as no file, and the log names the c
   assert.ok(!line.includes("notes.md")); // the code, never the path
 });
 
-test("a value that leaves the folder logs no cause", { ...GIT_LAYOUT, ...SYMLINKS }, async (t) => {
+test("a value that leaves the folder logs no cause", SYMLINKS, async (t) => {
   const world = openWorld(t);
   await inAThread(world);
   put(world.tmpPath, "outside.txt");
@@ -1197,7 +1136,7 @@ test("a value that leaves the folder logs no cause", { ...GIT_LAYOUT, ...SYMLINK
   );
 });
 
-test("open resolves in the folder of the thread s own session", GIT_LAYOUT, async (t) => {
+test("open resolves in the folder of the thread s own session", async (t) => {
   // The channel was bound to another folder after the thread began.
   const world = openWorld(t);
   const project = projectOf(world);
@@ -1212,7 +1151,7 @@ test("open resolves in the folder of the thread s own session", GIT_LAYOUT, asyn
   assert.equal(opened(world).length, 1);
 });
 
-test("the message of open stays so another file can be chosen", GIT_LAYOUT, async (t) => {
+test("the message of open stays so another file can be chosen", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   new ModalSlack(world.slack);
@@ -1231,7 +1170,7 @@ test("the message of open stays so another file can be chosen", GIT_LAYOUT, asyn
   assert.ok(post.blocks);
 });
 
-test("open with the path of a file shares it into the thread", GIT_LAYOUT, async (t) => {
+test("open with the path of a file shares it into the thread", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   await inAThread(world);
@@ -1260,7 +1199,7 @@ test("a path needs no git", async (t) => {
   assert.equal(opened(world).length, 1);
 });
 
-test("a name that matches one file opens it", GIT_LAYOUT, async (t) => {
+test("a name that matches one file opens it", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   await inAThread(world);
@@ -1271,24 +1210,20 @@ test("a name that matches one file opens it", GIT_LAYOUT, async (t) => {
   assert.equal(done.files[0].title, "src/Parser.py");
 });
 
-test(
-  "a file made after a name matched nothing is found by the next search",
-  GIT_LAYOUT,
-  async (t) => {
-    // A kept listing is never the reason for "no match": it is made again first.
-    const world = openWorld(t);
-    const project = projectOf(world);
-    await inAThread(world);
-    await askedOpen(world, "!open zzz");
-    assert.deepEqual(world.ephemerals(), [fill(slackTexts.OPEN_NO_MATCH, { words: "zzz" })]);
-    put(project, "src/zzz-made-since.py");
-    await askedOpen(world, "!open zzz");
-    const done = only(opened(world));
-    assert.equal(done.files[0].title, "src/zzz-made-since.py");
-  },
-);
+test("a file made after a name matched nothing is found by the next search", async (t) => {
+  // A kept listing is never the reason for "no match": it is made again first.
+  const world = openWorld(t);
+  const project = projectOf(world);
+  await inAThread(world);
+  await askedOpen(world, "!open zzz");
+  assert.deepEqual(world.ephemerals(), [fill(slackTexts.OPEN_NO_MATCH, { words: "zzz" })]);
+  put(project, "src/zzz-made-since.py");
+  await askedOpen(world, "!open zzz");
+  const done = only(opened(world));
+  assert.equal(done.files[0].title, "src/zzz-made-since.py");
+});
 
-test("typing finds a file made after the search matched nothing", GIT_LAYOUT, async (t) => {
+test("typing finds a file made after the search matched nothing", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   const modal = new ModalSlack(world.slack);
@@ -1340,7 +1275,7 @@ test("a listing that was cut is said in the modal too", async (t) => {
   assert.deepEqual(modal.labels(), ["1 file matches", slackTexts.OPEN_PARTIAL]);
 });
 
-test("a file over one megabyte is refused", GIT_LAYOUT, async (t) => {
+test("a file over one megabyte is refused", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   await inAThread(world);
@@ -1352,7 +1287,7 @@ test("a file over one megabyte is refused", GIT_LAYOUT, async (t) => {
   ]);
 });
 
-test("an empty file is refused before anything is uploaded", GIT_LAYOUT, async (t) => {
+test("an empty file is refused before anything is uploaded", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   await inAThread(world);
@@ -1370,7 +1305,7 @@ test("an empty file is refused before anything is uploaded", GIT_LAYOUT, async (
   );
 });
 
-test("without the files write scope the owner is told what to do", GIT_LAYOUT, async (t) => {
+test("without the files write scope the owner is told what to do", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   await inAThread(world);
@@ -1382,7 +1317,7 @@ test("without the files write scope the owner is told what to do", GIT_LAYOUT, a
   assert.ok(slackTexts.OPEN_NO_SCOPE.includes("slack-app-manifest.json"));
 });
 
-test("another slack failure names its code and no file content", GIT_LAYOUT, async (t) => {
+test("another slack failure names its code and no file content", async (t) => {
   const world = openWorld(t);
   const project = projectOf(world);
   await inAThread(world);
@@ -1394,7 +1329,7 @@ test("another slack failure names its code and no file content", GIT_LAYOUT, asy
   ]);
 });
 
-test("a word outside a session s thread is answered as bypass is", GIT_LAYOUT, async (t) => {
+test("a word outside a session s thread is answered as bypass is", async (t) => {
   const world = openWorld(t);
   projectOf(world);
   await world.dispatch(message("!open"));
