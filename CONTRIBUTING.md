@@ -179,8 +179,8 @@ show the text above Claude Code's reply.
 
 The **SDK release watch** workflow (`.github/workflows/sdk-release-watch.yml`) reads, every day,
 the latest `@anthropic-ai/claude-agent-sdk` release from the npm registry, runs `npm test` on it,
-and keeps one issue labelled `sdk release` with the versions, the outcome and the checks left to
-do by hand (`.github/scripts/watch-sdk-release.sh`, `.github/scripts/sdk-release-report.mjs`). The
-body is rewritten on each run; a comment is added once per new version and whenever the suite does
-not pass. Close the issue once the release is checked: a closed issue with the same title is not
+and keeps one issue labelled `sdk release` and `priority: high` with the versions, the outcome and
+the checks left to do by hand (`.github/scripts/watch-sdk-release.sh`,
+`.github/scripts/sdk-release-report.mjs`). The body is rewritten on each run; a comment is added
+once per new version and whenever the suite does not pass. Close the issue once the release is checked: a closed issue with the same title is not
 opened again.
