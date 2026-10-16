@@ -289,7 +289,10 @@ test("git is given the repository and never looks for one", async () => {
   assert.ok(!filterRan());
 });
 
-test("every git call shares one time limit", async () => {
+// The stub is a shell script found through a `:` separated PATH.
+test("every git call shares one time limit", {
+  skip: process.platform === "win32" && "the stub git is a shell script",
+}, async () => {
   // The reply waits for its footer. Each call here answers within the limit, and the limit
   // still ends the second one: it is for all of them together.
   const stub = join(tmp, "bin", "git");

@@ -121,7 +121,10 @@ test("the index is the tracked files and the untracked ones not ignored", async 
   assert.deepEqual(found.toSorted(), [".gitignore", "README", "src/new.py", "src/tracked.py"]);
 });
 
-test("the index of a subfolder is relative to it and stops at its edge", async () => {
+// Windows forbids `*` in a file name, so the folder cannot exist there.
+test("the index of a subfolder is relative to it and stops at its edge", {
+  skip: process.platform === "win32" && "Windows forbids * in a file name",
+}, async () => {
   const folder = app();
   // A folder named with glob characters: a pathspec must take it literally.
   const sub = join(folder, "we*ird [x]");

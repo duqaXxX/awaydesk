@@ -172,5 +172,6 @@ it they cannot be done.
   pages, read 2026-10-08). What awaydesk does when the first message of a thread is hidden has
   not been measured ([#196](https://github.com/duqaXxX/awaydesk/issues/196)).
 - The daemon has never run on a Linux or a Windows host. Its tests run on both in CI, apart from
-  the ones that need symlinks, FIFOs, POSIX modes, a POSIX lock or bash, or a trailing space in a
-  file name on Windows ([#197](https://github.com/duqaXxX/awaydesk/issues/197)).
+  the ones that need symlinks, FIFOs, POSIX modes, a POSIX lock or bash, and on Windows from those
+  that need a trailing space or a `*` in a file name or a shell script as `git`
+  ([#197](https://github.com/duqaXxX/awaydesk/issues/197)).

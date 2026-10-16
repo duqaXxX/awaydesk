@@ -287,7 +287,7 @@ test("the changes are counted from where head was when the thread started", asyn
   const modal = new ModalSlack(world.slack);
   const folder = join(world.root, "app");
   const start = Number(THREAD.split(".")[0]);
-  const repo = realpathSync(gitInit(join(folder, "workspace")));
+  const repo = realpathSync.native(gitInit(join(folder, "workspace")));
   commitAt(repo, "base.py", start - 1000);
   commitAt(repo, "before.py", start - 500); // moved HEAD before the thread began
   commitAt(repo, "made_by_claude.py", start + 500);
@@ -703,7 +703,7 @@ test("typing in a repository inside the folder leaves out what git ignores", asy
   const world = openWorld(t);
   const modal = new ModalSlack(world.slack);
   const folder = join(world.root, "app");
-  const nested = realpathSync(committed(join(folder, "workspace")));
+  const nested = realpathSync.native(committed(join(folder, "workspace")));
   put(nested, ".gitignore", ".venv/\n");
   put(nested, "docs/setup.md");
   put(nested, ".venv/lib/setup_tools.py");
@@ -721,7 +721,7 @@ test("typing in a repository inside the folder leaves out what git ignores", asy
  */
 function plantedBelow(world: World, ...command: string[]): { nested: string; marker: string } {
   const folder = join(world.root, "app");
-  const nested = realpathSync(committed(join(folder, "workspace")));
+  const nested = realpathSync.native(committed(join(folder, "workspace")));
   const marker = join(world.root, "filter-ran");
   git(nested, "config", "filter.planted.clean", `sh -c 'touch "${marker}"; cat'`);
   put(nested, ".git/info/attributes", "* filter=planted\n");
@@ -732,7 +732,7 @@ function plantedBelow(world: World, ...command: string[]): { nested: string; mar
   rmSync(marker);
   const home = join(world.root, "home");
   mkdirSync(home);
-  trust(home, [realpathSync(folder)]);
+  trust(home, [realpathSync.native(folder)]);
   world.backend.repository = (directory) => trustedRepository(directory, home);
   return { nested, marker };
 }
