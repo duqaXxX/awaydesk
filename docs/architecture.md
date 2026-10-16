@@ -893,8 +893,8 @@ several questions the terminal's tab row is drawn as one `context` line: each qu
 with `☒` once answered and `☐` before, cut at 40 characters, a header left empty reading
 `Question 2`, the page on screen in bold, then `✔ Submit` (bold on the review page). The modal's
 own button reads `Next (1/3)` and moves to the next page (`response_action: update`) only once the
-question has an answer, otherwise the question gets an error (`response_action: errors`), and it
-moves on whether or not the other questions already have one. On the last question it reads
+question has an answer, otherwise the question gets an error (`response_action: errors`), and, before
+the review was reached, it moves on whether or not the other questions already have one. On the last question it reads
 `Review`: it opens one more page of the same form (its page number is the question count) when
 every question has an answer, else the first question without one, with no error text. That page
 holds the tab row, `Review your answers`, and per question a section `● question` and `→ answer`
@@ -908,7 +908,7 @@ question's page with its answers as stored, through `views.update` on the click'
 validated. The draft records that the review was reached (`Draft.reviewed`): from then on, and on
 a page opened by `Edit`, the footer reads `Review` and Next goes back to the review page when
 every question has an answer, else to the first one without. `Submit answers` alone sends. The
-modal's close button reads `Close` on every page. The form has no button in its body. One question
+modal's close button reads `Close` on every page. No question page has a button in its body (the review page has `Edit`). One question
 has none of this and its `Submit` sends.
 What was filled is kept by the Slack provider in memory (`Requests.drafts`, `requests.Draft`), by
 request id, with the page on screen; the
@@ -948,8 +948,8 @@ draft is not sent without an answer, and the Review page does not show it either
 the answers (`requests.questionResult`); with a single-select option that has a preview, the
 annotation carries the preview too, as the terminal does. The record of the answers does not
 show notes, as the terminal's does not. The modal carries no channel or thread: each click in it is checked against the
-owner, the workspace, and the channel and thread its request was posted in (`Draft.threadTs`,
-alongside its `private_metadata`). Each request has a random id that only its buttons carry
+owner, the workspace, and the channel and thread its request was posted in (`requests.FormIds` in its
+`private_metadata`; the draft is never in it). Each request has a random id that only its buttons carry
 (`Approvals.open`). The listener reads a click or a form into an `OwnerAnswer` and, after the
 identity and channel guards, gives it to `ChatInbound.answer`; the answers flow
 (`answers.answersFlow`) resolves the request once, only from the channel and thread it was posted

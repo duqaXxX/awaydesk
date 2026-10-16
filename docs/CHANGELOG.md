@@ -20,7 +20,7 @@ All notable changes to this project are documented here. The format follows
   Notes field that is not on screen (a redraw Slack refused). Any other difference between the
   screen and the draft sends the draft, so a fast Next passes at once. A text of spaces alone in Other is a field error. With several
   questions the `1 of 3` line becomes the terminal's tab row, one line of text: `☒` once answered
-  and `☐` before, the page on screen in bold, then `✔ Submit`. Next moves to the next page,
+  and `☐` before, the page on screen in bold, then `✔ Submit`. Before the review is reached, Next moves to the next page,
   also when every question already has an answer, and the last question's button reads `Review`:
   it opens a page that lists each question with its answer and the notes of an answered one, each
   with an `Edit` button, and goes to the first question without an answer when one is missing, with

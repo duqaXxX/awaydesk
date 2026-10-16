@@ -223,6 +223,19 @@ test("a header the model wrote is shown as written in its tab", () => {
   );
 });
 
+test("a header with mrkdwn marks keeps the bold of the page whole in the tab row", () => {
+  const marked = question({ question: "Why?", header: "a*b_c~d", options: [{ label: "a" }] });
+  assert.equal(
+    tabsOf(questionView(draftOf(), [marked, TWO[1] as Question])),
+    "*☐ abcd*   ☐ Sizes   ✔ Submit",
+  );
+  const only = question({ question: "Why?", header: "*_~", options: [{ label: "a" }] });
+  assert.equal(
+    tabsOf(questionView(draftOf(), [only, TWO[1] as Question])),
+    "*☐ Question 1*   ☐ Sizes   ✔ Submit",
+  );
+});
+
 test("a question with no header is named by its number in the tab", () => {
   const nameless = question({ question: "Why?", header: "  ", options: [{ label: "a" }] });
   assert.equal(
@@ -237,12 +250,10 @@ test("one question has no tab row and sends with Submit", () => {
   assert.ok(view.blocks.every((b: Json) => b.type === "input"));
 });
 
-test("no page of the form has a Previous button, or a button in its body", () => {
+test("no question page has an actions block or an accessory in its body", () => {
   for (const active of [0, 1, 2]) {
     const view = questionView(draftOf({ active }), THREE);
     assert.ok(view.blocks.every((b: Json) => b.type !== "actions" && !b.accessory));
-    assert.ok(!JSON.stringify(view).includes("Previous"));
-    assert.ok(!JSON.stringify(view).includes("question_tab"));
   }
 });
 

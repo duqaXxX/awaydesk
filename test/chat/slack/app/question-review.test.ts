@@ -11,7 +11,7 @@ import { test } from "node:test";
 import type { Question } from "../../../../src/agent/seam.ts";
 import type { Draft } from "../../../../src/chat/slack/requests.ts";
 import * as slackTexts from "../../../../src/chat/slack/texts.ts";
-import { CHANNEL, rejected, STRANGER } from "../../../support/fake-slack.ts";
+import { AsyncEvent, CHANNEL, rejected, STRANGER } from "../../../support/fake-slack.ts";
 import {
   answerClick,
   type Body,
@@ -74,7 +74,7 @@ function editClick(o: Open, target: number, view: Body = o.modal.view): Body {
   return formAction(
     view,
     {},
-    { id: `question_edit_${target}`, block: `r${target}`, type: "button" },
+    { id: `question_edit_${target}`, type: "button" },
     { hash: o.modal.hash },
   );
 }
@@ -168,6 +168,17 @@ test("Edit opens that question's page with its answers as stored", async (t) => 
   assert.equal(pageOf(o.modal.view), 1);
 });
 
+test("a second Edit from the same review page changes nothing", async (t) => {
+  const o = await atReview(t);
+  const review = o.modal.view;
+  await o.world.dispatch(editClick(o, 0, review));
+  const calls = o.modal.calls.length;
+  await o.world.dispatch(editClick(o, 1, review)); // the review page it came from is gone
+  assert.equal(o.modal.calls.length, calls);
+  assert.equal(pageOf(o.modal.view), 0);
+  assert.equal(draftOf(o)?.active, 0);
+});
+
 test("Edit shows the notes kept with the answer", async (t) => {
   const o = await atReview(t);
   await o.world.dispatch(editClick(o, 0));
@@ -190,7 +201,7 @@ test("from a page opened by Edit the footer reads Review, and Review goes back t
   });
 });
 
-test("Next on a page opened by Edit validates the page like any other", async (t) => {
+test("Review on a page opened by Edit validates the page like any other", async (t) => {
   const o = await atReview(t);
   await o.world.dispatch(editClick(o, 2));
   const response = await o.world.dispatch(submitOn(o.modal.view, {}));
@@ -322,6 +333,36 @@ test("an Edit Slack refuses leaves the draft on the review page", async (t) => {
   await o.world.dispatch(editClick(o, 0));
   assert.deepEqual(o.world.ephemerals(), []);
   assert.deepEqual(draftOf(o), before);
+});
+
+test("an Edit Slack refuses after Submit answers does not bring the draft back", async (t) => {
+  const o = await atReview(t);
+  const review = o.modal.view;
+  o.world.slack.gate = new AsyncEvent();
+  o.world.slack.gateMethod = "views.update";
+  const edit = o.world.dispatch(editClick(o, 0, review));
+  await o.world.slack.gated.wait(); // the update is on its way
+  await o.world.dispatch(submitOn(review, {}));
+  await o.world.idle();
+  assert.ok(o.pending.decided);
+  assert.equal(o.world.built.drafts.size, 0);
+  o.world.slack.responses["views.update"] = rejected("not_found");
+  o.world.slack.gate.set();
+  await edit;
+  await o.world.idle();
+  assert.equal(o.world.built.drafts.size, 0);
+});
+
+test("a form closed and opened again after the review keeps reading Review", async (t) => {
+  const o = await atReview(t);
+  await o.world.dispatch(editClick(o, 0));
+  await o.world.dispatch(answerClick(o.approvalId)); // Close, then Answer
+  const reopened = (o.world.slack.callsTo("views.open") as Body[]).at(-1)?.view as Body;
+  o.modal.view = reopened;
+  assert.equal(pageOf(reopened), 0);
+  assert.equal(reopened.submit.text, "Review");
+  const review = await forward(o, radio("q0", "0"));
+  assert.equal(pageOf(review), 3);
 });
 
 test("an older form's Submit answers is stale and sends nothing", async (t) => {

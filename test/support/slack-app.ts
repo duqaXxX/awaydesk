@@ -744,7 +744,7 @@ export function picked(index: number, value: string): Body {
 export function formAction(
   view: Body,
   values: Body,
-  action: { readonly id: string; readonly block: string; readonly type: string },
+  action: { readonly id: string; readonly block?: string; readonly type: string },
   options: { readonly hash?: string; readonly user?: Body } = {},
 ): Body {
   const body = viewEvent("block_actions", values, {
@@ -756,7 +756,7 @@ export function formAction(
   body.actions = [
     {
       type: action.type,
-      block_id: action.block,
+      ...(action.block === undefined ? {} : { block_id: action.block }),
       action_id: action.id,
       action_ts: "1790000100.000000",
     },
@@ -778,7 +778,7 @@ export function answerClick(approvalId: string): Body {
  * its first question: the view of the second page, as `response_action: update` gave it. The
  * world's Slack answers `views.open` (a `ModalSlack` makes it keep the view).
  */
-export async function onSecondPage(world: World, approvalId: string, pick: string): Promise<Body> {
+async function onSecondPage(world: World, approvalId: string, pick: string): Promise<Body> {
   await world.dispatch(answerClick(approvalId));
   const first = (world.slack.callsTo("views.open") as Body[]).at(-1)?.view as Body;
   const response = await world.dispatch(submitOn(first, picked(0, pick)));

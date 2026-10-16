@@ -254,6 +254,7 @@ export type FormIds = Pick<
   "approvalId" | "channelId" | "threadTs" | "generation" | "active"
 >;
 
+/** The `private_metadata` of a form: its ids as JSON, which `loadIds` reads back. */
 export function dumpIds(ids: FormIds): string {
   return JSON.stringify({
     a: ids.approvalId,
@@ -455,9 +456,13 @@ function optionWhole(option: QuestionOption): Block {
   return { type: "rich_text", elements };
 }
 
-/** A question's header for the tab row: cut, not escaped. */
+/**
+ * A question's header for the tab row: cut, not escaped. Slack's mrkdwn has no escape for `*`, `_`
+ * and `~`, and one inside the header would end the bold of the page on screen early, so they are
+ * left out of the header here and nowhere else.
+ */
 function tabName(question: Question, at: number): string {
-  const header = cut(squeezed(question.header), TAB_LIMIT);
+  const header = cut(squeezed(question.header.replace(/[*_~]/g, "")), TAB_LIMIT);
   return header !== "" ? header : texts.fill(slackTexts.QUESTION_TAB_UNNAMED, { number: at + 1 });
 }
 

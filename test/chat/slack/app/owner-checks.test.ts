@@ -171,7 +171,7 @@ const CASES: readonly Case[] = [
       const body = formAction(
         review,
         {},
-        { id: "question_edit_0", block: "r0", type: "button" },
+        { id: "question_edit_0", type: "button" },
         { hash: modal.hash },
       );
       return {

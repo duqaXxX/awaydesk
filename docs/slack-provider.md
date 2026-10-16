@@ -680,7 +680,7 @@ workspace check applies, and the channel is checked at Submit. The Edit buttons 
 (`question_edit_{n}`, one listener, `Requests.onQuestionEdit`) check the owner and the workspace
 before anything else, act only from the newest form while it shows the review page, never reach
 the core, and when Slack refuses their `views.update` (`hash_conflict`, `not_found`) log a warning
-and put the draft back as it was, unless a Next has moved it on meanwhile. Next, Review and
+and put the draft back as it was, unless Submit answers sent it meanwhile. Next, Review and
 Submit answers go through `Requests.onQuestionSubmit`: before the review was reached Next moves
 to the next page, and on the last page, and on every page after the review, `Review` goes to the
 review page when every question has an answer, else to the first one without. The question form's Next, Review and Submit answer Slack after checks that make no network call, since a missing answer can only be shown in

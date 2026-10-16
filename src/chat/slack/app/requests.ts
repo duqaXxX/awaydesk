@@ -281,7 +281,7 @@ export class Requests {
    * the newest-form rule of `onQuestionLive`, acts only from the review page and never reaches
    * the core. The draft's page moves before the call so that a late change from the page left is
    * ignored; when Slack refuses the update (`hash_conflict`: the form moved on, `not_found`: it
-   * closed) the draft is put back, unless another click moved it since.
+   * closed) the draft is put back, unless Submit answers sent it meanwhile.
    */
   onQuestionEdit = async (ack: Ack, body: Payload): Promise<void> => {
     await ack();
