@@ -744,7 +744,7 @@ export function picked(index: number, value: string): Body {
 export function formAction(
   view: Body,
   values: Body,
-  action: { readonly id: string; readonly block: string; readonly type: string },
+  action: { readonly id: string; readonly block?: string; readonly type: string },
   options: { readonly hash?: string; readonly user?: Body } = {},
 ): Body {
   const body = viewEvent("block_actions", values, {
@@ -756,7 +756,7 @@ export function formAction(
   body.actions = [
     {
       type: action.type,
-      block_id: action.block,
+      ...(action.block === undefined ? {} : { block_id: action.block }),
       action_id: action.id,
       action_ts: "1790000100.000000",
     },
@@ -778,7 +778,7 @@ export function answerClick(approvalId: string): Body {
  * its first question: the view of the second page, as `response_action: update` gave it. The
  * world's Slack answers `views.open` (a `ModalSlack` makes it keep the view).
  */
-export async function onSecondPage(world: World, approvalId: string, pick: string): Promise<Body> {
+async function onSecondPage(world: World, approvalId: string, pick: string): Promise<Body> {
   await world.dispatch(answerClick(approvalId));
   const first = (world.slack.callsTo("views.open") as Body[]).at(-1)?.view as Body;
   const response = await world.dispatch(submitOn(first, picked(0, pick)));
@@ -800,12 +800,37 @@ export async function onReviewPage(
   return (response.body as Body).view as Body;
 }
 
-/** The Next or Submit of the form `view` with these values. */
+/**
+ * The Next or Submit of the form `view` as `submitAsShown` builds it, on a screen that took every
+ * redraw the choice in `values` called for: Other's field while Other is chosen, Notes once
+ * something is. A test about a redraw Slack refused uses `submitAsShown`.
+ */
 export function submitOn(view: Body, values: Body, user: Body = {}): Body {
+  const choice = (view.blocks as Body[] | undefined)?.find(
+    (block) => block.type === "input" && /^q\d+$/.test(block.block_id),
+  );
+  if (choice === undefined) return submitAsShown(view, values, user);
+  const at = (choice.block_id as string).slice(1);
+  const answer = values[`q${at}`]?.answer ?? {};
+  const chosen: Body[] =
+    answer.selected_options ?? (answer.selected_option ? [answer.selected_option] : []);
+  const ids = [
+    `q${at}`,
+    ...(chosen.some((option) => option.value === "other") ? [`o${at}`] : []),
+    ...(chosen.some((option) => option.value !== "other") ? [`n${at}`] : []),
+  ];
+  const shown = ids.map((block_id) => ({ type: "input", block_id }));
+  return submitAsShown({ ...view, blocks: shown }, values, user);
+}
+
+/** The Next or Submit of the form `view` exactly as it stands on screen, with these values. */
+export function submitAsShown(view: Body, values: Body, user: Body = {}): Body {
   const body = recorded("submit");
   body.type = "view_submission";
   Object.assign(body.user, user);
   body.view.private_metadata = view.private_metadata;
+  // The payload's view is the one on screen, blocks included.
+  if (Array.isArray(view.blocks)) body.view.blocks = view.blocks;
   body.view.state = { values };
   return body;
 }

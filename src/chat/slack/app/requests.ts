@@ -16,21 +16,16 @@ import {
   absorb,
   type Draft,
   draftAnswers,
-  excluding,
-  type Field,
   type FormIds,
   firstIncomplete,
   isAnswered,
   loadIds,
   newDraft,
-  notesNeedOption,
+  QUESTION_EDIT,
   QUESTION_FORM,
   QUESTION_SKIP,
   questionView,
   refusedView,
-  settled,
-  shownBlockId,
-  touched,
 } from "../requests.ts";
 import { readChoice, readSelection, setupBlocks } from "../setup.ts";
 import * as slackTexts from "../texts.ts";
@@ -46,6 +41,15 @@ import {
   str,
   text,
 } from "./wire.ts";
+
+/** The block ids of the input blocks in `blocks`, in order; none for anything but a list. */
+function inputIds(blocks: unknown): string[] {
+  if (!Array.isArray(blocks)) return [];
+  return blocks.flatMap((block) => {
+    const entry = record(block);
+    return entry.type === "input" ? [str(entry.block_id)] : [];
+  });
+}
 
 export class Requests {
   private readonly parts: AppParts;
@@ -207,19 +211,13 @@ export class Requests {
    * A change in the question form, dispatched by Slack with the form's state (block reference,
    * input block `dispatch_action` and `dispatch_action_config`; block_actions payload reference;
    * `views.update`, all read 2026-10-16). Every field reports, so the draft holds what is on
-   * screen when the form is closed with Later. Only a single select redraws: an option picked
-   * while a text stands under Other, or a character typed there while an option stands, empties
-   * the one that was not just changed in a single `views.update`; typing then goes on with no
-   * further call. `hash` makes a stale payload (the keystroke after the first) a
-   * `hash_conflict`, which is ignored. Submit reads the state again, so a missed update costs a
-   * second click on the right field. Only the newest form of a request counts (`Draft.generation`)
-   * and only the page it shows now (`FormIds`); anything else is ignored.
+   * screen when the form is closed with Close. Only a change of the choice redraws, with Other's
+   * field and Notes as the new choice needs them, in one `views.update`; typing never does. `hash`
+   * makes a stale payload a `hash_conflict`, which is ignored. Submit reads the state again. Only
+   * the newest form of a request counts (`Draft.generation`) and only the page it shows now
+   * (`FormIds`); anything else is ignored.
    */
-  private onQuestionLive = async (
-    ack: Ack,
-    body: Payload,
-    changed: Field | "notes",
-  ): Promise<void> => {
+  private onQuestionLive = async (ack: Ack, body: Payload, redraw: boolean): Promise<void> => {
     await ack();
     const { approvals, identity, slack } = this.parts;
     const [user, team] = interactionActor(body);
@@ -248,18 +246,16 @@ export class Requests {
       return;
     }
     // (sync) Kept before any await: a payload handled next finds what this one saw.
-    const read = absorb(kept, record(view.state).values);
-    const draft = changed === "notes" ? read : touched(read, changed);
-    const cleared = changed === "notes" ? null : excluding(draft, questions, changed);
-    this.drafts.set(ids.approvalId, cleared ?? draft);
+    const draft = absorb(kept, record(view.state).values);
+    this.drafts.set(ids.approvalId, draft);
     const viewId = text(view.id);
-    if (cleared === null || viewId === null || this.answers.stopped) return;
+    if (!redraw || viewId === null || this.answers.stopped) return;
     const hash = text(view.hash);
     try {
       await slack.views.update({
         view_id: viewId,
         ...(hash === null ? {} : { hash }),
-        view: questionView(cleared, questions, this.parts.names) as unknown as ModalView,
+        view: questionView(draft, questions, this.parts.names) as unknown as ModalView,
       });
     } catch (error) {
       if (isCancelled(error)) throw error;
@@ -269,29 +265,25 @@ export class Requests {
     }
   };
 
-  /** An option picked, or a box ticked, in the question form. */
+  /** An option picked, or a box ticked, in the question form: the form is drawn again. */
   onQuestionChoice = (ack: Ack, body: Payload): Promise<void> =>
-    this.onQuestionLive(ack, body, "choice");
+    this.onQuestionLive(ack, body, true);
 
-  /** A character typed under Other in the question form. */
-  onQuestionOther = (ack: Ack, body: Payload): Promise<void> =>
-    this.onQuestionLive(ack, body, "other");
-
-  /** A character typed in Notes in the question form. */
-  onQuestionNotes = (ack: Ack, body: Payload): Promise<void> =>
-    this.onQuestionLive(ack, body, "notes");
+  /** A character typed under Other or in Notes in the question form: the draft alone changes. */
+  onQuestionTyping = (ack: Ack, body: Payload): Promise<void> =>
+    this.onQuestionLive(ack, body, false);
 
   /**
-   * Back, in the question form: the page before, with every answer kept. The payload's state
-   * holds what the page on screen shows, so it is absorbed into the draft first (Back never
-   * validates), then the form is redrawn with `views.update` (block_actions payload and
-   * `views.update` references, read 2026-10-16). It checks the owner and the workspace like any
-   * inbound path, follows the newest-form rule of `onQuestionLive` and never reaches the core.
-   * The draft's page moves before the call so that a late change from the page left is ignored;
-   * when Slack refuses the update (`hash_conflict`: the form moved on, `not_found`: it closed)
-   * the page goes back to the one still on screen.
+   * Edit, on the review page of the question form: that question's page, with its answers as
+   * stored (`views.update` with the payload's view id and hash, block_actions payload and
+   * `views.update` references, read 2026-10-16). The review page has no field, so nothing is
+   * absorbed or validated. It checks the owner and the workspace like any inbound path, follows
+   * the newest-form rule of `onQuestionLive`, acts only from the review page and never reaches
+   * the core. The draft's page moves before the call so that a late change from the page left is
+   * ignored; when Slack refuses the update (`hash_conflict`: the form moved on, `not_found`: it
+   * closed) the draft is put back, unless Submit answers sent it meanwhile.
    */
-  onQuestionBack = async (ack: Ack, body: Payload): Promise<void> => {
+  onQuestionEdit = async (ack: Ack, body: Payload): Promise<void> => {
     await ack();
     const { approvals, identity, slack } = this.parts;
     const [user, team] = interactionActor(body);
@@ -313,21 +305,22 @@ export class Requests {
       this.drafts.delete(ids.approvalId);
       return;
     }
+    const target = Number(QUESTION_EDIT.exec(str(firstAction(body).action_id))?.[1] ?? Number.NaN);
     const kept = this.drafts.get(ids.approvalId);
     if (
       kept === undefined ||
       kept.generation !== ids.generation ||
       kept.active !== ids.active ||
-      ids.active === 0
+      questions.length < 2 ||
+      ids.active !== questions.length ||
+      !Number.isInteger(target) ||
+      target >= questions.length
     ) {
       return;
     }
-    // (sync) Kept before any await: a payload handled next finds what this one saw. The review
-    // page has no field to read.
-    const shown = questions.length > 1 && ids.active === questions.length;
-    const here = shown ? kept : settled(absorb(kept, record(view.state).values), questions);
-    const back = { ...here, active: ids.active - 1 };
-    this.drafts.set(ids.approvalId, back);
+    // (sync) Kept before any await: a payload handled next finds what this one saw.
+    const moved = { ...kept, active: target };
+    this.drafts.set(ids.approvalId, moved);
     const viewId = text(view.id);
     if (viewId === null || this.answers.stopped) return;
     const hash = text(view.hash);
@@ -335,13 +328,13 @@ export class Requests {
       await slack.views.update({
         view_id: viewId,
         ...(hash === null ? {} : { hash }),
-        view: questionView(back, questions, this.parts.names) as unknown as ModalView,
+        view: questionView(moved, questions, this.parts.names) as unknown as ModalView,
       });
     } catch (error) {
       if (isCancelled(error)) throw error;
-      // The form on screen is still the page the click came from.
-      if (this.drafts.get(ids.approvalId) === back) this.drafts.set(ids.approvalId, here);
-      logger.warning(`could not go back in the question form: ${describe(error)}`);
+      // The form on screen is still the review page.
+      if (this.drafts.get(ids.approvalId) === moved) this.drafts.set(ids.approvalId, kept);
+      logger.warning(`could not open a question from the review page: ${describe(error)}`);
     }
   };
 
@@ -364,7 +357,7 @@ export class Requests {
       await this.answers.tellOwner(channel, threadTs, texts.APPROVAL_GONE);
       return;
     }
-    // A form closed with Later and opened again shows what was given, on the page it was left
+    // A form closed with Close and opened again shows what was given, on the page it was left
     // on. Every Answer opens a new generation, and the older forms of the request go stale.
     const kept = this.drafts.get(approvalId) ?? newDraft(approvalId, channel, threadTs);
     const draft = { ...kept, generation: kept.generation + 1 };
@@ -444,7 +437,6 @@ export class Requests {
     if (kept === undefined || kept.generation !== ids.generation) {
       // An older form: it sends nothing, and the newest one is told apart from it. The review
       // page has no field to carry an error, so it is replaced by the reason.
-      const older = kept ?? newDraft(ids.approvalId, ids.channelId, ids.threadTs);
       if (reviewing) {
         await ack({
           response_action: "update",
@@ -454,34 +446,58 @@ export class Requests {
       }
       await ack({
         response_action: "errors",
-        errors: { [shownBlockId(older, state, "choice", ids.active)]: slackTexts.QUESTION_STALE },
+        errors: { [`q${ids.active}`]: slackTexts.QUESTION_STALE },
       });
       return;
     }
     const at = ids.active;
     // The review page has no field: its draft is the one kept.
-    const draft = reviewing
-      ? { ...kept, active: at }
-      : settled(absorb({ ...kept, active: at }, state), questions);
+    const draft = reviewing ? { ...kept, active: at } : absorb({ ...kept, active: at }, state);
     this.drafts.set(ids.approvalId, draft);
-    if (!reviewing && (notesNeedOption(draft, at) || !isAnswered(draft, questions, at))) {
-      const error = notesNeedOption(draft, at)
-        ? slackTexts.QUESTION_NOTES_NEED_OPTION
-        : slackTexts.QUESTION_MISSING;
-      await ack({
-        response_action: "errors",
-        errors: { [shownBlockId(draft, state, "choice", at)]: error },
-      });
-      return;
+    if (!reviewing) {
+      // A redraw Slack refused (`hash_conflict`) or one that has not landed yet leaves the form
+      // other than the draft draws; `view.blocks` of the payload lists the blocks on screen
+      // (docs.slack.dev, view interactions payload, read 2026-10-16: it does not say whether an
+      // empty input is listed in the state, so the state is not used for this). Only two
+      // differences put an answer at risk: Other chosen with no field to type in (Slack's
+      // required check could not run), and a note in the draft whose field the owner cannot
+      // see, though the form draws one. Any other difference sends what the draft holds: a
+      // field left on screen is read by `absorb`, and its text is used only while its choice is.
+      const drawn = questionView(draft, questions, this.parts.names);
+      const shown = inputIds(view.blocks);
+      const hidesOther = draft.other.has(at) && !shown.includes(`o${at}`);
+      const hidesNote =
+        draft.notes.has(at) &&
+        inputIds(drawn.blocks).includes(`n${at}`) &&
+        !shown.includes(`n${at}`);
+      if (hidesOther || hidesNote) {
+        await ack({ response_action: "update", view: drawn });
+        return;
+      }
+      if (!isAnswered(draft, questions, at)) {
+        // Spaces alone in Other's field are empty once stripped, and Slack keeps them there.
+        const field = draft.other.has(at) ? `o${at}` : `q${at}`;
+        await ack({
+          response_action: "errors",
+          errors: { [field]: slackTexts.QUESTION_MISSING },
+        });
+        return;
+      }
     }
-    // A form of several questions sends from its review page alone; every other page, the last
-    // question included, moves on, whether or not the rest have an answer already.
+    // A form of several questions sends from its review page alone; every other page moves on.
+    // Before the review was reached Next goes to the next page; on the last page, and on every
+    // page once the review was reached, Review goes to it, or to the first question with no
+    // answer, which shows no error text.
     const sends = reviewing || questions.length === 1;
     const missing = sends ? firstIncomplete(draft, questions) : null;
     if (!sends || missing !== null) {
-      // Each Next checks its own page, so `missing` is never set unless the draft changed under
-      // the form; kept so that a draft cannot reach the agent incomplete.
-      const next = { ...draft, active: missing ?? at + 1 };
+      const toReview =
+        questions.length > 1 && !reviewing && (draft.reviewed || at === questions.length - 1);
+      // `missing` is set only when the draft changed under the review page or a one-question
+      // form; kept so that a draft cannot reach the agent incomplete.
+      const to =
+        missing ?? (toReview ? (firstIncomplete(draft, questions) ?? questions.length) : at + 1);
+      const next = { ...draft, active: to, reviewed: draft.reviewed || to === questions.length };
       this.drafts.set(ids.approvalId, next);
       await ack({
         response_action: "update",

@@ -1,12 +1,12 @@
 /**
- * The question form while it is open (issue #325). In a single select an option and a text under
- * Other exclude each other, live: Slack dispatches a `block_actions` payload for each change
- * (input block `dispatch_action`, `dispatch_action_config` `on_character_entered`; block_actions
- * payload and `views.update` references, read 2026-10-16), and the daemon empties the other field
- * in one `views.update`, giving its block a new id because Slack keeps an input's value while the
- * block id stays. What the owner filled lives in the provider's memory (`BuiltApp.drafts`); the
- * view's `private_metadata` names the request, the form's generation and its page; only the
- * newest form of a request is valid.
+ * The question form while it is open (issue #325). Other is the last option of the list and its
+ * text field shows only while Other is chosen; Notes shows while a real option is chosen, never
+ * for Other alone. Slack
+ * dispatches a `block_actions` payload when the choice changes (input block `dispatch_action`;
+ * block_actions payload and `views.update` references, read 2026-10-16) and the daemon redraws
+ * the form in one `views.update`; typing in Other or Notes only reaches the draft. What the owner
+ * filled lives in the provider's memory (`BuiltApp.drafts`); the view's `private_metadata` names
+ * the request, the form's generation and its page; only the newest form of a request is valid.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -21,6 +21,7 @@ import {
   formAction,
   ModalSlack,
   QUESTIONS,
+  submitAsShown,
   submitOn,
   worldOf,
 } from "../../../support/slack-app.ts";
@@ -58,7 +59,7 @@ async function openForm(
 
 type Open = Awaited<ReturnType<typeof openForm>>;
 
-/** The owner picks an option / types under Other in the form as it stands. */
+/** The owner changes the choice, or types in a field, in the form as it stands. */
 const choose = (o: Open, values: Body, block = "q0"): Body =>
   formAction(
     o.modal.view,
@@ -66,15 +67,14 @@ const choose = (o: Open, values: Body, block = "q0"): Body =>
     { id: "answer", block, type: "radio_buttons" },
     { hash: o.modal.hash },
   );
-const type = (o: Open, values: Body, block = "o0"): Body =>
-  formAction(
-    o.modal.view,
-    values,
-    { id: "other", block, type: "plain_text_input" },
-    { hash: o.modal.hash },
-  );
+const typeIn = (o: Open, id: "other" | "notes", block: string, values: Body): Body =>
+  formAction(o.modal.view, values, { id, block, type: "plain_text_input" }, { hash: o.modal.hash });
+const type = (o: Open, values: Body): Body => typeIn(o, "other", "o0", values);
 /** Next or Submit in the form `view` (the one on screen unless said). */
 const submit = (o: Open, values: Body, view: Body = o.modal.view): Body => submitOn(view, values);
+
+const inputsOf = (view: Body): Body[] => (view.blocks as Body[]).filter((b) => b.type === "input");
+const draftOf = (o: Open) => o.world.built.drafts.get(o.approvalId);
 
 test("the form names its request, its generation and its page in private_metadata", async (t) => {
   const o = await openForm(t);
@@ -88,105 +88,123 @@ test("the form names its request, its generation and its page in private_metadat
   assert.equal(o.world.built.drafts.size, 1);
 });
 
-test("both fields take 300 characters", async (t) => {
+test("a question opens with its choice alone, required", async (t) => {
   const o = await openForm(t);
-  const inputs = (o.modal.view.blocks as Body[]).filter((b) => b.type === "input");
-  assert.deepEqual(
-    inputs.slice(1).map((b) => b.element.max_length),
-    [300, 300],
-  );
+  assert.deepEqual(idsOf(o.modal.view), ["q0"]);
+  assert.equal(inputsOf(o.modal.view)[0]?.optional, undefined);
 });
 
-test("picking an option empties the text under Other with one update", async (t) => {
+test("choosing Other shows its field, and no Notes, with one update", async (t) => {
   const o = await openForm(t);
   const shown = o.modal.hash;
-  await o.world.dispatch(
-    choose(o, { ...radio("q0", "1"), ...other("o0", "mauve"), ...notes("n") }),
-  );
+  await o.world.dispatch(choose(o, radio("q0", "other")));
   assert.equal(o.modal.calls.length, 1);
   const [hash, view] = o.modal.calls[0] as [string, Body];
   assert.equal(hash, shown); // the hash of the view the payload came from
-  assert.deepEqual(idsOf(view), ["q0", "o0.1", "n0"]);
-  const blocks = (view.blocks as Body[]).filter((b) => b.type === "input");
-  assert.equal(blocks[0]?.element.initial_option.value, "1"); // the pick stays
-  assert.equal(blocks[1]?.element.initial_value, undefined);
-  assert.equal(blocks[2]?.element.initial_value, "n"); // notes are never cleared
+  assert.deepEqual(idsOf(view), ["q0", "o0"]);
+  const inputs = inputsOf(view);
+  assert.equal(inputs[0]?.element.initial_option.value, "other");
+  assert.equal(inputs[1]?.element.max_length, 300);
   assert.equal(JSON.parse(view.private_metadata as string).a, o.approvalId);
+  assert.deepEqual(draftOf(o)?.other, new Set([0]));
 });
 
-test("typing under Other empties the option, and the next keystroke makes no call", async (t) => {
-  const o = await openForm(t);
-  await o.world.dispatch(type(o, { ...radio("q0", "0"), ...other("o0", "m") }));
-  assert.equal(o.modal.calls.length, 1);
-  assert.deepEqual(idsOf(o.modal.view), ["q0.1", "o0", "n0"]);
-  const blocks = (o.modal.view.blocks as Body[]).filter((b) => b.type === "input");
-  assert.equal(blocks[0]?.element.initial_option, undefined);
-  assert.equal(blocks[1]?.element.initial_value, "m");
-  // The form as it stands now: the radio is empty, the next character changes nothing else.
-  await o.world.dispatch(type(o, other("o0", "mo")));
-  assert.equal(o.modal.calls.length, 1);
-});
-
-test("nothing to clear, nothing updated", async (t) => {
+test("choosing an option shows Notes and no Other field", async (t) => {
   const o = await openForm(t);
   await o.world.dispatch(choose(o, radio("q0", "1")));
-  await o.world.dispatch(type(o, other("o0", "mauve")));
-  await o.world.dispatch(type(o, { ...radio("q0", "1"), ...other("o0", "") }));
-  assert.deepEqual(o.modal.calls, []);
+  assert.equal(o.modal.calls.length, 1);
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "n0"]);
+  assert.equal(inputsOf(o.modal.view)[0]?.element.initial_option.value, "1");
 });
 
-test("a multi-select keeps the option and the text: nothing is cleared", async (t) => {
+test("choosing an option after Other removes its field; Other again finds the text", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  await o.world.dispatch(type(o, { ...radio("q0", "other"), ...other("o0", "mauve") }));
+  await o.world.dispatch(choose(o, { ...radio("q0", "1"), ...other("o0", "mauve") }));
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "n0"]);
+  assert.deepEqual(draftOf(o)?.other, new Set());
+  assert.equal(draftOf(o)?.typed.get(0), "mauve"); // kept in the draft
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0"]);
+  assert.equal(inputsOf(o.modal.view)[1]?.element.initial_value, "mauve");
+});
+
+test("a multi select shows the Other field while Other is ticked, Notes while a real box is", async (t) => {
   const o = await openForm(t, [MULTI]);
-  const state = { ...boxes("q0", "0"), ...other("o0", "xl") };
-  for (const [id, block] of [
-    ["answer", "q0"],
-    ["other", "o0"],
-  ] as const) {
-    const body = formAction(o.modal.view, state, { id, block, type: "plain_text_input" });
-    await o.world.dispatch(body);
-  }
-  assert.deepEqual(o.modal.calls, []);
+  const tick = (...values: string[]): Body => ({
+    q0: {
+      answer: { type: "checkboxes", selected_options: values.map((value) => ({ value })) },
+    },
+  });
+  await o.world.dispatch(choose(o, tick("0")));
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "n0"]);
+  await o.world.dispatch(choose(o, tick("0", "other")));
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0", "n0"]);
+  await o.world.dispatch(choose(o, tick("other"))); // Other alone: its field, no Notes
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0"]);
+  await o.world.dispatch(choose(o, tick("0")));
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "n0"]);
+  await o.world.dispatch(choose(o, tick()));
+  assert.deepEqual(idsOf(o.modal.view), ["q0"]);
+});
+
+test("unticking everything removes Notes and keeps the note in the draft", async (t) => {
+  const o = await openForm(t, [MULTI]);
+  const ticked = boxes("q0", "0");
+  await o.world.dispatch(choose(o, ticked));
+  await o.world.dispatch(typeIn(o, "notes", "n0", { ...ticked, ...notes("both") }));
+  await o.world.dispatch(
+    choose(o, { q0: { answer: { type: "checkboxes", selected_options: [] } }, ...notes("both") }),
+  );
+  assert.deepEqual(idsOf(o.modal.view), ["q0"]);
+  assert.equal(draftOf(o)?.notes.get(0), "both");
+  await o.world.dispatch(choose(o, ticked));
+  assert.equal(inputsOf(o.modal.view)[1]?.element.initial_value, "both");
+});
+
+test("typing in Other or Notes reaches the draft and redraws nothing", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  assert.equal(o.modal.calls.length, 1);
+  const chosen = radio("q0", "other");
+  await o.world.dispatch(type(o, { ...chosen, ...other("o0", "m") }));
+  await o.world.dispatch(type(o, { ...chosen, ...other("o0", "mo") }));
+  await o.world.dispatch(
+    typeIn(o, "notes", "n0", { ...chosen, ...other("o0", "mo"), ...notes("darker") }),
+  );
+  assert.equal(o.modal.calls.length, 1);
+  assert.equal(draftOf(o)?.typed.get(0), "mo");
+  assert.equal(draftOf(o)?.notes.get(0), "darker");
 });
 
 test("a hash_conflict or a closed form is ignored", async (t) => {
   const o = await openForm(t);
-  const body = type(o, { ...radio("q0", "0"), ...other("o0", "m") });
+  const body = choose(o, radio("q0", "other"));
   body.view.hash = "1790000000.stale"; // a newer view than the payload's
   await o.world.dispatch(body);
   assert.equal(o.modal.calls.length, 1);
   assert.deepEqual(o.modal.written, []);
   o.world.slack.responses["views.update"] = rejected("not_found");
-  await o.world.dispatch(type(o, { ...radio("q0", "0"), ...other("o0", "m") }));
+  await o.world.dispatch(choose(o, radio("q0", "other")));
   assert.deepEqual(o.world.ephemerals(), []);
 });
 
 test("a stranger's change does nothing", async (t) => {
   const o = await openForm(t);
-  const body = type(o, { ...radio("q0", "0"), ...other("o0", "m") });
+  const body = choose(o, radio("q0", "other"));
   Object.assign(body.user, { id: STRANGER });
   await o.world.dispatch(body);
   assert.deepEqual(o.modal.calls, []);
+  assert.equal(draftOf(o)?.other.size, 0);
 });
 
 test("a form of another callback is left alone", async (t) => {
   const o = await openForm(t);
-  const body = type(o, { ...radio("q0", "0"), ...other("o0", "m") });
+  const body = choose(o, radio("q0", "other"));
   body.view.callback_id = "something_else";
   await o.world.dispatch(body);
   assert.deepEqual(o.modal.calls, []);
-});
-
-test("Submit reads the blocks of the revision on screen", async (t) => {
-  const o = await openForm(t);
-  await o.world.dispatch(type(o, { ...radio("q0", "0"), ...other("o0", "m") })); // radio now q0.1
-  await o.world.dispatch(submit(o, { ...radio("q0.1", "1"), ...other("o0", "") }));
-  await o.world.idle();
-  assert.ok(o.pending.decided);
-  assert.deepEqual(await o.pending.decision, {
-    answered: true,
-    answers: { "Colour?": "blue" },
-    notes: {},
-  });
 });
 
 test("an old form, whose request is gone, tells the owner instead of closing silently", async (t) => {
@@ -207,55 +225,87 @@ test("an old form, whose request is gone, tells the owner instead of closing sil
   assert.ok(!o.pending.decided);
 });
 
-test("notes travel with the option picked", async (t) => {
-  const o = await openForm(t);
-  await o.world.dispatch(submit(o, { ...radio("q0", "0"), ...notes("darker") }));
+/** The decision of a pending request after `values` were submitted on the form on screen. */
+async function sent(o: Open, values: Body) {
+  await o.world.dispatch(submit(o, values));
   await o.world.idle();
   assert.ok(o.pending.decided);
-  assert.deepEqual(await o.pending.decision, {
+  return o.pending.decision;
+}
+
+test("notes travel with the option picked", async (t) => {
+  const o = await openForm(t);
+  assert.deepEqual(await sent(o, { ...radio("q0", "0"), ...notes("darker") }), {
     answered: true,
     answers: { "Colour?": "red" },
     notes: { "Colour?": "darker" },
   });
 });
 
-test("notes with an option and a text under Other travel in a multi-select", async (t) => {
-  const o = await openForm(t, [MULTI]);
-  await o.world.dispatch(
-    submit(o, { ...boxes("q0", "0"), ...other("o0", "xl"), ...notes("both") }),
-  );
+test("a single select with Other sends the typed text and no note", async (t) => {
+  const o = await openForm(t);
+  assert.deepEqual(await sent(o, { ...radio("q0", "other"), ...other("o0", " mauve ") }), {
+    answered: true,
+    answers: { "Colour?": "mauve" },
+    notes: {},
+  });
+});
+
+test("a note typed with an option is not sent once the choice turns to Other", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(choose(o, radio("q0", "1")));
+  await o.world.dispatch(typeIn(o, "notes", "n0", { ...radio("q0", "1"), ...notes("darker") }));
+  await o.world.dispatch(choose(o, { ...radio("q0", "other"), ...notes("darker") }));
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0"]);
+  assert.equal(draftOf(o)?.notes.get(0), "darker"); // kept, not sent
+  const state = { ...radio("q0", "other"), ...other("o0", "mauve") };
+  // The form as it stands has no Notes field, and nothing bounces for the note kept.
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, state));
+  assert.equal((response.body as Body | undefined)?.response_action, undefined);
   await o.world.idle();
-  assert.ok(o.pending.decided);
   assert.deepEqual(await o.pending.decision, {
+    answered: true,
+    answers: { "Colour?": "mauve" },
+    notes: {},
+  });
+});
+
+test("a multi select with Other sends the labels and the typed text, and its notes", async (t) => {
+  const o = await openForm(t, [MULTI]);
+  const state = {
+    q0: {
+      answer: { type: "checkboxes", selected_options: [{ value: "0" }, { value: "other" }] },
+    },
+    ...other("o0", "xl"),
+    ...notes("both"),
+  };
+  assert.deepEqual(await sent(o, state), {
     answered: true,
     answers: { "Sizes?": ["s", "xl"] },
     notes: { "Sizes?": "both" },
   });
 });
 
-for (const [name, values] of [
-  ["notes alone", notes("something else")],
-  ["a text under Other and notes", { ...other("o0", "mauve"), ...notes("darker") }],
-] as const) {
-  test(`${name} with no option picked asks for an option`, async (t) => {
-    const o = await openForm(t);
-    const response = await o.world.dispatch(submit(o, values));
-    assert.deepEqual(response.body, {
-      response_action: "errors",
-      errors: { q0: slackTexts.QUESTION_NOTES_NEED_OPTION },
-    });
-    assert.equal(slackTexts.QUESTION_NOTES_NEED_OPTION, "Pick an option to add notes to it.");
-    assert.ok(!o.pending.decided);
+test("text typed before another option was chosen is not sent", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  await o.world.dispatch(type(o, { ...radio("q0", "other"), ...other("o0", "mauve") }));
+  await o.world.dispatch(choose(o, radio("q0", "1")));
+  assert.deepEqual(await sent(o, radio("q0", "1")), {
+    answered: true,
+    answers: { "Colour?": "blue" },
+    notes: {},
   });
-}
+});
 
-test("a multi-select with a text and notes but no option asks for an option too", async (t) => {
-  const o = await openForm(t, [MULTI]);
-  const response = await o.world.dispatch(submit(o, { ...other("o0", "xl"), ...notes("both") }));
+test("notes alone send nothing and ask for a choice", async (t) => {
+  const o = await openForm(t);
+  const response = await o.world.dispatch(submit(o, notes("something else")));
   assert.deepEqual(response.body, {
     response_action: "errors",
-    errors: { q0: slackTexts.QUESTION_NOTES_NEED_OPTION },
+    errors: { q0: slackTexts.QUESTION_MISSING },
   });
+  assert.ok(!o.pending.decided);
 });
 
 test("nothing at all still says to choose an option or type an answer", async (t) => {
@@ -268,13 +318,58 @@ test("nothing at all still says to choose an option or type an answer", async (t
   assert.equal(slackTexts.QUESTION_MISSING, "Choose an option or type your own answer.");
 });
 
-// Next clicked within the round trip of the clearing update carries both the option and the text.
-test("both carried at Submit: the option picked last wins", async (t) => {
+/** The multi select's boxes ticked, as the state of block q0. */
+const tick = (...values: string[]): Body => ({
+  q0: { answer: { type: "checkboxes", selected_options: values.map((value) => ({ value })) } },
+});
+
+/** A change whose payload carries the hash of a view that is no longer on screen. */
+function late(o: Open, values: Body): Body {
+  const body = choose(o, values);
+  body.view.hash = "1790000000.stale";
+  return body;
+}
+
+test("a multi select whose redraw was dropped does not send a note the owner cannot see", async (t) => {
+  const o = await openForm(t, [MULTI]);
+  await o.world.dispatch(choose(o, tick("0")));
+  await o.world.dispatch(typeIn(o, "notes", "n0", { ...tick("0"), ...notes("secret") }));
+  await o.world.dispatch(choose(o, { ...tick(), ...notes("secret") })); // Notes goes
+  assert.deepEqual(idsOf(o.modal.view), ["q0"]);
+  await o.world.dispatch(late(o, tick("1"))); // refused: hash_conflict
+  assert.deepEqual(idsOf(o.modal.view), ["q0"]);
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, tick("1")));
+  const body = response.body as Body;
+  assert.equal(body.response_action, "update");
+  assert.deepEqual(idsOf(body.view), ["q0", "n0"]);
+  assert.equal(inputsOf(body.view)[1]?.element.initial_value, "secret");
+  await o.world.idle();
+  assert.ok(!o.pending.decided);
+});
+
+test("a single select whose redraw was dropped does not send an Other text the owner cannot see", async (t) => {
   const o = await openForm(t);
-  await o.world.dispatch(type(o, other("o0", "mauve")));
-  const both = { ...radio("q0", "1"), ...other("o0", "mauve") };
-  await o.world.dispatch(choose(o, both)); // picked last; the update that clears Other is in flight
-  await o.world.dispatch(submit(o, both));
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  await o.world.dispatch(type(o, { ...radio("q0", "other"), ...other("o0", "mauve") }));
+  await o.world.dispatch(choose(o, radio("q0", "1"))); // Other's field goes
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "n0"]);
+  await o.world.dispatch(late(o, radio("q0", "other"))); // refused: hash_conflict
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, radio("q0", "other")));
+  const body = response.body as Body;
+  assert.equal(body.response_action, "update");
+  assert.deepEqual(idsOf(body.view), ["q0", "o0"]);
+  assert.equal(inputsOf(body.view)[1]?.element.initial_value, "mauve");
+  await o.world.idle();
+  assert.ok(!o.pending.decided);
+});
+
+test("a Next clicked before the redraw adding Notes lands passes at once", async (t) => {
+  const o = await openForm(t);
+  assert.deepEqual(idsOf(o.modal.view), ["q0"]);
+  // The payload lists what is on screen, the choice alone: Notes is not drawn yet, and nothing in
+  // the draft needs it, so there is no risk to bounce for.
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, radio("q0", "1")));
+  assert.equal((response.body as Body | undefined)?.response_action, undefined);
   await o.world.idle();
   assert.ok(o.pending.decided);
   assert.deepEqual(await o.pending.decision, {
@@ -284,25 +379,72 @@ test("both carried at Submit: the option picked last wins", async (t) => {
   });
 });
 
-test("both carried at Submit: the text typed last wins", async (t) => {
+test("an Other chosen with its field not on screen bounces and sends nothing", async (t) => {
   const o = await openForm(t);
-  await o.world.dispatch(choose(o, radio("q0", "1")));
-  const both = { ...radio("q0", "1"), ...other("o0", "mauve") };
-  await o.world.dispatch(type(o, both)); // typed last; the update that clears the radio is in flight
-  await o.world.dispatch(submit(o, both));
+  const state = { ...radio("q0", "other"), ...other("o0", "mauve") };
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, state));
+  const body = response.body as Body;
+  assert.equal(body.response_action, "update");
+  assert.deepEqual(idsOf(body.view), ["q0", "o0"]);
   await o.world.idle();
-  assert.ok(o.pending.decided);
+  assert.ok(!o.pending.decided);
+});
+
+test("a field on screen that the choice no longer needs does not leak its text", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0"]);
+  await o.world.dispatch(late(o, radio("q0", "1"))); // refused: Other's field stays on screen
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0"]);
+  const state = { ...radio("q0", "1"), ...other("o0", "mauve") };
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, state));
+  assert.equal((response.body as Body | undefined)?.response_action, undefined);
+  await o.world.idle();
   assert.deepEqual(await o.pending.decision, {
     answered: true,
-    answers: { "Colour?": "mauve" },
+    answers: { "Colour?": "blue" },
     notes: {},
   });
 });
 
-test("Later then Answer reopens the form with the answers already given", async (t) => {
+test("a note kept for an answer whose Notes field is not drawn again is not bounced forever", async (t) => {
+  const o = await openForm(t, [MULTI]);
+  const ticked = boxes("q0", "0");
+  await o.world.dispatch(choose(o, ticked));
+  await o.world.dispatch(typeIn(o, "notes", "n0", { ...ticked, ...notes("both") }));
+  const none = { q0: { answer: { type: "checkboxes", selected_options: [] } }, ...notes("both") };
+  await o.world.dispatch(choose(o, none)); // Notes goes; the note stays in the draft
+  assert.deepEqual(idsOf(o.modal.view), ["q0"]);
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, none));
+  // Nothing is chosen, so the form draws no Notes: the error, not a redraw that cannot help.
+  assert.equal((response.body as Body).response_action, "errors");
+});
+
+test("an Other text of spaces alone is an error on its field", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  const response = await o.world.dispatch(
+    submit(o, { ...radio("q0", "other"), ...other("o0", "   ") }),
+  );
+  assert.deepEqual(response.body, {
+    response_action: "errors",
+    errors: { o0: slackTexts.QUESTION_MISSING },
+  });
+  assert.ok(!o.pending.decided);
+});
+
+test("a change of the choice after the daemon stopped redraws nothing", async (t) => {
+  const o = await openForm(t);
+  o.world.chat.halt();
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  assert.deepEqual(o.modal.calls, []);
+  assert.deepEqual(draftOf(o)?.other, new Set([0])); // read before the stop check, as kept
+});
+
+test("Close then Answer reopens the form with the answers already given", async (t) => {
   const o = await openForm(t, [...QUESTIONS]);
   await o.world.dispatch(submit(o, radio("q0", "1"))); // Next: page two is on screen
-  // The owner closes the form (Later) and clicks Answer again.
+  // The owner closes the form (Close) and clicks Answer again.
   await o.world.dispatch(answerClick(o.approvalId));
   const reopened = o.modal.view;
   assert.equal(o.world.built.drafts.size, 1);
@@ -355,7 +497,7 @@ test("only the newest form of a request is valid: the older one's Next sends not
   assert.deepEqual(response.body, { response_action: "errors", errors: { q0: STALE } });
   assert.equal(STALE, "This form was opened again. Use the newest one.");
   assert.ok(!o.pending.decided);
-  assert.equal(o.world.built.drafts.get(o.approvalId)?.picks.size, 0); // nothing was written
+  assert.equal(draftOf(o)?.picks.size, 0); // nothing was written
 });
 
 test("the older form's changes are ignored, with no update", async (t) => {
@@ -363,19 +505,11 @@ test("the older form's changes are ignored, with no update", async (t) => {
   const older = o.modal.view;
   await o.world.dispatch(answerClick(o.approvalId));
   await o.world.dispatch(
-    formAction(
-      older,
-      { ...radio("q0", "0"), ...other("o0", "x") },
-      {
-        id: "other",
-        block: "o0",
-        type: "plain_text_input",
-      },
-    ),
+    formAction(older, radio("q0", "other"), { id: "answer", block: "q0", type: "radio_buttons" }),
   );
   assert.deepEqual(o.modal.calls, []);
-  assert.equal(o.world.built.drafts.get(o.approvalId)?.picks.size, 0);
-  assert.equal(o.world.built.drafts.get(o.approvalId)?.typed.size, 0);
+  assert.equal(draftOf(o)?.picks.size, 0);
+  assert.equal(draftOf(o)?.other.size, 0);
 });
 
 test("the older form cannot send what the newer one holds", async (t) => {
@@ -383,11 +517,11 @@ test("the older form cannot send what the newer one holds", async (t) => {
   const older = o.modal.view; // page one, nothing filled
   await o.world.dispatch(answerClick(o.approvalId));
   const newer = o.modal.view;
-  // The newer form goes on to page two and types under Other there.
+  // The newer form goes on to page two and ticks a box there.
   const next = await o.world.dispatch(submit(o, radio("q0", "0"), newer));
   const second = (next.body as Body).view as Body;
   await o.world.dispatch(
-    formAction(second, other("o1", "x"), { id: "other", block: "o1", type: "plain_text_input" }),
+    formAction(second, boxes("q1", "0"), { id: "answer", block: "q1", type: "checkboxes" }),
   );
   // Both questions now hold an answer, yet the older form's Next sends nothing.
   const response = await o.world.dispatch(submit(o, radio("q0", "0"), older));
@@ -399,15 +533,19 @@ test("the older form cannot send what the newer one holds", async (t) => {
 test("a late keystroke from the page Next already left writes nothing", async (t) => {
   const o = await openForm(t, [...QUESTIONS]);
   const first = o.modal.view;
-  await o.world.dispatch(type(o, other("o0", "blue")));
-  const next = await o.world.dispatch(submit(o, other("o0", "blue"), first));
+  const blue = radio("q0", "other");
+  const next = await o.world.dispatch(submit(o, { ...blue, ...other("o0", "mauve") }, first));
   assert.equal(((next.body as Body).view as Body).submit.text, "Review");
-  // The `blu` keystroke was handled after the submission, from the form as page one had it.
+  // The `mau` keystroke was handled after the submission, from the form as page one had it.
   await o.world.dispatch(
-    formAction(first, other("o0", "blu"), { id: "other", block: "o0", type: "plain_text_input" }),
+    formAction(
+      first,
+      { ...blue, ...other("o0", "mau") },
+      { id: "other", block: "o0", type: "plain_text_input" },
+    ),
   );
-  const kept = o.world.built.drafts.get(o.approvalId);
-  assert.equal(kept?.typed.get(0), "blue");
+  const kept = draftOf(o);
+  assert.equal(kept?.typed.get(0), "mauve");
   assert.equal(kept?.active, 1);
 });
 
@@ -432,43 +570,7 @@ test("a form that could not open leaves the older one valid", async (t) => {
       { id: "answer", block: "q0", type: "radio_buttons" },
     ),
   );
-  assert.deepEqual(o.world.built.drafts.get(o.approvalId)?.picks.get(0), [1]);
-});
-
-test("an error after an exclusion names the block now on screen", async (t) => {
-  const o = await openForm(t);
-  await o.world.dispatch(type(o, { ...radio("q0", "0"), ...other("o0", "m") })); // radio now q0.1
-  const response = await o.world.dispatch(
-    submit(o, {
-      "q0.1": { answer: { type: "radio_buttons", selected_option: null } },
-      ...other("o0", ""),
-    }),
-  );
-  assert.deepEqual(response.body, {
-    response_action: "errors",
-    errors: { "q0.1": slackTexts.QUESTION_MISSING },
-  });
-});
-
-test("a change in Notes is never the last change, nor does it run the exclusion", async (t) => {
-  const o = await openForm(t);
-  const both = { ...radio("q0", "1"), ...other("o0", "mauve") };
-  await o.world.dispatch(choose(o, both)); // the option last; Other is being emptied
-  assert.equal(o.modal.calls.length, 1);
-  const withNotes = { ...both, ...notes("darker") };
-  await o.world.dispatch(
-    formAction(o.modal.view, withNotes, { id: "notes", block: "n0", type: "plain_text_input" }),
-  );
-  assert.equal(o.modal.calls.length, 1); // no second update
-  assert.equal(o.world.built.drafts.get(o.approvalId)?.last.get(0), "choice");
-  await o.world.dispatch(submit(o, withNotes));
-  await o.world.idle();
-  assert.ok(o.pending.decided);
-  assert.deepEqual(await o.pending.decision, {
-    answered: true,
-    answers: { "Colour?": "blue" },
-    notes: { "Colour?": "darker" },
-  });
+  assert.deepEqual(draftOf(o)?.picks.get(0), [1]);
 });
 
 test("Answer on a request that is gone leaves another request's draft alone", async (t) => {
@@ -480,45 +582,36 @@ test("Answer on a request that is gone leaves another request's draft alone", as
   assert.deepEqual([...o.world.built.drafts.keys()], [o.approvalId]);
 });
 
-test("Later then Answer finds the notes typed, the boxes ticked and the text under Other", async (t) => {
+test("Close then Answer finds the boxes ticked, the text under Other and the notes typed", async (t) => {
   const o = await openForm(t, [MULTI]);
-  const field = (id: string, block: string, type: string, values: Body): Body =>
-    formAction(o.modal.view, values, { id, block, type });
-  const state = {
-    ...boxes("q0", "1"),
-    ...other("o0", "xl"),
-    ...notes("both"),
-  };
-  await o.world.dispatch(field("answer", "q0", "checkboxes", boxes("q0", "1")));
+  const tick = (...values: string[]): Body => ({
+    q0: {
+      answer: { type: "checkboxes", selected_options: values.map((value) => ({ value })) },
+    },
+  });
+  await o.world.dispatch(choose(o, tick("1", "other")));
+  await o.world.dispatch(typeIn(o, "other", "o0", { ...tick("1", "other"), ...other("o0", "xl") }));
   await o.world.dispatch(
-    field("other", "o0", "plain_text_input", { ...boxes("q0", "1"), ...other("o0", "xl") }),
+    typeIn(o, "notes", "n0", { ...tick("1", "other"), ...other("o0", "xl"), ...notes("both") }),
   );
-  await o.world.dispatch(field("notes", "n0", "plain_text_input", state));
-  assert.deepEqual(o.modal.calls, []); // only the single select's exclusion redraws
   await o.world.dispatch(answerClick(o.approvalId));
-  const inputs = (o.modal.view.blocks as Body[]).filter((b) => b.type === "input");
+  const inputs = inputsOf(o.modal.view);
   assert.deepEqual(
     inputs[0]?.element.initial_options.map((x: Body) => x.value),
-    ["1"],
+    ["1", "other"],
   );
   assert.equal(inputs[1]?.element.initial_value, "xl");
   assert.equal(inputs[2]?.element.initial_value, "both");
 });
 
-test("Later then Answer finds the notes of a single select too", async (t) => {
+test("Close then Answer finds the notes of a single select too", async (t) => {
   const o = await openForm(t);
   await o.world.dispatch(choose(o, radio("q0", "1")));
-  const typedNotes = formAction(
-    o.modal.view,
-    { ...radio("q0", "1"), ...notes("darker") },
-    { id: "notes", block: "n0", type: "plain_text_input" },
-  );
-  await o.world.dispatch(typedNotes);
-  assert.deepEqual(o.modal.calls, []);
+  await o.world.dispatch(typeIn(o, "notes", "n0", { ...radio("q0", "1"), ...notes("darker") }));
   await o.world.dispatch(answerClick(o.approvalId));
-  const inputs = (o.modal.view.blocks as Body[]).filter((b) => b.type === "input");
+  const inputs = inputsOf(o.modal.view);
   assert.equal(inputs[0]?.element.initial_option.value, "1");
-  assert.equal(inputs[2]?.element.initial_value, "darker");
+  assert.equal(inputs[1]?.element.initial_value, "darker");
 });
 
 test("a change in a form whose request is gone drops its draft", async (t) => {
@@ -538,18 +631,7 @@ test("a stranger's note changes nothing", async (t) => {
     { user: { id: STRANGER } },
   );
   await o.world.dispatch(body);
-  assert.equal(o.world.built.drafts.get(o.approvalId)?.notes.size, 0);
-});
-
-test("the older form's Next names the block it shows, not the one the draft expects", async (t) => {
-  const o = await openForm(t);
-  const older = o.modal.view; // form A: its radio block is `q0`
-  await o.world.dispatch(answerClick(o.approvalId)); // form B
-  // In B the owner picks, then types under Other: the exclusion moves the draft to `q0.1`.
-  await o.world.dispatch(type(o, { ...radio("q0", "0"), ...other("o0", "m") }));
-  assert.deepEqual(idsOf(o.modal.view), ["q0.1", "o0", "n0"]);
-  const response = await o.world.dispatch(submit(o, radio("q0", "0"), older));
-  assert.deepEqual(response.body, { response_action: "errors", errors: { q0: STALE } });
+  assert.equal(draftOf(o)?.notes.size, 0);
 });
 
 test("a late keystroke from page one leaves page two's fields as they are", async (t) => {
@@ -557,28 +639,29 @@ test("a late keystroke from page one leaves page two's fields as they are", asyn
   const first = o.modal.view;
   const next = await o.world.dispatch(submit(o, radio("q0", "0"), first));
   const second = (next.body as Body).view as Body;
-  const onSecond = (id: string, block: string, type: string, values: Body): Body =>
-    formAction(second, values, { id, block, type });
   const ticked = boxes("q1", "0");
-  await o.world.dispatch(onSecond("answer", "q1", "checkboxes", ticked));
   await o.world.dispatch(
-    onSecond("other", "o1", "plain_text_input", { ...ticked, ...other("o1", "xl") }),
+    formAction(second, ticked, { id: "answer", block: "q1", type: "checkboxes" }),
   );
   const noted = { n1: { notes: { type: "plain_text_input", value: "both" } } };
   await o.world.dispatch(
-    onSecond("notes", "n1", "plain_text_input", { ...ticked, ...other("o1", "xl"), ...noted }),
+    formAction(
+      second,
+      { ...ticked, ...noted },
+      { id: "notes", block: "n1", type: "plain_text_input" },
+    ),
   );
-  const before = o.world.built.drafts.get(o.approvalId);
+  const before = draftOf(o);
   assert.deepEqual(before?.picks.get(1), [0]);
-  // The page-one keystroke, handled after the owner went on and typed on page two.
+  // The page-one keystroke, handled after the owner went on and ticked page two.
   await o.world.dispatch(
-    formAction(first, other("o0", "blu"), { id: "other", block: "o0", type: "plain_text_input" }),
+    formAction(first, radio("q0", "other"), { id: "answer", block: "q0", type: "radio_buttons" }),
   );
-  const after = o.world.built.drafts.get(o.approvalId);
+  const after = draftOf(o);
   assert.deepEqual(after?.picks, before?.picks);
+  assert.deepEqual(after?.other, before?.other);
   assert.deepEqual(after?.typed, before?.typed);
   assert.deepEqual(after?.notes, before?.notes);
-  assert.deepEqual(after?.last, before?.last);
   assert.equal(after?.active, 1);
 });
 

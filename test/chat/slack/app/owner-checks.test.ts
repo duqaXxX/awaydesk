@@ -26,6 +26,7 @@ import {
   STATUS_ACTION,
   TODAY,
 } from "../../../../src/chat/slack/home.ts";
+import { QUESTION_EDIT } from "../../../../src/chat/slack/requests.ts";
 import {
   SETUP_BYPASS,
   SETUP_EFFORT,
@@ -126,9 +127,9 @@ const CASES: readonly Case[] = [
         const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [question]);
         const modal = new ModalSlack(world.slack);
         await world.dispatch(answerClick(approvalId)); // the form on screen
-        // An option and a text both stand: the change empties the one that was not just made.
+        // Other chosen and a text typed: a choice redraws the form, typing reaches the draft.
         const values = {
-          ...picked(0, "0"),
+          ...picked(0, "other"),
           o0: { other: { type: "plain_text_input", value: "mauve" } },
         };
         world.slack.apiCalls = []; // opening the form is the arrangement, not what the payload did
@@ -144,24 +145,33 @@ const CASES: readonly Case[] = [
         );
         return {
           body: sentBy(body, sender),
-          acted: () => world.slack.callsTo("views.update").length > 0,
+          acted:
+            actionId === "answer"
+              ? () => world.slack.callsTo("views.update").length > 0
+              : () => world.built.drafts.get(approvalId)?.typed.size === 1,
         };
       },
     }),
   ),
   {
-    listener: "action question_back",
+    listener: `action ${QUESTION_EDIT}`,
     arrange: async (world, sender) => {
       const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
       const modal = new ModalSlack(world.slack);
       await world.dispatch(answerClick(approvalId));
       const next = await world.dispatch(submitOn(modal.view, picked(0, "0")));
       const second = (next.body as Body).view as Body; // the form on page two
+      const last = await world.dispatch(
+        submitOn(second, {
+          q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } },
+        }),
+      );
+      const review = (last.body as Body).view as Body; // the review page
       world.slack.apiCalls = [];
       const body = formAction(
-        second,
+        review,
         {},
-        { id: "question_back", block: "back", type: "button" },
+        { id: "question_edit_0", type: "button" },
         { hash: modal.hash },
       );
       return {

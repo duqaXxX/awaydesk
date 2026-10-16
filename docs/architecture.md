@@ -878,60 +878,78 @@ backtick (`escape.shownAsWritten`), so no `<url|label>` can hide what it links a
 its code block. A clarifying question (Claude Code's `AskUserQuestion` tool, 1 to 4 questions)
 arrives the same way and is posted as one line naming the questions, with **Answer** and **Skip**.
 Answer opens a modal (`requests.questionView`) that shows one question at a time: radio buttons, or checkboxes when several may be picked, each option with its description, and
-an **Other** field and a **Notes** field, as the terminal offers. Slack caps an option object's text and description at 75
+**Other** as the last option of the list, as the terminal's list ends with its own row for a typed
+answer. The choice is required (no `optional`, so Slack shows no `(optional)` beside the question).
+While Other is chosen an input block under the choice, **Your answer** (required, placeholder
+`Type your own answer`), takes the text; **Notes** (optional) shows while a real option is
+chosen, not for Other alone (with a multi-select, while at least one real box is ticked, Other
+ticked or not), and a note kept in the draft is sent only then. Slack caps an option object's text and description at 75
 characters each and gives it no place for the option's `preview`. When an option says more than
 that, the page shows the question in bold, then every option whole in a `rich_text` block: its label
 in bold, its full description, and its preview in a preformatted element, which keeps its line
 breaks. Rich text shows its text as written, so nothing Claude wrote is read as markup. The choice
 under them keeps the labels alone, titled with the question's header. With
-several questions Slack has no tabs, so the terminal's are drawn as a context line:
-each question's header with `☒` once answered and `☐` before, the page on screen in bold, then
-`✔ Submit`; a header left empty reads `Question 2`. The modal's own button reads `Next (1/3)`
-and moves to the next page (`response_action: update`) only once the question has an answer,
-otherwise the question gets an error (`response_action: errors`), and it moves on whether or not
-the other questions already have one. On the last question it reads `Review` and opens one more
-page of the same form (its page number is the question count): the tab
-row with `✔ Submit` in bold, `Review your answers`, a section `● question` and `→ answer` per
-question (a multi-select's joined with `, `) and, when the question has notes, a line
-`Notes: …` under it; each text goes through `escape.shownAsWritten`, which escapes `&`, `<`, `>`
-and backticks (so `*` and `_` still format), and a section is cut to 3,000 characters before the
-escape, never inside one. `Submit answers` alone sends. From the second question on, and on the review page, a **← header** button
-(`question_back`, `Requests.onQuestionBack`) goes back one page: it absorbs the fields of the page
-on screen into the draft first, validates nothing, and redraws the previous page with
-`views.update` on the click's view id and `hash`, every answer kept. The button's text is plain
-text: the header goes in as written, cut to 40 characters, not escaped. One question has none of this
-and its `Submit` sends.
+several questions the terminal's tab row is drawn as one `context` line: each question's header
+with `☒` once answered and `☐` before, cut at 40 characters, a header left empty reading
+`Question 2`, the page on screen in bold, then `✔ Submit` (bold on the review page). The modal's
+own button reads `Next (1/3)` and moves to the next page (`response_action: update`) only once the
+question has an answer, otherwise the question gets an error (`response_action: errors`), and, before
+the review was reached, it moves on whether or not the other questions already have one. On the last question it reads
+`Review`: it opens one more page of the same form (its page number is the question count) when
+every question has an answer, else the first question without one, with no error text. That page
+holds the tab row, `Review your answers`, and per question a section `● question` and `→ answer`
+(a multi-select's joined with `, `) and, when a real option was chosen and the question has notes,
+a line `Notes: …` under it, with an `Edit` button as the section's accessory (`question_edit_{n}`,
+one action id per question, since Slack wants them unique in a view); each text goes through
+`escape.shownAsWritten`, which escapes `&`, `<`, `>` and backticks (so `*` and `_` still format),
+and a section is cut to 3,000 characters before the escape, never inside one. `Edit` opens that
+question's page with its answers as stored, through `views.update` on the click's view id and
+`hash` (`Requests.onQuestionEdit`); the review page has no field, so nothing is absorbed or
+validated. The draft records that the review was reached (`Draft.reviewed`): from then on, and on
+a page opened by `Edit`, the footer reads `Review` and Next goes back to the review page when
+every question has an answer, else to the first one without. `Submit answers` alone sends. The
+modal's close button reads `Close` on every page. No question page has a button in its body (the review page has `Edit`). One question
+has none of this and its `Submit` sends.
 What was filled is kept by the Slack provider in memory (`Requests.drafts`, `requests.Draft`), by
-request id, with the page on screen and the revision of each question's clearable blocks; the
+request id, with the page on screen; the
 view's `private_metadata` holds only the request's id, channel and thread, the form's generation
 and the page it shows (`requests.FormIds`), so Other and Notes take 300 characters each
 (`TYPED_LIMIT`, `NOTES_LIMIT`) with no Slack cap to fit. Only the newest form of a request is
-valid: every Answer opens a new generation (Later then Answer, a second click, a second device),
+valid: every Answer opens a new generation (Close then Answer, a second click, a second device),
 and the older forms are stale (a form whose `views.open` fails does not count: the older one
-stays valid). A stale form's changes and its Back are ignored, and its Next or Submit answers
+stays valid). A stale form's changes and its Edit are ignored, and its Next or Submit answers
 `response_action: errors` with `texts.QUESTION_STALE` on the question's block (on the review page,
-which has no field, the form is replaced by that sentence) and sends nothing; a change or a Back
-from a page Next has already left is ignored too. Every field of the valid form
+which has no field, the form is replaced by that sentence) and sends nothing; a change from a page Next has already left, or an Edit from a page that is not the review, is ignored too. Every field of the valid form
 reports each change (an option picked, a box ticked, a character typed under Other or in Notes:
-`dispatch_action`), and the draft is updated from it, with no `views.update` except the single
-select's exclusion below. An entry goes when its request is answered, skipped or found gone, at
-the next Answer for a request that ended another way, and when the app closes. Answer after Later
+`dispatch_action`), and the draft is updated from it. Only a change of the choice redraws the
+form with `views.update` (Other's field and Notes come and go with it); typing never does. A
+block keeps its `block_id` (`q0`, `o0`, `n0`) while it stays on screen, so Slack keeps what is
+typed in it. An entry goes when its request is answered, skipped or found gone, at
+the next Answer for a request that ended another way, and when the app closes. Answer after Close
 reopens the form on the page left, with the pages already submitted and what each field of the
 open page held at its last change. The picked labels,
 with the text typed under Other as the answer itself, go back as the tool's answers, a
-multi-select's as a list (measured: "Multi-select answer as a list"). In a single select an
-option and a text under Other exclude each other, as in the terminal, where the typed text
-replaces the option: the two blocks dispatch an action on every change and the provider empties
-the other one (`requests.excluding`); a click on Next that still carries both (it came before
-that update) keeps the one changed last (`requests.settled`). A multi-select adds the text to the
-labels and clears nothing. Notes are optional and belong to an option: with no option picked,
-Next and Submit show `Pick an option to add notes to it.` under the question, whatever else is
-filled. Notes travel to the agent as that question's `notes`, in the tool's `annotations` beside
+multi-select's as a list (measured: "Multi-select answer as a list"). In a single select Other
+is one option among the others, so an option and a text never stand together; a multi-select
+adds the text to the labels when Other is ticked. A text kept in the draft is sent only while
+Other is chosen, and the Review page shows it as the answer. With nothing chosen Next and Submit
+show `Choose an option or type your own answer.` under the question; Other chosen with only
+spaces is a field error on the Other block. Next and Submit also compare the input blocks the
+payload's `view.blocks` lists (what is on screen) with the ones the draft draws, and answer
+`response_action: update` with the form drawn again, sending nothing, in two cases only: Other is
+chosen on the page and its field `o{page}` is not on screen (Slack's required check could not run
+on it), or the draft holds a note for the page, the form draws its field `n{page}` and it is not on
+screen. Any other difference sends what the draft holds, so a Next clicked before the redraw that
+adds Notes lands passes at once, and a field left on screen that the choice no longer needs (Other
+unticked, the redraw refused) is read but its text is not used while its choice is not. The
+reference for `view.state.values` does not say whether an empty input is listed (read 2026-10-16),
+so the state is not used for this. A note kept in the
+draft is not sent without an answer, and the Review page does not show it either. Notes travel to the agent as that question's `notes`, in the tool's `annotations` beside
 the answers (`requests.questionResult`); with a single-select option that has a preview, the
 annotation carries the preview too, as the terminal does. The record of the answers does not
 show notes, as the terminal's does not. The modal carries no channel or thread: each click in it is checked against the
-owner, the workspace, and the channel and thread its request was posted in (`Draft.threadTs`,
-alongside its `private_metadata`). Each request has a random id that only its buttons carry
+owner, the workspace, and the channel and thread its request was posted in (`requests.FormIds` in its
+`private_metadata`; the draft is never in it). Each request has a random id that only its buttons carry
 (`Approvals.open`). The listener reads a click or a form into an `OwnerAnswer` and, after the
 identity and channel guards, gives it to `ChatInbound.answer`; the answers flow
 (`answers.answersFlow`) resolves the request once, only from the channel and thread it was posted

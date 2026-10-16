@@ -20,21 +20,21 @@ export const SECTION_LIMIT = 3000;
 export const MESSAGE_BLOCKS = 50; // Slack's limit on blocks in one message
 export const OPTION_TEXT_LIMIT = 75;
 export const LABEL_LIMIT = 2000; // an input block's label
-const TAB_LIMIT = 40; // a question's header in the tab row and on the Back button
+const TAB_LIMIT = 40; // a question's header in the tab row
 
 export const APPROVAL_ALLOW = "approval_allow";
 export const APPROVAL_DENY = "approval_deny";
 export const QUESTION_OPEN = "question_open";
 export const QUESTION_SKIP = "question_skip";
 export const QUESTION_FORM = "question_form";
-export const QUESTION_BACK = "question_back";
+/** The Edit buttons of the review page: `question_edit_{n}`, n a question's index. */
+export const QUESTION_EDIT = /^question_edit_(\d+)$/;
 // Text typed under Other and in Notes, per question. The draft lives in the daemon's memory
 // (`Requests`), so Slack's 3,000 characters of private_metadata bound neither.
 export const TYPED_LIMIT = 300;
 export const NOTES_LIMIT = 300;
-// A block that must show empty gets a new id: Slack keeps an input's value across `views.update`
-// while its `block_id` and `action_id` stay. The revision wraps, so the ids stay short.
-const REVISIONS = 100;
+// The value of the Other option; the others carry their index in the question's options.
+const OTHER_VALUE = "other";
 
 type Block = Record<string, unknown>;
 type Answers = Record<string, string | string[]>;
@@ -194,24 +194,11 @@ export function questionBlocks(
   ];
 }
 
-/** The two fields of a question that can be cleared while the form is open. */
-export type Field = "choice" | "other";
-
-/** The id of a question's choice or Other block at revision `rev` (0 is the plain id). */
-function blockIdOf(field: Field, at: number, rev: number): string {
-  return `${field === "choice" ? "q" : "o"}${at}${rev === 0 ? "" : `.${rev}`}`;
-}
-
-/** The id of the block that shows `field` of question `at` in a form built from `draft`. */
-export function blockIdIn(draft: Draft, field: Field, at: number): string {
-  return blockIdOf(field, at, draft.revisions.get(at)?.[field === "choice" ? 0 : 1] ?? 0);
-}
-
 /**
  * What the owner filled in the form so far, kept by the provider in memory (`Requests`) while
- * the request is open: option indexes picked, text typed under Other and notes, per question; the
- * revision of each question's two clearable blocks (`blockIdIn`); and which of the two was
- * changed last in a single select (`settled`).
+ * the request is open: option indexes picked, the questions whose Other option is chosen, and the
+ * text typed under Other and the notes, per question. A text or a note stays here when its field
+ * leaves the screen, so choosing Other again shows it again.
  */
 export interface Draft {
   readonly approvalId: string;
@@ -224,13 +211,13 @@ export interface Draft {
   readonly generation: number;
   /** The question on screen in the valid form. */
   readonly active: number;
+  /** Whether the review page was reached: from then on the footer reads Review on every page. */
+  readonly reviewed: boolean;
   readonly picks: ReadonlyMap<number, readonly number[]>;
+  /** The questions whose Other option is chosen. */
+  readonly other: ReadonlySet<number>;
   readonly typed: ReadonlyMap<number, string>;
   readonly notes: ReadonlyMap<number, string>;
-  /** Per question: the revision of its choice block and of its Other block in the valid form. */
-  readonly revisions: ReadonlyMap<number, readonly [choice: number, other: number]>;
-  /** Per question: the field the owner changed last. */
-  readonly last: ReadonlyMap<number, Field>;
 }
 
 /** A draft of the request `approvalId` posted in this thread, with nothing filled in unless given. */
@@ -239,7 +226,7 @@ export function newDraft(
   channelId: string,
   threadTs: string,
   filled: Partial<
-    Pick<Draft, "generation" | "active" | "picks" | "typed" | "notes" | "revisions" | "last">
+    Pick<Draft, "generation" | "active" | "reviewed" | "picks" | "other" | "typed" | "notes">
   > = {},
 ): Draft {
   return {
@@ -248,11 +235,11 @@ export function newDraft(
     threadTs,
     generation: filled.generation ?? 0,
     active: filled.active ?? 0,
+    reviewed: filled.reviewed ?? false,
     picks: filled.picks ?? new Map(),
+    other: filled.other ?? new Set(),
     typed: filled.typed ?? new Map(),
     notes: filled.notes ?? new Map(),
-    revisions: filled.revisions ?? new Map(),
-    last: filled.last ?? new Map(),
   };
 }
 
@@ -267,6 +254,7 @@ export type FormIds = Pick<
   "approvalId" | "channelId" | "threadTs" | "generation" | "active"
 >;
 
+/** The `private_metadata` of a form: its ids as JSON, which `loadIds` reads back. */
 export function dumpIds(ids: FormIds): string {
   return JSON.stringify({
     a: ids.approvalId,
@@ -307,40 +295,15 @@ function fieldsOf(value: unknown): Record<string, unknown> {
 }
 
 /**
- * The state of the block of `field` for question `at`, whatever its revision: Slack names the
- * blocks of the form by the ids it was given.
- */
-function stateOf(
-  values: Record<string, unknown>,
-  field: Field,
-  at: number,
-): Record<string, unknown> {
-  const prefix = blockIdOf(field, at, 0);
-  const id = Object.keys(values).find((key) => key === prefix || key.startsWith(`${prefix}.`));
-  return fieldsOf(id === undefined ? undefined : values[id]);
-}
-
-/**
- * The id of the block that shows `field` of question `at` in the form `stateValues` came from,
- * which is where a field error must go; the id the draft expects when the state names none.
- */
-export function shownBlockId(draft: Draft, stateValues: unknown, field: Field, at: number): string {
-  const values = fieldsOf(stateValues);
-  const prefix = blockIdOf(field, at, 0);
-  return (
-    Object.keys(values).find((key) => key === prefix || key.startsWith(`${prefix}.`)) ??
-    blockIdIn(draft, field, at)
-  );
-}
-
-/**
  * The draft with what the question on screen shows now: Slack sends the form's state with Next
- * and Submit, and with a dispatched action, but only for the blocks on screen.
+ * and Submit, and with a dispatched action, but only for the blocks on screen. The Other and
+ * Notes fields leave the screen with the choice, so a field the state does not carry keeps what
+ * the draft holds.
  */
 export function absorb(draft: Draft, stateValues: unknown): Draft {
   const at = draft.active;
   const values = fieldsOf(stateValues);
-  const picked = fieldsOf(stateOf(values, "choice", at).answer);
+  const picked = fieldsOf(fieldsOf(values[`q${at}`]).answer);
   const single = fieldsOf(picked.selected_option);
   const several = picked.selected_options;
   const chosen: unknown[] =
@@ -349,68 +312,33 @@ export function absorb(draft: Draft, stateValues: unknown): Draft {
       : Object.keys(single).length > 0
         ? [single]
         : [];
-  const typedText = fieldsOf(stateOf(values, "other", at).other).value;
-  const typed = typeof typedText === "string" ? strip(typedText) : "";
-  const noteText = fieldsOf(fieldsOf(values[`n${at}`]).notes).value;
-  const noted = typeof noteText === "string" ? strip(noteText) : "";
+  const values_ = chosen.map((o) => fieldsOf(o).value);
   const picks = new Map(draft.picks);
-  picks.set(
-    at,
-    chosen.map((o) => index(fieldsOf(o).value)),
-  );
-  const texts_ = new Map(draft.typed);
-  texts_.set(at, typed);
-  const notes = new Map(draft.notes);
-  notes.set(at, noted);
+  picks.set(at, values_.filter((v) => v !== OTHER_VALUE).map(index));
+  const other = new Set(draft.other);
+  if (values_.includes(OTHER_VALUE)) other.add(at);
+  else other.delete(at);
   return {
     ...draft,
     picks: new Map([...picks].filter(([, v]) => v.length > 0)),
-    typed: new Map([...texts_].filter(([, v]) => v !== "")),
-    notes: new Map([...notes].filter(([, v]) => v !== "")),
+    other,
+    typed: withField(draft.typed, at, fieldsOf(fieldsOf(values[`o${at}`]).other)),
+    notes: withField(draft.notes, at, fieldsOf(fieldsOf(values[`n${at}`]).notes)),
   };
 }
 
-/** The draft with `field` of the question on screen marked as the one changed last. */
-export function touched(draft: Draft, field: Field): Draft {
-  return { ...draft, last: new Map(draft.last).set(draft.active, field) };
-}
-
-/**
- * The draft to show when the field just changed (`changed`, read into `draft` by `absorb`) must
- * empty the other one, or null when nothing must be cleared. A single select takes an option or
- * a text under Other, never both (Claude Code replaces the option with the text); a multi-select
- * takes both, so nothing is cleared there. The cleared block gets a new id, since Slack would
- * keep its value otherwise.
- */
-export function excluding(
-  draft: Draft,
-  questions: readonly Question[],
-  changed: Field,
-): Draft | null {
-  const at = draft.active;
-  if (questions[at]?.multiSelect !== false) return null;
-  const cleared: Field = changed === "choice" ? "other" : "choice";
-  const filled = cleared === "other" ? draft.typed.has(at) : draft.picks.has(at);
-  const changedFilled = changed === "choice" ? draft.picks.has(at) : draft.typed.has(at);
-  if (!filled || !changedFilled) return null;
-  const [choice, other] = draft.revisions.get(at) ?? [0, 0];
-  const revisions = new Map(draft.revisions).set(
-    at,
-    cleared === "choice" ? [(choice + 1) % REVISIONS, other] : [choice, (other + 1) % REVISIONS],
-  );
-  const picks = new Map(draft.picks);
-  const typed = new Map(draft.typed);
-  (cleared === "choice" ? picks : typed).delete(at);
-  return { ...draft, picks, typed, revisions };
-}
-
-/**
- * The draft as Next or Submit reads it. A single select carries both an option and a text when
- * the click came before the update that empties one of them: the one changed last stays (the
- * text when no change was seen).
- */
-export function settled(draft: Draft, questions: readonly Question[]): Draft {
-  return excluding(draft, questions, draft.last.get(draft.active) ?? "other") ?? draft;
+/** `kept` with question `at` set to what `field` holds; unchanged when the field is not on screen. */
+function withField(
+  kept: ReadonlyMap<number, string>,
+  at: number,
+  field: Record<string, unknown>,
+): Map<number, string> {
+  const next = new Map(kept);
+  if (Object.keys(field).length === 0) return next;
+  const value = typeof field.value === "string" ? strip(field.value) : "";
+  if (value === "") next.delete(at);
+  else next.set(at, value);
+  return next;
 }
 
 function answerAt(
@@ -420,30 +348,36 @@ function answerAt(
 ): string | string[] | null {
   const question = questions[at];
   if (question === undefined) throw new RangeError(`no question ${at}`);
-  return answerOf(question, draft.picks.get(at) ?? [], draft.typed.get(at));
+  const picked = draft.picks.get(at) ?? [];
+  if (!draft.other.has(at)) return answerOf(question, picked, undefined);
+  // Other chosen with no text is no answer, even beside options picked in a multi select.
+  const typed = draft.typed.get(at);
+  return typed === undefined ? null : answerOf(question, picked, typed);
 }
 
-/** An option or a text under Other make an answer, as in the terminal. */
+/**
+ * Whether a note belongs to the answer of question `at`: only a real option carries one, so Other
+ * alone shows no Notes field and sends no note.
+ */
+function takesNotes(draft: Draft, at: number): boolean {
+  return (draft.picks.get(at) ?? []).length > 0;
+}
+
+/** An option, or Other with its text, makes an answer, as in the terminal. */
 export function isAnswered(draft: Draft, questions: readonly Question[], at: number): boolean {
   return answerAt(draft, questions, at) !== null;
 }
 
-/** Whether question `at` has notes and no option to add them to: a note is for an option. */
-export function notesNeedOption(draft: Draft, at: number): boolean {
-  return draft.notes.has(at) && !draft.picks.has(at);
-}
-
-/** The index of the first question with no answer or with notes and no option, else null. */
+/** The index of the first question with no answer, else null. */
 export function firstIncomplete(draft: Draft, questions: readonly Question[]): number | null {
-  const found = questions.findIndex(
-    (_, at) => !isAnswered(draft, questions, at) || notesNeedOption(draft, at),
-  );
+  const found = questions.findIndex((_, at) => !isAnswered(draft, questions, at));
   return found === -1 ? null : found;
 }
 
 /**
- * Every question's answer by its text and the notes added to an option by the question's text,
- * or null while one question is unanswered or has notes with no option.
+ * Every question's answer by its text and the notes added to it by the question's text, or null
+ * while one question is unanswered. A note kept for a question with no answer, or whose answer
+ * is Other alone, is not sent.
  */
 export function draftAnswers(
   draft: Draft,
@@ -453,10 +387,10 @@ export function draftAnswers(
   const notes: [string, string][] = [];
   for (const [at, question] of questions.entries()) {
     const answer = answerAt(draft, questions, at);
-    if (answer === null || notesNeedOption(draft, at)) return null;
+    if (answer === null) return null;
     answers.push([question.text, answer]);
     const note = draft.notes.get(at);
-    if (note !== undefined) notes.push([question.text, note]);
+    if (note !== undefined && takesNotes(draft, at)) notes.push([question.text, note]);
   }
   return { answers: Object.fromEntries(answers), notes: Object.fromEntries(notes) };
 }
@@ -522,9 +456,13 @@ function optionWhole(option: QuestionOption): Block {
   return { type: "rich_text", elements };
 }
 
-/** A question's header for the tab row and the Back button: cut, not escaped. */
+/**
+ * A question's header for the tab row: cut, not escaped. Slack's mrkdwn has no escape for `*`, `_`
+ * and `~`, and one inside the header would end the bold of the page on screen early, so they are
+ * left out of the header here and nowhere else.
+ */
 function tabName(question: Question, at: number): string {
-  const header = cut(squeezed(question.header), TAB_LIMIT);
+  const header = cut(squeezed(question.header.replace(/[*_~]/g, "")), TAB_LIMIT);
   return header !== "" ? header : texts.fill(slackTexts.QUESTION_TAB_UNNAMED, { number: at + 1 });
 }
 
@@ -542,33 +480,24 @@ function tabRow(draft: Draft, questions: readonly Question[]): Block {
   return context(cells.join("   "));
 }
 
-/**
- * The button that goes back to question `to`: it moves one page and keeps every answer. Its text
- * is plain text, so the header goes in as written, not escaped for mrkdwn.
- */
-function backBlock(questions: readonly Question[], to: number): Block {
-  const question = questions[to] as Question;
-  const label = texts.fill(slackTexts.QUESTION_BACK_TO, { header: tabName(question, to) });
-  return {
-    type: "actions",
-    elements: [
-      { type: "button", action_id: QUESTION_BACK, text: { type: "plain_text", text: label } },
-    ],
-  };
-}
-
 /** The page that ends a form of several questions: every answer, to read before it is sent. */
 function reviewView(draft: Draft, questions: readonly Question[], names: Names): Block {
   const sections = questions.map((question, at) => {
-    const answer = answerAt(draft, questions, at) ?? "";
-    const shown = typeof answer === "string" ? answer : answer.join(", ");
+    const answer = answerAt(draft, questions, at);
+    const shown = typeof answer === "string" ? answer : (answer ?? []).join(", ");
     let lines = `● ${question.text}\n→ ${shown}`;
+    // A note kept for a question with no answer, or answered by Other alone, is not sent, so the
+    // page does not show it.
     const noted = draft.notes.get(at);
-    if (noted !== undefined) lines += `\n${slackTexts.QUESTION_NOTES}: ${noted}`;
+    if (answer !== null && noted !== undefined && takesNotes(draft, at)) {
+      lines += `\n${slackTexts.QUESTION_NOTES}: ${noted}`;
+    }
     // Cut as written, on the room the escaped text takes, so no escape is split.
     const [first = "", ...rest] = codeChunks(lines, SECTION_LIMIT - 1);
     const text = `${shownAsWritten(first)}${rest.length > 0 ? "…" : ""}`;
-    return { type: "section", text: { type: "mrkdwn", text } };
+    // One action id per question: Slack wants them unique within a view.
+    const edit = button(`question_edit_${at}`, slackTexts.QUESTION_EDIT, String(at));
+    return { type: "section", text: { type: "mrkdwn", text }, accessory: edit };
   });
   return {
     type: "modal",
@@ -581,23 +510,24 @@ function reviewView(draft: Draft, questions: readonly Question[], names: Names):
       tabRow(draft, questions),
       { type: "section", text: { type: "mrkdwn", text: slackTexts.QUESTION_REVIEW_HEADING } },
       ...sections,
-      backBlock(questions, questions.length - 1),
     ],
   };
 }
 
 /**
  * The form, one question at a time, as the terminal's tabs: with several questions a tab row
- * names them and tells which are answered, the button reads `Next (1/3)` and leads to the next
- * question (whether or not the others have an answer), and `Review` on the last opens a page
- * that lists every answer (`reviewView`), whose `Submit answers` sends. From the second question
- * on a button goes back one question (`QUESTION_BACK`). One question has none of that and its
- * `Submit` sends. Each question needs an answer before the next. The question shows as radio buttons, or checkboxes when several may be
- * picked, each option with its description, and an Other field (tools reference: "type your own
- * text through the Other row"). Both are optional in Slack's eyes: Next checks that the question
- * has one. When an option says more than a choice holds (`saysMore`), the question and every
- * option are shown whole above the choice, which keeps the labels alone under the question's
- * header (issue #47).
+ * (one context line) names them and tells which are answered, the button reads `Next (1/3)` and
+ * leads to the next question (whether or not the others have an answer), and `Review` on the
+ * last opens a page that lists every answer with an Edit button (`reviewView`), whose `Submit
+ * answers` sends. Once the review was reached (`Draft.reviewed`) every page's button reads
+ * `Review`. One question has none of that and its `Submit` sends. Each question needs an answer
+ * before the next. The question shows as radio buttons, or checkboxes when several may be
+ * picked, each option with its description, and Other as the last option, as the terminal's list
+ * ends with its own row for a typed answer (tools reference: "type your own text through the
+ * Other row"). The choice is required. While Other is chosen its text field shows, required too;
+ * Notes shows while a real option is chosen, not for Other alone. When an option says more than
+ * a choice holds (`saysMore`), the question and every option are shown whole above the choice,
+ * which keeps the labels alone under the question's header (issue #47).
  */
 export function questionView(draft: Draft, questions: readonly Question[], names: Names): Block {
   const blocks: Block[] = [];
@@ -618,67 +548,72 @@ export function questionView(draft: Draft, questions: readonly Question[], names
     label = oneLine(header !== "" ? header : slackTexts.QUESTION_ANSWER, LABEL_LIMIT);
   }
   const options = question.options.map((o, i) => optionEntry(i, o, !whole));
+  const otherOption: Block = {
+    text: { type: "plain_text", text: slackTexts.QUESTION_OTHER },
+    description: { type: "plain_text", text: slackTexts.QUESTION_OTHER_HINT },
+    value: OTHER_VALUE,
+  };
+  const wantsOther = draft.other.has(at);
   const element: Block = {
     type: question.multiSelect ? "checkboxes" : "radio_buttons",
     action_id: "answer",
-    options,
+    options: [...options, otherOption],
   };
-  const picked = (draft.picks.get(at) ?? []).flatMap((i) => options[i] ?? []);
+  const real = (draft.picks.get(at) ?? []).flatMap((i) => options[i] ?? []);
+  const picked = [...real, ...(wantsOther ? [otherOption] : [])];
   if (picked.length > 0 && question.multiSelect) {
     element.initial_options = picked;
   } else if (picked.length > 0) {
     element.initial_option = picked[0];
   }
-  const other: Block = {
-    type: "plain_text_input",
-    action_id: "other",
-    max_length: TYPED_LIMIT,
-    placeholder: { type: "plain_text", text: slackTexts.QUESTION_OTHER_HINT },
-  };
-  const typed = draft.typed.get(at);
-  if (typed) other.initial_value = typed;
-  const notes: Block = {
-    type: "plain_text_input",
-    action_id: "notes",
-    max_length: NOTES_LIMIT,
-    placeholder: { type: "plain_text", text: slackTexts.QUESTION_NOTES_HINT },
-  };
-  const noted = draft.notes.get(at);
-  if (noted) notes.initial_value = noted;
-  // Every field reports its change (`Requests.onQuestionLive`), so that a form closed with Later
-  // and opened again finds what was typed. Only a single select redraws: it takes an option or
-  // a text under Other, not both, and `excluding` empties the other one. A multi-select adds the
-  // text to the labels and clears nothing.
+  // A change of the choice redraws the form (`Requests.onQuestionChoice`): Other's field and
+  // Notes come and go with it. The two text fields only report to the draft, so that a form
+  // closed with Close and opened again finds what was typed.
+  blocks.push({
+    type: "input",
+    block_id: `q${at}`,
+    dispatch_action: true,
+    label: { type: "plain_text", text: label },
+    element,
+  });
   const typing = { trigger_actions_on: ["on_character_entered"] };
-  other.dispatch_action_config = typing;
-  notes.dispatch_action_config = typing;
-  blocks.push(
-    {
+  if (wantsOther) {
+    const other: Block = {
+      type: "plain_text_input",
+      action_id: "other",
+      max_length: TYPED_LIMIT,
+      placeholder: { type: "plain_text", text: slackTexts.QUESTION_OTHER_HINT },
+      dispatch_action_config: typing,
+    };
+    const typed = draft.typed.get(at);
+    if (typed) other.initial_value = typed;
+    blocks.push({
       type: "input",
-      block_id: blockIdIn(draft, "choice", at),
-      optional: true,
+      block_id: `o${at}`,
       dispatch_action: true,
-      label: { type: "plain_text", text: label },
-      element,
-    },
-    {
-      type: "input",
-      block_id: blockIdIn(draft, "other", at),
-      optional: true,
-      dispatch_action: true,
-      label: { type: "plain_text", text: slackTexts.QUESTION_OTHER },
+      label: { type: "plain_text", text: slackTexts.QUESTION_YOUR_ANSWER },
       element: other,
-    },
-    {
+    });
+  }
+  if (real.length > 0) {
+    const notes: Block = {
+      type: "plain_text_input",
+      action_id: "notes",
+      max_length: NOTES_LIMIT,
+      placeholder: { type: "plain_text", text: slackTexts.QUESTION_NOTES_HINT },
+      dispatch_action_config: typing,
+    };
+    const noted = draft.notes.get(at);
+    if (noted) notes.initial_value = noted;
+    blocks.push({
       type: "input",
       block_id: `n${at}`,
       optional: true,
       dispatch_action: true,
       label: { type: "plain_text", text: slackTexts.QUESTION_NOTES },
       element: notes,
-    },
-  );
-  if (at > 0) blocks.push(backBlock(questions, at - 1));
+    });
+  }
   const last = at === count - 1;
   return {
     type: "modal",
@@ -687,11 +622,12 @@ export function questionView(draft: Draft, questions: readonly Question[], names
     title: { type: "plain_text", text: named(slackTexts.QUESTION_TITLE, names) },
     submit: {
       type: "plain_text",
-      text: !last
-        ? texts.fill(slackTexts.QUESTION_NEXT, { number: at + 1, count })
-        : count > 1
-          ? slackTexts.QUESTION_REVIEW
-          : "Submit",
+      text:
+        count === 1
+          ? "Submit"
+          : last || draft.reviewed
+            ? slackTexts.QUESTION_REVIEW
+            : texts.fill(slackTexts.QUESTION_NEXT, { number: at + 1, count }),
     },
     close: { type: "plain_text", text: slackTexts.QUESTION_CLOSE },
     blocks,

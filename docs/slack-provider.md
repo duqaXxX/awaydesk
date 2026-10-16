@@ -662,23 +662,28 @@ once the form is open, and a refused channel replaces the form with the reason
 The update carries the hash the form opened with; when the owner closed the form or moved on in
 it meanwhile, the reason goes to the thread as a line only the owner sees. The
 form shows the owner alone what the request already shows. In the question form every field reports its change as a `block_actions` payload
-(`Requests.onQuestionLive`: an option, a box, Other, Notes) and updates the draft. In a single
-select a change of the option, or a character typed under Other, also empties the other field with one `views.update` that carries the
-hash of the view it came from; the emptied block gets a new `block_id` (`Draft.revisions`),
+(`Requests.onQuestionLive`: an option, a box, Other, Notes) and updates the draft. A change of
+the choice (`onQuestionChoice`) also redraws the form with one `views.update` that carries the
+hash of the view it came from: Other is the last option, its text field shows only while Other
+is chosen, and Notes only while a real option is chosen (not for Other alone). Typing in Other or in Notes
+(`onQuestionTyping`) redraws nothing. A block keeps its `block_id` while it stays on screen,
 because Slack keeps an input's value while its `block_id` and `action_id` stay. A `hash_conflict`
 or `not_found` is logged and ignored: Submit reads the state as it stands. What the owner filled
 stays in the provider's memory (`Requests.drafts`) and the view's `private_metadata` holds the
 request's ids, the form's generation and its page. Only the newest form of a request is valid:
 every Answer (`Requests.onQuestionOpen`) opens a new generation from the draft, an older form's
-changes and its Back are ignored, and its Next or Submit answers `texts.QUESTION_STALE` as a field
+changes and its Edit are ignored, and its Next or Submit answers `texts.QUESTION_STALE` as a field
 error (on the review page, as the whole form replaced by that sentence) and sends nothing. A form an earlier version opened has no generation, or carries a whole draft
 beside the ids: it is read for the ids and the generation, so once its request is gone
 `texts.APPROVAL_GONE` answers (checked first), and while the request is open it is stale. The same owner and
-workspace check applies, and the channel is checked at Submit. The Back button of the question form
-(`question_back`) checks the owner and the workspace before anything else, never reaches the core,
-and when Slack refuses its `views.update` (`hash_conflict`, `not_found`) logs a warning and drops
-it; the draft's page, moved back before the call, is rolled back to the page still on screen
-unless a Next has moved it on meanwhile. The question form's Next, Review and Submit answer Slack after checks that make no network call, since a missing answer can only be shown in
+workspace check applies, and the channel is checked at Submit. The Edit buttons of the review page
+(`question_edit_{n}`, one listener, `Requests.onQuestionEdit`) check the owner and the workspace
+before anything else, act only from the newest form while it shows the review page, never reach
+the core, and when Slack refuses their `views.update` (`hash_conflict`, `not_found`) log a warning
+and put the draft back as it was, unless Submit answers sent it meanwhile. Next, Review and
+Submit answers go through `Requests.onQuestionSubmit`: before the review was reached Next moves
+to the next page, and on the last page, and on every page after the review, `Review` goes to the
+review page when every question has an answer, else to the first one without. The question form's Next, Review and Submit answer Slack after checks that make no network call, since a missing answer can only be shown in
 that answer, and Submit checks the channel before the answer reaches the core. A
 failure after the checks reaches the owner as a line of its own (`Talk.replyOnFailure` for what a
 flow does, `Answers.replyOnFailure` for what a listener does itself): a post in the thread for a

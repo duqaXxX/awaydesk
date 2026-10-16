@@ -7,6 +7,37 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The question form lists Other as its last option, has tabs and a review page, and takes
+  optional Notes (issue #325). Other is the last option of the radio buttons and of the
+  checkboxes (`Other`, `Type your own answer`), as the terminal's list ends with its own row. Its
+  text field, required, shows only while Other is chosen, and the optional Notes field only while a
+  real option is chosen (a single select with Other shows only Other's field; a multi select shows
+  Notes while at least one real box is ticked, Other ticked or not). The choice is required, so Slack shows no `(optional)` beside the question.
+  The form redraws only when the choice changes; typing in Other or Notes reaches the draft and
+  redraws nothing. A text or a note kept in the draft is sent only with a choice (Other's text
+  only while Other is chosen, a note only while a real option is). Next and Submit redraw the form and send nothing in two cases:
+  Other is chosen and its field is not on screen, or the draft holds a note and the form draws a
+  Notes field that is not on screen (a redraw Slack refused). Any other difference between the
+  screen and the draft sends the draft, so a fast Next passes at once. A text of spaces alone in Other is a field error. With several
+  questions the `1 of 3` line becomes the terminal's tab row, one line of text: `☒` once answered
+  and `☐` before, the page on screen in bold, then `✔ Submit`. Before the review is reached, Next moves to the next page,
+  also when every question already has an answer, and the last question's button reads `Review`:
+  it opens a page that lists each question with its answer and the notes of an answered one, each
+  with an `Edit` button, and goes to the first question without an answer when one is missing, with
+  no error text. `Edit` opens that question's page with its answers as stored; from then on, and on
+  every page once the review was reached, the button reads `Review` and leads back to the review
+  page (or to the first question without an answer). `Submit answers` alone sends. The form's
+  close button reads `Close`, and the field shown for Other is labelled `Your answer`. One question is unchanged. Notes reach the agent as that question's `annotations`
+  entry beside the answers, with the preview of the option picked for a single select; the
+  record of the answers does not show them. What the owner filled now lives in the daemon's
+  memory and the form's `private_metadata` holds only the request, the form's generation and its
+  page, so Other and Notes hold 300 characters each. Only the newest form of a request is valid:
+  Answer again (Close then Answer, a second click, a second device) opens a new generation, and
+  the older form's Next shows `This form was opened again. Use the newest one.` and sends nothing
+  (on the review page the whole form is replaced by that sentence). Close then Answer reopens the
+  form with the answers submitted and what each field of the open page held at its last change.
+  A restart still loses an open form, as it loses the request.
+
 - A crash while a question or an approval that opened the turn waits no longer leaves the thread
   with the owner's message alone (issue #325). The turn had no reply message (a reply starts on
   its first write), so the repair on the next start deleted the request and nothing said the turn
@@ -29,33 +60,6 @@ All notable changes to this project are documented here. The format follows
   skipped, denied, failed or stopped still gets its card then. The request message rewritten for a
   question asked inside a subagent starts with the same `✓ `. New `Preview.record` on the chat
   seam.
-
-- The question form has a way back and a review page (issue #325). With several questions the
-  `1 of 3` line becomes the terminal's tab row (`☒ Colour  *☐ Sizes*  ☐ Shape  ✔ Submit`:
-  answered, open, the page on screen in bold). From the second question on a button named for
-  the previous question (`← Colour`) goes back one page and keeps every answer; the fields of the
-  page it leaves are kept first, and Back checks nothing. Next always moves to the next page,
-  also when every question already has an answer; the last question's button reads `Review` and
-  opens a page that lists each question with its answer and its notes, whose `Submit answers`
-  alone sends.
-  One question is unchanged. A stale form's Back is ignored, and a stale `Submit answers`
-  replaces the review page with `This form was opened again. Use the newest one.`.
-
-- The question form takes a text under Other and optional Notes in every question (issue #325).
-  In a single select an option and a text under Other exclude each other, live, as in the
-  terminal where the typed text replaces the option: picking an option empties Other and typing
-  there empties the radio, in one `views.update`; a Next that carries both keeps the one changed
-  last. A multi-select clears nothing. Notes belong to an option: with none picked, Next and
-  Submit show `Pick an option to add notes to it.`. They reach the agent as that question's
-  `annotations` entry beside the answers, with the preview of the option picked for a single
-  select; the record of the answers does not show them. What the owner filled now lives in the
-  daemon's memory and the form's `private_metadata` holds only the request, the form's generation
-  and its page, so Other and Notes hold 300 characters each. Only the newest form of a request
-  is valid: Answer again (Later then Answer, a second click, a second device) opens a new
-  generation, and the older form's Next shows `This form was opened again. Use the newest one.`
-  and sends nothing. Every field reports its changes (an option, a box, Other, Notes), so Later
-  then Answer reopens the form with the answers submitted and what each field of the open page
-  held at its last change. A restart still loses an open form, as it loses the request.
 
 ### Fixed
 
