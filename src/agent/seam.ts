@@ -45,6 +45,12 @@ export interface Capabilities {
    * sent: the core drops it, with a line in the log.
    */
   readonly effortLevels: readonly string[];
+  /**
+   * The word the agent uses for "the model's own default effort", which an `effort_changed` or
+   * `effort_observed` level may carry though it is no level `setEffort` takes. The core stores
+   * it as no override. Null when the agent has no such word.
+   */
+  readonly effortDefault: string | null;
   /** `setEffort` changes the live session; without it the core restarts the session. */
   readonly liveEffort: boolean;
   readonly permissionModes: PermissionModes;

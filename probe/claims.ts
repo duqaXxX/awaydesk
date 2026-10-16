@@ -272,6 +272,14 @@ export const CLAIMS: readonly Claim[] = [
       "SDK now says what woke the turn, the limit is gone: take its row out of `docs/limits.md` " +
       "and say so in the issue it names",
   ),
+  claim(
+    "P26",
+    "gesture",
+    "the result of `/effort` and of `/model` names the command in `local_command`, and its text " +
+      "says the level a command set, so the back end can tell the core",
+    "src/agent/claude/translate.ts#effortChanged",
+    "in a thread, send `!effort low`; the footer shows `low`, then `!effort auto`; it shows `auto`",
+  ),
 ];
 
 if (new Set(CLAIMS.map((c) => c.id)).size !== CLAIMS.length) {

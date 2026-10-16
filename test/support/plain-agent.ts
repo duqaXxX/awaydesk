@@ -66,6 +66,7 @@ export const PLAIN_MODE = "standard";
 
 export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   effortLevels: Object.freeze(["brief", "full"]),
+  effortDefault: "standard",
   liveEffort: false,
   permissionModes: Object.freeze({ default: PLAIN_MODE, auto: null, bypass: null }),
   subagents: false,
@@ -170,7 +171,7 @@ export function effort(level: string | null): PlainStep {
   return { effort: level };
 }
 
-/** The turn waits here until `interrupt()`(it ends as `interrupted`) or `release()`. */
+/** The turn waits here until `interrupt()` (it ends as `interrupted`) or `release()`. */
 export function hold(): PlainStep {
   return { hold: true };
 }

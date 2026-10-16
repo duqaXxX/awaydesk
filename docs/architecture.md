@@ -1413,8 +1413,8 @@ messages not sent, whether or not Claude Code had taken it in; its replay is not
   ends with, corrects it; with no stored level the effort is unknown until Claude Code reports one.
   A stored level that is not among the back end's `effortLevels` is never sent, with a line in the
   log. The session stores the level of an `effort_changed` event (the back end reads it from the
-  output of the command that set it); `"auto"`, the CLI's word for the default, is stored as
-  unset.
+  output of the command that set it); the agent's word for its default (`Capabilities.effortDefault`,
+  `"auto"` for Claude) is stored as unset.
 - Shutting down, once the drain has ended, closes every session (`SessionManager.closeAll`). A
   thread's own session also closes on its own: from the idle close, or at once when its stored
   session id can no longer be resumed (`SessionGone`). Either way, every reply still waiting in it

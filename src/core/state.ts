@@ -46,7 +46,7 @@ export interface ThreadState {
   // `bypass_off: true`, written for that alone. A file from before reads as never chosen where
   // it held `false`; old code ignores the extra key and reads an off as not on.
   readonly bypass: boolean | null;
-  /** The level set with `/effort`; null when unset or set back to the default. */
+  /** The level the owner set by command; null when unset or set back to the default. */
   readonly effort: string | null;
   // Crash repair (issue #19), each an id only, never message content:
   // the ts of every open reply's last message (more than one can be open at once: a background
@@ -398,7 +398,7 @@ export class StateStore {
     }
   }
 
-  /** Record the effort level `/effort` set for a thread; a no-op for an unknown thread. */
+  /** Record the effort level a command set for a thread; a no-op for an unknown thread. */
   setEffort(channelId: string, threadId: string, effort: string | null): void {
     const current = this.thread(channelId, threadId);
     if (current !== null && current.effort !== effort) {

@@ -307,8 +307,8 @@ export class ThreadSession {
   // then whatever the agent reports (`dispatch`).
   mode: string;
   cliVersion: string | null = null;
-  // The effort level the agent last reported: its Stop hook, or the output of `/effort` and
-  // `/model`, which run no hook. Null for a model without effort.
+  // The effort level the agent last reported (`effort_observed`, or `effort_changed` after a
+  // command of the owner's). Null for a model without effort.
   effort: string | null = null;
   // Whether the agent has reported the level since the client started: until then it is not
   // known, since the settings do not decide it (measured 2026-09-25).
@@ -1429,8 +1429,8 @@ export class ThreadSession {
         resume: sessionId,
         settingsSources: ["user", "project", "local"],
         model: null,
-        // The model set with `/model` survives a resume by itself (measured); the effort
-        // `/effort` set does not, so the daemon stores it per thread and passes it back here.
+        // A model set by command survives a resume by itself (measured); the effort a command
+        // set does not, so the daemon stores it per thread and passes it back here.
         effort: valid,
       },
       {
@@ -1698,14 +1698,11 @@ export class ThreadSession {
         // Stored so the next connect can pass it back (a model set by command survives a
         // resume by itself; effort does not). A null level means "unknown" (a model change
         // that names no effort), not "back to default": the stored override, if any, is left
-        // alone. "auto" is the CLI's own word for the default: that IS an explicit reset,
+        // alone. The agent's word for its default (`effortDefault`) IS an explicit reset,
         // stored as none.
         if (event.level !== null) {
-          this.deps.state.setEffort(
-            this.channelId,
-            this.threadId,
-            event.level === "auto" ? null : event.level,
-          );
+          const reset = event.level === this.deps.agent.capabilities.effortDefault;
+          this.deps.state.setEffort(this.channelId, this.threadId, reset ? null : event.level);
         }
         return;
       case "folder_changed":

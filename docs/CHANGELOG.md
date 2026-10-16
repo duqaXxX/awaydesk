@@ -40,7 +40,11 @@ All notable changes to this project are documented here. The format follows
   the output of a result whose `local_command` is `effort` or `model` (`translate.effortChanged`),
   so the text of any other turn is never read as an output, which the core guarded against by
   matching the prompt (`footer.setsEffort`, removed with `footer.effortChange`). What the footer
-  shows is unchanged. `SDKResultMessage.local_command` is a row of `docs/sdk-surface.md`
+  shows is unchanged. The agent declares its word for the default effort in the new capability
+  `effortDefault` (Claude: `auto`, the CLI's word, which is no `EffortLevel`); the session
+  stores that level as no override instead of comparing with the literal. Probe claim P26 checks
+  that the results of `/effort` and `/model` name their command.
+  `SDKResultMessage.local_command` is a row of `docs/sdk-surface.md`
   (recorded 2026-10-16, Claude Code 2.1.301, `effort-model-commands.jsonl`).
 - A rate limited Slack call waits out at most 60 seconds of Slack's pauses in all
   (`clients.RATE_LIMIT_WAIT_SECONDS`, issue #236). It was sent again up to 3 times after any

@@ -9,6 +9,7 @@ import { CAPABILITIES } from "../../../src/agent/claude/capabilities.ts";
 test("the Claude back end declares what the core adapts to", () => {
   assert.deepEqual(CAPABILITIES, {
     effortLevels: ["low", "medium", "high", "xhigh", "max"],
+    effortDefault: "auto",
     liveEffort: true,
     permissionModes: { default: "default", auto: "auto", bypass: "bypassPermissions" },
     subagents: true,

@@ -26,6 +26,7 @@ import {
 import { type JsonObject, sdkRecords } from "../support/fixtures.ts";
 import {
   call,
+  effort,
   fail as failedRequest,
   hold,
   PLAIN_CAPABILITIES,
@@ -301,6 +302,18 @@ class ClaudeWorld implements AgentWorld {
     return { prompt: "/usage", includes: "Current session" };
   }
 
+  effortCommand(to: "level" | "default"): { readonly prompt: string; readonly level: string } {
+    const level = to === "level" ? "low" : (CAPABILITIES.effortDefault ?? "");
+    const recorded = sdkRecords("effort-model-commands").slice(0, 3);
+    const batch = recorded.map((item) =>
+      item.type === "result"
+        ? { ...item, result: `Effort level set to ${level} (this session only)` }
+        : item,
+    );
+    this.#plays.push({ kind: "other", batch: withSession(batch, this.#sessionId()) });
+    return { prompt: `/effort ${level}`, level };
+  }
+
   failTurn(): string {
     this.#plays.push({
       kind: "other",
@@ -455,6 +468,12 @@ class PlainWorld implements AgentWorld {
   // A command takes no turn of the script.
   command(): { readonly prompt: string; readonly includes: string } {
     return { prompt: "/echo hello", includes: "hello" };
+  }
+
+  effortCommand(to: "level" | "default"): { readonly prompt: string; readonly level: string } {
+    const level = to === "level" ? "full" : (PLAIN_CAPABILITIES.effortDefault ?? "");
+    this.#turns.push([effort(level)]);
+    return { prompt: "set the effort", level };
   }
 
   failTurn(): string {
