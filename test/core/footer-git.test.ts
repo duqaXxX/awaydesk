@@ -170,8 +170,12 @@ function filterRan(): boolean {
 }
 
 /** What a footer that lets git find the repository runs in `folder`. */
-function gitDiffsThere(folder: string): void {
-  spawnSync("git", ["-C", folder, "diff-files", "--shortstat"], { env: gitEnv(), stdio: "ignore" });
+function gitDiffsThere(folder: string): string {
+  const run = spawnSync("git", ["-C", folder, "diff-files", "--shortstat"], {
+    env: { ...gitEnv(), GIT_TRACE: "1" },
+    encoding: "utf8",
+  });
+  return `status ${run.status}\nstdout ${run.stdout}\nstderr ${run.stderr}`;
 }
 
 for (const [name, plant] of PLANTED) {
@@ -180,8 +184,8 @@ for (const [name, plant] of PLANTED) {
     const folder = plant();
     filterRan(); // building the folder ran it once
     // The control: git, left to find the repository from the folder, runs the filter.
-    gitDiffsThere(folder);
-    assert.ok(filterRan());
+    const trace = gitDiffsThere(folder);
+    assert.ok(filterRan(), trace);
     assert.deepEqual(await gitState(folder, repository), [null, null]);
     assert.ok(!filterRan());
   });
