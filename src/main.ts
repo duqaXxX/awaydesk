@@ -37,8 +37,9 @@
  *   In that time the lock is already free, and launchd, which sees a live job, starts nothing.
  *   A shutdown that completes no step for `SHUTDOWN_LIMIT_SECONDS` ends the process with 1 on
  *   a timer that does not keep it alive (`deferred`): a shutdown stuck on a connection, or on a
- *   start of the agent that a word of the daemon made and that never answers (`!status`, the
- *   setup of a thread: `ThreadSession.close` waits for it), would leave the daemon deaf, still
+ *   start of the agent that never answers (one a word of the daemon made, `!status` or the
+ *   setup of a thread, or one the session's own worker gave up: `ThreadSession.close` waits for
+ *   both), would leave the daemon deaf, still
  *   holding the single-instance lock, with nobody to Ctrl-C it. For a stop that a signal asked
  *   for, the limit starts once the drain is over (the drain's own wait is
  *   `DRAIN_LIMIT_SECONDS`, never shortened) and runs from the last step that completed: each

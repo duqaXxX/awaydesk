@@ -30,7 +30,6 @@ import type {
   StartOptions,
 } from "../../src/agent/seam.ts";
 import { ResumeRefused } from "../../src/agent/seam.ts";
-import { GIT_LAYOUT } from "../support/platform.ts";
 
 type Input = Readonly<Record<string, unknown>>;
 
@@ -1095,7 +1094,7 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       "a folder is trusted as the agent's record says",
       {
         ...LIMIT,
-        skip: caps.folderTrust ? GIT_LAYOUT.skip : `${name} does not declare folderTrust`,
+        skip: caps.folderTrust ? false : `${name} does not declare folderTrust`,
       },
       async (world) => {
         assert.ok(world.trust, "the harness records trust");
