@@ -63,7 +63,13 @@ const DECISION_LABEL = /\bD\d{1,2}\b/;
 function markdownFiles(directory: string): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist") {
+    // `build` holds the copy of npm/README.md that `npm run build:npm` assembles.
+    if (
+      entry.name.startsWith(".") ||
+      entry.name === "node_modules" ||
+      entry.name === "dist" ||
+      entry.name === "build"
+    ) {
       continue;
     }
     const path = join(directory, entry.name);

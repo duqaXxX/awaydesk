@@ -1,7 +1,7 @@
 {
   "name": "awaydesk",
   "version": "0.1.0",
-  "description": "Drive the Claude Code sessions on your own Mac from private Slack channels. Powered by Claude.",
+  "description": "Drive the coding-agent sessions on your own computer from private Slack channels.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -25,6 +25,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "build:npm": "npm run prepack && node .github/scripts/npm-package.mjs",
     "prepack": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && npm run build",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",

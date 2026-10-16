@@ -1,7 +1,7 @@
 {
   "display_information": {
     "name": "awaydesk",
-    "description": "Drive the Claude Code sessions on your own machine from private Slack channels. Powered by Claude.",
+    "description": "Drive the coding-agent sessions on your own computer from private Slack channels.",
     "background_color": "#1f2328"
   },
   "features": {
