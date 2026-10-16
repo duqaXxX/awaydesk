@@ -442,7 +442,7 @@ function optionWhole(option: QuestionOption): Block {
   return { type: "rich_text", elements };
 }
 
-/** A question's header for the tab row and the Back button: cut, not escaped. */
+/** A question's header for the tab row: cut, not escaped. */
 function tabName(question: Question, at: number): string {
   const header = cut(squeezed(question.header), TAB_LIMIT);
   return header !== "" ? header : texts.fill(slackTexts.QUESTION_TAB_UNNAMED, { number: at + 1 });

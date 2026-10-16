@@ -20,6 +20,7 @@ import {
   formAction,
   ModalSlack,
   QUESTIONS,
+  submitAsShown,
   submitOn,
   worldOf,
 } from "../../../support/slack-app.ts";
@@ -295,20 +296,70 @@ test("nothing at all still says to choose an option or type an answer", async (t
   assert.equal(slackTexts.QUESTION_MISSING, "Choose an option or type your own answer.");
 });
 
-test("Other chosen with no text shows the field again instead of sending", async (t) => {
-  // Slack's own check of the required field comes first; this is the guard behind it, for a
-  // form whose redraw was dropped and so never showed the field.
+/** The multi select's boxes ticked, as the state of block q0. */
+const tick = (...values: string[]): Body => ({
+  q0: { answer: { type: "checkboxes", selected_options: values.map((value) => ({ value })) } },
+});
+
+/** A change whose payload carries the hash of a view that is no longer on screen. */
+function late(o: Open, values: Body): Body {
+  const body = choose(o, values);
+  body.view.hash = "1790000000.stale";
+  return body;
+}
+
+test("a multi select whose redraw was dropped does not send a note the owner cannot see", async (t) => {
   const o = await openForm(t, [MULTI]);
-  const state = {
-    q0: {
-      answer: { type: "checkboxes", selected_options: [{ value: "0" }, { value: "other" }] },
-    },
-  };
-  const response = await o.world.dispatch(submit(o, state));
+  await o.world.dispatch(choose(o, tick("0")));
+  await o.world.dispatch(typeIn(o, "notes", "n0", { ...tick("0"), ...notes("secret") }));
+  await o.world.dispatch(choose(o, { ...tick(), ...notes("secret") })); // Notes goes
+  assert.deepEqual(idsOf(o.modal.view), ["q0"]);
+  await o.world.dispatch(late(o, tick("1"))); // refused: hash_conflict
+  assert.deepEqual(idsOf(o.modal.view), ["q0"]);
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, tick("1")));
+  const body = response.body as Body;
+  assert.equal(body.response_action, "update");
+  assert.deepEqual(idsOf(body.view), ["q0", "n0"]);
+  assert.equal(inputsOf(body.view)[1]?.element.initial_value, "secret");
+  await o.world.idle();
+  assert.ok(!o.pending.decided);
+});
+
+test("a single select whose redraw was dropped does not send an Other text the owner cannot see", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  await o.world.dispatch(type(o, { ...radio("q0", "other"), ...other("o0", "mauve") }));
+  await o.world.dispatch(choose(o, radio("q0", "1"))); // Other's field goes
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "n0"]);
+  await o.world.dispatch(late(o, radio("q0", "other"))); // refused: hash_conflict
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, radio("q0", "other")));
   const body = response.body as Body;
   assert.equal(body.response_action, "update");
   assert.deepEqual(idsOf(body.view), ["q0", "o0", "n0"]);
+  assert.equal(inputsOf(body.view)[1]?.element.initial_value, "mauve");
+  await o.world.idle();
   assert.ok(!o.pending.decided);
+});
+
+test("an Other text of spaces alone is an error on its field", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  const response = await o.world.dispatch(
+    submit(o, { ...radio("q0", "other"), ...other("o0", "   ") }),
+  );
+  assert.deepEqual(response.body, {
+    response_action: "errors",
+    errors: { o0: slackTexts.QUESTION_MISSING },
+  });
+  assert.ok(!o.pending.decided);
+});
+
+test("a change of the choice after the daemon stopped redraws nothing", async (t) => {
+  const o = await openForm(t);
+  o.world.chat.halt();
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  assert.deepEqual(o.modal.calls, []);
+  assert.deepEqual(draftOf(o)?.other, new Set([0])); // read before the stop check, as kept
 });
 
 test("Later then Answer reopens the form with the answers already given", async (t) => {

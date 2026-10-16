@@ -41,6 +41,19 @@ import {
   text,
 } from "./wire.ts";
 
+/** The block ids of the input blocks in `blocks`, in order; none for anything but a list. */
+function inputIds(blocks: unknown): string[] {
+  if (!Array.isArray(blocks)) return [];
+  return blocks.flatMap((block) => {
+    const entry = record(block);
+    return entry.type === "input" ? [str(entry.block_id)] : [];
+  });
+}
+
+function sameIds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
 export class Requests {
   private readonly parts: AppParts;
   private readonly answers: Answers;
@@ -443,21 +456,27 @@ export class Requests {
     // The review page has no field: its draft is the one kept.
     const draft = reviewing ? { ...kept, active: at } : absorb({ ...kept, active: at }, state);
     this.drafts.set(ids.approvalId, draft);
-    if (!reviewing && !isAnswered(draft, questions, at)) {
-      if (draft.other.has(at)) {
-        // Slack checks the required Other field before this point; reaching here means the
-        // redraw that shows it was dropped, so the form is drawn again with the field.
+    if (!reviewing) {
+      // The blocks on screen must be the ones the draft draws. A redraw Slack refused
+      // (`hash_conflict`) leaves a field on screen that the choice no longer needs, or none for
+      // one it needs; what is not on screen is not sent. `view.blocks` of the payload lists the
+      // blocks on screen: the reference for `view.state.values` (docs.slack.dev, view
+      // interactions payload, read 2026-10-16) does not say whether an empty input is listed in
+      // the state, so the state is not used for this.
+      const drawn = questionView(draft, questions, this.parts.names);
+      if (!sameIds(inputIds(drawn.blocks), inputIds(view.blocks))) {
+        await ack({ response_action: "update", view: drawn });
+        return;
+      }
+      if (!isAnswered(draft, questions, at)) {
+        // Spaces alone in Other's field are empty once stripped, and Slack keeps them there.
+        const field = draft.other.has(at) ? `o${at}` : `q${at}`;
         await ack({
-          response_action: "update",
-          view: questionView(draft, questions, this.parts.names),
+          response_action: "errors",
+          errors: { [field]: slackTexts.QUESTION_MISSING },
         });
         return;
       }
-      await ack({
-        response_action: "errors",
-        errors: { [`q${at}`]: slackTexts.QUESTION_MISSING },
-      });
-      return;
     }
     // A form of several questions sends from its review page alone; every other page, the last
     // question included, moves on, whether or not the rest have an answer already.

@@ -929,8 +929,13 @@ multi-select's as a list (measured: "Multi-select answer as a list"). In a singl
 is one option among the others, so an option and a text never stand together; a multi-select
 adds the text to the labels when Other is ticked. A text kept in the draft is sent only while
 Other is chosen, and the Review page shows it as the answer. With nothing chosen Next and Submit
-show `Choose an option or type your own answer.` under the question; Other chosen with no text
-draws the form again with its field (Slack checks the required field first). A note kept in the
+show `Choose an option or type your own answer.` under the question; Other chosen with only
+spaces is a field error on the Other block. Next and Submit also compare the input blocks the
+payload's `view.blocks` lists (what is on screen) with the ones the draft draws; when a redraw
+Slack refused left a field out of sight (a note or an Other text in the draft with no block
+showing it), the form is drawn again with `response_action: update` and nothing is sent. The
+reference for `view.state.values` does not say whether an empty input is listed (read
+2026-10-16), so the state is not used for this. A note kept in the
 draft is not sent without a choice. Notes travel to the agent as that question's `notes`, in the tool's `annotations` beside
 the answers (`requests.questionResult`); with a single-select option that has a preview, the
 annotation carries the preview too, as the terminal does. The record of the answers does not
