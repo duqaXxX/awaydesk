@@ -377,6 +377,13 @@ export type SessionEvent =
    * has its default). Said before the end of the turn that ran the command.
    */
   | { readonly type: "effort_changed"; readonly level: string | null }
+  /**
+   * The agent runs another model from now on, however the switch came (a command, the daemon's
+   * own `setModel`, a fallback, a resume): the id its `ContextUsage` will name once a request
+   * has gone to it. Said before the end of the turn that ran a command, ahead of the usage,
+   * which after a command still names the model before it.
+   */
+  | { readonly type: "model_changed"; readonly model: string }
   | { readonly type: "folder_changed"; readonly folder: string }
   /** The cached usage limits are stale. */
   | { readonly type: "limits_changed" }

@@ -322,6 +322,10 @@ export class ThreadSession {
   // the footer then says so whatever the setting. Cleared by anything that may change the model
   // or the level, and by a turn that reports one.
   effortUnsupported = false;
+  // The model the agent last said it switched to (`model_changed`), kept until the context
+  // usage names it too: after a command the usage still names the model before it. Null when
+  // none is awaited.
+  modelSwitched: string | null = null;
   // Where the session works as its hooks last reported (`cwd` follows a `cd` and a worktree;
   // Stop and PostToolUse measured 2026-09-27 on 2.1.283); null until then: `directory`.
   workingDirectory: string | null = null;
@@ -903,6 +907,7 @@ export class ThreadSession {
       this.effortReported = requested !== null;
       this.effortUnsupported = false;
       this.workingDirectory = null; // the new process starts in the bound folder
+      this.modelSwitched = null; // its usage names the model it runs
       this.sessionTokens = null; // counted by the client process, which starts at zero
       this.reader = new Task((reading) => this.read(client, reading));
       this.idleTimerCheck(); // a daemon word (`!status`, say) connects with no turn
@@ -1654,6 +1659,8 @@ export class ThreadSession {
         return declared.declaredState ? null : "declaredState";
       case "limits_changed":
         return declared.usageLimits ? null : "usageLimits";
+      case "model_changed":
+        return declared.models ? null : "models";
       case "task_started": {
         const needs = event.kind === "subagent" ? "subagents" : "backgroundTasks";
         if (declared[needs]) return null;
@@ -1721,6 +1728,9 @@ export class ThreadSession {
           this.effortSetting = reset ? null : event.level;
           this.deps.state.setEffort(this.channelId, this.threadId, this.effortSetting);
         }
+        return;
+      case "model_changed":
+        this.modelSwitched = event.model;
         return;
       case "folder_changed":
         this.workingDirectory = event.folder;
@@ -1941,6 +1951,9 @@ export class ThreadSession {
     if (event.type === "call_ended" && active.renderer.backgroundTasks.length > 0)
       this.showRunning();
     if (event.type === "turn_ended") {
+      // A turn that went to the model leaves the usage naming the model it ran on, whatever
+      // the id a switch said (`model_changed`).
+      if (event.steps !== null && event.steps > 0) this.modelSwitched = null;
       // The turn stays active until its reply is closed: the footer is read first, and a
       // drain that saw this thread idle meanwhile would exit before the reply's end, leaving
       // its stream open (#25).
@@ -3162,9 +3175,13 @@ export class ThreadSession {
     const here = this.workingDirectory || this.directory;
     const [branch, changes] = await gitState(here, repositoryBy(this.deps.agent));
     const usage = this.usage?.current ?? null;
+    // A switch the usage does not name yet is the newer word; once a request has gone to the
+    // new model the usage names it, and from then on the usage alone speaks.
+    if (context.model === this.modelSwitched) this.modelSwitched = null;
+    const model = this.modelSwitched ?? context.model;
     return {
       bypass: this.bypass,
-      model: context.model === null ? null : modelName(this.models, context.model),
+      model: model === null ? null : modelName(this.models, model),
       ...this.effortFields(),
       folder: this.directory,
       branch,

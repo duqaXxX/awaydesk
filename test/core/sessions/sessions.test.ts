@@ -3916,6 +3916,104 @@ test("a model change with no effort does not clear the stored level", async (t) 
   assert.equal(thread(h).effort, "high"); // unknown, not cleared
 });
 
+/** A `/model` command's turn: the CLI's PostModelSwitch hook comes before the result. */
+function modelCommandTurn(to: string, text: string): Item[] {
+  const hookInput = { ...(sdkJson("post-model-switch-hook") as JsonObject), to_model: to };
+  const turn = withResult(sdkMessages("usage"), text, "model");
+  return [...turn.slice(0, -1), hookRun(hookInput, "PostModelSwitch"), at(turn, -1)];
+}
+
+/** The usage the agent reports, which a test moves as the real agent does after a request. */
+function usageNaming(h: Harness, model: () => string): void {
+  for (const client of h.clients) {
+    client.contextUsage = async () => ({ model: model(), percentage: 7 });
+  }
+}
+
+test("the footer and status name the model a command switched to, and keep it", async (t) => {
+  // After a command the agent's usage still names the model before it (measured 2026-10-16).
+  const SONNET = "claude-sonnet-5-5";
+  const OPUS = "claude-opus-5-5";
+  let reported = SONNET;
+  const h = harnessFor(t)({
+    turns: [
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+      modelCommandTurn(OPUS, "Set model to `Opus 5.5` for this session only"),
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => reported);
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Sonnet 5.5 · "));
+  await (await session.submit("/model opus")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Opus 5.5 · "), "the footer under the command");
+  assert.ok((await session.status()).includes("Model: `Opus 5.5`"));
+  reported = OPUS; // the next request goes to the new model
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Opus 5.5 · "), "the next model turn keeps it");
+  assert.ok((await session.status()).includes("Model: `Opus 5.5`"));
+});
+
+test("a model turn after a switch gives the footer back to the usage", async (t) => {
+  // The id a switch names need not be the one the usage names: once a request has gone to the
+  // model, the usage speaks alone and the footer cannot stay on the switch.
+  let reported = "claude-sonnet-5-5";
+  const h = harnessFor(t)({
+    turns: [
+      modelCommandTurn("an-id-the-usage-spells-otherwise", "Set model to `Opus 5.5`"),
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => reported);
+  await (await session.submit("/model opus")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("an-id-the-usage-spells-otherwise · "));
+  reported = "claude-opus-5-5";
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Opus 5.5 · "));
+});
+
+test("a command that names the model already in use leaves the footer on it", async (t) => {
+  const h = harnessFor(t)({
+    turns: [
+      modelCommandTurn("claude-sonnet-5-5", "Set model to `Sonnet 5.5` for this session only"),
+    ],
+  });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => "claude-sonnet-5-5");
+  await (await session.submit("/model sonnet")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Sonnet 5.5 · "));
+  assert.ok((await session.status()).includes("Model: `Sonnet 5.5`"));
+});
+
+test("a switch of a process that is gone does not outlive it", async (t) => {
+  // The process that replaces it resumes the session and its usage names the model it runs.
+  const h = harnessFor(t)({
+    turns: [modelCommandTurn("claude-opus-5-5", "Set model to `Opus 5.5`")],
+  });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => "claude-sonnet-5-5");
+  await (await session.submit("/model opus")).done.wait();
+  await h.idle();
+  assert.ok((await session.status()).includes("Model: `Opus 5.5`"));
+  h.clients[0]?.inject([END_OF_STREAM]);
+  await h.until(() => inside(session).client === null);
+  const text = await session.status(); // connects the new process
+  assert.equal(h.clients.length, 2);
+  assert.ok(text.includes("Model: `Haiku 4.5`"), text); // the fake's own usage
+});
+
 test("an unrecognized stored effort is dropped not sent", async (t) => {
   const h = harnessFor(t)({});
   h.session(); // opens the thread

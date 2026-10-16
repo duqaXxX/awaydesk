@@ -285,6 +285,7 @@ module that breaks it fails only in use.
 |---|---|---|
 | A command | The owner types `!name args`. When `name` is the `name` of an entry of `AgentInfo.commands`, the agent receives the prompt `/name args` (the message flow, `messages.messages`); an alias does not match, and any other `!text` arrives as typed. A name in `AgentWords.newSession` is refused inside a thread and the names in `AgentWords.login` and `AgentWords.logout` are answered by the core: none of the three reaches the agent | `a command's output arrives whole, once, and uses no model`; nothing checks the text that arrives as typed |
 | The effort | `effort_observed` and `effort_changed` come before the `turn_ended` of their turn: `ThreadSession.showFooterIfEnded` builds the footer once the session has ended, from what it has by then. Null is the agent's default | Not checked: only that a level is one of `Capabilities.effortLevels` |
+| The model | `model_changed` carries the id of the model the agent runs after a switch (a command, `setModel`, a fallback, a resume) and comes before the `turn_ended` of the command's turn, ahead of a `contextUsage` that after a command still names the model before it. Needs `models` | `a command that switches the model says so before the turn ends`; a back end without `models` emits none (`assertDeclared`) |
 | Who started a turn | `turn_ended.startedBy` is `owner` for a prompt's turn and `agent` for one the agent starts by itself to report a task. `report_started` names the task before such a turn's words, and needs `backgroundTasks` | `startedBy` is checked for a prompt's turn only |
 | A notification folded | An agent that declares `foldedNotifications` emits `notification_folded` with the task's id when the running turn takes that task's notification, after the task's end and before the turn's `turn_ended`; it emits none for a task whose report the agent opens a turn for, and needs `backgroundTasks`. `task_ended.foldNamed` says per task whether it can: false when the SDK gave the run no id | Only that a back end that lacks `foldedNotifications` emits none (`assertDeclared`, run on the turns of the suite) |
 | A prompt taken | An agent that declares `promptDuringTurn` emits `prompt_taken` with the `Prompt.id` of each prompt it accepts, before that turn's words, whether it took the prompt into the running turn or as the next one | `a prompt taken is named by its id, before the turn's words` |
@@ -930,7 +931,9 @@ and the footer is left out only when nothing at all can be read. When the core e
 that never comes (a misattributed turn), the footer waits for `constants.INJECTED_TURN_WAIT`. The footer is handed over as fields
 (`FooterFields`, from `ThreadSession.footerData`), and the Slack provider writes the line
 (`footer.formatFooter`): `⚡ bypass` when bypass is on, the model from `AgentSession.contextUsage`
-(the SDK's `getContextUsage()`, named by the display name of the agent's model list, `core/models.ts`), the effort level, the name of the folder this thread was opened in,
+(the SDK's `getContextUsage()`, named by the display name of the agent's model list, `core/models.ts`;
+after a model switch, the id of the latest `model_changed` until a turn that went to the model ends
+or the usage names that id, `ThreadSession.modelSwitched`), the effort level, the name of the folder this thread was opened in,
 the git branch and the uncommitted changes of the folder the session works in, the session's tokens
 from the turn's `turn_ended` event (the `modelUsage` of the `result` record, summed by
 `footer.sessionTokens`), the context percentage from the same `contextUsage`, and the 5-hour and
@@ -960,6 +963,11 @@ hook (`effort.level`, the event `effort_observed`); `/effort` and `/model` run n
 of them the footer follows the event `effort_changed`, which the Claude back end reads from the
 output of the command (`Set effort level to ...`, `translate.effortChanged`) in the result that
 names the command in `local_command`. A model change that names no level says null.
+The model follows the event `model_changed`, which the Claude back end reads from the `to_model` of
+the `PostModelSwitch` hook, run before the command's result: `getContextUsage()` still names the
+model before the command after it (measured 2026-10-16, Claude Code 2.1.301). Every `source` of the
+hook counts, since each is a change of the model the footer names. A connect to a new process drops
+the event's model, as that process's own usage names the model it runs.
 The core keeps the owner's setting (`ThreadSession.effortSetting`: a fixed level, or null for the
 agent's default) apart from the level the last turn ran at (`ThreadSession.effort`), and
 `ThreadSession.effortFields` builds the footer from both. A fixed level shows as itself (the level

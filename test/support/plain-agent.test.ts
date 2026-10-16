@@ -20,6 +20,7 @@ import {
   call,
   die,
   effort,
+  modelSwitched,
   PLAIN_CAPABILITIES,
   PLAIN_COMMANDS,
   PLAIN_MODE,
@@ -227,6 +228,16 @@ test("an effort step says the level a command set, before the turn ends", LIMIT,
     assert.deepEqual(turn[changed], { type: "effort_changed", level });
     assert.ok(changed < turn.findIndex((e) => e.type === "turn_ended"));
   }
+});
+
+test("a model step says the model a command switched to, before the turn ends", LIMIT, async () => {
+  const agent = new PlainAgent().next(modelSwitched("plain-large"));
+  const { session, events } = await started(agent);
+  await session.send(prompt("go"));
+  const turn = await turnOf(events);
+  const changed = turn.findIndex((e) => e.type === "model_changed");
+  assert.deepEqual(turn[changed], { type: "model_changed", model: "plain-large" });
+  assert.ok(changed < turn.findIndex((e) => e.type === "turn_ended"));
 });
 
 test("the store outlives the agent: a new agent resumes, lists and refuses", LIMIT, async () => {

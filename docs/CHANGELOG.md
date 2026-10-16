@@ -58,6 +58,16 @@ All notable changes to this project are documented here. The format follows
   that the results of `/effort` and `/model` name their command.
   `SDKResultMessage.local_command` is a row of `docs/sdk-surface.md`
   (recorded 2026-10-16, Claude Code 2.1.301, `effort-model-commands.jsonl`).
+- The footer and `!status` show the model a `/model` command switched to at once (issue #246).
+  They read it from `getContextUsage()`, which after a command still names the model before it,
+  so `!model opus` was answered `Set model to Opus 5.5` under a footer that said `Sonnet 5.5`.
+  The Claude back end now registers the `PostModelSwitch` hook, which runs before the command's
+  result (measured 2026-10-16, Claude Code 2.1.301), and emits the new seam event
+  `model_changed` with its `to_model`, for every `source` of the hook. The core keeps the id
+  (`ThreadSession.modelSwitched`) until a turn that went to the model ends, or the usage names
+  that id, or a new process connects; from then the usage speaks alone. The event needs the
+  `models` capability. `PostModelSwitchHookInput.to_model` and `HookEvent` `"PostModelSwitch"` are
+  rows of `docs/sdk-surface.md`, and probe claim P26 checks the event on a switch to Sonnet and back.
 - A rate limited Slack call waits out at most 60 seconds of Slack's pauses in all
   (`clients.RATE_LIMIT_WAIT_SECONDS`, issue #236). It was sent again up to 3 times after any
   `Retry-After`, so one call could hold a reply's lock, and a `!stop` behind it, for minutes. A

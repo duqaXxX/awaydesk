@@ -52,6 +52,7 @@ const PROMPT: Prompt = { id: "00000000-0000-4000-8000-0000000000b1", content: "S
 const TOOLS = sdkRecords("tools");
 const STOP = sdkJson("stop-hook") as JsonObject;
 const POST_TOOL_USE = sdkJson("post-tool-use-hook") as JsonObject;
+const MODEL_SWITCH = sdkJson("post-model-switch-hook") as JsonObject;
 const ASK = sdkJson("ask-can-use-tool") as JsonObject;
 const BASH = { command: "echo ok", description: "Print ok" };
 const EXITED = "the Claude Code process exited";
@@ -156,7 +157,11 @@ test(
       "stderr",
       "systemPrompt",
     ]);
-    assert.deepEqual(Object.keys(options.hooks ?? {}).sort(), ["PostToolUse", "Stop"]);
+    assert.deepEqual(Object.keys(options.hooks ?? {}).sort(), [
+      "PostModelSwitch",
+      "PostToolUse",
+      "Stop",
+    ]);
   },
 );
 
@@ -613,6 +618,20 @@ test("the PostToolUse hook gives the folder alone", LIMIT, async (t) => {
     seen.some((event) => event.type === "effort_observed"),
     false,
   );
+});
+
+test("the PostModelSwitch hook gives the model before the turn ends", LIMIT, async (t) => {
+  const batch: Batch = [
+    ...TOOLS.slice(0, -1),
+    hook("PostModelSwitch", MODEL_SWITCH),
+    TOOLS.at(-1) as JsonObject,
+  ];
+  const { session, events } = await started(t, { turns: [batch] });
+  await session.send(PROMPT);
+  const seen = await until(events, "turn_ended");
+  const at = seen.findIndex((event) => event.type === "model_changed");
+  assert.deepEqual(seen[at], { type: "model_changed", model: "claude-opus-5-5" });
+  assert.ok(at < seen.length - 1);
 });
 
 // The end of the process.

@@ -22,8 +22,9 @@ import {
   type FakeScript,
   FakeSdk,
   fail,
+  hook,
 } from "../support/fake-query.ts";
-import { type JsonObject, sdkRecords } from "../support/fixtures.ts";
+import { type JsonObject, sdkJson, sdkRecords } from "../support/fixtures.ts";
 import {
   call,
   effort,
@@ -36,6 +37,7 @@ import {
   plainAgent,
   question,
   say,
+  modelSwitched as switched,
 } from "../support/plain-agent.ts";
 import {
   type AgentHarness,
@@ -314,6 +316,19 @@ class ClaudeWorld implements AgentWorld {
     return { prompt: `/effort ${level}`, level };
   }
 
+  modelCommand(): { readonly prompt: string; readonly model: string } {
+    // The model's turn is `/model haiku`'s; the CLI runs the PostModelSwitch hook before its result.
+    const model = "claude-haiku-4-5-20251001";
+    const [assistant, user, result] = withSession(
+      sdkRecords("effort-model-commands").slice(3, 6),
+      this.#sessionId(),
+    );
+    const input = { ...(sdkJson("post-model-switch-hook") as JsonObject), to_model: model };
+    const batch: Batch = [assistant, user, hook("PostModelSwitch", input), result] as Batch;
+    this.#plays.push({ kind: "other", batch });
+    return { prompt: "/model haiku", model };
+  }
+
   failTurn(): string {
     this.#plays.push({
       kind: "other",
@@ -474,6 +489,12 @@ class PlainWorld implements AgentWorld {
     const level = to === "level" ? "full" : (PLAIN_CAPABILITIES.effortDefault ?? "");
     this.#turns.push([effort(level)]);
     return { prompt: "set the effort", level };
+  }
+
+  modelCommand(): { readonly prompt: string; readonly model: string } {
+    const model = "plain-large";
+    this.#turns.push([switched(model)]);
+    return { prompt: "switch the model", model };
   }
 
   failTurn(): string {

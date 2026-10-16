@@ -22,7 +22,11 @@ import { join } from "node:path";
 import type { TestContext } from "node:test";
 import { NAME, WORDS } from "../../src/agent/claude/backend.ts";
 import { CAPABILITIES } from "../../src/agent/claude/capabilities.ts";
-import { postToolUseHookEvents, stopHookEvents } from "../../src/agent/claude/hooks.ts";
+import {
+  postModelSwitchHookEvents,
+  postToolUseHookEvents,
+  stopHookEvents,
+} from "../../src/agent/claude/hooks.ts";
 import { agentInfo, contextUsage } from "../../src/agent/claude/info.ts";
 import { toRequest } from "../../src/agent/claude/requests.ts";
 import { Translator } from "../../src/agent/claude/translate.ts";
@@ -96,12 +100,23 @@ export type Item =
    * end with a request still waiting: `ask` cannot play that, since it holds the stream.
    */
   | { readonly request: CanUseToolCall }
-  /** The CLI runs the host's hooks: Stop before the result, PostToolUse after a tool. */
-  | { readonly hook: "Stop" | "PostToolUse"; readonly input: JsonObject }
+  /**
+   * The CLI runs the host's hooks: Stop before the result, PostToolUse after a tool,
+   * PostModelSwitch before the result of a `/model` command.
+   */
+  | { readonly hook: HookName; readonly input: JsonObject }
   /** The CLI process exits and its stream ends. */
   | { readonly end: true };
 
 export type Batch = readonly Item[];
+
+type HookName = "Stop" | "PostToolUse" | "PostModelSwitch";
+
+const HOOK_EVENTS = {
+  Stop: stopHookEvents,
+  PostToolUse: postToolUseHookEvents,
+  PostModelSwitch: postModelSwitchHookEvents,
+};
 
 // The records the Python SDK's parser gave no message for.
 const UNPARSED = new Set(["command_lifecycle", "tool_progress"]);
@@ -159,7 +174,7 @@ export function requestWhileStreaming(
   return { request: { toolName, input, callId, ...(abort !== undefined && { abort }) } };
 }
 
-export function hookRun(input: JsonObject, hook: "Stop" | "PostToolUse" = "Stop"): Item {
+export function hookRun(input: JsonObject, hook: HookName = "Stop"): Item {
   return { hook, input };
 }
 
@@ -341,9 +356,7 @@ export class FakeAgentSession implements AgentSession {
             },
           );
         } else if ("hook" in item) {
-          yield* item.hook === "Stop"
-            ? stopHookEvents(item.input)
-            : postToolUseHookEvents(item.input);
+          yield* HOOK_EVENTS[item.hook](item.input);
         } else if ("record" in item) {
           yield* this.#translator.translate(item.record);
         } else {

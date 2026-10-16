@@ -89,6 +89,11 @@ export interface AgentWorld {
    * declares, or to its word for the default: the prompt to send and the level the agent says.
    */
   effortCommand(to: "level" | "default"): { readonly prompt: string; readonly level: string };
+  /**
+   * The next prompt is a command of the owner's that switches the model: the prompt to send and
+   * the model id the agent then runs, as its context usage will name it.
+   */
+  modelCommand(): { readonly prompt: string; readonly model: string };
   /** The next prompt fails as a request of the agent's own does. Returns a word its message holds. */
   failTurn(): string;
   /** The agent's process dies now. */
@@ -311,6 +316,7 @@ function assertDeclared(events: readonly SessionEvent[], caps: Capabilities): vo
       assert.ok(!event.type.startsWith("compaction_") && event.type !== "compacted");
     }
     if (!caps.usageLimits) assert.notEqual(event.type, "limits_changed");
+    if (!caps.models) assert.notEqual(event.type, "model_changed");
     if (!caps.declaredState) assert.notEqual(event.type, "state_changed");
     if (
       (event.type === "effort_observed" || event.type === "effort_changed") &&
@@ -768,6 +774,23 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         },
       );
     }
+
+    check(
+      "a command that switches the model says so before the turn ends",
+      lacks(caps.models, "models"),
+      async (world, t) => {
+        const { prompt: text, model } = world.modelCommand();
+        const { session, events } = await open(t, world);
+        await session.send(prompt(text));
+        const turn = await events.turn();
+        const changed = turn.filter((event) => event.type === "model_changed");
+        assert.deepEqual(changed, [{ type: "model_changed", model }]);
+        const at = turn.findIndex((event) => event.type === "model_changed");
+        assert.ok(at < turn.findIndex((event) => event.type === "turn_ended"));
+        assertWellFormed(turn);
+        assertDeclared(turn, caps);
+      },
+    );
 
     check(
       "a request that fails ends the turn as an error with the agent's words",
