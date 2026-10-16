@@ -675,7 +675,8 @@ beside the ids: it is read for the ids and the generation, so once its request i
 workspace check applies, and the channel is checked at Submit. The Back button of the question form
 (`question_back`) checks the owner and the workspace before anything else, never reaches the core,
 and when Slack refuses its `views.update` (`hash_conflict`, `not_found`) logs a warning and drops
-it. The question form's Next, Review and Submit answer Slack after checks that make no network call, since a missing answer can only be shown in
+it; the draft's page, moved back before the call, is rolled back to the page still on screen
+unless a Next has moved it on meanwhile. The question form's Next, Review and Submit answer Slack after checks that make no network call, since a missing answer can only be shown in
 that answer, and Submit checks the channel before the answer reaches the core. A
 failure after the checks reaches the owner as a line of its own (`Talk.replyOnFailure` for what a
 flow does, `Answers.replyOnFailure` for what a listener does itself): a post in the thread for a

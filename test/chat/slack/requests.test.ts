@@ -259,6 +259,53 @@ test("the review page lists every answer, with Submit answers and a way back", (
   assert.ok(view.blocks.every((b: Json) => b.type !== "input"));
 });
 
+test("the review page shows the notes of a question under its answer, and only then", () => {
+  const draft = draftOf({
+    active: 2,
+    picks: new Map([
+      [0, [1]],
+      [1, [0]],
+    ]),
+    notes: new Map([[0, "darker <b>"]]),
+  });
+  const sections = questionView(draft, TWO).blocks.slice(2, 4);
+  assert.equal(sections[0].text.text, "● Colour?\n→ blue\nNotes: darker &lt;b&gt;");
+  assert.equal(sections[1].text.text, "● Sizes?\n→ s");
+});
+
+test("a header is cut at the tab limit, in the tab row and on the Back button", () => {
+  const long = question({ question: "Why?", header: "h".repeat(60), options: [{ label: "a" }] });
+  const view = questionView(draftOf({ active: 1 }), [long, TWO[1] as Question]);
+  assert.equal(tabsOf(view), `☐ ${"h".repeat(39)}…   *☐ Sizes*   ✔ Submit`);
+  assert.equal(view.blocks.at(-1).elements[0].text.text, `← ${"h".repeat(39)}…`);
+});
+
+test("the Back button's label is plain text: the header is not escaped, and it fits Slack's 75", () => {
+  const rd = question({ question: "Why?", header: "R&D", options: [{ label: "a" }] });
+  const view = questionView(draftOf({ active: 1 }), [rd, TWO[1] as Question]);
+  assert.equal(view.blocks.at(-1).elements[0].text.text, "← R&D");
+  assert.equal(view.blocks[0].elements[0].text.includes("R&amp;D"), true); // the mrkdwn row escapes
+  const amps = question({ question: "Why?", header: "&".repeat(60), options: [{ label: "a" }] });
+  const long = questionView(draftOf({ active: 1 }), [amps, TWO[1] as Question]);
+  assert.ok(chars(long.blocks.at(-1).elements[0].text.text) <= 75);
+});
+
+test("a review section is cut to Slack's limit and ends on the cut mark", () => {
+  const draft = draftOf({ active: 2, typed: new Map([[0, "x".repeat(4000)]]) });
+  const text: string = questionView(draft, TWO).blocks[2].text.text;
+  assert.ok(chars(text) <= SECTION_LIMIT);
+  assert.ok(text.endsWith("…"));
+});
+
+test("a review section is never cut inside an escape", () => {
+  const draft = draftOf({ active: 2, typed: new Map([[0, "&".repeat(1000)]]) });
+  const text: string = questionView(draft, TWO).blocks[2].text.text;
+  assert.ok(chars(text) <= SECTION_LIMIT);
+  assert.ok(text.endsWith("…"));
+  const kept = text.slice(text.indexOf("→ ") + 2, -1);
+  assert.match(kept, /^(?:&amp;)+$/);
+});
+
 test("the last question holds checkboxes and Review", () => {
   const draft = draftOf({
     active: 1,

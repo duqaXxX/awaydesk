@@ -13,7 +13,8 @@ All notable changes to this project are documented here. The format follows
   the previous question (`← Colour`) goes back one page and keeps every answer; the fields of the
   page it leaves are kept first, and Back checks nothing. Next always moves to the next page,
   also when every question already has an answer; the last question's button reads `Review` and
-  opens a page that lists each question with its answer, whose `Submit answers` alone sends.
+  opens a page that lists each question with its answer and its notes, whose `Submit answers`
+  alone sends.
   One question is unchanged. A stale form's Back is ignored, and a stale `Submit answers`
   replaces the review page with `This form was opened again. Use the newest one.`.
 

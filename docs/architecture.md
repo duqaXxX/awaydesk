@@ -879,11 +879,14 @@ otherwise the question gets an error (`response_action: errors`), and it moves o
 the other questions already have one. On the last question it reads `Review` and opens one more
 page of the same form (its page number is the question count): the tab
 row with `✔ Submit` in bold, `Review your answers`, a section `● question` and `→ answer` per
-question (a multi-select's joined with `, `, every text shown as written), and `Submit answers`,
-which alone sends. From the second question on, and on the review page, a **← header** button
+question (a multi-select's joined with `, `) and, when the question has notes, a line
+`Notes: …` under it; each text goes through `escape.shownAsWritten`, which escapes `&`, `<`, `>`
+and backticks (so `*` and `_` still format), and a section is cut to 3,000 characters before the
+escape, never inside one. `Submit answers` alone sends. From the second question on, and on the review page, a **← header** button
 (`question_back`, `Requests.onQuestionBack`) goes back one page: it absorbs the fields of the page
 on screen into the draft first, validates nothing, and redraws the previous page with
-`views.update` on the click's view id and `hash`, every answer kept. One question has none of this
+`views.update` on the click's view id and `hash`, every answer kept. The button's text is plain
+text: the header goes in as written, cut to 40 characters, not escaped. One question has none of this
 and its `Submit` sends.
 What was filled is kept by the Slack provider in memory (`Requests.drafts`, `requests.Draft`), by
 request id, with the page on screen and the revision of each question's clearable blocks; the

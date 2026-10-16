@@ -11,7 +11,7 @@ import { test } from "node:test";
 import type { Question } from "../../../../src/agent/seam.ts";
 import { QUESTION_BACK } from "../../../../src/chat/slack/requests.ts";
 import * as slackTexts from "../../../../src/chat/slack/texts.ts";
-import { CHANNEL, rejected, STRANGER } from "../../../support/fake-slack.ts";
+import { AsyncEvent, CHANNEL, rejected, STRANGER } from "../../../support/fake-slack.ts";
 import {
   answerClick,
   type Body,
@@ -279,6 +279,24 @@ test("a Back that meets a hash_conflict is dropped and the page stays the draft'
   o.world.slack.responses["views.update"] = rejected("not_found");
   await o.world.dispatch(backClick(o, boxes("q1", "1")));
   assert.deepEqual(o.world.ephemerals(), []);
+});
+
+test("a refused Back does not undo a Next that moved the draft on meanwhile", async (t) => {
+  const o = await openForm(t, THREE);
+  await forward(o, radio("q0", "0"));
+  const second = o.modal.view;
+  const gate = new AsyncEvent();
+  o.world.slack.gate = gate;
+  o.world.slack.gateMethod = "views.update";
+  o.world.slack.responses["views.update"] = rejected("hash_conflict");
+  await o.world.dispatch(backClick(o, boxes("q1", "0"))); // held in Slack's call
+  assert.equal(o.world.built.drafts.get(o.approvalId)?.active, 0);
+  // Next from the same page is accepted while the update is held: the draft moves on.
+  const next = await o.world.dispatch(submitOn(second, boxes("q1", "0")));
+  assert.equal((next.body as Body).response_action, "update");
+  gate.set();
+  await o.world.idle();
+  assert.equal(o.world.built.drafts.get(o.approvalId)?.active, 2);
 });
 
 test("an older form's Submit answers is stale and sends nothing", async (t) => {

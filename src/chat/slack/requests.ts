@@ -522,12 +522,10 @@ function optionWhole(option: QuestionOption): Block {
   return { type: "rich_text", elements };
 }
 
-/** A question's header for the tab row and the Back button, as written and cut. */
+/** A question's header for the tab row and the Back button: cut, not escaped. */
 function tabName(question: Question, at: number): string {
   const header = cut(squeezed(question.header), TAB_LIMIT);
-  return header !== ""
-    ? shownAsWritten(header)
-    : texts.fill(slackTexts.QUESTION_TAB_UNNAMED, { number: at + 1 });
+  return header !== "" ? header : texts.fill(slackTexts.QUESTION_TAB_UNNAMED, { number: at + 1 });
 }
 
 /**
@@ -536,7 +534,7 @@ function tabName(question: Question, at: number): string {
  */
 function tabRow(draft: Draft, questions: readonly Question[]): Block {
   const cells = questions.map((question, at) => {
-    const cell = `${isAnswered(draft, questions, at) ? "☒" : "☐"} ${tabName(question, at)}`;
+    const cell = `${isAnswered(draft, questions, at) ? "☒" : "☐"} ${shownAsWritten(tabName(question, at))}`;
     return at === draft.active ? `*${cell}*` : cell;
   });
   const review = draft.active === questions.length;
@@ -544,7 +542,10 @@ function tabRow(draft: Draft, questions: readonly Question[]): Block {
   return context(cells.join("   "));
 }
 
-/** The button that goes back to question `to`: it moves one page and keeps every answer. */
+/**
+ * The button that goes back to question `to`: it moves one page and keeps every answer. Its text
+ * is plain text, so the header goes in as written, not escaped for mrkdwn.
+ */
 function backBlock(questions: readonly Question[], to: number): Block {
   const question = questions[to] as Question;
   const label = texts.fill(slackTexts.QUESTION_BACK_TO, { header: tabName(question, to) });
@@ -561,8 +562,13 @@ function reviewView(draft: Draft, questions: readonly Question[], names: Names):
   const sections = questions.map((question, at) => {
     const answer = answerAt(draft, questions, at) ?? "";
     const shown = typeof answer === "string" ? answer : answer.join(", ");
-    const lines = `● ${shownAsWritten(question.text)}\n→ ${shownAsWritten(shown)}`;
-    return { type: "section", text: { type: "mrkdwn", text: cut(lines, SECTION_LIMIT) } };
+    let lines = `● ${question.text}\n→ ${shown}`;
+    const noted = draft.notes.get(at);
+    if (noted !== undefined) lines += `\n${slackTexts.QUESTION_NOTES}: ${noted}`;
+    // Cut as written, on the room the escaped text takes, so no escape is split.
+    const [first = "", ...rest] = codeChunks(lines, SECTION_LIMIT - 1);
+    const text = `${shownAsWritten(first)}${rest.length > 0 ? "…" : ""}`;
+    return { type: "section", text: { type: "mrkdwn", text } };
   });
   return {
     type: "modal",
