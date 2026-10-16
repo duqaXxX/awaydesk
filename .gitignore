@@ -1,5 +1,6 @@
-# What `npm run build` writes.
+# What `npm run build` writes, and the package `npm run build:npm` assembles from it.
 /dist/
+/build/
 
 # Secrets. awaydesk reads its configuration from ~/.config/awaydesk/, never from
 # the repository; these lines only catch a copy made here by mistake.

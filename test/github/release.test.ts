@@ -14,9 +14,11 @@ import { fileURLToPath } from "node:url";
 // module is loaded by URL and given the types its JSDoc declares.
 const SCRIPT_URL = new URL("../../.github/scripts/release.mjs", import.meta.url);
 const SCRIPT = fileURLToPath(SCRIPT_URL);
-const { refusal, releaseNotes } = (await import(SCRIPT_URL.href)) as {
+const { refusal, releaseNotes, releaseBody, NOTES_LIMIT } = (await import(SCRIPT_URL.href)) as {
   refusal: (tag: string, version: string, changelog: string) => string | null;
   releaseNotes: (changelog: string, version: string) => string | null;
+  releaseBody: (changelog: string, version: string, tag: string, repository: string) => string;
+  NOTES_LIMIT: number;
 };
 const WORKFLOW = readFileSync(
   join(import.meta.dirname, "..", "..", ".github", "workflows", "release.yml"),
@@ -92,11 +94,26 @@ test("the notes are the section under the version's heading, up to the next head
   assert.equal(releaseNotes(CHANGELOG, "0.9.0"), null);
 });
 
+test("a section longer than GitHub takes becomes a link to it at the tag", () => {
+  const repository = "https://github.com/alice/awaydesk";
+  assert.equal(releaseBody(CHANGELOG, "0.1.0", "v0.1.0", repository), "- The first release.");
+  const long = `## [0.4.0] - 2026-12-01\n\n${"- A change.\n".repeat(NOTES_LIMIT / 10)}`;
+  const body = releaseBody(long, "0.4.0", "v0.4.0", repository);
+  assert.ok(body.length < 1000);
+  assert.ok(body.includes(`(${repository}/blob/v0.4.0/docs/CHANGELOG.md)`), body);
+  // At the limit itself the section is the body.
+  const exact = `## [0.5.0] - 2026-12-01\n\n${"x".repeat(NOTES_LIMIT)}\n`;
+  assert.equal(releaseBody(exact, "0.5.0", "v0.5.0", repository).length, NOTES_LIMIT);
+});
+
 /** The script run as the workflow runs it, in a folder holding `version` and `changelog`. */
 function run(t: { after(fn: () => void): void }, args: string[], version: string) {
   const folder = mkdtempSync(join(tmpdir(), "awaydesk-release-"));
   t.after(() => rmSync(folder, { recursive: true, force: true }));
-  writeFileSync(join(folder, "package.json"), JSON.stringify({ version }));
+  writeFileSync(
+    join(folder, "package.json"),
+    JSON.stringify({ version, repository: { url: "git+https://github.com/alice/awaydesk.git" } }),
+  );
   mkdirSync(join(folder, "docs"));
   writeFileSync(join(folder, "docs", "CHANGELOG.md"), CHANGELOG);
   return spawnSync(process.execPath, [SCRIPT, ...args], { cwd: folder, encoding: "utf8" });
@@ -133,6 +150,7 @@ test("only the publish job may ask for an OIDC token, and no npm token is stored
 
 test("the publish job runs no dependency's install script and uses no cache", () => {
   assert.match(job("publish"), /^ {6}- run: npm ci --ignore-scripts$/m);
+  assert.match(job("publish"), /npm publish build\/npm\/awaydesk$/m);
   assert.match(job("publish"), /^ {10}package-manager-cache: false$/m);
 });
 

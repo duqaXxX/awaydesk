@@ -10,7 +10,7 @@ channel is one project and each thread in it is one session: you write a message
 runs in the project's folder with your own login, settings and permissions, and the reply shows
 up in the thread while Claude works. Nobody else can talk to it.
 
-Powered by Claude, through the
+awaydesk runs Claude Code through the
 [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview).
 
 ## Before you install

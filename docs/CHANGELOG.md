@@ -7,6 +7,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The package on npm has a README of its own, `npm/README.md`, with links to GitHub pinned to the
+  version's tag, and the repository keeps its README. `npm run build:npm` assembles the package in
+  `build/npm/awaydesk` (`.github/scripts/npm-package.mjs`): `dist`, a `package.json` with no
+  scripts or devDependencies, `LICENSE`, `slack-app-manifest.json` and that README; `docs/` no
+  longer ships in the package. The Release workflow publishes that folder. A changelog section
+  longer than a GitHub Release takes (125,000 characters, as projects that hit it report) becomes
+  a link to the section at the tag.
+- The descriptions of the package and of the Slack app, and the README, carry no Claude brand
+  line: "Drive the coding-agent sessions on your own computer from private Slack channels." The
+  Slack app shows its new description once the manifest is applied again.
 - A release workflow, `.github/workflows/release.yml`: a tag `vX.Y.Z` pushed to GitHub is
   checked against `package.json`'s version and `docs/CHANGELOG.md`'s dated section
   (`.github/scripts/release.mjs`) and against `main`, then lint and types run on Linux and the tests on Linux, macOS

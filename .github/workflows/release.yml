@@ -82,9 +82,12 @@ jobs:
           package-manager-cache: false
       # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
       - run: npm install -g npm@11.17.0
-      # No dependency's install script runs in the job that holds the OIDC permission. The
-      # package's own `prepack` still runs at `npm publish`.
+      # No dependency's install script runs in the job that holds the OIDC permission. The build
+      # runs in the next step, by name.
       - run: npm ci --ignore-scripts
+      # The package is assembled in build/npm/awaydesk, with npm/README.md as its README
+      # (.github/scripts/npm-package.mjs). The build's tsc is a devDependency with no install script.
+      - run: npm run build:npm
       # A version already on the registry is not published again: the first one is published by
       # hand (npm configures a trusted publisher only for a package that exists), and a re-run
       # of this workflow finds its own.
@@ -98,7 +101,7 @@ jobs:
           if [ "$published" = "$version" ]; then
             echo "awaydesk $version is already on the registry: not published again"
           else
-            npm publish
+            npm publish build/npm/awaydesk
           fi
 
   github-release:

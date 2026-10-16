@@ -207,15 +207,23 @@ releases above).
 3. The **Release** workflow (`.github/workflows/release.yml`) checks that the tag names
    `package.json`'s version and that the changelog has its dated section, which is not empty
    (`.github/scripts/release.mjs`), and that the tagged commit is on `main`. It then runs lint and types on Linux and the tests
-   on Linux, macOS and Windows, publishes with `npm publish` through npm's trusted publishing, and
-   creates the GitHub Release with the version's section as its notes. A version already on the
+   on Linux, macOS and Windows, publishes through npm's trusted publishing, and creates the GitHub
+   Release with the version's section as its notes, or a link to that section when it is longer
+   than GitHub takes. A version already on the
    registry is not published again, so a re-run only completes what is missing.
+
+The package on npm has a README of its own, `npm/README.md`: short, with absolute links to GitHub
+pinned to the version's tag through `{{VERSION}}`. npm always packs the README at the root of the
+folder it publishes, so `npm run build:npm` assembles the package in `build/npm/awaydesk`
+(`.github/scripts/npm-package.mjs`): the built `dist`, a `package.json` with what an install needs
+and no scripts or devDependencies, `LICENSE`, `slack-app-manifest.json`, and that README. That
+folder is what is published, by the workflow and by hand.
 
 Trusted publishing has no npm token: npm exchanges the workflow's OIDC token for one publish, and
 attaches provenance. It needs a package that already exists on the registry, so the first version
-is published by hand, once, by the package's owner with 2FA: `npm publish` from a clean checkout
-of the merge commit, and only then the tag, whose workflow finds the version on the registry and
-creates the GitHub Release. Then, just before the next release (a new trusted publisher must
+is published by hand, once, by the package's owner with 2FA: `npm run build:npm` then
+`npm publish build/npm/awaydesk` from a clean checkout of the merge commit, and only then the
+tag, whose workflow finds the version on the registry and creates the GitHub Release. Then, just before the next release (a new trusted publisher must
 publish within 2 days), the owner links the package to the workflow, with npm 11.15 or later:
 
 ```bash
