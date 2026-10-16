@@ -221,6 +221,23 @@ test("a Home control used after the stop does nothing", async (t) => {
   assert.deepEqual(world.slack.apiCalls, []);
 });
 
+test("a question form whose opening ends after the stop calls nothing more", async (t) => {
+  // The form opens before the channel check (#325): it is held on views.open instead.
+  const world = worldOf(t);
+  const [approvalId] = world.approvals.open(CHANNEL, CLICK_THREAD, "Colour", QUESTIONS);
+  new ModalSlack(world.slack);
+  const gate = new AsyncEvent();
+  world.slack.gate = gate;
+  world.slack.gateMethod = "views.open";
+  const crossed = crossings(t, world);
+  const body = click("question_open", approvalId);
+  body.trigger_id = "0000000000.0000000000.fake";
+  await world.dispatch(body);
+  assert.ok(world.slack.gated.isSet(), "the listener never reached views.open");
+  await stop(world);
+  assert.deepEqual(await release(world, gate, crossed), ["views.open"]);
+});
+
 test("closing the app twice is harmless", async (t) => {
   const world = worldOf(t);
   world.built.close();

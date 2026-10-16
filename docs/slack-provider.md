@@ -656,7 +656,9 @@ channel and check the owner and the workspace. Answer, on a question, opens its 
 (`Requests.onQuestionOpen`) after the owner and workspace check alone, since the click's
 `trigger_id` lives 3 seconds and the channel check makes two calls to Slack; the channel is checked
 once the form is open, and a refused channel replaces the form with the reason
-(`requests.refusedView`), since Slack lets an app close a modal only in answer to a submission. The
+(`requests.refusedView`), since Slack lets an app close a modal only in answer to a submission.
+The update carries the hash the form opened with; when the owner closed the form or moved on in
+it meanwhile, the reason goes to the thread as a line only the owner sees. The
 form shows the owner alone what the request already shows. The question form's Next and Submit
 answer Slack after checks that make no network call, since a missing answer can only be shown in
 that answer, and Submit checks the channel before the answer reaches the core. A

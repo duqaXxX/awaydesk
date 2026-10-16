@@ -50,6 +50,7 @@ import {
   OTHER_TEAM,
   OTHER_THREAD,
   OWNER,
+  rejected,
   STRANGER,
   TEAM,
   THREAD,
@@ -1016,6 +1017,37 @@ test("in a refused channel the opened form shows why and nothing else", async (t
   assert.deepEqual(world.ephemerals(), []);
   assert.ok(!pending.decided);
 });
+
+test("the refusal replaces only the form as opened", async (t) => {
+  // A Next clicked meanwhile has changed the view: its hash is no longer the one opened.
+  const world = worldOf(t);
+  const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
+  const modal = new ModalSlack(world.slack);
+  world.slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
+  await world.dispatch(answerClick(approvalId));
+  assert.deepEqual(
+    modal.calls.map(([hash]) => hash),
+    ["1790000000.h1"],
+  );
+});
+
+for (const error of ["not_found", "hash_conflict"]) {
+  test(`a refusal the form cannot show is told in the thread [${error}]`, async (t) => {
+    // The owner closed the form, or moved on in it, before the channel check returned.
+    const world = worldOf(t);
+    const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
+    new ModalSlack(world.slack);
+    world.slack.responses["views.update"] = rejected(error);
+    world.slack.responses["conversations.members"] = {
+      ok: true,
+      members: [OWNER, BOT, STRANGER],
+    };
+    await world.dispatch(answerClick(approvalId));
+    assert.deepEqual(world.ephemerals(), [
+      fill(slackTexts.CHANNEL_REFUSED, { reason: slackTexts.REASON_MEMBERS }),
+    ]);
+  });
+}
 
 for (const [index, user] of OTHER_USERS.entries()) {
   test(`nobody else can open the form [user${index}]`, async (t) => {

@@ -196,15 +196,15 @@ export class Requests {
     }
     // trigger_id lives 3 seconds: no network call before this one (#325).
     const view = questionView(newDraft(approvalId, channel, threadTs), questions, names);
-    let viewId: unknown;
+    let opened: { id?: string; hash?: string } | undefined;
     try {
       const trigger = text(body.trigger_id);
       if (trigger === null) throw new TypeError("the click carries no trigger_id");
-      const opened = await slack.views.open({
+      const answer = await slack.views.open({
         trigger_id: trigger,
         view: view as unknown as ModalView,
       });
-      viewId = opened.view?.id;
+      opened = answer.view;
     } catch (error) {
       if (isCancelled(error)) throw error;
       // an expired trigger_id, say: the turn must not wait unseen
@@ -212,13 +212,24 @@ export class Requests {
       await this.answers.tellOwner(channel, threadTs, message);
       return;
     }
+    if (this.answers.stopped) return;
     const reason = await guard.refusal(channel);
-    if (this.answers.stopped || reason === null || typeof viewId !== "string") return;
+    if (this.answers.stopped || reason === null) return;
     const told = fill(slackTexts.CHANNEL_REFUSED, { reason });
-    await slack.views.update({
-      view_id: viewId,
-      view: refusedView(told, names) as unknown as ModalView,
-    });
+    try {
+      if (opened?.id === undefined) throw new TypeError("views.open answered no view id");
+      // The hash it was opened with: a Next clicked meanwhile is not overwritten.
+      await slack.views.update({
+        view_id: opened.id,
+        ...(opened.hash === undefined ? {} : { hash: opened.hash }),
+        view: refusedView(told, names) as unknown as ModalView,
+      });
+    } catch (error) {
+      if (isCancelled(error)) throw error;
+      // Closed, or moved on: Submit refuses it, and the owner learns why here.
+      logger.warning(`could not show the refusal in the question form: ${describe(error)}`);
+      await this.answers.tellOwner(channel, threadTs, told);
+    }
   };
 
   /**
