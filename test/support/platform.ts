@@ -5,5 +5,5 @@
  * into past the first: a test that builds a git layout is skipped there.
  */
 export const GIT_LAYOUT = {
-  skip: process.platform === "win32" ? "git layouts are read by POSIX rules" : false,
+  skip: false,
 };
