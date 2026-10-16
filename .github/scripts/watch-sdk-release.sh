@@ -14,6 +14,8 @@ set -euo pipefail
 
 REPO="${REPO:?REPO is required}"
 LABEL="sdk release"
+# A release blocks the pin until the probe has run on it, so its issue comes before the rest.
+PRIORITY="priority: high"
 
 number="$(gh issue list --repo "$REPO" --label "$LABEL" --state open --limit 1 \
   --json number --jq '.[0].number // empty')"
@@ -60,9 +62,12 @@ fi
 gh label create "$LABEL" --repo "$REPO" --color 5319e7 \
   --description "A claude-agent-sdk release awaydesk has not been checked against yet" \
   >/dev/null 2>&1 || true
+gh label create "$PRIORITY" --repo "$REPO" --color b60205 \
+  --description "Breaks something the owner uses today, or blocks other work" \
+  >/dev/null 2>&1 || true
 
 if [ -z "$number" ]; then
-  number="$(gh issue create --repo "$REPO" --label "$LABEL" --title "$title" \
+  number="$(gh issue create --repo "$REPO" --label "$LABEL" --label "$PRIORITY" --title "$title" \
     --body-file "$body_file" | grep -oE '[0-9]+$')"
   echo "opened issue #$number"
 else
