@@ -175,7 +175,19 @@ function gitDiffsThere(folder: string): string {
     env: { ...gitEnv(), GIT_TRACE: "1" },
     encoding: "utf8",
   });
-  return `status ${run.status}\nstdout ${run.stdout}\nstderr ${run.stderr}`;
+  const more = (args: string[]) =>
+    spawnSync("git", ["-C", folder, ...args], { env: gitEnv(), encoding: "utf8" });
+  const config = more(["config", "--show-origin", "--list"]);
+  const debug = more(["ls-files", "--debug"]);
+  const status = more(["status", "--porcelain=v1", "--untracked-files=no"]);
+  return [
+    `status ${run.status}`,
+    `stdout ${run.stdout}`,
+    `stderr ${run.stderr}`,
+    `config ${config.stdout}${config.stderr}`,
+    `ls-files ${debug.stdout}${debug.stderr}`,
+    `porcelain ${status.stdout}${status.stderr}`,
+  ].join("\n");
 }
 
 for (const [name, plant] of PLANTED) {
