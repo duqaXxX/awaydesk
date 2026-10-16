@@ -1,0 +1,125 @@
+# Releases awaydesk when a tag `vX.Y.Z` is pushed: checks the tag, runs the checks of ci.yml on
+# the three systems, publishes the package to the npm registry through trusted publishing, and
+# creates the GitHub Release with the version's section of docs/CHANGELOG.md. The procedure, and
+# the one-time setup on npmjs.com, are in CONTRIBUTING.md under "Releases".
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Tag
+    runs-on: ubuntu-latest
+    steps:
+      # Full history: the tagged commit must be on main, which a shallow clone cannot tell.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # The tag arrives through the environment, never interpolated into the script.
+      - name: The tag names package.json's version, its changelog section, and a commit of main
+        env:
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          node .github/scripts/release.mjs check "$TAG"
+          git merge-base --is-ancestor "$SHA" origin/main || {
+            echo "release: $TAG points at a commit that is not on main" >&2
+            exit 1
+          }
+
+  # What ci.yml checks: lint and types on Linux, where ci.yml runs them, and the tests on the three
+  # systems.
+  check:
+    name: Checks (${{ matrix.os }})
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run lint
+        if: matrix.os == 'ubuntu-latest'
+      - run: npm run typecheck
+        if: matrix.os == 'ubuntu-latest'
+      - run: npm test
+
+  publish:
+    name: Publish to npm
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Trusted publishing: npm exchanges the workflow's OIDC token for a short-lived publish
+      # token, so no npm token is stored anywhere. Provenance follows from it.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No cache in a job that publishes: what it packs comes from the lock file alone.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
+      - run: npm install -g npm@11.17.0
+      # No dependency's install script runs in the job that holds the OIDC permission. The
+      # package's own `prepack` still runs at `npm publish`.
+      - run: npm ci --ignore-scripts
+      # A version already on the registry is not published again: the first one is published by
+      # hand (npm configures a trusted publisher only for a package that exists), and a re-run
+      # of this workflow finds its own.
+      - name: Publish
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          published="$(npm view "awaydesk@$version" version 2>/dev/null || true)"
+          if [ "$published" = "$version" ]; then
+            echo "awaydesk $version is already on the registry: not published again"
+          else
+            npm publish
+          fi
+
+  github-release:
+    name: GitHub Release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create the release with the changelog's section
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "the release $TAG exists: not created again"
+            exit 0
+          fi
+          node .github/scripts/release.mjs notes "$TAG" > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" --verify-tag --title "awaydesk ${TAG#v}" --notes-file "$RUNNER_TEMP/notes.md"

@@ -185,3 +185,48 @@ the checks left to do by hand (`.github/scripts/watch-sdk-release.sh`,
 `.github/scripts/sdk-release-report.mjs`). The body is rewritten on each run; a comment is added
 once per new version and whenever the suite does not pass. Close the issue once the release is checked: a closed issue with the same title is not
 opened again.
+
+## Releases
+
+awaydesk is published to the npm registry as `awaydesk`, one package for every system, from a git
+tag. The version follows semver within 0.x: a release that changes the pin of
+`@anthropic-ai/claude-agent-sdk` or adds something the owner can see is a minor (`0.2.0`), a
+release of fixes alone a patch (`0.1.1`). The pinned SDK is one the probe certified (see SDK
+releases above).
+
+1. A pull request sets `version` in `package.json` and moves what is under `## Unreleased` in
+   `docs/CHANGELOG.md` into a section `## [x.y.z] - YYYY-MM-DD`, leaving `## Unreleased` empty
+   above it.
+2. Once it is merged, tag the merge commit and push the tag:
+
+   ```bash
+   git tag v0.2.0 <merge commit>
+   git push origin v0.2.0
+   ```
+
+3. The **Release** workflow (`.github/workflows/release.yml`) checks that the tag names
+   `package.json`'s version and that the changelog has its dated section, which is not empty
+   (`.github/scripts/release.mjs`), and that the tagged commit is on `main`. It then runs lint and types on Linux and the tests
+   on Linux, macOS and Windows, publishes with `npm publish` through npm's trusted publishing, and
+   creates the GitHub Release with the version's section as its notes. A version already on the
+   registry is not published again, so a re-run only completes what is missing.
+
+Trusted publishing has no npm token: npm exchanges the workflow's OIDC token for one publish, and
+attaches provenance. It needs a package that already exists on the registry, so the first version
+is published by hand, once, by the package's owner with 2FA: `npm publish` from a clean checkout
+of the merge commit, and only then the tag, whose workflow finds the version on the registry and
+creates the GitHub Release. Then, just before the next release (a new trusted publisher must
+publish within 2 days), the owner links the package to the workflow, with npm 11.15 or later:
+
+```bash
+npm trust github awaydesk --file release.yml --repository duqaXxX/awaydesk --allow-publish
+```
+
+and sets "Require two-factor authentication and disallow tokens" in the package's settings on
+npmjs.com.
+
+The check that the tagged commit is on `main` catches a tag put on the wrong commit by mistake.
+It runs from the workflow file of the tagged commit, so it does not stop someone who can push to
+the repository and edits that file in the same commit. The repository's ruleset `release tags`
+refuses to delete, move or force-push a tag `v*`, for everyone: a published version's tag never
+changes.
