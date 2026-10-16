@@ -17,7 +17,7 @@ import { HOLD_CANCEL, HOLD_CONTINUE } from "../../src/chat/slack/hold.ts";
 import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
-  newDraft,
+  QUESTION_OPEN,
   QUESTION_SKIP,
 } from "../../src/chat/slack/requests.ts";
 import { RESUME_ACTION } from "../../src/chat/slack/resume.ts";
@@ -38,11 +38,11 @@ import { memoryChat, OWNER, SOMEONE } from "../support/memory-chat.ts";
 import {
   type Body,
   clickIn,
-  formBody,
   message,
   picked,
   reply,
   setupState,
+  submitOn,
   type World,
   worldOf,
 } from "../support/slack-app.ts";
@@ -235,7 +235,13 @@ function slackPerson(
           if (request.request.type !== "question") throw new Error("a question's answer");
           const { questions } = request.request;
           asked.set(requestId, pendingOf(ref, questions));
-          const draft = newDraft(requestId, ref.channel, ref.thread);
+          // The owner opens the form (Answer); whoever submits it, the form is that one.
+          const open = clickIn(QUESTION_OPEN, requestId, ref.channel, ref.thread, {
+            messageTs: shownAt,
+          });
+          open.trigger_id = "0000000000.0000000000.fake";
+          await dispatch(open);
+          const form = world.slack.callsTo("views.open").at(-1)?.view as Body;
           // The option each question was answered with, by its place in the question's list.
           const values = Object.assign(
             {},
@@ -246,7 +252,7 @@ function slackPerson(
               return picked(at, String(index));
             }),
           );
-          const body = formBody("view_submission", draft, values, userOf(user, world));
+          const body = submitOn(form, values, userOf(user, world));
           await dispatch(body);
           return;
         }

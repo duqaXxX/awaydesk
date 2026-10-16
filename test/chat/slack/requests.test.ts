@@ -158,8 +158,8 @@ test("the form shows one question with next until the last", () => {
     approvalId: "abc",
     channelId: "C1",
     threadTs: THREAD,
+    generation: 0,
     active: 0,
-    revisions: new Map(),
   });
   assert.equal(view.submit.text, "Next (1/2)");
   assert.equal(view.blocks[0].elements[0].text, "Colour · 1 of 2");
@@ -402,34 +402,28 @@ test("the first unanswered question is found", () => {
   assert.equal(draftAnswers(draft, TWO), null);
 });
 
-test("the form names its request and its page by a fixed few ids", () => {
+test("the form names its request, its generation and its page", () => {
   const form = {
     approvalId: "abc",
     channelId: "C1",
     threadTs: THREAD,
+    generation: 3,
     active: 2,
-    revisions: new Map([[0, [1, 0] as const]]),
   };
   const text = dumpIds(form);
-  assert.deepEqual(JSON.parse(text), {
-    a: "abc",
-    c: "C1",
-    h: THREAD,
-    n: 2,
-    r: { "0": [1, 0] },
-  });
+  assert.deepEqual(JSON.parse(text), { a: "abc", c: "C1", h: THREAD, g: 3, n: 2 });
   assert.deepEqual(loadIds(text), form);
-  // The metadata of the first version, ids with a whole draft beside them, still names it.
-  const old = '{"a":"abc","c":"C1","h":"1.2","n":1,"p":{"0":[1]},"t":{"0":"x"}}';
+  // The metadata of the first version, ids with a whole draft beside them, names its request
+  // with generation 0, older than any form now open; so does the one of the second version.
+  const old = '{"a":"abc","c":"C1","h":"1.2","n":1,"p":{"0":[1]},"t":{"0":"x"},"r":{"0":[1,0]}}';
   assert.deepEqual(loadIds(old), {
     approvalId: "abc",
     channelId: "C1",
     threadTs: "1.2",
+    generation: 0,
     active: 1,
-    revisions: new Map(),
   });
-  // The one of the second version had the ids alone.
-  assert.equal(loadIds('{"a":"abc","c":"C1","h":"1.2"}').active, 0);
+  assert.deepEqual(loadIds('{"a":"abc","c":"C1","h":"1.2"}').generation, 0);
 });
 
 test("metadata that names no request is refused", () => {

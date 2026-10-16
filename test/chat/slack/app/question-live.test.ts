@@ -18,9 +18,9 @@ import {
   type Body,
   FORM_THREAD,
   formAction,
-  formBody,
   ModalSlack,
   QUESTIONS,
+  submitOn,
   worldOf,
 } from "../../../support/slack-app.ts";
 
@@ -73,21 +73,16 @@ const type = (o: Open, values: Body, block = "o0"): Body =>
     { hash: o.modal.hash },
   );
 /** Next or Submit in the form `view` (the one on screen unless said). */
-const submit = (o: Open, values: Body, view: Body = o.modal.view): Body => {
-  const ids = { approvalId: o.approvalId, channelId: CHANNEL, threadTs: FORM_THREAD };
-  const body = formBody("view_submission", ids, values);
-  body.view.private_metadata = view.private_metadata;
-  return body;
-};
+const submit = (o: Open, values: Body, view: Body = o.modal.view): Body => submitOn(view, values);
 
-test("the form names its request, its page and its block revisions in private_metadata", async (t) => {
+test("the form names its request, its generation and its page in private_metadata", async (t) => {
   const o = await openForm(t);
   assert.deepEqual(JSON.parse(o.modal.view.private_metadata as string), {
     a: o.approvalId,
     c: CHANNEL,
     h: FORM_THREAD,
+    g: 1,
     n: 0,
-    r: {},
   });
   assert.equal(o.world.built.drafts.size, 1);
 });
@@ -349,37 +344,139 @@ test("a draft goes when its request is answered, skipped or gone, and the app cl
   assert.equal(left.world.built.drafts.size, 0);
 });
 
-test("two forms of one request each keep their own page", async (t) => {
+const STALE = slackTexts.QUESTION_STALE;
+
+test("only the newest form of a request is valid: the older one's Next sends nothing", async (t) => {
   const o = await openForm(t, [...QUESTIONS]);
-  const a = o.modal.view; // form A, on page one
-  await o.world.dispatch(answerClick(o.approvalId)); // Answer clicked again: form B
-  const b = o.modal.view;
-  // B goes on to page two and ticks a box there.
-  const next = await o.world.dispatch(submit(o, radio("q0", "0"), b));
-  const onB = (next.body as Body).view as Body;
-  assert.equal(onB.submit.text, "Submit");
+  const older = o.modal.view;
+  await o.world.dispatch(answerClick(o.approvalId)); // Answer again, say on another device
+  const response = await o.world.dispatch(submit(o, radio("q0", "0"), older));
+  assert.deepEqual(response.body, { response_action: "errors", errors: { q0: STALE } });
+  assert.equal(STALE, "This form was opened again. Use the newest one.");
+  assert.ok(!o.pending.decided);
+  assert.equal(o.world.built.drafts.get(o.approvalId)?.picks.size, 0); // nothing was written
+});
+
+test("the older form's changes are ignored, with no update", async (t) => {
+  const o = await openForm(t);
+  const older = o.modal.view;
+  await o.world.dispatch(answerClick(o.approvalId));
   await o.world.dispatch(
-    formAction(onB, boxes("q1", "0"), { id: "answer", block: "q1", type: "checkboxes" }),
+    formAction(
+      older,
+      { ...radio("q0", "0"), ...other("o0", "x") },
+      {
+        id: "other",
+        block: "o0",
+        type: "plain_text_input",
+      },
+    ),
   );
-  assert.deepEqual(o.world.built.drafts.get(o.approvalId)?.picks.get(1), [0]);
-  // A, still on page one, picks an option: read from A's own page, B's page-two answer kept.
+  assert.deepEqual(o.modal.calls, []);
+  assert.equal(o.world.built.drafts.get(o.approvalId)?.picks.size, 0);
+  assert.equal(o.world.built.drafts.get(o.approvalId)?.typed.size, 0);
+});
+
+test("the older form cannot send what the newer one holds", async (t) => {
+  const o = await openForm(t, [...QUESTIONS]);
+  const older = o.modal.view; // page one, nothing filled
+  await o.world.dispatch(answerClick(o.approvalId));
+  const newer = o.modal.view;
+  // The newer form goes on to page two and types under Other there.
+  const next = await o.world.dispatch(submit(o, radio("q0", "0"), newer));
+  const second = (next.body as Body).view as Body;
   await o.world.dispatch(
-    formAction(a, radio("q0", "1"), { id: "answer", block: "q0", type: "radio_buttons" }),
+    formAction(second, other("o1", "x"), { id: "other", block: "o1", type: "plain_text_input" }),
+  );
+  // Both questions now hold an answer, yet the older form's Next sends nothing.
+  const response = await o.world.dispatch(submit(o, radio("q0", "0"), older));
+  assert.equal((response.body as Body).response_action, "errors");
+  await o.world.idle();
+  assert.ok(!o.pending.decided);
+});
+
+test("a late keystroke from the page Next already left writes nothing", async (t) => {
+  const o = await openForm(t, [...QUESTIONS]);
+  const first = o.modal.view;
+  await o.world.dispatch(type(o, other("o0", "blue")));
+  const next = await o.world.dispatch(submit(o, other("o0", "blue"), first));
+  assert.equal(((next.body as Body).view as Body).submit.text, "Submit");
+  // The `blu` keystroke was handled after the submission, from the form as page one had it.
+  await o.world.dispatch(
+    formAction(first, other("o0", "blu"), { id: "other", block: "o0", type: "plain_text_input" }),
   );
   const kept = o.world.built.drafts.get(o.approvalId);
-  assert.deepEqual(kept?.picks.get(0), [1]);
-  assert.deepEqual(kept?.picks.get(1), [0]);
-  // A's Next is no error keyed on a block A does not show: with B's answer on page two the form
-  // is complete, and both answers reach the agent.
-  const response = await o.world.dispatch(submit(o, radio("q0", "1"), a));
-  assert.equal(response.body, null);
+  assert.equal(kept?.typed.get(0), "blue");
+  assert.equal(kept?.active, 1);
+});
+
+test("a form the first versions opened is stale when its request is still open", async (t) => {
+  const o = await openForm(t);
+  const old = submit(o, radio("q0", "0"));
+  old.view.private_metadata = JSON.stringify({ a: o.approvalId, c: CHANNEL, h: FORM_THREAD });
+  const response = await o.world.dispatch(old);
+  assert.deepEqual(response.body, { response_action: "errors", errors: { q0: STALE } });
+  assert.ok(!o.pending.decided);
+});
+
+test("a form that could not open leaves the older one valid", async (t) => {
+  const o = await openForm(t);
+  const older = o.modal.view;
+  o.world.slack.responses["views.open"] = { ok: false, error: "expired_trigger_id" };
+  await o.world.dispatch(answerClick(o.approvalId));
+  await o.world.dispatch(
+    formAction(
+      older,
+      { ...radio("q0", "1") },
+      { id: "answer", block: "q0", type: "radio_buttons" },
+    ),
+  );
+  assert.deepEqual(o.world.built.drafts.get(o.approvalId)?.picks.get(0), [1]);
+});
+
+test("an error after an exclusion names the block now on screen", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(type(o, { ...radio("q0", "0"), ...other("o0", "m") })); // radio now q0.1
+  const response = await o.world.dispatch(
+    submit(o, {
+      "q0.1": { answer: { type: "radio_buttons", selected_option: null } },
+      ...other("o0", ""),
+    }),
+  );
+  assert.deepEqual(response.body, {
+    response_action: "errors",
+    errors: { "q0.1": slackTexts.QUESTION_MISSING },
+  });
+});
+
+test("a change in Notes is never the last change, nor does it run the exclusion", async (t) => {
+  const o = await openForm(t);
+  const both = { ...radio("q0", "1"), ...other("o0", "mauve") };
+  await o.world.dispatch(choose(o, both)); // the option last; Other is being emptied
+  assert.equal(o.modal.calls.length, 1);
+  const withNotes = { ...both, ...notes("darker") };
+  await o.world.dispatch(
+    formAction(o.modal.view, withNotes, { id: "notes", block: "n0", type: "plain_text_input" }),
+  );
+  assert.equal(o.modal.calls.length, 1); // no second update
+  assert.equal(o.world.built.drafts.get(o.approvalId)?.last.get(0), "choice");
+  await o.world.dispatch(submit(o, withNotes));
   await o.world.idle();
   assert.ok(o.pending.decided);
   assert.deepEqual(await o.pending.decision, {
     answered: true,
-    answers: { "Colour?": "blue", "Sizes?": ["s"] },
-    notes: {},
+    answers: { "Colour?": "blue" },
+    notes: { "Colour?": "darker" },
   });
+});
+
+test("Answer on a request that is gone leaves another request's draft alone", async (t) => {
+  const o = await openForm(t);
+  const [gone] = o.world.approvals.open(CHANNEL, FORM_THREAD, "Size", [SINGLE]);
+  o.world.approvals.giveUp(gone);
+  await o.world.dispatch(answerClick(gone));
+  assert.deepEqual(o.world.ephemerals(), [texts.APPROVAL_GONE]);
+  assert.deepEqual([...o.world.built.drafts.keys()], [o.approvalId]);
 });
 
 test("Later then Answer finds the notes typed, the boxes ticked and the text under Other", async (t) => {

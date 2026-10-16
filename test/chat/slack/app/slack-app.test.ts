@@ -68,7 +68,6 @@ import {
   clickIn,
   composed,
   FORM_THREAD,
-  formBody,
   HOME_THREAD,
   homeAction,
   idleMessage,
@@ -76,6 +75,7 @@ import {
   ModalSlack,
   message,
   onSecondPage,
+  openedForm,
   PERMALINK,
   picked,
   QUESTIONS,
@@ -985,8 +985,8 @@ test("answer opens the form", async (t) => {
     approvalId,
     channelId: CHANNEL,
     threadTs: FORM_THREAD,
+    generation: 1,
     active: 0,
-    revisions: new Map(),
   });
 });
 
@@ -1063,8 +1063,8 @@ for (const [index, user] of OTHER_USERS.entries()) {
 test("submit with the open question unanswered shows an error", async (t) => {
   const world = worldOf(t);
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
-  const response = await world.dispatch(formBody("view_submission", draft, {}));
+  const form = await openedForm(world, approvalId);
+  const response = await world.dispatch(submitOn(form, {}));
   assert.deepEqual(response.body, {
     response_action: "errors",
     errors: { q0: slackTexts.QUESTION_MISSING },
@@ -1075,13 +1075,17 @@ test("submit with the open question unanswered shows an error", async (t) => {
 test("next with an answer moves to the next question", async (t) => {
   const world = worldOf(t);
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
-  const response = await world.dispatch(formBody("view_submission", draft, picked(0, "0")));
+  const form = await openedForm(world, approvalId);
+  const response = await world.dispatch(submitOn(form, picked(0, "0")));
   const answer = response.body as Body;
   assert.equal(answer.response_action, "update");
   assert.deepEqual(
     world.built.drafts.get(approvalId),
-    newDraft(approvalId, CHANNEL, FORM_THREAD, { active: 1, picks: new Map([[0, [0]]]) }),
+    newDraft(approvalId, CHANNEL, FORM_THREAD, {
+      generation: 1,
+      active: 1,
+      picks: new Map([[0, [0]]]),
+    }),
   );
   assert.equal(answer.view.submit.text, "Submit");
   assert.ok(!pending.decided);
@@ -1147,8 +1151,9 @@ test("a form that cannot open tells the owner", async (t) => {
 test("a submit that needs more answers makes no slack call first", async (t) => {
   const world = worldOf(t);
   const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
-  await world.dispatch(formBody("view_submission", draft, {}));
+  const form = await openedForm(world, approvalId);
+  world.slack.apiCalls = [];
+  await world.dispatch(submitOn(form, {}));
   assert.deepEqual(
     world.slack.apiCalls.filter((call) => call.method.startsWith("conversations.")),
     [],

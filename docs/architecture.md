@@ -875,16 +875,19 @@ under them keeps the labels alone, titled with the question's header. The modal'
 `Next (1/3)` and moves on (`response_action: update`) only once the question has an answer,
 otherwise the question gets an error (`response_action: errors`); it reads `Submit` on the last.
 What was filled is kept by the Slack provider in memory (`Requests.drafts`, `requests.Draft`), by
-request id, and shared by the forms of one request; the view's `private_metadata` holds only
-what is its own, the request's id, channel and thread, the page on screen and the revision of
-each question's clearable blocks (`requests.FormIds`), so two forms open on one request each
-keep their page and Other and Notes take 300 characters each (`TYPED_LIMIT`, `NOTES_LIMIT`) with
-no Slack cap to fit. Every field of the form reports each change (an option picked, a box
-ticked, a character typed under Other or in Notes: `dispatch_action`), and the draft is updated
-from it, with no `views.update` except the single select's exclusion below. An entry goes when
-its request is answered, skipped or found gone, at the next Answer for a request that ended
-another way, and when the app closes. Closing the form with Later and clicking Answer again
-reopens it on the page last written, with the pages already submitted and what each field of the
+request id, with the page on screen and the revision of each question's clearable blocks; the
+view's `private_metadata` holds only the request's id, channel and thread, the form's generation
+and the page it shows (`requests.FormIds`), so Other and Notes take 300 characters each
+(`TYPED_LIMIT`, `NOTES_LIMIT`) with no Slack cap to fit. Only the newest form of a request is
+valid: every Answer opens a new generation (Later then Answer, a second click, a second device),
+and the older forms are stale. A stale form's changes are ignored, and its Next or Submit answers
+`response_action: errors` with `texts.QUESTION_STALE` on the question's block and sends nothing;
+a change from a page Next has already left is ignored too. Every field of the valid form
+reports each change (an option picked, a box ticked, a character typed under Other or in Notes:
+`dispatch_action`), and the draft is updated from it, with no `views.update` except the single
+select's exclusion below. An entry goes when its request is answered, skipped or found gone, at
+the next Answer for a request that ended another way, and when the app closes. Answer after Later
+reopens the form on the page left, with the pages already submitted and what each field of the
 open page held at its last change. The picked labels,
 with the text typed under Other as the answer itself, go back as the tool's answers, a
 multi-select's as a list (measured: "Multi-select answer as a list"). In a single select an

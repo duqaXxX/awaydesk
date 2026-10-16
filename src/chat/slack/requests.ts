@@ -215,12 +215,17 @@ export interface Draft {
   readonly approvalId: string;
   readonly channelId: string;
   readonly threadTs: string;
-  /** The question on screen. */
+  /**
+   * The generation of the form that is valid: every Answer opens a new one and makes the older
+   * forms of the request stale (`Requests.onQuestionOpen`).
+   */
+  readonly generation: number;
+  /** The question on screen in the valid form. */
   readonly active: number;
   readonly picks: ReadonlyMap<number, readonly number[]>;
   readonly typed: ReadonlyMap<number, string>;
   readonly notes: ReadonlyMap<number, string>;
-  /** Per question: the revision of its choice block and of its Other block. */
+  /** Per question: the revision of its choice block and of its Other block in the valid form. */
   readonly revisions: ReadonlyMap<number, readonly [choice: number, other: number]>;
   /** Per question: the field the owner changed last. */
   readonly last: ReadonlyMap<number, Field>;
@@ -231,12 +236,15 @@ export function newDraft(
   approvalId: string,
   channelId: string,
   threadTs: string,
-  filled: Partial<Pick<Draft, "active" | "picks" | "typed" | "notes" | "revisions" | "last">> = {},
+  filled: Partial<
+    Pick<Draft, "generation" | "active" | "picks" | "typed" | "notes" | "revisions" | "last">
+  > = {},
 ): Draft {
   return {
     approvalId,
     channelId,
     threadTs,
+    generation: filled.generation ?? 0,
     active: filled.active ?? 0,
     picks: filled.picks ?? new Map(),
     typed: filled.typed ?? new Map(),
@@ -247,46 +255,42 @@ export function newDraft(
 }
 
 /**
- * What a form carries in its `private_metadata`: the request it answers and what only that form
- * knows, the page on screen and the revision of each question's clearable blocks. Two forms of
- * one request (Answer clicked twice, two devices) each read their own from the payload, while the
- * answers they fill are shared (`Requests.drafts`).
+ * What a form carries in its `private_metadata`: the request it answers, its generation and the
+ * page it shows. Only the newest form of a request is valid (`Draft.generation`), so everything
+ * else lives in the draft. The page names the blocks the payload's state belongs to: a late
+ * change from a page Next has left carries the old one and is ignored.
  */
-export type FormIds = Pick<Draft, "approvalId" | "channelId" | "threadTs" | "active" | "revisions">;
+export type FormIds = Pick<
+  Draft,
+  "approvalId" | "channelId" | "threadTs" | "generation" | "active"
+>;
 
 export function dumpIds(ids: FormIds): string {
   return JSON.stringify({
     a: ids.approvalId,
     c: ids.channelId,
     h: ids.threadTs,
+    g: ids.generation,
     n: ids.active,
-    r: Object.fromEntries([...ids.revisions].map(([k, v]) => [String(k), v])),
   });
 }
 
 /**
- * The ids `dumpIds` wrote; throws on anything else. Page and revisions are read when they are
- * there, so the metadata of an earlier version (the ids with a whole draft beside them, or the
- * ids alone) names its request too, and the lookup that follows finds none.
+ * The ids `dumpIds` wrote; throws on anything else. Generation and page are read when they are
+ * there: the metadata of an earlier version has no generation (0, older than any form now open)
+ * and may carry a whole draft beside the ids, which is left unread.
  */
 export function loadIds(dumped: string): FormIds {
   const data: unknown = JSON.parse(dumped);
   if (!isRecord(data) || ![data.a, data.c, data.h].every((id) => typeof id === "string")) {
     throw new Error("malformed form");
   }
-  const revisions = new Map<number, readonly [number, number]>();
-  if (isRecord(data.r)) {
-    for (const [key, value] of Object.entries(data.r)) {
-      if (!Array.isArray(value) || value.length !== 2) throw new Error("malformed form");
-      revisions.set(index(key), [index(value[0]), index(value[1])]);
-    }
-  }
   return {
     approvalId: data.a as string,
     channelId: data.c as string,
     threadTs: data.h as string,
+    generation: data.g === undefined ? 0 : index(data.g),
     active: data.n === undefined ? 0 : index(data.n),
-    revisions,
   };
 }
 
@@ -312,6 +316,19 @@ function stateOf(
   const prefix = blockIdOf(field, at, 0);
   const id = Object.keys(values).find((key) => key === prefix || key.startsWith(`${prefix}.`));
   return fieldsOf(id === undefined ? undefined : values[id]);
+}
+
+/**
+ * The id of the block that shows `field` of question `at` in the form `stateValues` came from,
+ * which is where a field error must go; the id the draft expects when the state names none.
+ */
+export function shownBlockId(draft: Draft, stateValues: unknown, field: Field, at: number): string {
+  const values = fieldsOf(stateValues);
+  const prefix = blockIdOf(field, at, 0);
+  return (
+    Object.keys(values).find((key) => key === prefix || key.startsWith(`${prefix}.`)) ??
+    blockIdIn(draft, field, at)
+  );
 }
 
 /**

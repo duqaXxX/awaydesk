@@ -26,7 +26,6 @@ import {
   STATUS_ACTION,
   TODAY,
 } from "../../../../src/chat/slack/home.ts";
-import { newDraft } from "../../../../src/chat/slack/requests.ts";
 import {
   SETUP_BYPASS,
   SETUP_EFFORT,
@@ -48,12 +47,12 @@ import {
   clipMessage,
   FORM_THREAD,
   formAction,
-  formBody,
   HOME_THREAD,
   homeAction,
   listed,
   ModalSlack,
   message,
+  openedForm,
   picked,
   put,
   QUESTIONS,
@@ -61,6 +60,7 @@ import {
   resumeClick,
   SESSION_A,
   setupState,
+  submitOn,
   submitted,
   typing,
   type World,
@@ -175,9 +175,10 @@ const CASES: readonly Case[] = [
       const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [
         QUESTIONS[0] as (typeof QUESTIONS)[number],
       ]);
-      const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
+      const form = await openedForm(world, approvalId);
+      world.slack.apiCalls = []; // opening the form is the arrangement, not what the payload did
       return {
-        body: sentBy(formBody("view_submission", draft, picked(0, "0")), sender),
+        body: sentBy(submitOn(form, picked(0, "0")), sender),
         acted: () => pending.decided,
       };
     },
@@ -447,13 +448,12 @@ test("every listener the app registers has a row in the table, and every row a l
 test("view question_form: a stranger's Next on a two-question form is answered with nothing", async (t) => {
   const world = worldOf(t);
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
+  const form = await openedForm(world, approvalId);
+  world.slack.apiCalls = [];
   // The first question answered: for the owner this is a Next, answered with the next question.
-  const owner = await world.dispatch(formBody("view_submission", draft, picked(0, "0")));
+  const owner = await world.dispatch(submitOn(form, picked(0, "0")));
   assert.equal(owner.body?.response_action, "update");
-  const stranger = await world.dispatch(
-    sentBy(formBody("view_submission", draft, picked(0, "0")), "stranger"),
-  );
+  const stranger = await world.dispatch(sentBy(submitOn(form, picked(0, "0")), "stranger"));
   assert.equal(stranger.status, 200);
   assert.equal(stranger.body, null); // no view, no error: nothing that says the form exists
   assert.equal(pending.decided, false);
@@ -465,10 +465,10 @@ test("view question_form: the form of a channel the guard refuses resolves nothi
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [
     QUESTIONS[0] as (typeof QUESTIONS)[number],
   ]);
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD);
+  const form = await openedForm(world, approvalId);
   // The channel gained a member while the form was open.
   world.slack.responses["conversations.members"] = { ok: true, members: [OWNER, BOT, STRANGER] };
-  const response = await world.dispatch(formBody("view_submission", draft, picked(0, "0")));
+  const response = await world.dispatch(submitOn(form, picked(0, "0")));
   await world.settle();
   assert.equal(response.status, 200);
   assert.equal(pending.decided, false);

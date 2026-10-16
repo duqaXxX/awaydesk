@@ -665,11 +665,13 @@ select a change of the option, or a character typed under Other, also empties th
 hash of the view it came from; the emptied block gets a new `block_id` (`Draft.revisions`),
 because Slack keeps an input's value while its `block_id` and `action_id` stay. A `hash_conflict`
 or `not_found` is logged and ignored: Submit reads the state as it stands. What the owner filled
-stays in the provider's memory (`Requests.drafts`), shared by the forms of one request, and the
-view's `private_metadata` holds the request's ids, the page on screen and the block revisions,
-which each handler reads from its own payload. A form an earlier version opened carries a whole
-draft or the ids alone: it is read for what it has, so its request is looked up and, once gone,
-`texts.APPROVAL_GONE` answers. The same owner and
+stays in the provider's memory (`Requests.drafts`) and the view's `private_metadata` holds the
+request's ids, the form's generation and its page. Only the newest form of a request is valid:
+every Answer (`Requests.onQuestionOpen`) opens a new generation from the draft, an older form's
+changes are ignored, and its Next or Submit answers `texts.QUESTION_STALE` as a field error and
+sends nothing. A form an earlier version opened has no generation, or carries a whole draft
+beside the ids: it is read for the ids and the generation, so once its request is gone
+`texts.APPROVAL_GONE` answers (checked first), and while the request is open it is stale. The same owner and
 workspace check applies, and the channel is checked at Submit. The question form's Next and Submit
 answer Slack after checks that make no network call, since a missing answer can only be shown in
 that answer, and Submit checks the channel before the answer reaches the core. A

@@ -54,7 +54,7 @@ import {
 } from "../../src/chat/slack/openfile/modal.ts";
 import { type Limiter, UpdateLimiter } from "../../src/chat/slack/reply/limiter.ts";
 import { resetStatusFlags } from "../../src/chat/slack/reply/status.ts";
-import { type Draft, QUESTION_FORM } from "../../src/chat/slack/requests.ts";
+import { QUESTION_FORM } from "../../src/chat/slack/requests.ts";
 import {
   SETUP_BLOCK,
   SETUP_BYPASS,
@@ -725,24 +725,10 @@ export const QUESTIONS: readonly Question[] = [
   },
 ];
 
-/** The form's recorded Submit (view_submission, 2026-09-24), carrying this draft and state. */
-export function formBody(
-  kind: string,
-  ids: Pick<Draft, "approvalId" | "channelId" | "threadTs">,
-  values: Body,
-  user: Body = {},
-): Body {
-  const body = recorded("submit");
-  body.type = kind;
-  Object.assign(body.user, user);
-  // What `questionView` names its request with: the ids alone.
-  body.view.private_metadata = JSON.stringify({
-    a: ids.approvalId,
-    c: ids.channelId,
-    h: ids.threadTs,
-  });
-  body.view.state = { values };
-  return body;
+/** Answer clicked on the question `approvalId` names: the form as `views.open` showed it. */
+export async function openedForm(world: World, approvalId: string): Promise<Body> {
+  await world.dispatch(answerClick(approvalId));
+  return (world.slack.callsTo("views.open") as Body[]).at(-1)?.view as Body;
 }
 
 export function picked(index: number, value: string): Body {
@@ -794,12 +780,8 @@ export function answerClick(approvalId: string): Body {
  */
 export async function onSecondPage(world: World, approvalId: string, pick: string): Promise<Body> {
   await world.dispatch(answerClick(approvalId));
-  const opened = world.slack.callsTo("views.open") as Body[];
-  const first = opened.at(-1)?.view as Body;
-  const ids = { approvalId, channelId: CHANNEL, threadTs: FORM_THREAD };
-  const body = formBody("view_submission", ids, picked(0, pick));
-  body.view.private_metadata = first.private_metadata;
-  const response = await world.dispatch(body);
+  const first = (world.slack.callsTo("views.open") as Body[]).at(-1)?.view as Body;
+  const response = await world.dispatch(submitOn(first, picked(0, pick)));
   return (response.body as Body).view as Body;
 }
 
