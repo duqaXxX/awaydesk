@@ -13,8 +13,10 @@ npm install -g awaydesk
 ```
 
 The [setup guide](https://github.com/duqaXxX/awaydesk/blob/v{{VERSION}}/docs/setup.md) says which
-systems and agents this version supports, and takes you through the Slack app, the settings, and
-the service that starts awaydesk at login:
+systems and agents this version supports, and takes you through
+[creating the Slack app](https://github.com/duqaXxX/awaydesk/blob/v{{VERSION}}/docs/setup.md#part-1-the-slack-app)
+from [`slack-app-manifest.json`](https://github.com/duqaXxX/awaydesk/blob/v{{VERSION}}/slack-app-manifest.json),
+the settings, and the service that starts awaydesk at login:
 
 ```sh
 awaydesk service install

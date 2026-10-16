@@ -16,7 +16,7 @@ All notable changes to this project are documented here. The format follows
   the refusal of an old Node, a missing `.env`, a folder macOS does not let awaydesk read, `!open`
   without the `files:write` scope, and the log line of a Home tab the Slack app does not enable.
 - The package on npm has a README of its own, `npm/README.md`, with links to GitHub pinned to the
-  version's tag, and the repository keeps its README. `npm run build:npm` assembles the package in
+  version's tag (the setup guide, its part on creating the Slack app, `slack-app-manifest.json`), and the repository keeps its README. `npm run build:npm` assembles the package in
   `build/npm/awaydesk` (`.github/scripts/npm-package.mjs`): `dist`, a `package.json` with no
   scripts or devDependencies, `LICENSE`, `slack-app-manifest.json` and that README; `docs/` no
   longer ships in the package. The Release workflow publishes that folder. A changelog section
