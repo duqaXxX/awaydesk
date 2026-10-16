@@ -1421,7 +1421,10 @@ messages not sent, whether or not Claude Code had taken it in; its replay is not
   the agent makes from then on (`ThreadSession.askOwner`). A closing
   session waits for an agent session that a daemon word (`!help`, `!bypass`, `!status`) is still
   starting, then closes it, and starts no other: the word gets `SessionClosed`, which tells the
-  owner to send it again, and `!bypass` stores nothing. A session rebuilt to replace one still
+  owner to send it again, and `!bypass` stores nothing. It waits the same way for a start its own
+  worker gave up when the close cancelled it: the session keeps that start, and `close` returns,
+  and `doneClosing` fires, only once the agent process is closed (`AgentBackend.start` takes no
+  signal, so a launching process is closed when it is there). A session rebuilt to replace one still
   closing (an idle close, or a fresh lookup after a gone resume) waits for the old one to finish
   tearing down before its own first start (`ThreadSession.doneClosing`): `AgentSession.close`
   resolves once the process's stream has ended, and resuming the same session id any sooner would

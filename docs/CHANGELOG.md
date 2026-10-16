@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A close while the session's own worker is waiting for the agent to start no longer ends before
+  that process is closed (issue #240): the session keeps the start the worker gave up, and
+  `close` and `doneClosing` wait for it, so a session built next on the same id cannot resume
+  it while the first process still launches.
 - Folder trust reads paths by the host's own rules (issue #197): `src/agent/claude/trust.ts`
   split every path on `/` and started its walk at `/`, so on Windows no folder could be matched
   to a trust record or a repository, and the footer's git and the file lists found none. The
