@@ -7,7 +7,7 @@
  * stop clears these same fields itself, so a second start finds nothing to do. What the chat
  * did not repair stays in the state, and the next start asks again (issue #264).
  */
-import type { ChatProvider, SessionStatus } from "../../chat/seam.ts";
+import type { ChatProvider, MessageId, SessionStatus, ThreadChat } from "../../chat/seam.ts";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import type { ThreadsState } from "../port/threads.ts";
@@ -32,13 +32,17 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
   for (const [channelId, threadId, thread] of state.repairsPending()) {
     try {
       const chatThread = chat.thread({ channel: channelId, thread: threadId });
+      // Read before the replies are repaired: a turn with no reply message (a question or an
+      // approval opened it, and a reply starts on its first write) leaves its request as the
+      // only trace in the thread.
+      const hadReply = thread.openReplies.length > 0;
       for (const messageId of thread.openReplies) {
         if (await chatThread.endReply(messageId, texts.STOPPED_BEFORE_ANSWER)) {
           safe(() => state.replaceOpenReply(channelId, threadId, messageId, null));
         } else left(channelId, threadId, "a reply");
       }
       for (const messageId of thread.requests) {
-        if (await chatThread.withdraw(messageId)) {
+        if (await settleRequest(chatThread, messageId, hadReply)) {
           safe(() => state.removeRequest(channelId, threadId, messageId));
         } else left(channelId, threadId, "a request");
       }
@@ -60,6 +64,27 @@ export async function repair(chat: ChatProvider, state: RepairState): Promise<vo
       );
     }
   }
+}
+
+/**
+ * A request the crash left open. With a reply in the thread the reply says the turn stopped, and
+ * the request goes. Without one, the request is rewritten into that line (no controls, and no
+ * notification: an edit), or it goes when the chat refuses the rewrite. False when it still shows.
+ */
+async function settleRequest(
+  chatThread: ThreadChat,
+  messageId: MessageId,
+  hadReply: boolean,
+): Promise<boolean> {
+  if (!hadReply) {
+    try {
+      await chatThread.rewrite(messageId, texts.STOPPED_BEFORE_ANSWER);
+      return true;
+    } catch (error) {
+      logger.warning(`could not rewrite a stale request: ${errorName(error)}`);
+    }
+  }
+  return chatThread.withdraw(messageId);
 }
 
 /** One line for what stays in the state for the next start: ids and the kind only. */

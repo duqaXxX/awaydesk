@@ -1524,12 +1524,12 @@ test("a question cut short by a stop shows as stopped", async () => {
 test("a question asked inside a subagent has no line of its own to keep answers on", async () => {
   const parent: SessionEvent = {
     type: "call_started",
-    callId: "toolu_skill",
-    toolName: "Skill",
-    input: { skill: "Scan" },
+    callId: "toolu_agent",
+    toolName: "Agent",
+    input: { description: "Scan", prompt: "Scan" },
     parentCallId: null,
   };
-  const [, renderer] = await render([parent, { ...ASK_START, parentCallId: "toolu_skill" }]);
+  const [, renderer] = await render([parent, { ...ASK_START, parentCallId: "toolu_agent" }]);
   assert.equal(renderer.answered("toolu_ask", [{ text: "Colour?" }], { "Colour?": "red" }), false);
 });
 

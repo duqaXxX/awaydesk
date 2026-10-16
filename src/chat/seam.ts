@@ -49,7 +49,7 @@ export interface Preview {
   readonly plain: boolean;
   /**
    * The preview is a record that stands for the call: its title is the first line of the body, in
-   * one block, and the call has no card. Only a call that ends well and says so (an answered
+   * one block, and the call has no card. Always with `plain`: the body is lines of words. Only a call that ends well and says so (an answered
    * question) carries one; any other state of the call keeps its card.
    */
   readonly record: boolean;

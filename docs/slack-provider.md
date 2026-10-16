@@ -114,7 +114,7 @@ title; one that was stopped has a card of its own; one whose preview has no line
 file) has a card that says the sentence. A card the sink already drew for the call stays
 (`Tool.cardless`), and the diff under it is then titled with the sentence alone. An answered
 `AskUserQuestion` is held until it ends (`previews.ASKERS`) and shows its answers as a record
-(`Preview.record`, which implies `Preview.plain`): one `context` block of words whose first line is
+(`Preview.record`, always with `Preview.plain`): one `context` block of words whose first line is
 the title behind `texts.RECORD_MARK` (`✓ `), with no card and no gap under the heading. The
 request message rewritten by `requests.answeredBlocks` has the same first line. Its lines come from the questions and answers the daemon sent back, so they depend on no
 undocumented field. The preview is built from the event's `FileChange`, which the back end reads

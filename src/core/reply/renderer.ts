@@ -580,8 +580,9 @@ export class TurnRenderer {
       LAUNCHERS.has(event.toolName)
     ) {
       // Kept from the sink until it ends: what shows it then is its preview with no card (a
-      // question's record, once answered), or a card that says why it failed. An approval has a message of its own. A call that
-      // starts an agent is kept until its task starts (`#taskStarted`).
+      // question's record, once answered), or a card that says why it failed. An approval has a
+      // message of its own. A call that starts an agent is kept until its task starts
+      // (`#taskStarted`).
       if (LAUNCHERS.has(event.toolName)) this.#undecided.add(event.callId);
       this.#lines.set(
         event.callId,

@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A crash while a question or an approval that opened the turn waits no longer leaves the thread
+  with the owner's message alone (issue #325). The turn had no reply message (a reply starts on
+  its first write), so the repair on the next start deleted the request and nothing said the turn
+  stopped. It now rewrites the request into `awaydesk stopped before this answer.` with an edit, so
+  no notification and no control is left; a turn that had a reply behaves as before. A rewrite
+  Slack refuses falls back to the deletion.
+
 - The record of answered questions is one block with no gap under its heading (issue #325). It
   was a task card titled `User answered Claude's questions:` with the rows in a `context` block
   under it, and Slack draws a space between the two. It is now a single `context` block:

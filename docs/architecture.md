@@ -548,9 +548,14 @@ crash in that time leaves repair less to find.
 On start, before the chat's connection opens, `repair.repair` (a flow of the core, over the chat
 seam) repairs every thread `state.json` still shows as left open. For each open reply it calls
 `ThreadChat.endReply` with `texts.STOPPED_BEFORE_ANSWER`, which ends the reply where it stands; it
-withdraws each stale request (`ThreadChat.withdraw`) and, for a root left working or waiting, asks
-for the error status (`ThreadChat.showStatus`), only where the chat has `reactions`. Each of the
-three calls answers whether the chat did it. An entry is cleared when its repair was made or the
+settles each stale request and, for a root left working or waiting, asks
+for the error status (`ThreadChat.showStatus`), only where the chat has `reactions`. A request is
+withdrawn (`ThreadChat.withdraw`) when the thread had an open reply, which carries the stopped
+line. When it had none (a question or an approval opened the turn, and a reply starts on its first
+write, so no reply message exists), the request is rewritten into that same line
+(`ThreadChat.rewrite`, an edit that notifies nobody) so the thread does not show the owner's
+message alone; a rewrite the chat refuses falls back to the withdrawal. Each of the three calls
+answers whether the chat did it. An entry is cleared when its repair was made or the
 chat said its message is gone, and stays when the chat did not make it, so the next start asks
 again: a chat that keeps refusing is asked once at every start, for as long as the thread is in
 `state.json`. A status the chat did not show keeps its word for the next start beside the error
