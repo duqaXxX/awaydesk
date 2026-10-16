@@ -17,6 +17,8 @@ export type Settle = (answer: HoldAnswer, shownAt: MessageId, pending: Pending) 
 
 /** The question to put: what to show, and what to do with the answer. */
 export interface Question {
+  /** Stored beside the message, for the crash repair. */
+  readonly kind: "setup" | "hold";
   /** The request, given the id only its answer carries. */
   readonly request: (requestId: string) => HoldRequest | SetupRequest;
   /** The request in one line. */
@@ -74,7 +76,7 @@ export async function askOwner(
     // `holdStart`/`holdEnd` and leave the hold itself undiscarded; the message is already
     // live either way, so a failure is logged loudly.
     try {
-      state.addRequest(ref.channel, ref.thread, shownAt);
+      state.addRequest(ref.channel, ref.thread, shownAt, question.kind);
     } catch (error) {
       logger.error(
         `posted a hold in ${ref.channel}/${ref.thread} that state.json could not record: ${errorName(error)}`,

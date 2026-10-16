@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
@@ -394,7 +394,7 @@ test("a start Slack did not serve leaves the repair to the next one", async (t) 
   const { state, slack } = makeState();
   t.mock.method(logger, "warning", () => {});
   state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
-  state.addRequest(CHANNEL, THREAD, "1790000000.000002");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002", "question");
   state.setStatusPending(CHANNEL, THREAD, "waiting");
   for (const method of [
     "chat.stopStream",
@@ -444,7 +444,7 @@ test("a reply, a request and a root Slack no longer has count as repaired", asyn
   const { state, slack } = makeState();
   t.mock.method(logger, "warning", () => {});
   state.replaceOpenReply(CHANNEL, THREAD, null, "1790000000.000001");
-  state.addRequest(CHANNEL, THREAD, "1790000000.000002");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002", "question");
   state.setStatusPending(CHANNEL, THREAD, "working");
   slack.responses["chat.stopStream"] = rejected("message_not_found");
   slack.responses["conversations.replies"] = rejected("thread_not_found");
@@ -494,8 +494,8 @@ test("a request Slack did not delete stays for the next start, beside one it did
   const { state, slack } = makeState();
   t.mock.method(logger, "warning", () => {});
   withOpenReply(state, slack);
-  state.addRequest(CHANNEL, THREAD, "1790000000.000002");
-  state.addRequest(CHANNEL, THREAD, "1790000000.000003");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002", "question");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000003", "question");
   slack.responses["chat.delete"] = [rejected("internal_error"), { ok: true }];
   await repairCrash(slack, state, new UpdateLimiter());
   assert.deepEqual(thread(state).requests, ["1790000000.000002"]);
@@ -516,8 +516,8 @@ test("more than one open reply in a thread are all repaired", async () => {
 test("stale requests of a turn with a reply are deleted and a gone one still counts as done", async () => {
   const { state, slack } = makeState();
   withOpenReply(state, slack);
-  state.addRequest(CHANNEL, THREAD, "1790000000.000002");
-  state.addRequest(CHANNEL, THREAD, "1790000000.000003");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002", "question");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000003", "question");
   slack.responses["chat.delete"] = [{ ok: true }, rejected("message_not_found")];
   await repairCrash(slack, state, new UpdateLimiter());
   const deleted = slack.callsTo("chat.delete").map((call) => call.ts);
@@ -603,7 +603,7 @@ test("a request left by a turn with no reply becomes the stopped line, not a del
   // thread with the owner's message alone. A `chat.update` notifies nobody.
   resetStatusFlags();
   const { state, slack } = makeState();
-  state.addRequest(CHANNEL, THREAD, "1790000000.000002");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002", "question");
   state.setStatusPending(CHANNEL, THREAD, "waiting");
   await repairCrash(slack, state, new UpdateLimiter());
   assert.deepEqual(slack.callsTo("chat.delete"), []);
@@ -625,7 +625,7 @@ test("a request left by a turn with no reply becomes the stopped line, not a del
 test("a request of a turn that had a reply is still deleted, the reply carrying the line", async () => {
   const { state, slack } = makeState();
   withOpenReply(state, slack);
-  state.addRequest(CHANNEL, THREAD, "1790000000.000002");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002", "question");
   await repairCrash(slack, state, new UpdateLimiter());
   assert.deepEqual(
     slack.callsTo("chat.delete").map((call) => call.ts),
@@ -638,17 +638,112 @@ test("a request of a turn that had a reply is still deleted, the reply carrying 
   assert.deepEqual(thread(state).requests, []);
 });
 
+test("with no reply only a question or an approval becomes the stopped line", async () => {
+  // The setup form and the same-folder hold are requests too, but the owner's message was never
+  // sent for them: a line saying the answer stopped would be false, so they are deleted.
+  for (const [kind, rewritten] of [
+    ["question", true],
+    ["approval", true],
+    ["setup", false],
+    ["hold", false],
+  ] as const) {
+    const { state, slack } = makeState();
+    state.addRequest(CHANNEL, THREAD, "1790000000.000002", kind);
+    await repairCrash(slack, state, new UpdateLimiter());
+    assert.deepEqual(
+      slack.callsTo("chat.update").map((call) => call.ts),
+      rewritten ? ["1790000000.000002"] : [],
+      kind,
+    );
+    assert.deepEqual(
+      slack.callsTo("chat.delete").map((call) => call.ts),
+      rewritten ? [] : ["1790000000.000002"],
+      kind,
+    );
+    assert.deepEqual(thread(state).requests, [], kind);
+    assert.deepEqual(thread(state).requestKinds, {}, kind);
+  }
+});
+
+test("with a reply every kind of request is deleted", async () => {
+  for (const kind of ["question", "approval", "setup", "hold"] as const) {
+    const { state, slack } = makeState();
+    withOpenReply(state, slack);
+    state.addRequest(CHANNEL, THREAD, "1790000000.000002", kind);
+    await repairCrash(slack, state, new UpdateLimiter());
+    assert.deepEqual(
+      slack.callsTo("chat.delete").map((call) => call.ts),
+      ["1790000000.000002"],
+      kind,
+    );
+    assert.deepEqual(
+      slack.callsTo("chat.update").map((call) => call.ts),
+      ["1790000000.000009"], // the reply alone
+      kind,
+    );
+  }
+});
+
+test("a request with no kind, written before the kinds, is deleted", async () => {
+  const { directory, slack } = makeState();
+  const path = join(directory, "state.json");
+  const file = JSON.parse(readFileSync(path, "utf8"));
+  file.channels[CHANNEL].threads[THREAD].requests = ["1790000000.000002"];
+  writeFileSync(path, JSON.stringify(file));
+  const state = new StateStore(path);
+  await repairCrash(slack, state, new UpdateLimiter());
+  assert.deepEqual(
+    slack.callsTo("chat.delete").map((call) => call.ts),
+    ["1790000000.000002"],
+  );
+  assert.deepEqual(slack.callsTo("chat.update"), []);
+  assert.deepEqual(thread(state).requests, []);
+});
+
+test("two requests with no reply leave one stopped line, the other is deleted", async () => {
+  const { state, slack } = makeState();
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002", "question");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000003", "approval");
+  await repairCrash(slack, state, new UpdateLimiter());
+  assert.deepEqual(
+    slack.callsTo("chat.update").map((call) => call.ts),
+    ["1790000000.000002"],
+  );
+  assert.deepEqual(
+    slack.callsTo("chat.delete").map((call) => call.ts),
+    ["1790000000.000003"],
+  );
+  assert.deepEqual(thread(state).requests, []);
+});
+
+test("a refused rewrite does not use up the thread's stopped line", async (t) => {
+  t.mock.method(logger, "warning", () => {});
+  const { state, slack } = makeState();
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002", "question");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000003", "question");
+  slack.responses["chat.update"] = [rejected("invalid_blocks"), { ok: true }];
+  await repairCrash(slack, state, new UpdateLimiter());
+  assert.deepEqual(
+    slack.callsTo("chat.update").map((call) => call.ts),
+    ["1790000000.000002", "1790000000.000003"],
+  );
+  assert.deepEqual(
+    slack.callsTo("chat.delete").map((call) => call.ts),
+    ["1790000000.000002"],
+  );
+});
+
 test("a request that cannot be rewritten is deleted, and kept when that fails too", async (t) => {
   t.mock.method(logger, "warning", () => {});
   const { state, slack } = makeState();
-  state.addRequest(CHANNEL, THREAD, "1790000000.000002");
+  state.addRequest(CHANNEL, THREAD, "1790000000.000002", "question");
   slack.responses["chat.update"] = rejected("invalid_blocks");
   await repairCrash(slack, state, new UpdateLimiter());
   assert.equal(slack.callsTo("chat.delete").length, 1);
   assert.deepEqual(thread(state).requests, []);
 
   const other = makeState();
-  other.state.addRequest(CHANNEL, THREAD, "1790000000.000003");
+  other.state.addRequest(CHANNEL, THREAD, "1790000000.000003", "question");
   other.slack.responses["chat.update"] = rejected("invalid_blocks");
   other.slack.responses["chat.delete"] = rejected("internal_error");
   await repairCrash(other.slack, other.state, new UpdateLimiter());

@@ -522,7 +522,10 @@ Each thread also carries three fields for crash repair, ids only, never message 
   The sink reports each change through the callback `ThreadChat.openReply` was given, and the
   session writes it (`StateStore.replaceOpenReply`).
 - `requests`: the id of every approval, question, setup and same-folder hold message still carrying
-  buttons (added on post, removed on delete or answer).
+  buttons (added on post, removed on delete or answer), and `request_kinds`, one word for each id:
+  `approval`, `question`, `setup` or `hold` (a word, never the content). The repair reads the word
+  to tell a request that stands for a turn from one that waits before the owner's message is sent.
+  An entry written before the kinds existed has none and is read as a request to delete.
 - `status`: the root's status while it is ⏳ or ✋ (cleared once ✅ or ❌ is requested). The session
   asks the chat for a status by one of four words (`SessionStatus`), and the file keeps that word:
   `working`, `waiting`, `done` or `error`, whatever the chat draws it as. A file written before the
@@ -551,11 +554,14 @@ seam) repairs every thread `state.json` still shows as left open. For each open 
 settles each stale request and, for a root left working or waiting, asks
 for the error status (`ThreadChat.showStatus`), only where the chat has `reactions`. A request is
 withdrawn (`ThreadChat.withdraw`) when the thread had an open reply, which carries the stopped
-line. When it had none (a question or an approval opened the turn, and a reply starts on its first
-write, so no reply message exists), the request is rewritten into that same line
-(`ThreadChat.rewrite`, an edit that notifies nobody) so the thread does not show the owner's
-message alone; a rewrite the chat refuses falls back to the withdrawal. Each of the three calls
-answers whether the chat did it. An entry is cleared when its repair was made or the
+line. When it had none, a question or an approval (the kinds that stand for a turn: it opened the
+turn, and a reply starts on its first write, so no reply message exists) is rewritten into that
+same line (`ThreadChat.rewrite`, an edit that notifies nobody) so the thread does not show the
+owner's message alone; a rewrite the chat refuses falls back to the withdrawal. A thread gets that
+line once: after the first successful rewrite the other requests are withdrawn. The setup form and
+the same-folder hold are always withdrawn, since the owner's message was never sent for them and a
+line saying an answer stopped would be false, and so is an entry with no kind. `withdraw` and
+`endReply` answer whether the chat did it; `rewrite` rejects when it did not. An entry is cleared when its repair was made or the
 chat said its message is gone, and stays when the chat did not make it, so the next start asks
 again: a chat that keeps refusing is asked once at every start, for as long as the thread is in
 `state.json`. A status the chat did not show keeps its word for the next start beside the error
@@ -1271,7 +1277,8 @@ closed when the start returns (`ThreadSession.connect`).
   session with its effort and model) is undone by `ThreadSession.forgetSetup`, called when a setup
   is cancelled or fails, when the same-folder hold cancels after Start, and before each new setup,
   so the setup asked again shows the defaults. A setup shows ✋ and pauses the idle timer; crash
-  repair deletes a setup message left standing.
+  repair deletes a setup message left standing (the stopped line is for a question or an approval
+  only).
 ### Status and the activity line
 
 - Each `ThreadSession` asks its `ThreadChat` for one of four statuses (`working`, `waiting`, `done`,

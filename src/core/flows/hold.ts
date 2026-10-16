@@ -25,6 +25,7 @@ export function holdFlow(deps: FlowDeps, talk: Talk): HoldFlow {
     const otherRef = { channel: other.channelId, thread: other.threadId };
     const link = await talk.noticeLink(otherRef, "Session");
     const answer = await askOwner(deps, talk, ref, session, {
+      kind: "hold",
       title: fill(texts.HOLD_QUESTION, { link }),
       request: (requestId): HoldRequest => ({ type: "hold", requestId, other: otherRef, link }),
     });

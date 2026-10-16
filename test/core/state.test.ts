@@ -230,6 +230,7 @@ test("v2 round trips every field", () => {
             effort: "low",
             open_replies: [],
             requests: [],
+            request_kinds: {},
             status: null,
             ended: null,
           },
@@ -579,8 +580,8 @@ test("repair fields round trip and are ignored by code that predates them", () =
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD_TS);
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "1790000000.000001");
-  store.addRequest(CHANNEL, THREAD_TS, "1790000000.000002");
-  store.addRequest(CHANNEL, THREAD_TS, "1790000000.000003");
+  store.addRequest(CHANNEL, THREAD_TS, "1790000000.000002", "question");
+  store.addRequest(CHANNEL, THREAD_TS, "1790000000.000003", "setup");
   store.setStatusPending(CHANNEL, THREAD_TS, "working");
 
   const reloaded = new StateStore(path).thread(CHANNEL, THREAD_TS);
@@ -589,6 +590,7 @@ test("repair fields round trip and are ignored by code that predates them", () =
     threadState(join(dir, "project"), {
       openReplies: ["1790000000.000001"],
       requests: ["1790000000.000002", "1790000000.000003"],
+      requestKinds: { "1790000000.000002": "question", "1790000000.000003": "setup" },
       status: "working",
     }),
   );
@@ -601,6 +603,60 @@ test("repair fields round trip and are ignored by code that predates them", () =
     effort: raw.effort,
   };
   assert.deepEqual(parseThread(oldShape), threadState(join(dir, "project")));
+});
+
+test("a request is stored with one word for its kind, and the word leaves with it", () => {
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  const store = new StateStore(path);
+  store.bind(CHANNEL, join(dir, "project"));
+  store.openThread(CHANNEL, THREAD_TS);
+  for (const [ts, kind] of [
+    ["ts-1", "question"],
+    ["ts-2", "approval"],
+    ["ts-3", "setup"],
+    ["ts-4", "hold"],
+  ] as const) {
+    store.addRequest(CHANNEL, THREAD_TS, ts, kind);
+  }
+  const raw = (): Record<string, unknown> => {
+    const channels = read(path).channels as Record<string, { threads: Record<string, unknown> }>;
+    return channels[CHANNEL]?.threads[THREAD_TS] as Record<string, unknown>;
+  };
+  assert.deepEqual(raw().request_kinds, {
+    "ts-1": "question",
+    "ts-2": "approval",
+    "ts-3": "setup",
+    "ts-4": "hold",
+  });
+  store.removeRequest(CHANNEL, THREAD_TS, "ts-2");
+  assert.deepEqual(Object.keys(raw().request_kinds as object), ["ts-1", "ts-3", "ts-4"]);
+  store.clearRepair(CHANNEL, THREAD_TS);
+  assert.deepEqual(raw().request_kinds, {});
+});
+
+test("a file from before the kinds loads its requests with no kind and keeps them", () => {
+  // Written by the daemon of 663fdf4 and before: `requests` alone. No kind is read as one the
+  // repair deletes, and an unknown word or a kind for an id not in `requests` is dropped.
+  const dir = scratch();
+  const path = join(dir, "state.json");
+  writeThreadFile(path, dir, {
+    directory: dir,
+    session_id: null,
+    requests: ["old-1", "old-2"],
+  });
+  const store = new StateStore(path);
+  assert.deepEqual(mustThread(store).requests, ["old-1", "old-2"]);
+  assert.deepEqual(mustThread(store).requestKinds, {});
+  store.addRequest(CHANNEL, THREAD_TS, "new-1", "approval");
+  assert.deepEqual(mustThread(store).requestKinds, { "new-1": "approval" });
+
+  const odd = parseThread({
+    directory: dir,
+    requests: ["a", "b"],
+    request_kinds: { a: "question", b: "poll", c: "hold" },
+  });
+  assert.deepEqual(odd.requestKinds, { a: "question" });
 });
 
 test("replace open reply tracks two sinks independently", () => {
@@ -635,8 +691,8 @@ test("remove request drops only the named one", () => {
   const store = new StateStore(join(dir, "state.json"));
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD_TS);
-  store.addRequest(CHANNEL, THREAD_TS, "ts-1");
-  store.addRequest(CHANNEL, THREAD_TS, "ts-2");
+  store.addRequest(CHANNEL, THREAD_TS, "ts-1", "question");
+  store.addRequest(CHANNEL, THREAD_TS, "ts-2", "question");
   store.removeRequest(CHANNEL, THREAD_TS, "ts-1");
   const thread = mustThread(store);
   assert.deepEqual(thread.requests, ["ts-2"]);
@@ -649,7 +705,7 @@ test("repair setters are a no op for an unknown thread", () => {
   const store = new StateStore(join(dir, "state.json"));
   store.bind(CHANNEL, dir);
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "ts-1");
-  store.addRequest(CHANNEL, THREAD_TS, "ts-1");
+  store.addRequest(CHANNEL, THREAD_TS, "ts-1", "question");
   store.setStatusPending(CHANNEL, THREAD_TS, "error");
   assert.equal(store.thread(CHANNEL, THREAD_TS), null);
 });
@@ -673,7 +729,7 @@ test("clear repair fields clears all three and is a no op after", () => {
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD_TS);
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "ts-1");
-  store.addRequest(CHANNEL, THREAD_TS, "ts-2");
+  store.addRequest(CHANNEL, THREAD_TS, "ts-2", "question");
   store.setStatusPending(CHANNEL, THREAD_TS, "error");
   store.clearRepair(CHANNEL, THREAD_TS);
   assert.deepEqual(store.thread(CHANNEL, THREAD_TS), threadState(join(dir, "project")));
@@ -696,7 +752,7 @@ test("clear repair keeps what an unlanded answer still needs", () => {
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD_TS);
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "ts-1");
-  store.addRequest(CHANNEL, THREAD_TS, "ts-2");
+  store.addRequest(CHANNEL, THREAD_TS, "ts-2", "question");
   store.setStatusPending(CHANNEL, THREAD_TS, "error");
   store.clearRepair(CHANNEL, THREAD_TS, { keepOpen: true });
   const kept = new StateStore(path).thread(CHANNEL, THREAD_TS);
@@ -834,7 +890,7 @@ test("clear repair keeps the ended reaction", () => {
   store.bind(CHANNEL, join(dir, "project"));
   store.openThread(CHANNEL, THREAD_TS);
   store.setStatusPending(CHANNEL, THREAD_TS, null, "error");
-  store.addRequest(CHANNEL, THREAD_TS, "1790549807.000001");
+  store.addRequest(CHANNEL, THREAD_TS, "1790549807.000001", "question");
   store.clearRepair(CHANNEL, THREAD_TS);
   assert.equal(mustThread(store).ended, "error");
 });
@@ -882,7 +938,7 @@ test("the observer hears what the session index shows and nothing else", () => {
 
   // What no row of the index shows: a reply's bookkeeping, a request, bypass, effort, a rebind.
   store.replaceOpenReply(CHANNEL, THREAD_TS, null, "1790549807.000001");
-  store.addRequest(CHANNEL, THREAD_TS, "1790549807.000002");
+  store.addRequest(CHANNEL, THREAD_TS, "1790549807.000002", "question");
   store.setBypass(CHANNEL, THREAD_TS, true);
   store.setEffort(CHANNEL, THREAD_TS, "low");
   store.bind(CHANNEL, join(dir, "elsewhere"));
@@ -1034,6 +1090,9 @@ const STATE_BYTES = String.raw`{
           "requests": [
             "1790549807.000002"
           ],
+          "request_kinds": {
+            "1790549807.000002": "question"
+          },
           "status": "working",
           "ended": null
         },
@@ -1045,6 +1104,7 @@ const STATE_BYTES = String.raw`{
           "effort": null,
           "open_replies": [],
           "requests": [],
+          "request_kinds": {},
           "status": null,
           "ended": null
         }
@@ -1066,6 +1126,7 @@ const STATE_BYTES = String.raw`{
           "effort": null,
           "open_replies": [],
           "requests": [],
+          "request_kinds": {},
           "status": null,
           "ended": "done"
         }
@@ -1091,7 +1152,7 @@ test("the file is written with these exact bytes, and read back into the same st
   store.setEffort(c, t1, "high");
   store.replaceOpenReply(c, t1, null, "1790549807.000001");
   store.replaceOpenReply(c, t1, null, "1790549807.000009");
-  store.addRequest(c, t1, "1790549807.000002");
+  store.addRequest(c, t1, "1790549807.000002", "question");
   store.setStatusPending(c, t1, "working");
   store.setStatusPending(o, t3, null, "done");
   store.setSession(c, t2, "s-é ");

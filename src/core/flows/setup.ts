@@ -122,6 +122,7 @@ export function setupFlow(deps: FlowDeps, talk: Talk): SetupFlow {
     };
 
     const answer = await askOwner(deps, talk, ref, live, {
+      kind: "setup",
       title: texts.SETUP_FALLBACK,
       request: (requestId): SetupRequest => ({
         type: "setup",

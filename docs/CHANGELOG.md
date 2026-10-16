@@ -12,7 +12,12 @@ All notable changes to this project are documented here. The format follows
   its first write), so the repair on the next start deleted the request and nothing said the turn
   stopped. It now rewrites the request into `awaydesk stopped before this answer.` with an edit, so
   no notification and no control is left; a turn that had a reply behaves as before. A rewrite
-  Slack refuses falls back to the deletion.
+  Slack refuses falls back to the deletion. Only a question or an approval gets the line, and
+  only one line per thread: the setup form and the same-folder hold are still deleted (the
+  owner's message was never sent for them), and so are the other requests of the thread. For
+  that, `state.json` stores one word beside each request id, `request_kinds` (`question`,
+  `approval`, `setup` or `hold`; never content). The key is additive, the version stays 3, and an
+  entry written before it has no kind and is deleted.
 
 - The record of answered questions is one block with no gap under its heading (issue #325). It
   was a task card titled `User answered Claude's questions:` with the rows in a `context` block

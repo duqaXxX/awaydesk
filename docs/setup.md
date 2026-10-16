@@ -891,12 +891,12 @@ Detail that the install sequence links to, kept out of its way.
 | File | Written by | Holds |
 |---|---|---|
 | `.env` | you | the tokens and the settings of Part 2 |
-| `state.json` | awaydesk | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice (on, off or never chosen), the effort level set with `/effort`, the status of its root message (`working` or `waiting`) and the one it ended with (`done` or `error`), and the ids (`open_replies`, `requests`) of the replies and request messages still open, which the repair after a crash needs. Never a message's text |
+| `state.json` | awaydesk | the names of the agent and the chat that wrote it; for each channel, its directory; for each of its threads, the folder it was opened in, its Claude Code session id, its bypass choice (on, off or never chosen), the effort level set with `/effort`, the status of its root message (`working` or `waiting`) and the one it ended with (`done` or `error`), the ids (`open_replies`, `requests`) of the replies and request messages still open, and one word for the kind of each request (`request_kinds`: `question`, `approval`, `setup` or `hold`), which the repair after a crash needs. Never a message's text |
 
 `state.json` looks like this; you never need to edit it:
 
 ```json
-{"version": 3, "agent": "claude", "chat": "slack", "channels": {"C0123456789": {"directory": "/home/dev/code/project", "notice_pending": false, "threads": {"1700000000.000100": {"directory": "/home/dev/code/project", "session_id": "...", "bypass": false, "effort": null, "open_replies": [], "requests": [], "status": null, "ended": null}}}}}
+{"version": 3, "agent": "claude", "chat": "slack", "channels": {"C0123456789": {"directory": "/home/dev/code/project", "notice_pending": false, "threads": {"1700000000.000100": {"directory": "/home/dev/code/project", "session_id": "...", "bypass": false, "effort": null, "open_replies": [], "requests": [], "request_kinds": {}, "status": null, "ended": null}}}}}
 ```
 
 `state.json` belongs to the agent and the chat named in it, since a session id and a thread's name

@@ -49,8 +49,9 @@ export interface Preview {
   readonly plain: boolean;
   /**
    * The preview is a record that stands for the call: its title is the first line of the body, in
-   * one block, and the call has no card. Always with `plain`: the body is lines of words. Only a call that ends well and says so (an answered
-   * question) carries one; any other state of the call keeps its card.
+   * one block, and the call has no card. Always with `plain`: the body is lines of words. Only a
+   * call that ends well and says so (an answered question) carries one; any other state of the
+   * call keeps its card.
    */
   readonly record: boolean;
 }
@@ -262,7 +263,8 @@ export interface ThreadChat {
   ): Promise<void>;
   /**
    * Rewrites a message of the daemon's into a notice that says `text`, with nothing left to
-   * press: the record of an answered setup. `text` is written for a notice (`Markup`). Rejects
+   * press: the record of an answered setup, or the line a crash repair leaves for a request that
+   * waited with no reply. `text` is written for a notice (`Markup`). Rejects
    * with `ChatError` when the chat refuses.
    */
   rewrite(message: MessageId, text: string): Promise<void>;
