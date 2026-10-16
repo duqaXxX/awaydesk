@@ -186,17 +186,17 @@ test("a module imports no other module, of its layer or of the other", () => {
 });
 
 test("the host layer and the other layers do not import each other", () => {
-  assert.ok(refusal("host/version.ts", "../core/config.ts"));
+  assert.ok(refusal("host/program.ts", "../core/config.ts"));
   assert.ok(refusal("host/service/launchd.ts", "../../agent/seam.ts"));
-  assert.ok(refusal("host/version.ts", "../chat/slack/module.ts"));
-  assert.ok(refusal("core/flows/words.ts", "../../host/version.ts"));
-  assert.ok(refusal("chat/slack/home.ts", "../../host/version.ts"));
-  assert.ok(refusal("agent/claude/session.ts", "../../host/version.ts"));
-  assert.ok(refusal("host/version.ts", "left-pad"));
-  assert.equal(refusal("cli.ts", "./host/version.ts"), null);
-  assert.equal(refusal("main.ts", "./host/version.ts"), null);
-  assert.equal(refusal("host/service/launchd.ts", "../version.ts"), null);
-  assert.equal(refusal("host/version.ts", "node:fs"), null);
+  assert.ok(refusal("host/program.ts", "../chat/slack/module.ts"));
+  assert.ok(refusal("core/flows/words.ts", "../../host/program.ts"));
+  assert.ok(refusal("chat/slack/home.ts", "../../host/program.ts"));
+  assert.ok(refusal("agent/claude/session.ts", "../../host/program.ts"));
+  assert.ok(refusal("host/program.ts", "left-pad"));
+  assert.equal(refusal("cli.ts", "./host/program.ts"), null);
+  assert.equal(refusal("main.ts", "./host/program.ts"), null);
+  assert.equal(refusal("host/service/launchd.ts", "../program.ts"), null);
+  assert.equal(refusal("host/program.ts", "node:fs"), null);
 });
 
 test("only main.ts imports the registry, and nothing imports main.ts", () => {

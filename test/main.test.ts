@@ -1438,6 +1438,9 @@ test("run as the entry point reports a missing configuration and exits 1", (t) =
     encoding: "utf8",
   });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /ERROR awaydesk\.main: .*\.env does not exist; see docs\/setup\.md/);
+  assert.match(
+    result.stderr,
+    /ERROR awaydesk\.main: .*\.env does not exist; see https:\/\/github\.com\/duqaXxX\/awaydesk\/blob\/v[\d.]+\/docs\/setup\.md#part-2-configuration/,
+  );
   assert.equal(result.stderr.trim().split("\n").length, 1);
 });

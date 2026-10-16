@@ -4,6 +4,7 @@
  * shows are the core's (`texts` of the port).
  */
 import { Named } from "../../core/port.ts";
+import { setupGuide } from "../../version.ts";
 
 function naming(template: string): Named {
   return new Named(template);
@@ -49,9 +50,11 @@ export const OPEN_TOO_LARGE = naming(
   "`{path}` is larger than 1 MB, the most {chat} opens in its file viewer.",
 );
 export const OPEN_EMPTY = "`{path}` is empty: there is nothing to show.";
+/** The anchor of the setup guide's part on the Slack app, which `version.setupGuide` addresses. */
+export const SETUP_SLACK_APP = "part-1-the-slack-app";
 export const OPEN_NO_SCOPE =
   "Opening a file needs the `files:write` scope: add it to the app and reinstall it from " +
-  "`slack-app-manifest.json` (docs/setup.md, Part 1).";
+  `\`slack-app-manifest.json\` (see ${setupGuide(SETUP_SLACK_APP)}).`;
 export const OPEN_FAILED = "Could not open `{path}`: {error}";
 export const UPLOAD_FAILED = naming(
   "Nothing was sent to {author}: {name} {reason}. Send the message again without it.",

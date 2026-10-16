@@ -1,11 +1,11 @@
 # Setup
 
-This guide takes a Mac from `git clone` to the first reply in Slack. It covers the Slack app, the
-configuration awaydesk reads, how it starts on macOS, and the security settings the design
-relies on.
+This guide takes a Mac from installing the package to the first reply in Slack. It covers the
+Slack app, the configuration awaydesk reads, how it starts on macOS, and the security settings the
+design relies on.
 
-Status: no tagged release yet. [features.md](features.md) lists what is tested and what is still
-checked by hand.
+Status: an early release (0.x); [CHANGELOG.md](CHANGELOG.md) lists each one, and
+[features.md](features.md) what is tested and what is still checked by hand.
 
 The install is one numbered sequence that runs through Parts 0 to 4. Three checkpoints in it say
 what to run and what you should see, so a wrong turn shows up where it happened. Part 5 is the
@@ -30,22 +30,19 @@ detail the sequence leaves out.
 
 ## Part 0: install
 
-1. Clone the repository and install the command:
+1. Install the command from the npm registry:
 
    ```bash
-   git clone https://github.com/duqaXxX/awaydesk.git
-   cd awaydesk
-   npm ci
-   npm install -g "./$(npm pack --silent)"
+   npm install -g awaydesk
    ```
 
-`npm ci` installs the dependencies the lock file names. `npm pack` builds the package (its
-`prepack` script runs the TypeScript compiler) and prints the name of the tarball it wrote in the
-clone, which `npm install -g` then installs. That puts the `awaydesk` command in the `bin` folder
-of npm's global prefix (`npm prefix -g`) and the package beside it, in `lib/node_modules/awaydesk`;
-the service of Part 4 runs that copy, not the clone. To update, pull, run the last two commands
-again, then `awaydesk service restart`: the running daemon keeps the old copy until it restarts.
-The tarball can be deleted once it is installed.
+That puts the `awaydesk` command in the `bin` folder of npm's global prefix (`npm prefix -g`) and
+the package beside it, in `lib/node_modules/awaydesk`; the service of Part 4 runs that copy. When
+npm answers `EACCES`, your user cannot write to that prefix: npm's page
+[Resolving EACCES permissions errors](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally)
+gives the remedies. To update, `npm install -g awaydesk@latest`, then `awaydesk service restart`:
+the running daemon keeps the old copy until it restarts. To run a copy built from the repository
+instead, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 awaydesk runs the Claude Code CLI that ships inside the Claude Agent SDK it depends on,
 not the `claude` on your `PATH`. Both read the same login, so logging in once with `claude` and
@@ -62,10 +59,11 @@ The first prints the command's path, which ends in `bin/awaydesk`; the second th
 installed, such as `0.1.0`, without starting anything. If the first prints nothing, the `bin`
 folder of npm's global prefix is not on your `PATH`: add `$(npm prefix -g)/bin` to it in your
 shell profile and open a new terminal. Running `awaydesk` now, before `.env` exists, ends at
-once with `ERROR awaydesk.main:` and a line that says `.env` does not exist and points to Part 2,
-and exit status 1. On a Node older than 22.18 the same command ends with a line that starts
-`ERROR awaydesk.main: awaydesk needs Node 22.18.0 or later and this is Node`, followed by the
-version found, and also with status 1: install a newer Node.
+once with `ERROR awaydesk.main:` and a line that says `.env` does not exist and gives the address
+of Part 2 of this guide, and exit status 1. On a Node older than 22.18 the same command ends with
+a line that starts `ERROR awaydesk.main: awaydesk needs Node 22.18.0 or later and this is Node`,
+followed by the version found and the address of Requirements, and also with status 1: install a
+newer Node.
 
 ## Part 1: the Slack app
 

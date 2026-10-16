@@ -61,6 +61,7 @@ import {
   texts,
 } from "../../core/port.ts";
 import { getLogger } from "../../log.ts";
+import { setupGuide } from "../../version.ts";
 import type { SessionStatus, ThreadRef } from "../seam.ts";
 import { contextBlock, plainTextObject } from "./reply/blocks.ts";
 import { take } from "./reply/chars.ts";
@@ -953,8 +954,8 @@ export class Home {
         if (code === NOT_ENABLED) {
           this.off = true;
           logger.warning(
-            "the Home tab is not enabled in the Slack app (docs/setup.md): the session index " +
-              "is not published this run",
+            `the Home tab is not enabled in the Slack app (see ${setupGuide(slackTexts.SETUP_SLACK_APP)}): ` +
+              "the session index is not published this run",
           );
           return;
         }

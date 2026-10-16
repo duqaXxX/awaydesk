@@ -5,8 +5,16 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [0.1.0] - 2026-10-17
+
 ### Added
 
+- awaydesk is installed from the npm registry, `npm install -g awaydesk`, and `docs/setup.md`
+  starts there. Running a build of a clone is in `CONTRIBUTING.md`, Running your own build.
+- A text that sends you to the setup guide gives its address on GitHub, at the tag of the version
+  that runs (`version.setupGuide`), since the package installed from npm does not carry `docs/`:
+  the refusal of an old Node, a missing `.env`, a folder macOS does not let awaydesk read, `!open`
+  without the `files:write` scope, and the log line of a Home tab the Slack app does not enable.
 - The package on npm has a README of its own, `npm/README.md`, with links to GitHub pinned to the
   version's tag, and the repository keeps its README. `npm run build:npm` assembles the package in
   `build/npm/awaydesk` (`.github/scripts/npm-package.mjs`): `dist`, a `package.json` with no
@@ -24,7 +32,7 @@ All notable changes to this project are documented here. The format follows
   token, with provenance), and the GitHub Release is created with the version's section as notes.
   The procedure and the one-time setup on npmjs.com are in `CONTRIBUTING.md`, Releases.
 - `awaydesk --version` prints the installed version (the `version` of the package's own
-  `package.json`, `host/version.installedVersion`) and `awaydesk --help` the usage; both end
+  `package.json`, `version.installedVersion`) and `awaydesk --help` the usage; both end
   without reading `.env` or taking the lock. Any other argument is refused with the usage and
   status 2, so a mistyped argument starts no daemon. With no argument the command runs the daemon,
   as before. The arguments are read by `src/cli.ts`.

@@ -24,16 +24,13 @@ awaydesk runs Claude Code through the
   [Node 22.18](https://nodejs.org/) or later.
 - If your projects live in a folder macOS protects, such as `~/Documents` or `~/Desktop`, the
   daemon needs Full Disk Access.
-- Status: version 0.1.0, no tagged release yet. [docs/features.md](docs/features.md) lists what
-  is tested and what is still checked by hand.
+- Status: version 0.1.0, an early release. [docs/features.md](docs/features.md) lists what is
+  tested and what is still checked by hand.
 
 ## Install
 
 ```bash
-git clone https://github.com/duqaXxX/awaydesk.git
-cd awaydesk
-npm ci
-npm install -g "./$(npm pack --silent)"
+npm install -g awaydesk
 ```
 
 [docs/setup.md](docs/setup.md) takes you through the rest:

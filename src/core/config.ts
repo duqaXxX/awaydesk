@@ -5,6 +5,7 @@ import { isAbsolute, join } from "node:path";
 import { parseEnv } from "node:util";
 import { strip } from "../text.ts";
 import { errorCode } from "../values.ts";
+import { SETUP_SECTIONS, setupGuide } from "../version.ts";
 import { expandUser, resolvePath } from "./paths.ts";
 
 export const CONFIG_DIR = join(homedir(), ".config", "awaydesk");
@@ -182,7 +183,9 @@ export function loadConfig(
     st = lstatSync(envPath);
   } catch (error) {
     if (errorCode(error) === "ENOENT") {
-      throw new ConfigError(`${envPath} does not exist; see docs/setup.md, Part 2`);
+      throw new ConfigError(
+        `${envPath} does not exist; see ${setupGuide(SETUP_SECTIONS.configuration)}`,
+      );
     }
     throw error;
   }

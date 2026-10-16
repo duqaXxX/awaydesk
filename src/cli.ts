@@ -9,7 +9,7 @@ import { type Program, programOf } from "./host/program.ts";
 import { runCommand } from "./host/run.ts";
 import { Launchd } from "./host/service/launchd.ts";
 import { SERVICE_ACTIONS, type ServiceAction, type ServiceManager } from "./host/service/seam.ts";
-import { installedVersion } from "./host/version.ts";
+import { installedVersion } from "./version.ts";
 
 export const USAGE = [
   "usage: awaydesk                  run the daemon",
