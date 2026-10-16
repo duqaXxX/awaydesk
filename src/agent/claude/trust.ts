@@ -132,7 +132,7 @@ function joinPath(base: string, name: string): string {
   return root + parts.join(sep);
 }
 
-/** `posixpath.join` for a name that is not absolute. */
+/** `os.path.join` for a name that is not absolute, with the host's separator. */
 function joinSlash(path: string, name: string): string {
   return ENDS_WITH_SEPARATOR.test(path) ? path + name : `${path}${sep}${name}`;
 }
