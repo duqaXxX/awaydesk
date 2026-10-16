@@ -42,7 +42,7 @@ npm install -g "./$(npm pack --silent)"
    tokens.
 2. Write the tokens and your settings in `~/.config/awaydesk/.env`.
 3. Trust your project folder in Claude Code.
-4. Start the LaunchAgent.
+4. Install the service: `awaydesk service install`.
 5. In a private channel with you and the bot, send `!bind <folder>`, then your first message.
 
 ## What you get

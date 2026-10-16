@@ -12,6 +12,19 @@ All notable changes to this project are documented here. The format follows
   without reading `.env` or taking the lock. Any other argument is refused with the usage and
   status 2, so a mistyped argument starts no daemon. With no argument the command runs the daemon,
   as before. The arguments are read by `src/cli.ts`.
+- `awaydesk service install`, `uninstall`, `status` and `restart` manage the LaunchAgent
+  (`host/service/launchd.Launchd`), replacing the plist `docs/setup.md` had you write by hand.
+  `install` writes `~/Library/LaunchAgents/local.awaydesk.plist` with the same label, keys and log
+  as before, lints it with `plutil` and loads it with `launchctl bootstrap`; over a loaded job it
+  changes nothing when the plist is the same and refuses, writing nothing, when it differs, since
+  replacing it means a `bootout` that ends running turns after 60 seconds. The plist names the
+  first `node` on the caller's `PATH` and, in the service's `PATH`, npm's global `bin` folder after
+  Node's. `restart` sends `SIGTERM` (`launchctl kill TERM`), the stop that lets turns finish;
+  `status` reads `launchctl list`, whose columns `man launchctl` documents, and answers 0 when the
+  daemon runs and 3 otherwise; `uninstall` boots the job out, removes the plist and names the
+  configuration and log folders it leaves. Elsewhere than on macOS `awaydesk service` answers that
+  it exists on macOS only. A plist written by hand is replaced with `awaydesk service uninstall`,
+  then `awaydesk service install`.
 - A host layer, `src/host/`, for what concerns the machine awaydesk is installed on (its version
   today). It imports none of the three layers and none of them imports it; `test/imports.test.ts`
   holds both directions.
