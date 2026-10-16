@@ -307,7 +307,10 @@ function assertDeclared(events: readonly SessionEvent[], caps: Capabilities): vo
     }
     if (!caps.usageLimits) assert.notEqual(event.type, "limits_changed");
     if (!caps.declaredState) assert.notEqual(event.type, "state_changed");
-    if (event.type === "effort_observed" && event.level !== null) {
+    if (
+      (event.type === "effort_observed" || event.type === "effort_changed") &&
+      event.level !== null
+    ) {
       assert.ok(caps.effortLevels.includes(event.level), "an effort the back end declares");
     }
   }

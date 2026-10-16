@@ -113,6 +113,7 @@ export type PlainStep =
     }
   | { readonly question: readonly Question[]; readonly giveUp: boolean }
   | { readonly fail: string }
+  | { readonly effort: string | null }
   | { readonly hold: true }
   | { readonly die: true };
 
@@ -164,7 +165,12 @@ export function fail(text: string): PlainStep {
   return { fail: text };
 }
 
-/** The turn waits here until `interrupt()` (it ends as `interrupted`) or `release()`. */
+/** A command of the owner's changed the effort (null: it names none), as a turn's first step. */
+export function effort(level: string | null): PlainStep {
+  return { effort: level };
+}
+
+/** The turn waits here until `interrupt()`(it ends as `interrupted`) or `release()`. */
 export function hold(): PlainStep {
   return { hold: true };
 }
@@ -505,6 +511,8 @@ export class PlainSession implements AgentSession {
         });
         turn.ending = "error";
         return;
+      } else if ("effort" in step) {
+        this.#push({ type: "effort_changed", level: step.effort });
       } else if ("hold" in step) {
         await orAborted(
           new Promise<void>((resolve) => {

@@ -284,7 +284,7 @@ module that breaks it fails only in use.
 | Subject | Rule | Checked by `test/conformance/agent.ts` |
 |---|---|---|
 | A command | The owner types `!name args`. When `name` is the `name` of an entry of `AgentInfo.commands`, the agent receives the prompt `/name args` (the message flow, `messages.messages`); an alias does not match, and any other `!text` arrives as typed. A name in `AgentWords.newSession` is refused inside a thread and the names in `AgentWords.login` and `AgentWords.logout` are answered by the core: none of the three reaches the agent | `a command's output arrives whole, once, and uses no model`; nothing checks the text that arrives as typed |
-| The effort | `effort_observed` comes before the `turn_ended` of its turn: `ThreadSession.showFooterIfEnded` builds the footer once the session has ended, from what it has by then. Null is the agent's default | Not checked: only that a level is one of `Capabilities.effortLevels` |
+| The effort | `effort_observed` and `effort_changed` come before the `turn_ended` of their turn: `ThreadSession.showFooterIfEnded` builds the footer once the session has ended, from what it has by then. Null is the agent's default | Not checked: only that a level is one of `Capabilities.effortLevels` |
 | Who started a turn | `turn_ended.startedBy` is `owner` for a prompt's turn and `agent` for one the agent starts by itself to report a task. `report_started` names the task before such a turn's words, and needs `backgroundTasks` | `startedBy` is checked for a prompt's turn only |
 | A notification folded | An agent that declares `foldedNotifications` emits `notification_folded` with the task's id when the running turn takes that task's notification, after the task's end and before the turn's `turn_ended`; it emits none for a task whose report the agent opens a turn for, and needs `backgroundTasks`. `task_ended.foldNamed` says per task whether it can: false when the SDK gave the run no id | Only that a back end that lacks `foldedNotifications` emits none (`assertDeclared`, run on the turns of the suite) |
 | A prompt taken | An agent that declares `promptDuringTurn` emits `prompt_taken` with the `Prompt.id` of each prompt it accepts, before that turn's words, whether it took the prompt into the running turn or as the next one | `a prompt taken is named by its id, before the turn's words` |
@@ -957,7 +957,9 @@ the index names, so a submodule counts by its checked-out commit alone, also one
 calls of one footer share `footer.GIT_TIMEOUT` (`footer.gitState`), and a git process still running
 when it passes is killed. The effort level is the one Claude Code reports in the input of the `Stop`
 hook (`effort.level`, the event `effort_observed`); `/effort` and `/model` run no hook, so after one
-of them the footer follows its output (`Set effort level to ...`, read by `footer.effortChange`).
+of them the footer follows the event `effort_changed`, which the Claude back end reads from the
+output of the command (`Set effort level to ...`, `translate.effortChanged`) in the result that
+names the command in `local_command`. A model change that names no level says null.
 Until Claude Code reports a level on the running process the footer leaves it out, unless the daemon
 itself just set a stored level, which shows at once; when the model takes no effort parameter it
 shows `default`. The limits come from the agent (`AgentBackend.usageLimits`, present with the
@@ -1410,8 +1412,8 @@ messages not sent, whether or not Claude Code had taken it in; its replay is not
   start and shown at once as the session's effort, until Claude Code's own report, which every turn
   ends with, corrects it; with no stored level the effort is unknown until Claude Code reports one.
   A stored level that is not among the back end's `effortLevels` is never sent, with a line in the
-  log. `ThreadSession.finish` parses the level from a `!effort` turn's own output
-  (`footer.effortChange`) and stores it; `"auto"`, the CLI's word for the default, is stored as
+  log. The session stores the level of an `effort_changed` event (the back end reads it from the
+  output of the command that set it); `"auto"`, the CLI's word for the default, is stored as
   unset.
 - Shutting down, once the drain has ended, closes every session (`SessionManager.closeAll`). A
   thread's own session also closes on its own: from the idle close, or at once when its stored

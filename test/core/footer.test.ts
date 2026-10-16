@@ -16,14 +16,12 @@ import { locate, Unkeyed } from "../../src/agent/claude/trust.ts";
 import type { ModelTokens, Repository } from "../../src/agent/seam.ts";
 import type { FooterFields } from "../../src/chat/seam.ts";
 import {
-  effortChange,
   footerFields,
   formatStatusFields,
   formatTokens,
   formatUntil,
   gitState,
   sessionTokens,
-  setsEffort,
   type Usage,
   UsageCache,
 } from "../../src/core/footer.ts";
@@ -245,45 +243,6 @@ test("git changes outside a repo is unknown", async () => {
   assert.equal(await gitChanges(tmp), null);
   assert.equal(await gitChanges(join(tmp, "missing")), null);
 });
-
-for (const [output, expected] of [
-  // Measured on Claude Code 2.1.280 (2026-09-23) through the SDK.
-  ["Set effort level to high (this session only): Comprehensive implementation", [true, "high"]],
-  ["Effort level set to auto (this session only)", [true, "auto"]],
-  ["Set model to `Sonnet 5` for this session only", [true, null]],
-  // The form ccstatusline reads from transcripts.
-  ["Set model to Opus with xhigh effort", [true, "xhigh"]],
-  ["Current session: 5% used", [false, null]],
-] as const) {
-  test(`effort change [${output}]`, () => {
-    assert.deepEqual(effortChange(output), expected);
-  });
-}
-
-test("an output is trimmed as Python's strip trims it", () => {
-  // U+0085 is whitespace to Python and U+FEFF is not.
-  assert.deepEqual(effortChange("\u0085Set effort level to high"), [true, "high"]);
-  assert.deepEqual(effortChange("\ufeffSet effort level to high"), [false, null]);
-});
-
-test("a prompt is trimmed as Python's lstrip trims it before it is read as a command", () => {
-  assert.equal(setsEffort("\u001c/effort high"), true);
-  assert.equal(setsEffort("\ufeff/effort high"), false);
-});
-
-for (const [prompt, expected] of [
-  ["/effort high", true],
-  ["/effort", true],
-  ["  /model sonnet", true],
-  ["/models", false],
-  ["/usage", false],
-  ["tell me about /effort high", false],
-  ["Set effort level to low", false],
-] as const) {
-  test(`only an effort or a model command sets the effort [${prompt}]`, () => {
-    assert.equal(setsEffort(prompt), expected);
-  });
-}
 
 test("git changes do not run the repo s fsmonitor", GIT_LAYOUT, async () => {
   const folder = repo();

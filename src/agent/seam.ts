@@ -365,6 +365,12 @@ export type SessionEvent =
   | { readonly type: "mode_changed"; readonly mode: PermissionMode }
   /** The effort the agent runs at; null is its default. */
   | { readonly type: "effort_observed"; readonly level: string | null }
+  /**
+   * A command of the owner's changed the effort, or the model, which takes its own. `level` is
+   * the effort the command says the agent now runs at; null when it says none (the new model
+   * has its default). Said before the end of the turn that ran the command.
+   */
+  | { readonly type: "effort_changed"; readonly level: string | null }
   | { readonly type: "folder_changed"; readonly folder: string }
   /** The cached usage limits are stale. */
   | { readonly type: "limits_changed" }

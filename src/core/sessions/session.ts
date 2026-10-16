@@ -70,12 +70,10 @@ import { getLogger } from "../../log.ts";
 import { strip } from "../../text.ts";
 import { errorName } from "../../values.ts";
 import {
-  effortChange,
   footerFields,
   formatStatusFields,
   gitState,
   sessionTokens,
-  setsEffort,
   type UsageCache,
 } from "../footer.ts";
 import { modelName } from "../models.ts";
@@ -1694,6 +1692,22 @@ export class ThreadSession {
         this.effort = event.level;
         this.effortReported = true;
         return;
+      case "effort_changed":
+        this.effort = event.level;
+        this.effortReported = true;
+        // Stored so the next connect can pass it back (a model set by command survives a
+        // resume by itself; effort does not). A null level means "unknown" (a model change
+        // that names no effort), not "back to default": the stored override, if any, is left
+        // alone. "auto" is the CLI's own word for the default: that IS an explicit reset,
+        // stored as none.
+        if (event.level !== null) {
+          this.deps.state.setEffort(
+            this.channelId,
+            this.threadId,
+            event.level === "auto" ? null : event.level,
+          );
+        }
+        return;
       case "folder_changed":
         this.workingDirectory = event.folder;
         return;
@@ -2867,29 +2881,6 @@ export class ThreadSession {
     try {
       if (result.sessionId) {
         this.deps.state.setSession(this.channelId, this.threadId, result.sessionId);
-      }
-      // The prompt this result answers, as `settle` reads it: none in a turn the agent started,
-      // and the first one waiting when the turn was guessed to be a report.
-      const prompt = injected ? undefined : (active.turn ?? this.sent[0])?.prompt;
-      const [changed, effort] =
-        prompt !== undefined && setsEffort(prompt)
-          ? effortChange(result.finalText ?? "")
-          : [false, null];
-      if (changed) {
-        this.effort = effort;
-        this.effortReported = true;
-        // Stored so the next connect can pass it back (the model set with `/model` survives a
-        // resume by itself; effort does not). `effortChange`'s own null means "unknown" (a
-        // `/model` change with no effort in its output), not "back to default": the stored
-        // override, if any, is left alone. "auto" is the CLI's own word for the default: that
-        // IS an explicit reset, stored as none.
-        if (effort !== null) {
-          this.deps.state.setEffort(
-            this.channelId,
-            this.threadId,
-            effort === "auto" ? null : effort,
-          );
-        }
       }
       // Kept for `!status`, even when this result reports none (`/usage`, `/clear`): the two
       // lines never disagree.

@@ -498,6 +498,32 @@ function endingOf(record: WireRecord): TurnEnding {
   return record.is_error === true ? "error" : "done";
 }
 
+// The outputs of `/effort` and `/model`, measured on Claude Code 2.1.280 (2026-09-23) and 2.1.301
+// (2026-10-16); the "with X effort" form is the one ccstatusline reads from transcripts.
+const EFFORT_OUTPUT = /^(?:Set effort level to|Effort level set to) ([a-z0-9-]+)/i;
+const MODEL_OUTPUT = /^Set model to\b(?:.*? with ([a-z0-9-]+) effort)?/is;
+
+/**
+ * The effort a result's command set. `/effort` and `/model` run no Stop hook (2.1.280) and no
+ * message carries the level, so it is read from the output, and only from the result that names
+ * the command in `local_command`: the text of any other turn is the model's. The result of a
+ * command that changed nothing (a failure, a read) gives no event; a model change that names no
+ * effort gives a null level.
+ */
+export function effortChanged(record: WireRecord): SessionEvent[] {
+  const command = string(record.local_command);
+  const output = strip(string(record.result) ?? "");
+  if (command === "effort") {
+    const set = EFFORT_OUTPUT.exec(output);
+    return set ? [{ type: "effort_changed", level: (set[1] as string).toLowerCase() }] : [];
+  }
+  if (command === "model") {
+    const set = MODEL_OUTPUT.exec(output);
+    return set ? [{ type: "effort_changed", level: set[1]?.toLowerCase() ?? null }] : [];
+  }
+  return [];
+}
+
 function result(memory: Memory, record: WireRecord): SessionEvent[] {
   // The stream's memory is a turn's: an interrupted stream has no `message_stop`, and the next
   // turn must not read as still inside it.
@@ -509,6 +535,7 @@ function result(memory: Memory, record: WireRecord): SessionEvent[] {
   // anything but the owner: none or `human` is the owner's own prompt.
   const origin = isRecord(record.origin) ? string(record.origin.kind) : null;
   return [
+    ...effortChanged(record),
     {
       type: "turn_ended",
       sessionId: words(record.session_id),

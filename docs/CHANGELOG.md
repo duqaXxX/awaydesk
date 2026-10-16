@@ -34,6 +34,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The core no longer reads the effort an `/effort` or `/model` command set from the turn's
+  result text (issue #246). The agent seam has a new event, `effort_changed`, said before the
+  `turn_ended` of the command's turn, and the Claude back end emits it: it takes the level from
+  the output of a result whose `local_command` is `effort` or `model` (`translate.effortChanged`),
+  so the text of any other turn is never read as an output, which the core guarded against by
+  matching the prompt (`footer.setsEffort`, removed with `footer.effortChange`). What the footer
+  shows is unchanged. `SDKResultMessage.local_command` is a row of `docs/sdk-surface.md`
+  (recorded 2026-10-16, Claude Code 2.1.301, `effort-model-commands.jsonl`).
 - A rate limited Slack call waits out at most 60 seconds of Slack's pauses in all
   (`clients.RATE_LIMIT_WAIT_SECONDS`, issue #236). It was sent again up to 3 times after any
   `Retry-After`, so one call could hold a reply's lock, and a `!stop` behind it, for minutes. A

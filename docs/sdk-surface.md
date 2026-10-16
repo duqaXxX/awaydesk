@@ -162,6 +162,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKPartialAssistantMessage` | `event` | field | translate.ts: kindOf, messageStart, contentBlockStart, contentBlockDelta | reference | none |
 | `SDKPartialAssistantMessage` | `parent_tool_use_id` | field | translate.ts: parentOf | reference | none |
 | `SDKResultMessage` | `is_error` | field | translate.ts: endingOf; session.ts: ClaudeSession.#pump | reference | none |
+| `SDKResultMessage` | `local_command` | field | translate.ts: effortChanged | package | none |
 | `SDKResultMessage` | `modelUsage` | field | translate.ts: result | reference | none |
 | `SDKResultMessage` | `num_turns` | field | translate.ts: result | reference | none |
 | `SDKResultMessage` | `origin` | field | translate.ts: result | reference | P25 |
@@ -295,6 +296,8 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKPartialAssistantMessage.event.type` | `"message_stop"` | value | translate.ts: HANDLERS | measured | none |
 | `SDKPartialAssistantMessage.type` | `"stream_event"` | value | translate.ts: kindOf | reference | none |
 | `SDKRateLimitEvent.type` | `"rate_limit_event"` | value | translate.ts: HANDLERS | reference | none |
+| `SDKResultMessage.local_command` | `"effort"` | value | translate.ts: effortChanged | measured | none |
+| `SDKResultMessage.local_command` | `"model"` | value | translate.ts: effortChanged | measured | none |
 | `SDKResultMessage.terminal_reason` | `"aborted_streaming"` | value | translate.ts: INTERRUPTED | reference | none |
 | `SDKResultMessage.terminal_reason` | `"aborted_tools"` | value | translate.ts: INTERRUPTED | reference | none |
 | `SDKResultMessage.type` | `"result"` | value | translate.ts: HANDLERS; session.ts: ClaudeSession.#pump | reference | none |

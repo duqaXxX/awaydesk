@@ -1989,6 +1989,7 @@ test("the footer follows an effort set from slack", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),
     "Set effort level to high (this session only): Comprehensive",
+    "effort",
   );
   const h = harnessFor(t)({ turns: [effortTurn, sdkMessages("tools")] });
   const session = h.session();
@@ -2038,6 +2039,7 @@ test("an effort set before a restart is not carried over", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),
     "Set effort level to low (this session only): Quick",
+    "effort",
   );
   const h = harnessFor(t)(
     { turns: [effortTurn] },
@@ -3443,6 +3445,7 @@ test("a result reporting an effort change stores it", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),
     "Set effort level to high (this session only): Comprehensive",
+    "effort",
   );
   const h = harnessFor(t)({ turns: [effortTurn] });
   await (await h.session().submit("/effort high")).done.wait();
@@ -3468,6 +3471,7 @@ test("setting effort back to auto stores the default", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),
     "Effort level set to auto (this session only)",
+    "effort",
   );
   const h = harnessFor(t)({ turns: [effortTurn] });
   const session = h.session(); // opens the thread
@@ -3608,6 +3612,7 @@ test("the next message after an idle close resumes with effort", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),
     "Set effort level to high (this session only): Comprehensive",
+    "effort",
   );
   const h = harnessFor(t)({ turns: [effortTurn] }, { turns: [sdkMessages("tools")] });
   const session = h.session();
@@ -3774,6 +3779,7 @@ test("a model change with no effort does not clear the stored level", async (t) 
   const modelTurn = withResult(
     sdkMessages("usage"),
     "Set model to `Sonnet 5` for this session only",
+    "model",
   );
   const h = harnessFor(t)({ turns: [modelTurn] });
   const session = h.session(); // opens the thread
