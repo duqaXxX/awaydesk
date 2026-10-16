@@ -76,7 +76,8 @@ Two tests refuse what a module must not do, by layer, so that they hold for a mo
 there yet. `test/imports.test.ts` fails when the core imports a module, when a module imports
 another module (of its layer or the other), when anything but `src/main.ts` imports
 `src/registry.ts`, when anything imports `src/main.ts`, when a chat provider imports anything of
-the core but its port, and when a package is imported by a module that does not list it; it also
+the core but its port, when the host layer (`src/host/`) and the three layers import each other,
+and when a package is imported by a module that does not list it; it also
 fails on an `import()` whose specifier is not a literal and on `createRequire`, which it cannot
 read. A new module adds its package to `LIBRARIES` in that test. `test/vocabulary.test.ts` fails on
 an identifier or a string outside the module directories under `src/agent/` and `src/chat/` and

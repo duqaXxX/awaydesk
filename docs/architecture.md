@@ -18,11 +18,14 @@ registry. The agent module (`src/agent/claude/`) implements the agent seam; the 
 (`src/chat/slack/`) implements the chat seam. The source is three layers and a registry, wired by
 `main`. Four files sit above them and any layer imports them: `src/clock.ts`, `src/log.ts`,
 `src/text.ts` (Python's whitespace and its order of strings, where JavaScript's differ) and
-`src/values.ts` (reading a parsed value or a caught error by what it is). `test/imports.test.ts`
+`src/values.ts` (reading a parsed value or a caught error by what it is). Beside the layers,
+`src/host/` holds what concerns the machine awaydesk is installed on: none of the layers imports it
+and it imports none of them; the entry files (`src/main.ts`, `src/cli.ts`) do. `test/imports.test.ts`
 reads the imports of every source file and fails on one the table does not allow. The rules are
 written by layer, so that they hold for a module that is not there yet: the core imports no
 module, a module imports no other module, only `src/main.ts` imports `src/registry.ts` and
-nothing imports `src/main.ts`, and a package is imported only by the module that lists it in
+nothing imports `src/main.ts`, the host layer and the three layers do not import each other, and
+a package is imported only by the module that lists it in
 `LIBRARIES` (`@anthropic-ai/claude-agent-sdk` for `agent/claude`, `@slack/` for `chat/slack`).
 The scan reads a specifier written as a string or a plain template, and fails on an `import()` or
 `require()` whose specifier is not a literal and on `createRequire`, which it cannot read.
@@ -33,7 +36,9 @@ The scan reads a specifier written as a string or a plain template, and fails on
 | `src/core/` | the sessions, the flows (`src/core/flows/`: a message, a word, a request to the owner, a list, the crash repair), the port a provider calls (`src/core/port.ts`), `state.json`, the model of a reply, the pending requests and holds, the daemon's words and texts, the configuration, the lock | the two seams; neither library, and nothing under `src/agent/claude/` or `src/chat/slack/` |
 | `src/chat/` | the chat seam (`src/chat/seam.ts`) and the Slack provider (`src/chat/slack/`): the listeners and their guards, the reply sink, the root's reaction and the thread's status line, the Home tab, files, the provider's own texts | the provider is the only code that imports `@slack/bolt` and `@slack/web-api`; the agent seam's types and, of the core, the port alone; never the back end |
 | `src/registry.ts` | the agents and the chats the daemon can run, by name | the two modules: the one file outside them that names them |
-| `src/main.ts` | the startup order and the shutdown; its first import, `src/require-node.ts`, ends the process with a refusal on a Node older than `node-version.MINIMUM_NODE` | the registry and the core; neither module |
+| `src/host/` | the machine awaydesk is installed on: the installed version (`host/version.installedVersion`) | Node's built-ins alone; none of the layers |
+| `src/cli.ts` | the command line: no argument runs the daemon, `--version` and `--help` answer and end, any other argument is refused with status 2 | the host layer |
+| `src/main.ts` | the startup order and the shutdown; its first import, `src/require-node.ts`, ends the process with a refusal on a Node older than `node-version.MINIMUM_NODE` | the registry, the core, the command line; neither module |
 
 The core talks to the two libraries through the seams alone. No type of the Agent SDK appears in
 `src/agent/seam.ts` and no type of a Slack package in `src/chat/seam.ts`. The same holds for
