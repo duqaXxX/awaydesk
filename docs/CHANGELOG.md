@@ -5,8 +5,22 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- `awaydesk --version` prints the installed version (the `version` of the package's own
+  `package.json`, `host/version.installedVersion`) and `awaydesk --help` the usage; both end
+  without reading `.env` or taking the lock. Any other argument is refused with the usage and
+  status 2, so a mistyped argument starts no daemon. With no argument the command runs the daemon,
+  as before. The arguments are read by `src/cli.ts`.
+- A host layer, `src/host/`, for what concerns the machine awaydesk is installed on (its version
+  today). It imports none of the three layers and none of them imports it; `test/imports.test.ts`
+  holds both directions.
+
 ### Changed
 
+- `package.json` is no longer `private` and names its repository, ahead of publishing to the npm
+  registry. Its `prepack` removes `dist` with Node instead of `rm -rf`, so `npm pack` also runs
+  where no POSIX shell is.
 - The question form lists Other as its last option, has tabs and a review page, and takes
   optional Notes (issue #325). Other is the last option of the radio buttons and of the
   checkboxes (`Other`, `Type your own answer`), as the terminal's list ends with its own row. Its

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * `awaydesk`: start the daemon (normally from the LaunchAgent in docs/setup.md). The one module
- * that may import all three layers.
+ * `awaydesk`: start the daemon (normally from the LaunchAgent in docs/setup.md), or answer one of
+ * the arguments of `cli.ts` and end. The one module that may import all three layers.
  *
  * How the process behaves under Node:
  *
@@ -60,6 +60,7 @@
 import "./require-node.ts";
 import { join } from "node:path";
 import type { AgentEntry } from "./agent/seam.ts";
+import { answer, parseArguments } from "./cli.ts";
 import { type Clock, monotonicClock, systemClock } from "./clock.ts";
 import { CLEAN_EVERY_SECONDS, clean } from "./core/cleanup.ts";
 import { CONFIG_DIR, ConfigError, loadConfig } from "./core/config.ts";
@@ -479,4 +480,15 @@ export async function main(options: MainOptions = {}): Promise<void> {
   }
 }
 
-if (import.meta.main) void main();
+if (import.meta.main) {
+  const invocation = parseArguments(process.argv.slice(2));
+  if (invocation.kind === "run") {
+    void main();
+  } else {
+    // An exit code, not `process.exit`: a write to a pipe can still be pending on macOS.
+    process.exitCode = answer(invocation, {
+      out: (text) => process.stdout.write(text),
+      err: (text) => process.stderr.write(text),
+    });
+  }
+}

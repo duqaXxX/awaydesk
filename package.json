@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "Drive the Claude Code sessions on your own Mac from private Slack channels. Powered by Claude.",
   "license": "MIT",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/duqaXxX/awaydesk.git"
+  },
   "type": "module",
   "bin": {
     "awaydesk": "dist/main.js"
@@ -22,7 +25,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "rm -rf dist && npm run build",
+    "prepack": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && npm run build",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome check --write .",

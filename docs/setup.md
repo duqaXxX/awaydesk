@@ -54,9 +54,11 @@ not the `claude` on your `PATH`. Both read the same login, so logging in once wi
 
 ```bash
 command -v awaydesk
+awaydesk --version
 ```
 
-It prints the command's path, which ends in `bin/awaydesk`. If it prints nothing, the `bin`
+The first prints the command's path, which ends in `bin/awaydesk`; the second the version
+installed, such as `0.1.0`, without starting anything. If the first prints nothing, the `bin`
 folder of npm's global prefix is not on your `PATH`: add `$(npm prefix -g)/bin` to it in your
 shell profile and open a new terminal. Running `awaydesk` now, before `.env` exists, ends at
 once with `ERROR awaydesk.main:` and a line that says `.env` does not exist and points to Part 2,
