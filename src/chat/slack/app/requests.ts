@@ -19,7 +19,7 @@ import {
   excluding,
   type Field,
   type FormIds,
-  firstUnanswered,
+  firstIncomplete,
   isAnswered,
   loadIds,
   newDraft,
@@ -282,6 +282,70 @@ export class Requests {
     this.onQuestionLive(ack, body, "notes");
 
   /**
+   * Back, in the question form: the page before, with every answer kept. The payload's state
+   * holds what the page on screen shows, so it is absorbed into the draft first (Back never
+   * validates), then the form is redrawn with `views.update` (block_actions payload and
+   * `views.update` references, read 2026-10-16). It checks the owner and the workspace like any
+   * inbound path, follows the newest-form rule of `onQuestionLive` and never reaches the core.
+   * The draft's page moves before the call so that a late change from the page left is ignored;
+   * when Slack refuses the update (`hash_conflict`: the form moved on, `not_found`: it closed)
+   * the page goes back to the one still on screen.
+   */
+  onQuestionBack = async (ack: Ack, body: Payload): Promise<void> => {
+    await ack();
+    const { approvals, identity, slack } = this.parts;
+    const [user, team] = interactionActor(body);
+    // (sync) The owner and the workspace, as on Next; the channel is checked at Submit.
+    if (!isOwner(identity, user, team)) {
+      logger.info("ignored an inbound event from someone other than the owner");
+      return;
+    }
+    const view = record(body.view);
+    if (view.callback_id !== QUESTION_FORM) return;
+    let ids: FormIds;
+    try {
+      ids = loadIds(str(view.private_metadata));
+    } catch {
+      return;
+    }
+    const questions = approvals.questions(ids.approvalId, ids.channelId, ids.threadTs);
+    if (questions === null) {
+      this.drafts.delete(ids.approvalId);
+      return;
+    }
+    const kept = this.drafts.get(ids.approvalId);
+    if (
+      kept === undefined ||
+      kept.generation !== ids.generation ||
+      kept.active !== ids.active ||
+      ids.active === 0
+    ) {
+      return;
+    }
+    // (sync) Kept before any await: a payload handled next finds what this one saw. The review
+    // page has no field to read.
+    const shown = questions.length > 1 && ids.active === questions.length;
+    const here = shown ? kept : settled(absorb(kept, record(view.state).values), questions);
+    const back = { ...here, active: ids.active - 1 };
+    this.drafts.set(ids.approvalId, back);
+    const viewId = text(view.id);
+    if (viewId === null || this.answers.stopped) return;
+    const hash = text(view.hash);
+    try {
+      await slack.views.update({
+        view_id: viewId,
+        ...(hash === null ? {} : { hash }),
+        view: questionView(back, questions, this.parts.names) as unknown as ModalView,
+      });
+    } catch (error) {
+      if (isCancelled(error)) throw error;
+      // The form on screen is still the page the click came from.
+      if (this.drafts.get(ids.approvalId) === back) this.drafts.set(ids.approvalId, here);
+      logger.warning(`could not go back in the question form: ${describe(error)}`);
+    }
+  };
+
+  /**
    * Answer, on a question of Claude's: opens the form, then checks the channel. The form shows
    * the owner alone what the request already shows, and Submit checks the channel again before
    * anything reaches the agent; a refused channel turns the open form into the reason.
@@ -346,7 +410,7 @@ export class Requests {
   };
 
   /**
-   * Next or Submit, in the question form. Slack wants the answer within 3 seconds, and a missing
+   * Next, Review or Submit, in the question form. Slack wants the answer within 3 seconds, and a missing
    * answer can only be shown in it: the checks before it make no network call. The channel is
    * checked before acting.
    */
@@ -374,20 +438,33 @@ export class Requests {
       return;
     }
     const state = record(view.state).values;
+    // The page after the last question lists the answers (only a form of several has one).
+    const reviewing = questions.length > 1 && ids.active === questions.length;
     const kept = this.drafts.get(ids.approvalId);
     if (kept === undefined || kept.generation !== ids.generation) {
-      // An older form: it sends nothing, and the newest one is told apart from it.
+      // An older form: it sends nothing, and the newest one is told apart from it. The review
+      // page has no field to carry an error, so it is replaced by the reason.
       const older = kept ?? newDraft(ids.approvalId, ids.channelId, ids.threadTs);
+      if (reviewing) {
+        await ack({
+          response_action: "update",
+          view: refusedView(slackTexts.QUESTION_STALE, this.parts.names),
+        });
+        return;
+      }
       await ack({
         response_action: "errors",
         errors: { [shownBlockId(older, state, "choice", ids.active)]: slackTexts.QUESTION_STALE },
       });
       return;
     }
-    const draft = settled(absorb({ ...kept, active: ids.active }, state), questions);
+    const at = ids.active;
+    // The review page has no field: its draft is the one kept.
+    const draft = reviewing
+      ? { ...kept, active: at }
+      : settled(absorb({ ...kept, active: at }, state), questions);
     this.drafts.set(ids.approvalId, draft);
-    const at = draft.active;
-    if (notesNeedOption(draft, at) || !isAnswered(draft, questions, at)) {
+    if (!reviewing && (notesNeedOption(draft, at) || !isAnswered(draft, questions, at))) {
       const error = notesNeedOption(draft, at)
         ? slackTexts.QUESTION_NOTES_NEED_OPTION
         : slackTexts.QUESTION_MISSING;
@@ -397,12 +474,14 @@ export class Requests {
       });
       return;
     }
-    const missing = firstUnanswered(draft, questions);
-    if (missing !== null) {
-      // Next: the following question, or one left unanswered (never, since each Next checks
-      // its own; kept so a draft cannot reach Claude incomplete).
-      const following = draft.active + 1 < questions.length ? draft.active + 1 : missing;
-      const next = { ...draft, active: following };
+    // A form of several questions sends from its review page alone; every other page, the last
+    // question included, moves on, whether or not the rest have an answer already.
+    const sends = reviewing || questions.length === 1;
+    const missing = sends ? firstIncomplete(draft, questions) : null;
+    if (!sends || missing !== null) {
+      // Each Next checks its own page, so `missing` is never set unless the draft changed under
+      // the form; kept so that a draft cannot reach the agent incomplete.
+      const next = { ...draft, active: missing ?? at + 1 };
       this.drafts.set(ids.approvalId, next);
       await ack({
         response_action: "update",

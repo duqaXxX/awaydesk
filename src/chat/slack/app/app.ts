@@ -67,6 +67,7 @@ import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
   type Draft,
+  QUESTION_BACK,
   QUESTION_FORM,
   QUESTION_OPEN,
   QUESTION_SKIP,
@@ -350,6 +351,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action("answer", requests.onQuestionChoice);
   action("other", requests.onQuestionOther);
   action("notes", requests.onQuestionNotes);
+  action(QUESTION_BACK, requests.onQuestionBack);
   action(QUESTION_OPEN, requests.onQuestionOpen);
   view(QUESTION_FORM, requests.onQuestionSubmit);
 

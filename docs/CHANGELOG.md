@@ -7,6 +7,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The question form has a way back and a review page (issue #325). With several questions the
+  `1 of 3` line becomes the terminal's tab row (`☒ Colour  *☐ Sizes*  ☐ Shape  ✔ Submit`:
+  answered, open, the page on screen in bold). From the second question on a button named for
+  the previous question (`← Colour`) goes back one page and keeps every answer; the fields of the
+  page it leaves are kept first, and Back checks nothing. Next always moves to the next page,
+  also when every question already has an answer; the last question's button reads `Review` and
+  opens a page that lists each question with its answer and its notes, whose `Submit answers`
+  alone sends.
+  One question is unchanged. A stale form's Back is ignored, and a stale `Submit answers`
+  replaces the review page with `This form was opened again. Use the newest one.`.
+
 - The question form takes a text under Other and optional Notes in every question (issue #325).
   In a single select an option and a text under Other exclude each other, live, as in the
   terminal where the typed text replaces the option: picking an option empties Other and typing
