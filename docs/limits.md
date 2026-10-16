@@ -124,7 +124,6 @@ be measured first.
 | Being told that Claude waits for your approval | The request appears where you work | A push to your phone does not come for every request. With iOS locked and Slack open in a browser (2026-09-29), a turn that asked two or three times brought no push for any of them. Slack gives an app no way to ask for one | [#71](https://github.com/duqaXxX/awaydesk/issues/71) |
 | The list of what still runs, once you opened it | A line under the prompt counts the tasks and changes by itself (`· 1 shell still running`) | The list is one card, under the thread's last reply once it rests, and on no reply while that one is still written. A card you opened closes again after you leave the channel or scroll far away from it | none |
 | Moving between a question's tabs | The terminal moves between the tabs at any time | A Slack modal has two footer buttons and at most three stacked views (docs.slack.dev/surfaces/modals, read 2026-10-16), so the form goes forward page by page to a review page, and back to a question with **Edit** on that page | none |
-| Notes on an answer | The terminal offers Notes only on a question whose options have previews (measured 2026-10-16, Claude Code 2.1.301) | The form offers a Notes field on any question once a real option is chosen, not for an answer typed under Other alone | none |
 
 Of three clips spoken in Italian in a workspace set to English (Slack free plan, iOS app,
 2026-10-09), Slack first wrote one in Italian and two as English words that were not what was
@@ -150,6 +149,7 @@ it they cannot be done.
 | Where it runs | macOS, Linux and Windows | macOS, as a LaunchAgent in your login session | [#197](https://github.com/duqaXxX/awaydesk/issues/197) |
 | Permission modes | Every mode Claude Code has | Bypass on or off for a thread; any other mode is the one your Claude Code settings start in | [#213](https://github.com/duqaXxX/awaydesk/issues/213) |
 | How many running tasks are listed | A line under the prompt counts every task | The card lists 6 of them, then `+N more`; its title counts all | none |
+| Notes on an answer | The terminal offers Notes only on a question whose options have previews (measured 2026-10-16, Claude Code 2.1.301) | The form offers a Notes field on any question once a real option is chosen, not for an answer typed under Other alone | none |
 
 ## Not checked
 
