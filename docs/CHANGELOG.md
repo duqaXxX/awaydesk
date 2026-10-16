@@ -15,9 +15,12 @@ All notable changes to this project are documented here. The format follows
   Submit show `Pick an option to add notes to it.`. They reach the agent as that question's
   `annotations` entry beside the answers, with the preview of the option picked for a single
   select; the record of the answers does not show them. What the owner filled now lives in the
-  daemon's memory, not in the form's `private_metadata`, so Other and Notes hold 300 characters
-  each, and closing the form with Later and clicking Answer again reopens it with the answers
-  kept. A restart still loses an open form, as it loses the request.
+  daemon's memory, shared by the forms of one request, and the form's `private_metadata` holds
+  only the request, the page and the block revisions, so Other and Notes hold 300 characters
+  each. Every field reports its changes (an option, a box, Other, Notes), so closing the form
+  with Later and clicking Answer again reopens it with the answers submitted and what each
+  field of the open page held at its last change. A restart still loses an open form, as it
+  loses the request.
 
 ### Fixed
 

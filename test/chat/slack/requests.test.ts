@@ -158,6 +158,8 @@ test("the form shows one question with next until the last", () => {
     approvalId: "abc",
     channelId: "C1",
     threadTs: THREAD,
+    active: 0,
+    revisions: new Map(),
   });
   assert.equal(view.submit.text, "Next (1/2)");
   assert.equal(view.blocks[0].elements[0].text, "Colour · 1 of 2");
@@ -400,14 +402,34 @@ test("the first unanswered question is found", () => {
   assert.equal(draftAnswers(draft, TWO), null);
 });
 
-test("the form names its request by ids alone", () => {
-  const ids = { approvalId: "abc", channelId: "C1", threadTs: THREAD };
-  const text = dumpIds(ids);
-  assert.deepEqual(JSON.parse(text), { a: "abc", c: "C1", h: THREAD });
-  assert.deepEqual(loadIds(text), ids);
-  // The metadata of the previous version, ids with a whole draft beside them, still names it.
+test("the form names its request and its page by a fixed few ids", () => {
+  const form = {
+    approvalId: "abc",
+    channelId: "C1",
+    threadTs: THREAD,
+    active: 2,
+    revisions: new Map([[0, [1, 0] as const]]),
+  };
+  const text = dumpIds(form);
+  assert.deepEqual(JSON.parse(text), {
+    a: "abc",
+    c: "C1",
+    h: THREAD,
+    n: 2,
+    r: { "0": [1, 0] },
+  });
+  assert.deepEqual(loadIds(text), form);
+  // The metadata of the first version, ids with a whole draft beside them, still names it.
   const old = '{"a":"abc","c":"C1","h":"1.2","n":1,"p":{"0":[1]},"t":{"0":"x"}}';
-  assert.deepEqual(loadIds(old), { approvalId: "abc", channelId: "C1", threadTs: "1.2" });
+  assert.deepEqual(loadIds(old), {
+    approvalId: "abc",
+    channelId: "C1",
+    threadTs: "1.2",
+    active: 1,
+    revisions: new Map(),
+  });
+  // The one of the second version had the ids alone.
+  assert.equal(loadIds('{"a":"abc","c":"C1","h":"1.2"}').active, 0);
 });
 
 test("metadata that names no request is refused", () => {
@@ -494,12 +516,13 @@ test("every question has a Notes field under Other, optional, kept in the draft"
   const notes = inputsOf(view).n0 as Json;
   assert.deepEqual(notes.label, { type: "plain_text", text: "Notes" });
   assert.equal(notes.optional, true);
-  assert.equal(notes.dispatch_action, undefined);
+  assert.equal(notes.dispatch_action, true);
   assert.deepEqual(notes.element, {
     type: "plain_text_input",
     action_id: "notes",
     max_length: NOTES_LIMIT,
     placeholder: { type: "plain_text", text: "Add notes to your answer" },
+    dispatch_action_config: { trigger_actions_on: ["on_character_entered"] },
     initial_value: "darker",
   });
   assert.deepEqual(Object.keys(inputsOf(view)), ["q0", "o0", "n0"]);
@@ -507,17 +530,17 @@ test("every question has a Notes field under Other, optional, kept in the draft"
   assert.equal(multi.n1?.element.action_id, "notes");
 });
 
-test("a single select dispatches its option and its Other text, a multi-select nothing", () => {
-  const single = inputsOf(questionView(draftOf(), TWO));
-  assert.equal(single.q0?.dispatch_action, true);
-  assert.equal(single.o0?.dispatch_action, true);
-  assert.deepEqual(single.o0?.element.dispatch_action_config, {
-    trigger_actions_on: ["on_character_entered"],
-  });
-  const multi = inputsOf(questionView(draftOf({ active: 1 }), TWO));
-  for (const block of [multi.q1, multi.o1, multi.n1] as Json[]) {
-    assert.equal(block.dispatch_action, undefined);
-    assert.equal(block.element.dispatch_action_config, undefined);
+test("every field of a form reports its changes, a single select's and a multi-select's", () => {
+  for (const active of [0, 1]) {
+    const inputs = inputsOf(questionView(draftOf({ active }), TWO));
+    for (const id of [`q${active}`, `o${active}`, `n${active}`]) {
+      assert.equal(inputs[id]?.dispatch_action, true, id);
+    }
+    for (const id of [`o${active}`, `n${active}`]) {
+      assert.deepEqual(inputs[id]?.element.dispatch_action_config, {
+        trigger_actions_on: ["on_character_entered"],
+      });
+    }
   }
 });
 
@@ -558,8 +581,16 @@ test("notes go with the answer of their question", () => {
     notes: { "Sizes?": "both" },
   });
   // Notes with no option to hold them keep the form from going on.
-  const alone = draftOf({ ...draft, picks: new Map(), notes: new Map([[1, "both"]]) });
+  // (A text under Other answers the multi-select, so only the notes rule can refuse it.)
+  const alone = draftOf({
+    notes: new Map([[1, "both"]]),
+    typed: new Map([
+      [0, "mauve"],
+      [1, "xl"],
+    ]),
+  });
   assert.equal(draftAnswers(alone, TWO), null);
+  assert.ok(draftAnswers({ ...alone, notes: new Map() }, TWO) !== null);
 });
 
 test("a single select carrying both keeps the one changed last", () => {
@@ -570,6 +601,32 @@ test("a single select carrying both keeps the one changed last", () => {
   assert.deepEqual([text.picks, text.typed], [new Map(), new Map([[0, "mauve"]])]);
   // No change seen: the text wins, as before.
   assert.deepEqual(settled(both, TWO).picks, new Map());
+});
+
+test("the field changed last is told apart per question", () => {
+  const two = [TWO[0], { ...(TWO[0] as Question), text: "Shade?" }] as Question[];
+  const both = draftOf({
+    active: 1,
+    picks: new Map([
+      [0, [1]],
+      [1, [1]],
+    ]),
+    typed: new Map([
+      [0, "mauve"],
+      [1, "navy"],
+    ]),
+  });
+  const option = settled(touched(both, "choice"), two);
+  assert.deepEqual(
+    option.picks,
+    new Map([
+      [0, [1]],
+      [1, [1]],
+    ]),
+  );
+  assert.deepEqual(option.typed, new Map([[0, "mauve"]])); // question 1 lost its text only
+  assert.equal(touched(both, "choice").last.get(0), undefined);
+  assert.equal(touched(both, "choice").last.get(1), "choice");
 });
 
 test("a text under Other empties the option of a single select, and the option the text", () => {

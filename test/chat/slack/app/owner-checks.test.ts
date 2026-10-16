@@ -150,6 +150,26 @@ const CASES: readonly Case[] = [
     }),
   ),
   {
+    listener: "action notes",
+    arrange: async (world, sender) => {
+      const question = QUESTIONS[0] as (typeof QUESTIONS)[number];
+      const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [question]);
+      const modal = new ModalSlack(world.slack);
+      await world.dispatch(answerClick(approvalId));
+      world.slack.apiCalls = [];
+      const values = { ...picked(0, "0"), n0: { notes: { type: "plain_text_input", value: "x" } } };
+      const body = formAction(modal.view, values, {
+        id: "notes",
+        block: "n0",
+        type: "plain_text_input",
+      });
+      return {
+        body: sentBy(body, sender),
+        acted: () => world.built.drafts.get(approvalId)?.notes.size === 1,
+      };
+    },
+  },
+  {
     listener: "view question_form",
     arrange: async (world, sender) => {
       const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [

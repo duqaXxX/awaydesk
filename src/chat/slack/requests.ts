@@ -246,24 +246,48 @@ export function newDraft(
   };
 }
 
-/** What names the request in a form: the ids alone, as `private_metadata` text. */
-export type RequestIds = Pick<Draft, "approvalId" | "channelId" | "threadTs">;
+/**
+ * What a form carries in its `private_metadata`: the request it answers and what only that form
+ * knows, the page on screen and the revision of each question's clearable blocks. Two forms of
+ * one request (Answer clicked twice, two devices) each read their own from the payload, while the
+ * answers they fill are shared (`Requests.drafts`).
+ */
+export type FormIds = Pick<Draft, "approvalId" | "channelId" | "threadTs" | "active" | "revisions">;
 
-export function dumpIds(ids: RequestIds): string {
-  return JSON.stringify({ a: ids.approvalId, c: ids.channelId, h: ids.threadTs });
+export function dumpIds(ids: FormIds): string {
+  return JSON.stringify({
+    a: ids.approvalId,
+    c: ids.channelId,
+    h: ids.threadTs,
+    n: ids.active,
+    r: Object.fromEntries([...ids.revisions].map(([k, v]) => [String(k), v])),
+  });
 }
 
 /**
- * The ids `dumpIds` wrote; throws on anything else. Only the ids are read, so the metadata of a
- * form the previous version opened (the ids with a whole draft beside them) names its request
- * too, and the lookup that follows finds none.
+ * The ids `dumpIds` wrote; throws on anything else. Page and revisions are read when they are
+ * there, so the metadata of an earlier version (the ids with a whole draft beside them, or the
+ * ids alone) names its request too, and the lookup that follows finds none.
  */
-export function loadIds(dumped: string): RequestIds {
+export function loadIds(dumped: string): FormIds {
   const data: unknown = JSON.parse(dumped);
   if (!isRecord(data) || ![data.a, data.c, data.h].every((id) => typeof id === "string")) {
     throw new Error("malformed form");
   }
-  return { approvalId: data.a as string, channelId: data.c as string, threadTs: data.h as string };
+  const revisions = new Map<number, readonly [number, number]>();
+  if (isRecord(data.r)) {
+    for (const [key, value] of Object.entries(data.r)) {
+      if (!Array.isArray(value) || value.length !== 2) throw new Error("malformed form");
+      revisions.set(index(key), [index(value[0]), index(value[1])]);
+    }
+  }
+  return {
+    approvalId: data.a as string,
+    channelId: data.c as string,
+    threadTs: data.h as string,
+    active: data.n === undefined ? 0 : index(data.n),
+    revisions,
+  };
 }
 
 function index(value: unknown): number {
@@ -536,17 +560,19 @@ export function questionView(draft: Draft, questions: readonly Question[], names
   };
   const noted = draft.notes.get(at);
   if (noted) notes.initial_value = noted;
-  // A single select takes an option or a text under Other, not both: both blocks dispatch an
-  // action when they change, and `excluding` empties the other one (`Requests.onQuestionLive`).
-  // A multi-select adds the text to the labels, so nothing is dispatched.
-  const live = !question.multiSelect;
-  if (live) other.dispatch_action_config = { trigger_actions_on: ["on_character_entered"] };
+  // Every field reports its change (`Requests.onQuestionLive`), so that a form closed with Later
+  // and opened again finds what was typed. Only a single select redraws: it takes an option or
+  // a text under Other, not both, and `excluding` empties the other one. A multi-select adds the
+  // text to the labels and clears nothing.
+  const typing = { trigger_actions_on: ["on_character_entered"] };
+  other.dispatch_action_config = typing;
+  notes.dispatch_action_config = typing;
   blocks.push(
     {
       type: "input",
       block_id: blockIdIn(draft, "choice", at),
       optional: true,
-      ...(live ? { dispatch_action: true } : {}),
+      dispatch_action: true,
       label: { type: "plain_text", text: label },
       element,
     },
@@ -554,7 +580,7 @@ export function questionView(draft: Draft, questions: readonly Question[], names
       type: "input",
       block_id: blockIdIn(draft, "other", at),
       optional: true,
-      ...(live ? { dispatch_action: true } : {}),
+      dispatch_action: true,
       label: { type: "plain_text", text: slackTexts.QUESTION_OTHER },
       element: other,
     },
@@ -562,6 +588,7 @@ export function questionView(draft: Draft, questions: readonly Question[], names
       type: "input",
       block_id: `n${at}`,
       optional: true,
+      dispatch_action: true,
       label: { type: "plain_text", text: slackTexts.QUESTION_NOTES },
       element: notes,
     },

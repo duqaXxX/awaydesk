@@ -155,9 +155,9 @@ export interface BuiltApp {
   close(): void;
   /**
    * What the owner filled in each open question form, by request id (`Requests.drafts`): read by
-   * a test, which also seeds a form that is already on its second page.
+   * a test.
    */
-  readonly drafts: Map<string, Draft>;
+  readonly drafts: ReadonlyMap<string, Draft>;
   /** `!open` typed in a session's thread, for the folder the session works in. */
   openFile(channel: string, threadTs: string, folder: string, words: string): Promise<void>;
 }
@@ -349,6 +349,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   for (const actionId of DECISION_ACTIONS) action(actionId, requests.onDecision);
   action("answer", requests.onQuestionChoice);
   action("other", requests.onQuestionOther);
+  action("notes", requests.onQuestionNotes);
   action(QUESTION_OPEN, requests.onQuestionOpen);
   view(QUESTION_FORM, requests.onQuestionSubmit);
 

@@ -59,6 +59,7 @@ import { EVERYTHING_OFFERED } from "../../../support/guide-offer.ts";
 import { NAMES } from "../../../support/names.ts";
 import { canUseToolCall, sdkMessages, splitTurns } from "../../../support/sessions.ts";
 import {
+  answerClick,
   type Body,
   buttonValue,
   CLICK_THREAD,
@@ -74,6 +75,7 @@ import {
   listed,
   ModalSlack,
   message,
+  onSecondPage,
   PERMALINK,
   picked,
   QUESTIONS,
@@ -86,6 +88,7 @@ import {
   SESSION_B,
   said,
   sharedFile,
+  submitOn,
   twoSessions,
   type World,
   worldFor,
@@ -982,16 +985,10 @@ test("answer opens the form", async (t) => {
     approvalId,
     channelId: CHANNEL,
     threadTs: FORM_THREAD,
+    active: 0,
+    revisions: new Map(),
   });
 });
-
-/** The Answer click, recorded 2026-09-24, on the question `approvalId` names. */
-function answerClick(approvalId: string): Body {
-  const body = recorded("open-click");
-  body.actions[0].value = approvalId;
-  body.trigger_id = "0000000000.0000000000.fake"; // real clicks carry one; the scrub drops it
-  return body;
-}
 
 test("the form opens before the channel is looked up", async (t) => {
   // trigger_id lives 3 seconds: a Slack call before views.open spends them (#325).
@@ -1094,16 +1091,12 @@ test("a complete submit answers claude and leaves the request to the session", a
   const world = worldOf(t);
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
   pending.messageTs = "1790000000.000009";
-  const draft = newDraft(approvalId, CHANNEL, FORM_THREAD, {
-    active: 1,
-    picks: new Map([[0, [1]]]),
-  });
-  world.built.drafts.set(approvalId, draft); // the second page, as Next left it
+  const second = await onSecondPage(world, approvalId, "1");
   const values = {
     q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } },
     o1: { other: { type: "plain_text_input", value: "xl" } },
   };
-  await world.dispatch(formBody("view_submission", draft, values));
+  await world.dispatch(submitOn(second, values));
   assert.ok(pending.decided);
   assert.deepEqual(await pending.decision, {
     answered: true,
@@ -1120,14 +1113,9 @@ for (const [index, user] of OTHER_USERS.entries()) {
   test(`nobody else can submit the form [user${index}]`, async (t) => {
     const world = worldOf(t);
     const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-    const draft = newDraft(approvalId, CHANNEL, FORM_THREAD, {
-      picks: new Map([
-        [0, [0]],
-        [1, [0]],
-      ]),
-    });
-    world.built.drafts.set(approvalId, draft); // answered, were it the owner's
-    await world.dispatch(formBody("view_submission", draft, {}, user));
+    const second = await onSecondPage(world, approvalId, "0");
+    const boxes = { q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } } };
+    await world.dispatch(submitOn(second, boxes, user));
     assert.ok(!pending.decided);
   });
 }

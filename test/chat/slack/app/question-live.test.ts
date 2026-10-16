@@ -72,17 +72,22 @@ const type = (o: Open, values: Body, block = "o0"): Body =>
     { id: "other", block, type: "plain_text_input" },
     { hash: o.modal.hash },
   );
-const submit = (o: Open, values: Body): Body => {
+/** Next or Submit in the form `view` (the one on screen unless said). */
+const submit = (o: Open, values: Body, view: Body = o.modal.view): Body => {
   const ids = { approvalId: o.approvalId, channelId: CHANNEL, threadTs: FORM_THREAD };
-  return formBody("view_submission", ids, values);
+  const body = formBody("view_submission", ids, values);
+  body.view.private_metadata = view.private_metadata;
+  return body;
 };
 
-test("the form names its request and holds nothing else in private_metadata", async (t) => {
+test("the form names its request, its page and its block revisions in private_metadata", async (t) => {
   const o = await openForm(t);
   assert.deepEqual(JSON.parse(o.modal.view.private_metadata as string), {
     a: o.approvalId,
     c: CHANNEL,
     h: FORM_THREAD,
+    n: 0,
+    r: {},
   });
   assert.equal(o.world.built.drafts.size, 1);
 });
@@ -342,4 +347,98 @@ test("a draft goes when its request is answered, skipped or gone, and the app cl
 
   left.world.built.close();
   assert.equal(left.world.built.drafts.size, 0);
+});
+
+test("two forms of one request each keep their own page", async (t) => {
+  const o = await openForm(t, [...QUESTIONS]);
+  const a = o.modal.view; // form A, on page one
+  await o.world.dispatch(answerClick(o.approvalId)); // Answer clicked again: form B
+  const b = o.modal.view;
+  // B goes on to page two and ticks a box there.
+  const next = await o.world.dispatch(submit(o, radio("q0", "0"), b));
+  const onB = (next.body as Body).view as Body;
+  assert.equal(onB.submit.text, "Submit");
+  await o.world.dispatch(
+    formAction(onB, boxes("q1", "0"), { id: "answer", block: "q1", type: "checkboxes" }),
+  );
+  assert.deepEqual(o.world.built.drafts.get(o.approvalId)?.picks.get(1), [0]);
+  // A, still on page one, picks an option: read from A's own page, B's page-two answer kept.
+  await o.world.dispatch(
+    formAction(a, radio("q0", "1"), { id: "answer", block: "q0", type: "radio_buttons" }),
+  );
+  const kept = o.world.built.drafts.get(o.approvalId);
+  assert.deepEqual(kept?.picks.get(0), [1]);
+  assert.deepEqual(kept?.picks.get(1), [0]);
+  // A's Next is no error keyed on a block A does not show: with B's answer on page two the form
+  // is complete, and both answers reach the agent.
+  const response = await o.world.dispatch(submit(o, radio("q0", "1"), a));
+  assert.equal(response.body, null);
+  await o.world.idle();
+  assert.ok(o.pending.decided);
+  assert.deepEqual(await o.pending.decision, {
+    answered: true,
+    answers: { "Colour?": "blue", "Sizes?": ["s"] },
+    notes: {},
+  });
+});
+
+test("Later then Answer finds the notes typed, the boxes ticked and the text under Other", async (t) => {
+  const o = await openForm(t, [MULTI]);
+  const field = (id: string, block: string, type: string, values: Body): Body =>
+    formAction(o.modal.view, values, { id, block, type });
+  const state = {
+    ...boxes("q0", "1"),
+    ...other("o0", "xl"),
+    ...notes("both"),
+  };
+  await o.world.dispatch(field("answer", "q0", "checkboxes", boxes("q0", "1")));
+  await o.world.dispatch(
+    field("other", "o0", "plain_text_input", { ...boxes("q0", "1"), ...other("o0", "xl") }),
+  );
+  await o.world.dispatch(field("notes", "n0", "plain_text_input", state));
+  assert.deepEqual(o.modal.calls, []); // only the single select's exclusion redraws
+  await o.world.dispatch(answerClick(o.approvalId));
+  const inputs = (o.modal.view.blocks as Body[]).filter((b) => b.type === "input");
+  assert.deepEqual(
+    inputs[0]?.element.initial_options.map((x: Body) => x.value),
+    ["1"],
+  );
+  assert.equal(inputs[1]?.element.initial_value, "xl");
+  assert.equal(inputs[2]?.element.initial_value, "both");
+});
+
+test("Later then Answer finds the notes of a single select too", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(choose(o, radio("q0", "1")));
+  const typedNotes = formAction(
+    o.modal.view,
+    { ...radio("q0", "1"), ...notes("darker") },
+    { id: "notes", block: "n0", type: "plain_text_input" },
+  );
+  await o.world.dispatch(typedNotes);
+  assert.deepEqual(o.modal.calls, []);
+  await o.world.dispatch(answerClick(o.approvalId));
+  const inputs = (o.modal.view.blocks as Body[]).filter((b) => b.type === "input");
+  assert.equal(inputs[0]?.element.initial_option.value, "1");
+  assert.equal(inputs[2]?.element.initial_value, "darker");
+});
+
+test("a change in a form whose request is gone drops its draft", async (t) => {
+  const o = await openForm(t);
+  assert.equal(o.world.built.drafts.size, 1);
+  o.world.approvals.giveUp(o.approvalId);
+  await o.world.dispatch(choose(o, radio("q0", "1")));
+  assert.equal(o.world.built.drafts.size, 0);
+});
+
+test("a stranger's note changes nothing", async (t) => {
+  const o = await openForm(t);
+  const body = formAction(
+    o.modal.view,
+    { ...radio("q0", "1"), ...notes("x") },
+    { id: "notes", block: "n0", type: "plain_text_input" },
+    { user: { id: STRANGER } },
+  );
+  await o.world.dispatch(body);
+  assert.equal(o.world.built.drafts.get(o.approvalId)?.notes.size, 0);
 });

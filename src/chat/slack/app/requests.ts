@@ -19,6 +19,7 @@ import {
   draftAnswers,
   excluding,
   type Field,
+  type FormIds,
   firstUnanswered,
   isAnswered,
   loadIds,
@@ -27,7 +28,6 @@ import {
   QUESTION_FORM,
   QUESTION_SKIP,
   questionView,
-  type RequestIds,
   refusedView,
   settled,
   touched,
@@ -203,15 +203,22 @@ export class Requests {
   };
 
   /**
-   * A change in the form of a single select, dispatched by Slack with the form's state (block
-   * reference, input block `dispatch_action` and `dispatch_action_config`; block_actions payload
-   * reference; `views.update`, all read 2026-10-16): an option picked while a text stands under
-   * Other, or a character typed there while an option stands. The one that was not just changed
-   * is emptied in a single `views.update`; typing then goes on with no further call. `hash`
-   * makes a stale payload (the keystroke after the first) a `hash_conflict`, which is ignored.
-   * Submit reads the state again, so a missed update costs a second click on the right field.
+   * A change in the question form, dispatched by Slack with the form's state (block reference,
+   * input block `dispatch_action` and `dispatch_action_config`; block_actions payload reference;
+   * `views.update`, all read 2026-10-16). Every field reports, so the draft holds what is on
+   * screen when the form is closed with Later. Only a single select redraws: an option picked
+   * while a text stands under Other, or a character typed there while an option stands, empties
+   * the one that was not just changed in a single `views.update`; typing then goes on with no
+   * further call. `hash` makes a stale payload (the keystroke after the first) a
+   * `hash_conflict`, which is ignored. Submit reads the state again, so a missed update costs a
+   * second click on the right field. The page and the block revisions are the payload's own
+   * view's (`FormIds`): two forms of one request share the answers and nothing else.
    */
-  private onQuestionLive = async (ack: Ack, body: Payload, changed: Field): Promise<void> => {
+  private onQuestionLive = async (
+    ack: Ack,
+    body: Payload,
+    changed: Field | "notes",
+  ): Promise<void> => {
     await ack();
     const { approvals, identity, slack } = this.parts;
     const [user, team] = interactionActor(body);
@@ -222,7 +229,7 @@ export class Requests {
     }
     const view = record(body.view);
     if (view.callback_id !== QUESTION_FORM) return;
-    let ids: RequestIds;
+    let ids: FormIds;
     try {
       ids = loadIds(str(view.private_metadata));
     } catch {
@@ -234,8 +241,9 @@ export class Requests {
       return;
     }
     // (sync) Kept before any await: a payload handled next finds what this one saw.
-    const draft = touched(this.draftOf(ids, record(view.state).values), changed);
-    const cleared = excluding(draft, questions, changed);
+    const read = this.draftOf(ids, record(view.state).values);
+    const draft = changed === "notes" ? read : touched(read, changed);
+    const cleared = changed === "notes" ? null : excluding(draft, questions, changed);
     this.drafts.set(ids.approvalId, cleared ?? draft);
     const viewId = text(view.id);
     if (cleared === null || viewId === null || this.answers.stopped) return;
@@ -254,22 +262,27 @@ export class Requests {
     }
   };
 
-  /** The draft of the request `ids` names, with the state of the form on screen read into it. */
-  private draftOf(ids: RequestIds, stateValues: unknown): Draft {
+  /**
+   * The draft of the request `ids` names: the answers kept for it, with the page and the
+   * revisions of the form the payload came from, and the state of that form's page read in.
+   */
+  private draftOf(ids: FormIds, stateValues: unknown): Draft {
     const kept = this.drafts.get(ids.approvalId);
-    return absorb(kept ?? newDraft(ids.approvalId, ids.channelId, ids.threadTs), stateValues);
+    const base = kept ?? newDraft(ids.approvalId, ids.channelId, ids.threadTs);
+    return absorb({ ...base, active: ids.active, revisions: ids.revisions }, stateValues);
   }
 
-  /**
-   * An option picked in a single select's form. A multi-select's checkboxes dispatch nothing;
-   * their values are read when Submit is clicked.
-   */
+  /** An option picked, or a box ticked, in the question form. */
   onQuestionChoice = (ack: Ack, body: Payload): Promise<void> =>
     this.onQuestionLive(ack, body, "choice");
 
-  /** A character typed under Other in a single select's form. */
+  /** A character typed under Other in the question form. */
   onQuestionOther = (ack: Ack, body: Payload): Promise<void> =>
     this.onQuestionLive(ack, body, "other");
+
+  /** A character typed in Notes in the question form. */
+  onQuestionNotes = (ack: Ack, body: Payload): Promise<void> =>
+    this.onQuestionLive(ack, body, "notes");
 
   /**
    * Answer, on a question of Claude's: opens the form, then checks the channel. The form shows
@@ -287,7 +300,6 @@ export class Requests {
     const questions = approvals.questions(approvalId, channel, threadTs);
     this.sweep();
     if (questions === null) {
-      this.drafts.delete(approvalId);
       await this.answers.tellOwner(channel, threadTs, texts.APPROVAL_GONE);
       return;
     }
@@ -341,7 +353,7 @@ export class Requests {
     const { approvals, identity } = this.parts;
     const [user, team] = interactionActor(body);
     const view = record(body.view);
-    let ids: RequestIds;
+    let ids: FormIds;
     try {
       ids = loadIds(str(view.private_metadata));
     } catch {

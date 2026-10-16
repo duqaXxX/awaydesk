@@ -787,6 +787,32 @@ export function answerClick(approvalId: string): Body {
   return body;
 }
 
+/**
+ * Answer clicked on the question `approvalId` names and Next pressed with the option `pick` of
+ * its first question: the view of the second page, as `response_action: update` gave it. The
+ * world's Slack answers `views.open` (a `ModalSlack` makes it keep the view).
+ */
+export async function onSecondPage(world: World, approvalId: string, pick: string): Promise<Body> {
+  await world.dispatch(answerClick(approvalId));
+  const opened = world.slack.callsTo("views.open") as Body[];
+  const first = opened.at(-1)?.view as Body;
+  const ids = { approvalId, channelId: CHANNEL, threadTs: FORM_THREAD };
+  const body = formBody("view_submission", ids, picked(0, pick));
+  body.view.private_metadata = first.private_metadata;
+  const response = await world.dispatch(body);
+  return (response.body as Body).view as Body;
+}
+
+/** The Next or Submit of the form `view` with these values. */
+export function submitOn(view: Body, values: Body, user: Body = {}): Body {
+  const body = recorded("submit");
+  body.type = "view_submission";
+  Object.assign(body.user, user);
+  body.view.private_metadata = view.private_metadata;
+  body.view.state = { values };
+  return body;
+}
+
 /** Two stored sessions of the channel's folder: one titled, one named by its first prompt. */
 export function twoSessions(world: World): void {
   const now = Math.trunc(world.now() * 1000);
