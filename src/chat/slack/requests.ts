@@ -479,11 +479,14 @@ function backBlock(): Block {
 /** The page that ends a form of several questions: every answer, to read before it is sent. */
 function reviewView(draft: Draft, questions: readonly Question[], names: Names): Block {
   const sections = questions.map((question, at) => {
-    const answer = answerAt(draft, questions, at) ?? "";
-    const shown = typeof answer === "string" ? answer : answer.join(", ");
+    const answer = answerAt(draft, questions, at);
+    const shown = typeof answer === "string" ? answer : (answer ?? []).join(", ");
     let lines = `● ${question.text}\n→ ${shown}`;
+    // A note kept for a question with no answer is not sent, so the page does not show it.
     const noted = draft.notes.get(at);
-    if (noted !== undefined) lines += `\n${slackTexts.QUESTION_NOTES}: ${noted}`;
+    if (answer !== null && noted !== undefined) {
+      lines += `\n${slackTexts.QUESTION_NOTES}: ${noted}`;
+    }
     // Cut as written, on the room the escaped text takes, so no escape is split.
     const [first = "", ...rest] = codeChunks(lines, SECTION_LIMIT - 1);
     const text = `${shownAsWritten(first)}${rest.length > 0 ? "…" : ""}`;

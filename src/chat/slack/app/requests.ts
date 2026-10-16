@@ -50,10 +50,6 @@ function inputIds(blocks: unknown): string[] {
   });
 }
 
-function sameIds(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((id, i) => id === b[i]);
-}
-
 export class Requests {
   private readonly parts: AppParts;
   private readonly answers: Answers;
@@ -457,14 +453,22 @@ export class Requests {
     const draft = reviewing ? { ...kept, active: at } : absorb({ ...kept, active: at }, state);
     this.drafts.set(ids.approvalId, draft);
     if (!reviewing) {
-      // The blocks on screen must be the ones the draft draws. A redraw Slack refused
-      // (`hash_conflict`) leaves a field on screen that the choice no longer needs, or none for
-      // one it needs; what is not on screen is not sent. `view.blocks` of the payload lists the
-      // blocks on screen: the reference for `view.state.values` (docs.slack.dev, view
-      // interactions payload, read 2026-10-16) does not say whether an empty input is listed in
-      // the state, so the state is not used for this.
+      // A redraw Slack refused (`hash_conflict`) or one that has not landed yet leaves the form
+      // other than the draft draws; `view.blocks` of the payload lists the blocks on screen
+      // (docs.slack.dev, view interactions payload, read 2026-10-16: it does not say whether an
+      // empty input is listed in the state, so the state is not used for this). Only two
+      // differences put an answer at risk: Other chosen with no field to type in (Slack's
+      // required check could not run), and a note in the draft whose field the owner cannot
+      // see, though the form draws one. Any other difference sends what the draft holds: a
+      // field left on screen is read by `absorb`, and its text is used only while its choice is.
       const drawn = questionView(draft, questions, this.parts.names);
-      if (!sameIds(inputIds(drawn.blocks), inputIds(view.blocks))) {
+      const shown = inputIds(view.blocks);
+      const hidesOther = draft.other.has(at) && !shown.includes(`o${at}`);
+      const hidesNote =
+        draft.notes.has(at) &&
+        inputIds(drawn.blocks).includes(`n${at}`) &&
+        !shown.includes(`n${at}`);
+      if (hidesOther || hidesNote) {
         await ack({ response_action: "update", view: drawn });
         return;
       }

@@ -931,12 +931,16 @@ adds the text to the labels when Other is ticked. A text kept in the draft is se
 Other is chosen, and the Review page shows it as the answer. With nothing chosen Next and Submit
 show `Choose an option or type your own answer.` under the question; Other chosen with only
 spaces is a field error on the Other block. Next and Submit also compare the input blocks the
-payload's `view.blocks` lists (what is on screen) with the ones the draft draws; when a redraw
-Slack refused left a field out of sight (a note or an Other text in the draft with no block
-showing it), the form is drawn again with `response_action: update` and nothing is sent. The
-reference for `view.state.values` does not say whether an empty input is listed (read
-2026-10-16), so the state is not used for this. A note kept in the
-draft is not sent without a choice. Notes travel to the agent as that question's `notes`, in the tool's `annotations` beside
+payload's `view.blocks` lists (what is on screen) with the ones the draft draws, and answer
+`response_action: update` with the form drawn again, sending nothing, in two cases only: Other is
+chosen on the page and its field `o{page}` is not on screen (Slack's required check could not run
+on it), or the draft holds a note for the page, the form draws its field `n{page}` and it is not on
+screen. Any other difference sends what the draft holds, so a Next clicked before the redraw that
+adds Notes lands passes at once, and a field left on screen that the choice no longer needs (Other
+unticked, the redraw refused) is read but its text is not used while its choice is not. The
+reference for `view.state.values` does not say whether an empty input is listed (read 2026-10-16),
+so the state is not used for this. A note kept in the
+draft is not sent without an answer, and the Review page does not show it either. Notes travel to the agent as that question's `notes`, in the tool's `annotations` beside
 the answers (`requests.questionResult`); with a single-select option that has a preview, the
 annotation carries the preview too, as the terminal does. The record of the answers does not
 show notes, as the terminal's does not. The modal carries no channel or thread: each click in it is checked against the

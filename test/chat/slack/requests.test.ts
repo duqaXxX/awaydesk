@@ -288,6 +288,16 @@ test("the review page shows the notes of a question under its answer, and only t
   assert.equal(sections[1].text.text, "● Sizes?\n→ s");
 });
 
+test("the review page leaves out a note kept for a question with no answer", () => {
+  const draft = draftOf({
+    active: 2,
+    picks: new Map([[0, [1]]]),
+    notes: new Map([[1, "kept but not sent"]]),
+  });
+  const sections = questionView(draft, TWO).blocks.slice(2, 4);
+  assert.equal(sections[1].text.text, "● Sizes?\n→ ");
+});
+
 test("a header is cut at the tab limit in the tab row", () => {
   const long = question({ question: "Why?", header: "h".repeat(60), options: [{ label: "a" }] });
   const view = questionView(draftOf({ active: 1 }), [long, TWO[1] as Question]);

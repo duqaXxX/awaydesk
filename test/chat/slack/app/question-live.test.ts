@@ -341,6 +341,63 @@ test("a single select whose redraw was dropped does not send an Other text the o
   assert.ok(!o.pending.decided);
 });
 
+test("a Next clicked before the redraw adding Notes lands passes at once", async (t) => {
+  const o = await openForm(t);
+  assert.deepEqual(idsOf(o.modal.view), ["q0"]);
+  // The payload lists what is on screen, the choice alone: Notes is not drawn yet, and nothing in
+  // the draft needs it, so there is no risk to bounce for.
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, radio("q0", "1")));
+  assert.equal((response.body as Body | undefined)?.response_action, undefined);
+  await o.world.idle();
+  assert.ok(o.pending.decided);
+  assert.deepEqual(await o.pending.decision, {
+    answered: true,
+    answers: { "Colour?": "blue" },
+    notes: {},
+  });
+});
+
+test("an Other chosen with its field not on screen bounces and sends nothing", async (t) => {
+  const o = await openForm(t);
+  const state = { ...radio("q0", "other"), ...other("o0", "mauve") };
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, state));
+  const body = response.body as Body;
+  assert.equal(body.response_action, "update");
+  assert.deepEqual(idsOf(body.view), ["q0", "o0", "n0"]);
+  await o.world.idle();
+  assert.ok(!o.pending.decided);
+});
+
+test("a field on screen that the choice no longer needs does not leak its text", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(choose(o, radio("q0", "other")));
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0", "n0"]);
+  await o.world.dispatch(late(o, radio("q0", "1"))); // refused: Other's field stays on screen
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0", "n0"]);
+  const state = { ...radio("q0", "1"), ...other("o0", "mauve") };
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, state));
+  assert.equal((response.body as Body | undefined)?.response_action, undefined);
+  await o.world.idle();
+  assert.deepEqual(await o.pending.decision, {
+    answered: true,
+    answers: { "Colour?": "blue" },
+    notes: {},
+  });
+});
+
+test("a note kept for an answer whose Notes field is not drawn again is not bounced forever", async (t) => {
+  const o = await openForm(t, [MULTI]);
+  const ticked = boxes("q0", "0");
+  await o.world.dispatch(choose(o, ticked));
+  await o.world.dispatch(typeIn(o, "notes", "n0", { ...ticked, ...notes("both") }));
+  const none = { q0: { answer: { type: "checkboxes", selected_options: [] } }, ...notes("both") };
+  await o.world.dispatch(choose(o, none)); // Notes goes; the note stays in the draft
+  assert.deepEqual(idsOf(o.modal.view), ["q0"]);
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, none));
+  // Nothing is chosen, so the form draws no Notes: the error, not a redraw that cannot help.
+  assert.equal((response.body as Body).response_action, "errors");
+});
+
 test("an Other text of spaces alone is an error on its field", async (t) => {
   const o = await openForm(t);
   await o.world.dispatch(choose(o, radio("q0", "other")));

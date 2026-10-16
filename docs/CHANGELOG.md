@@ -14,15 +14,16 @@ All notable changes to this project are documented here. The format follows
   something is chosen. The choice is required, so Slack shows no `(optional)` beside the question.
   The form redraws only when the choice changes; typing in Other or Notes reaches the draft and
   redraws nothing. A text or a note kept in the draft is sent only with a choice (Other's text
-  only while Other is chosen). Next and Submit check that the blocks on screen are the ones the
-  choice calls for: when a redraw Slack refused left a text out of sight, the form is drawn again
-  and nothing is sent, and a text of spaces alone in Other is a field error. With several
+  only while Other is chosen). Next and Submit redraw the form and send nothing in two cases:
+  Other is chosen and its field is not on screen, or the draft holds a note and the form draws a
+  Notes field that is not on screen (a redraw Slack refused). Any other difference between the
+  screen and the draft sends the draft, so a fast Next passes at once. A text of spaces alone in Other is a field error. With several
   questions the `1 of 3` line becomes the terminal's tab row (`☒ Colour  *☐ Sizes*  ☐ Shape
   ✔ Submit`: answered, open, the page on screen in bold). From the second question on, and on the
   review page, a `Previous` button goes back one page and keeps every answer; the fields of the
   page it leaves are kept first, and Previous checks nothing. Next always moves to the next page,
   also when every question already has an answer; the last question's button reads `Review` and
-  opens a page that lists each question with its answer and its notes, whose `Submit answers`
+  opens a page that lists each question with its answer and the notes of an answered one, whose `Submit answers`
   alone sends. One question is unchanged. Notes reach the agent as that question's `annotations`
   entry beside the answers, with the preview of the option picked for a single select; the
   record of the answers does not show them. What the owner filled now lives in the daemon's
