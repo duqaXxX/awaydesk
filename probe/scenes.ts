@@ -13,7 +13,7 @@
  * is in play, and each works in a temporary folder whose transcripts the run removes again.
  */
 import { spawnSync } from "node:child_process";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, type UUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
@@ -98,6 +98,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   resume: ["P6", "P7"],
   "model and effort resume": ["P15", "P16"],
   "setup model resume": ["P18"],
+  "model command after setModel": ["P27", "P28"],
   bypass: ["P9"],
   "working folder": ["P14"],
   replay: ["P19"],
@@ -674,7 +675,7 @@ async function modelEffortResume(s: Stage): Promise<Seen> {
 }
 
 /**
- * P18: a model set with `setModel()` (what the setup's Start does) survives a resume that passes
+ * P18: a model set with `/model` (what the setup's Start does) survives a resume that passes
  * none. The session starts on the default model, so Haiku showing after the resume can only come
  * from the session's own record.
  */
@@ -712,6 +713,92 @@ async function setupModelResume(s: Stage): Promise<Seen> {
       kept.includes("haiku") ? "" : `the resumed session reports ${kept}`,
     ),
   };
+}
+
+/**
+ * P27: with a model named in the project settings, after the SDK's `setModel()` a `/model` to that
+ * model's alias leaves the next request on the `setModel` model (issue #333). The daemon no longer calls
+ * `setModel`, so the scene reads the raw SDK. The startup model, which is not Haiku, runs no
+ * request: the two commands cost nothing and the one-word turn runs on Haiku while the limit
+ * stands. P28 rides on the same run: the command is sent under a uuid of its own, as the daemon
+ * sends it, and Claude Code ends its turn with a `command_lifecycle` `completed` naming it. P28
+ * does not depend on P27's precondition: without it the command goes out alone and P27 is UNPROVEN.
+ */
+async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
+  const input = new AsyncQueue<SDKUserMessage>();
+  // The override shows through only for the model the settings name (measured 2026-10-16), so the
+  // scene names one: a project settings file in a folder of its own, read alone.
+  const cwd = join(s.workdir, "model-settings");
+  await mkdir(join(cwd, ".claude"), { recursive: true });
+  await writeFile(join(cwd, ".claude", "settings.json"), JSON.stringify({ model: "sonnet" }));
+  const raw = query({ prompt: input, options: { cwd, settingSources: ["project"] } });
+  const say = (content: string, uuid?: UUID) =>
+    input.push({
+      type: "user",
+      message: { role: "user", content },
+      parent_tool_use_id: null,
+      ...(uuid !== undefined && { uuid }),
+    });
+  const commandId = randomUUID();
+  let completed = false;
+  let late = false;
+  const timer = setTimeout(() => {
+    late = true;
+    raw.close();
+  }, TURN_LIMIT);
+  try {
+    const init: unknown = await raw.initializationResult();
+    const listed = isRecord(init) ? records(init.models) : [];
+    const usage: unknown = await raw.getContextUsage();
+    const startup = isRecord(usage) && typeof usage.model === "string" ? usage.model : "none";
+    const alias = listed.find(
+      (entry) => entry.value !== "default" && entry.resolvedModel === startup,
+    )?.value;
+    // P27 needs a startup model that is not Haiku and an alias that names it; P28 needs neither,
+    // so the command goes out whatever the alias and the scene ends at its `completed` then.
+    const precondition = !startup.includes("haiku") && typeof alias === "string";
+    if (precondition) await raw.setModel(PROBE_MODEL);
+    say(`/model ${typeof alias === "string" ? alias : "default"}`, commandId);
+    let results = 0;
+    const ranOn: string[] = [];
+    try {
+      for await (const record of raw) {
+        const seen: unknown = record;
+        if (!isRecord(seen)) continue;
+        if (seen.type === "command_lifecycle" && seen.state === "completed") {
+          completed ||= seen.command_uuid === commandId;
+          if (!precondition && completed) break;
+        }
+        if (seen.type === "assistant" && results === 1 && isRecord(seen.message)) {
+          if (typeof seen.message.model === "string") ranOn.push(seen.message.model);
+        }
+        if (seen.type !== "result" || !precondition) continue;
+        results += 1;
+        if (results === 2) break;
+        say("Reply with the single word: ok");
+      }
+    } catch (error) {
+      if (!late) throw error;
+    }
+    if (late) throw new ProbeTimeout("the turns did not end in time");
+    const ended = observation(true, completed, completed ? "" : "no completed named the command");
+    if (!precondition) {
+      const detail = `no alias other than Haiku names the startup model ${startup}`;
+      return { P27: observation(false, false, detail), P28: ended };
+    }
+    if (ranOn.length === 0) {
+      return { P27: observation(false, false, "the turn named no model"), P28: ended };
+    }
+    const holds = ranOn.every((model) => model.includes("haiku"));
+    return {
+      P27: observation(true, holds, holds ? "" : `the turn ran on ${ranOn.join(", ")}`),
+      P28: ended,
+    };
+  } finally {
+    clearTimeout(timer);
+    input.end();
+    raw.close();
+  }
 }
 
 async function bypass(s: Stage): Promise<Seen> {
@@ -1066,6 +1153,10 @@ export async function runScenes(log: Log): Promise<Seen> {
       Object.assign(seen, await attempt("resume", s, () => resume(s, word, sessionId)));
       Object.assign(seen, await attempt("model and effort resume", s, () => modelEffortResume(s)));
       Object.assign(seen, await attempt("setup model resume", s, () => setupModelResume(s)));
+      Object.assign(
+        seen,
+        await attempt("model command after setModel", s, () => modelCommandAfterSetModel(s)),
+      );
       Object.assign(seen, await attempt("bypass", s, () => bypass(s)));
       Object.assign(seen, await attempt("working folder", s, () => workingFolder(s)));
       Object.assign(seen, await attempt("replay", s, () => replay(s)));

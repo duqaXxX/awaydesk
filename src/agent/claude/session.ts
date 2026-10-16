@@ -8,6 +8,8 @@
  * seam's events, and as the calls of the permission callback and of the two hooks the daemon
  * registers. A task of its own (`#pump`) reads that stream.
  */
+
+import { randomUUID } from "node:crypto";
 import {
   type EffortLevel,
   type HookCallback,
@@ -84,7 +86,6 @@ export interface QueryHandle extends AsyncIterable<unknown> {
   interrupt(): Promise<unknown>;
   stopTask(taskId: string): Promise<void>;
   setPermissionMode(mode: SdkPermissionMode): Promise<void>;
-  setModel(model?: string): Promise<void>;
   applyFlagSettings(settings: { effortLevel: EffortLevel | null }): Promise<void>;
   initializationResult(): Promise<unknown>;
   getContextUsage(): Promise<unknown>;
@@ -215,6 +216,20 @@ function modeOf(mode: PermissionMode): SdkPermissionMode {
   return mode as SdkPermissionMode;
 }
 
+/**
+ * The model command's turn, read and hidden. The command is pushed under a uuid of its own, which
+ * Claude Code replays on the user record and names in `command_lifecycle` (recorded 2026-10-16,
+ * Claude Code 2.1.301, `test/fixtures/sdk/model-command.json`): every record from the push to the
+ * `completed` of that uuid is the command's, and none of them reaches the core. The caller's wait
+ * ends at the command's `result`, or at that `completed` when no result came.
+ */
+interface CommandTurn {
+  readonly id: string;
+  /** The wait is over; what is left is the hidden tail up to `completed`. */
+  settled: boolean;
+  readonly settle: (error?: unknown) => void;
+}
+
 export class ClaudeSession implements AgentSession {
   readonly events: AsyncIterable<SessionEvent>;
   readonly #config: SessionConfig;
@@ -226,6 +241,7 @@ export class ClaudeSession implements AgentSession {
   #closing = false;
   #ended = false;
   #started = false;
+  #command: CommandTurn | null = null;
   // An error result arrived before the process answered the start: a resume it refused.
   #startRefused = false;
 
@@ -302,9 +318,31 @@ export class ClaudeSession implements AgentSession {
 
   #hook(events: (input: unknown) => SessionEvent[]): HookCallback {
     return async (input) => {
+      // A hook of the hidden command's turn (Stop, PostToolUse) is as much the command's as its
+      // records: nothing of it reaches the core.
+      if (this.#command !== null) return {};
       for (const event of events(input)) this.#queue.push(event);
       return {};
     };
+  }
+
+  /**
+   * Reads a record of the hidden model command: none reaches the core. The `result` settles the
+   * wait. The command's own `completed` settles it too (a no-op after the result) and ends the
+   * hiding; so does its own `cancelled`, the other terminal state `sdk.d.ts` documents (0.3.301,
+   * the comment of `cancel_queued`: "a terminal 'cancelled' lifecycle"), which fails a caller that had no result.
+   */
+  #readCommand(command: CommandTurn, record: unknown): void {
+    if (!isRecord(record)) return;
+    if (record.type === "result") command.settle();
+    if (record.type !== "command_lifecycle" || record.command_uuid !== command.id) return;
+    if (record.state === "completed") {
+      command.settle();
+      this.#command = null;
+    } else if (record.state === "cancelled") {
+      command.settle(new Error("the model command was cancelled"));
+      this.#command = null;
+    }
   }
 
   /** Reads the query's stream until it ends, whatever ends it; never rejects. */
@@ -314,6 +352,10 @@ export class ClaudeSession implements AgentSession {
       for await (const record of this.#query) {
         if (!this.#started && isRecord(record) && record.type === "result") {
           this.#startRefused = record.is_error === true;
+        }
+        if (this.#command !== null) {
+          this.#readCommand(this.#command, record);
+          continue;
         }
         try {
           for (const event of this.#translator.translate(record)) this.#queue.push(event);
@@ -326,6 +368,7 @@ export class ClaudeSession implements AgentSession {
       reason = lostName(error);
     }
     this.#ended = true;
+    this.#command?.settle(new SessionClosedError());
     if (!this.#closing) {
       logger.error(`session stopped: ${reason}`);
       this.#queue.push({ type: "process_lost", reason });
@@ -377,6 +420,14 @@ export class ClaudeSession implements AgentSession {
   }
 
   async interrupt(): Promise<void> {
+    // An interrupt while the model command runs rejects `setModel` and closes the session (the
+    // seam's contract): what the command's turn would still write is never read for a state.
+    const command = this.#command;
+    if (command !== null && !command.settled) {
+      command.settle(new Error("the model command was interrupted"));
+      await this.close();
+      return;
+    }
     await this.#ask(() => this.#query.interrupt());
   }
 
@@ -388,8 +439,42 @@ export class ClaudeSession implements AgentSession {
     await this.#ask(() => this.#query.setPermissionMode(modeOf(mode)));
   }
 
+  /**
+   * Runs Claude Code's own `/model` on the idle session and resolves once its turn is over; the
+   * turn is read here and no event of it reaches the core. The SDK's `setModel` is not used: it
+   * leaves an override that a later `/model` to the default model's alias does not undo
+   * (measured 2026-10-16, SDK 0.3.301, issue #333). A model the initialization result does not
+   * list is refused, since Claude Code answers an unknown one as a success.
+   */
   async setModel(model: string | null): Promise<void> {
-    await this.#ask(() => this.#query.setModel(model ?? undefined));
+    if (this.#closing || this.#ended) throw new SessionClosedError();
+    if (model !== null && !(await this.info()).models.some((entry) => entry.value === model)) {
+      throw new RangeError(`unknown model: ${model}`);
+    }
+    // The session may have ended during the await above, and `#pump` found no command to end.
+    if (this.#closing || this.#ended) throw new SessionClosedError();
+    // The guard and the marker follow each other with no await between them: two callers cannot
+    // both pass. A second command is refused, not queued: the setup lock already serializes its
+    // one caller, so a second is a defect. The hidden tail of one that has settled does not count.
+    if (this.#command !== null && !this.#command.settled) {
+      throw new Error("a model command is already running");
+    }
+    const id = randomUUID();
+    const done = new Promise<void>((resolve, reject) => {
+      const command: CommandTurn = {
+        id,
+        settled: false,
+        settle: (error) => {
+          if (command.settled) return;
+          command.settled = true;
+          if (error === undefined) resolve();
+          else reject(error);
+        },
+      };
+      this.#command = command;
+    });
+    this.#input.push(userMessage({ id, content: `/model ${model ?? "default"}` }));
+    await done;
   }
 
   /**

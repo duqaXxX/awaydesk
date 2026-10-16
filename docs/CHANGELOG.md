@@ -18,6 +18,21 @@ All notable changes to this project are documented here. The format follows
   macOS and Linux is unchanged. The tests that build a git layout run on Windows in CI, except
   the ones that name a folder with a trailing space or a `*`, and the one that puts a shell
   script first on `PATH`.
+- `/model` to the model your settings name works again in a thread whose setup picked another
+  model (issue #333). The setup set the model with the SDK's `setModel`, after which `/model
+  opus` with `"model": "opus"` in the settings answered `Set model to Opus 5.5` and requests kept
+  running on the chosen model; a `/model` to any other model, or with no model in the settings,
+  was not affected (measured 2026-10-16, SDK 0.3.301, Claude Code 2.1.301). The Claude back end now
+  sets the model as the terminal does, by running `/model <model>` in the idle session and
+  reading that turn itself, under a uuid of its own: every record from the push to the
+  `command_lifecycle` `completed` that names it stays in the back end (its states, its output, its
+  result and the hooks that fire in it included), and the first prompt waits for its result. The
+  command still reaches the session: the model sees it and it enters the session's transcript,
+  which `docs/limits.md` declares. `!stop` while it runs makes the model change reject and closes
+  the session (the seam's contract for `AgentSession.interrupt`), so the setup is undone
+  (`Not sent.`). A second command while one runs is refused. `Query.setModel` leaves
+  `docs/sdk-surface.md`; `docs/limits.md` declares the SDK's behaviour, and the new probe claims
+  P27 and P28 check it, and the `completed` record, on each release.
 - A second `Start` on a session's setup while the first is applied, and a model picked just
   before `Start` but handled after it, no longer add `This question is no longer open: it was
   already answered, or awaydesk restarted.` under the summary (issue #142): the summary says

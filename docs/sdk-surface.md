@@ -91,7 +91,6 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Query` | `getContextUsage` | method | session.ts: ClaudeSession.contextUsage | reference | P2 |
 | `Query` | `initializationResult` | method | session.ts: ClaudeSession.ready, ClaudeSession.info | reference | P2 |
 | `Query` | `interrupt` | method | session.ts: ClaudeSession.interrupt | reference | P8 |
-| `Query` | `setModel` | method | session.ts: ClaudeSession.setModel | reference | P18 |
 | `Query` | `setPermissionMode` | method | session.ts: ClaudeSession.setPermissionMode | reference | P9 |
 | `Query` | `stopTask` | method | session.ts: ClaudeSession.stopTask | reference | P12 |
 | `HookCallbackMatcher` | `hooks` | option | session.ts: ClaudeSession.#options | reference | none |
@@ -259,6 +258,9 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKUserMessage.tool_use_result.structuredPatch[]` | `lines` | key | translate.ts: hunkOf | measured | none |
 | `SDKUserMessage.tool_use_result.structuredPatch[]` | `newStart` | key | translate.ts: hunkOf | measured | none |
 | `SDKUserMessage.tool_use_result.structuredPatch[]` | `oldStart` | key | translate.ts: hunkOf | measured | none |
+| `command_lifecycle` | `command_uuid` | key | session.ts: ClaudeSession.#readCommand | measured | P28 |
+| `command_lifecycle` | `state` | key | session.ts: ClaudeSession.#readCommand | measured | P28 |
+| `command_lifecycle` | `type` | key | session.ts: ClaudeSession.#readCommand | measured | P28 |
 | `CanUseTool.toolName` | `"AskUserQuestion"` | value | requests.ts: QUESTION_TOOL | measured | none |
 | `EffortLevel` | `"high"` | value | capabilities.ts: CAPABILITIES | package | none |
 | `EffortLevel` | `"low"` | value | capabilities.ts: CAPABILITIES | package | none |
@@ -297,7 +299,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKRateLimitEvent.type` | `"rate_limit_event"` | value | translate.ts: HANDLERS | reference | none |
 | `SDKResultMessage.terminal_reason` | `"aborted_streaming"` | value | translate.ts: INTERRUPTED | reference | none |
 | `SDKResultMessage.terminal_reason` | `"aborted_tools"` | value | translate.ts: INTERRUPTED | reference | none |
-| `SDKResultMessage.type` | `"result"` | value | translate.ts: HANDLERS; session.ts: ClaudeSession.#pump | reference | none |
+| `SDKResultMessage.type` | `"result"` | value | translate.ts: HANDLERS; session.ts: ClaudeSession.#pump, ClaudeSession.#readCommand | reference | none |
 | `SDKSessionStateChangedMessage.state` | `"idle"` | value | translate.ts: AGENT_STATES | package | none |
 | `SDKSessionStateChangedMessage.state` | `"requires_action"` | value | translate.ts: AGENT_STATES | package | none |
 | `SDKSessionStateChangedMessage.state` | `"running"` | value | translate.ts: AGENT_STATES | package | none |
@@ -324,6 +326,9 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKUserMessage.message.role` | `"user"` | value | prompt.ts: userMessage | measured | none |
 | `SDKUserMessage.tool_use_result.type` | `"create"` | value | translate.ts: fileChange | measured | none |
 | `SDKUserMessage.type` | `"user"` | value | translate.ts: HANDLERS; prompt.ts: userMessage | reference | none |
+| `command_lifecycle.state` | `"cancelled"` | value | session.ts: ClaudeSession.#readCommand | measured | none |
+| `command_lifecycle.state` | `"completed"` | value | session.ts: ClaudeSession.#readCommand | measured | P28 |
+| `command_lifecycle.type` | `"command_lifecycle"` | value | session.ts: ClaudeSession.#readCommand | measured | P28 |
 
 ## Types the daemon does not read
 
@@ -334,7 +339,7 @@ union, none of which any recording carries.
 
 ### Recorded and left unread
 
-- `command_lifecycle`: in no declaration of `sdk.d.ts`; the queue of a prompt sent while a turn runs
+- `command_lifecycle`: in no declaration of `sdk.d.ts`; the queue of a prompt sent while a turn runs (the translator leaves it unread; `ClaudeSession.#readCommand` reads it to end the hidden model command, rows above)
 - `conversation_reset`: `SDKConversationResetMessage`
 - `stream_event:content_block_stop`: a stream event of the Claude API, below `SDKPartialAssistantMessage.event`
 - `stream_event:message_delta`: a stream event of the Claude API, below `SDKPartialAssistantMessage.event`
@@ -377,6 +382,7 @@ no check covers them here.
   `sdk.d.ts` 0.3.296: of the 23 kinds they hold, `command_lifecycle` is in no declaration and 10
   others carry fields that the declaration of their type lacks (`thinking_display` on three stream
   events, `user_message_uuids` on `status`, `logical_parent_uuid` on `compact_boundary`, and more).
+- The state `"cancelled"` is named only in comments of `sdk.d.ts` 0.3.301, never in a declaration and in no recording, so its row is `measured` only in the sense that no declaration names it. The comment of `cancel_queued` says each uuid-stamped command it cancels "is closed with a terminal 'cancelled' lifecycle", and the same comment mentions "a command_lifecycle 'cancelled' frame"; `ClaudeSession.#readCommand` ends the hidden model command on the one that names its uuid
 - `ClaudeSession` names a process that ended by the start of the message of the plain `Error`
   the SDK throws, from its stream, its start or a request: `Claude Code process exited with code `,
   `Claude Code process terminated by signal ` and `Claude Code returned an error result: `. The package declares no class, field or

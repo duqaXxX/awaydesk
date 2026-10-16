@@ -223,6 +223,29 @@ test("start applies model effort and bypass", async (t) => {
   assert.equal(summaryOf(manual), "Model: Opus 5.5 · Effort: high · Bypass: on");
 });
 
+test("the first prompt is sent once the model change has settled", async (t) => {
+  const manual = manualWorld(t);
+  // The back end changes the model with a turn of its own: a prompt sent before that turn ends
+  // would run on the old model (issue #333).
+  const gate = new AsyncEvent();
+  t.mock.method(
+    FakeAgentSession.prototype,
+    "setModel",
+    async function (this: FakeAgentSession, model: string | null): Promise<void> {
+      this.modelsSet.push(model);
+      await gate.wait();
+    },
+  );
+  await manual.dispatch(message("hello", { ts: THREAD }));
+  await manual.dispatch(setupClick(manual, SETUP_START, { model: "opus" }));
+  await manual.idle();
+  assert.deepEqual(manual.clients.at(-1)?.modelsSet, ["opus"]);
+  assert.deepEqual(manual.queries(), []);
+  gate.set();
+  await manual.settle();
+  assert.deepEqual(manual.queries(), ["hello"]);
+});
+
 test("start applies model effort and bypass with a live effort change", async (t) => {
   const manual = manualWorld(t);
   await manual.dispatch(message("hello", { ts: THREAD }));
@@ -459,6 +482,33 @@ test("bypass typed while start is applied wins over the box", async (t) => {
   assert.ok(manual.ephemerals().includes(texts.BYPASS_ON_THREAD));
   assert.deepEqual(reactionsOn(manual, word.event.ts), ["white_check_mark"]);
   assert.deepEqual(manual.queries(), ["hello"]);
+});
+
+test("stop while the model command runs interrupts it and cancels", async (t) => {
+  const manual = manualWorld(t);
+  // The agent's own model command is a turn no reply shows, so no busy turn tells `!stop` that
+  // anything runs: the stop of a Start being applied reaches the session on its own.
+  const gate = new AsyncEvent();
+  t.mock.method(
+    FakeAgentSession.prototype,
+    "setModel",
+    async function (this: FakeAgentSession, model: string | null): Promise<void> {
+      this.modelsSet.push(model);
+      await gate.wait();
+      throw new Error("the model command was interrupted");
+    },
+  );
+  await manual.dispatch(message("hello", { ts: THREAD }));
+  await manual.dispatch(setupClick(manual, SETUP_START, { model: "opus" }));
+  await manual.idle();
+  await manual.dispatch(reply("!stop", THREAD));
+  await manual.idle();
+  assert.equal(manual.clients.at(-1)?.interrupts, 1);
+  gate.set();
+  await manual.settle();
+  assert.deepEqual(manual.queries(), []);
+  assert.ok(manual.ephemerals().includes(texts.NOT_SENT));
+  assert.equal(manual.state.thread(CHANNEL, THREAD)?.bypass, null);
 });
 
 for (const live of [false, true]) {

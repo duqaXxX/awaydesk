@@ -9,6 +9,7 @@
  */
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
+import type { SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import {
   ClaudeSession,
   logger,
@@ -772,14 +773,209 @@ test(
   },
 );
 
-test("a model reaches Claude Code, none meaning its default", LIMIT, async (t) => {
+// What Claude Code writes for a `/model` typed to a session: a local command, so a turn with no
+// model request in it, named by the uuid it was sent under (the replayed `user` record's `uuid`
+// and `command_lifecycle`'s `command_uuid`), ended by that uuid's `completed` and followed by the
+// session's `idle`. Recorded 2026-10-16 on Claude Code 2.1.301 with the daemon's options, ids
+// replaced and the init record of `goal.jsonl` in place of the recorded one. The fake query puts
+// the uuid the command was sent under where the recording has its own.
+const MODEL_COMMAND = sdkJson("model-command") as JsonObject[];
+const COMMAND_RESULT = MODEL_COMMAND.findIndex((record) => record.type === "result");
+const COMMAND_COMPLETED = MODEL_COMMAND.findIndex(
+  (record) => record.type === "command_lifecycle" && record.state === "completed",
+);
+const IDLE: SessionEvent = { type: "state_changed", state: "idle" };
+const STATUS: JsonObject = { type: "system", subtype: "status", status: "requesting" };
+const RUNNING = MODEL_COMMAND[0] as JsonObject;
+
+/** The content of a user message the session sent. */
+function textOf(message: SDKUserMessage | undefined): unknown {
+  return message?.message.content;
+}
+
+function pause(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 20));
+}
+
+test(
+  "a model is set with Claude Code's own command, and its turn shows nothing",
+  LIMIT,
+  async (t) => {
+    const { session, query, events } = await started(t, { turns: [MODEL_COMMAND, TOOLS] });
+    const control = await started(t, { turns: [TOOLS] });
+    await control.session.send(PROMPT);
+    const alone = await until(control.events, "turn_ended");
+
+    await session.setModel("haiku");
+    // No control call: the SDK's own `setModel` leaves an override that a later `/model` to the
+    // default model's alias does not undo (issue #333).
+    assert.deepEqual(query.calls, []);
+    assert.equal(textOf(query.sent[0]), "/model haiku");
+    assert.match(String(query.sent[0]?.uuid), /^[0-9a-f-]{36}$/);
+    // The next prompt is a turn of its own: the events up to its end are those it gives alone,
+    // after the one `idle` the command's own end leaves.
+    await session.send(PROMPT);
+    assert.deepEqual(await until(events, "turn_ended"), [IDLE, ...alone]);
+    assert.equal(query.sent.length, 2);
+  },
+);
+
+test(
+  "the command's wait ends at its result, and the records up to its completed stay hidden",
+  LIMIT,
+  async (t) => {
+    const { session, query, events } = await started(t);
+    let settled = false;
+    const set = session.setModel("haiku").then(() => {
+      settled = true;
+    });
+    await pause();
+    query.answer(MODEL_COMMAND.slice(0, COMMAND_RESULT));
+    await pause();
+    assert.equal(settled, false);
+    // A status between the result and the completed is the command's too, and a completed of
+    // another command does not end the hiding.
+    const other = { ...MODEL_COMMAND[COMMAND_COMPLETED], command_uuid: "another-command" };
+    query.answer([MODEL_COMMAND[COMMAND_RESULT] as JsonObject]);
+    query.inject([STATUS, other, RUNNING]);
+    await set;
+    query.answer(MODEL_COMMAND.slice(COMMAND_COMPLETED));
+    await pause();
+    await session.close();
+    // Only what follows the completed leaves: the session's `idle`.
+    assert.deepEqual(await drain({ [Symbol.asyncIterator]: () => events }), [IDLE]);
+  },
+);
+
+test("a command that wrote no result is done at its completed", LIMIT, async (t) => {
   const { session, query } = await started(t);
+  const set = session.setModel("haiku");
+  await pause();
+  query.answer(MODEL_COMMAND.filter((record) => record.type !== "result"));
+  await set;
+});
+
+// `sdk.d.ts` 0.3.301 (the comment of `cancel_queued`): "closed with a terminal 'cancelled' lifecycle".
+// It ends the command's turn as `completed` does, and fails a caller that had no result.
+test("a cancelled of the command ends it: an error without a result", LIMIT, async (t) => {
+  const { session, query, events } = await started(t);
+  const set = session.setModel("haiku");
+  await pause();
+  const cancelled = { ...MODEL_COMMAND[COMMAND_COMPLETED], state: "cancelled" };
+  query.answer([MODEL_COMMAND[0] as JsonObject, cancelled]);
+  await assert.rejects(set, /cancelled/);
+  // The hiding ended: what follows reaches the core.
+  query.answer(MODEL_COMMAND.slice(COMMAND_COMPLETED + 1));
+  await pause();
+  await session.close();
+  assert.deepEqual(await drain({ [Symbol.asyncIterator]: () => events }), [IDLE]);
+});
+
+test("a cancelled of another command, or after the result, changes nothing", LIMIT, async (t) => {
+  const { session, query } = await started(t);
+  let failed = false;
+  const set = session.setModel("haiku").catch(() => {
+    failed = true;
+  });
+  await pause();
+  const completed = MODEL_COMMAND[COMMAND_COMPLETED];
+  query.inject([{ ...completed, state: "cancelled", command_uuid: "another-command" }]);
+  await pause();
+  query.answer([MODEL_COMMAND[COMMAND_RESULT] as JsonObject]);
+  await set;
+  query.answer([{ ...completed, state: "cancelled" }]);
+  await pause();
+  assert.equal(failed, false);
+});
+
+test("a hook of the command's turn does not reach the core", LIMIT, async (t) => {
+  const { session, query, events } = await started(t);
+  const set = session.setModel("haiku");
+  await pause();
+  const batch: Batch = [
+    ...MODEL_COMMAND.slice(0, COMMAND_RESULT),
+    hook("Stop", STOP),
+    hook("PostToolUse", POST_TOOL_USE),
+    ...MODEL_COMMAND.slice(COMMAND_RESULT, COMMAND_COMPLETED + 1),
+  ];
+  query.answer(batch);
+  await set;
+  await pause();
+  await session.close();
+  assert.deepEqual(types(await drain({ [Symbol.asyncIterator]: () => events })), []);
+});
+
+test("two model commands at once: the second is refused, the first settles", LIMIT, async (t) => {
+  const { session, query } = await started(t);
+  const first = session.setModel("haiku");
+  const second = session.setModel("opus");
+  await assert.rejects(second, /already running/);
+  await pause();
+  query.answer(MODEL_COMMAND);
+  await first;
+  assert.equal(query.sent.length, 1);
+});
+
+test("a session that ends while the model is checked fails the call", LIMIT, async (t) => {
+  const { session, query } = await started(t, { initDelayMs: 30 });
+  const set = session.setModel("haiku");
+  query.inject([END]);
+  await assert.rejects(set, SessionClosedError);
+  assert.deepEqual(query.sent, []);
+});
+
+// An interrupt while the command runs rejects the call and closes the session, whether the
+// command's turn began or not: nothing of it is read for a state.
+for (const [name, written] of [
+  ["before the command's turn began", 0],
+  ["while the command's turn runs", 1],
+] as const) {
+  test(`an interrupt ${name} rejects the call and closes the session`, LIMIT, async (t) => {
+    const { session, query, events } = await started(t);
+    const set = session.setModel("haiku");
+    await pause();
+    if (written > 0) query.answer(MODEL_COMMAND.slice(0, written));
+    await pause();
+    await session.interrupt();
+    await assert.rejects(set, /interrupted/);
+    assert.equal(query.closed, true);
+    // The query was closed, not interrupted: no control call asked it to stop.
+    assert.deepEqual(query.calls, [{ method: "close" }]);
+    await assert.rejects(session.send(PROMPT), SessionClosedError);
+    await assert.rejects(session.setModel("opus"), SessionClosedError);
+    // Nothing reached the core: no state, no session, no text of the command, no loss.
+    assert.deepEqual(await drain({ [Symbol.asyncIterator]: () => events }), []);
+  });
+}
+
+test("an interrupt with no model command running goes to the query", LIMIT, async (t) => {
+  const { session, query } = await started(t, { turns: [MODEL_COMMAND] });
   await session.setModel("haiku");
+  await session.interrupt();
+  assert.deepEqual(query.calls, [{ method: "interrupt" }]);
+  assert.equal(query.closed, false);
+});
+
+test("no model means the agent's default: the command names it", LIMIT, async (t) => {
+  const { session, query } = await started(t, { turns: [MODEL_COMMAND] });
   await session.setModel(null);
-  assert.deepEqual(query.calls, [
-    { method: "setModel", model: "haiku" },
-    { method: "setModel", model: undefined },
-  ]);
+  assert.equal(textOf(query.sent[0]), "/model default");
+});
+
+test("a model the session does not list is refused and nothing is sent", LIMIT, async (t) => {
+  const { session, query } = await started(t, { turns: [MODEL_COMMAND] });
+  await assert.rejects(session.setModel("nosuchmodel"), RangeError);
+  await assert.rejects(session.setModel("haiku\nrm -rf /"), RangeError);
+  assert.deepEqual(query.sent, []);
+});
+
+test("a model set fails when the session ends first, and after it", LIMIT, async (t) => {
+  const { session, query } = await started(t);
+  const pending = session.setModel("haiku");
+  await pause();
+  query.answer([MODEL_COMMAND[0] as JsonObject, END]);
+  await assert.rejects(pending, SessionClosedError);
+  await assert.rejects(session.setModel("haiku"), SessionClosedError);
 });
 
 test("an effort level is applied to the live session, none clearing it", LIMIT, async (t) => {
@@ -895,13 +1091,9 @@ test(
     // Not measured on a real process: which message a request on a dead process is rejected with.
     const failure = new Error("Claude Code process exited with code 1. stderr: a secret sentence");
     const { session } = await started(t, {
-      rejects: { setModel: failure, interrupt: failure, getContextUsage: failure },
+      rejects: { interrupt: failure, getContextUsage: failure },
     });
-    for (const request of [
-      () => session.setModel("haiku"),
-      () => session.interrupt(),
-      () => session.contextUsage(),
-    ]) {
+    for (const request of [() => session.interrupt(), () => session.contextUsage()]) {
       await assert.rejects(request(), (error) => {
         assert.ok(error instanceof Error);
         assert.equal(error.name, "ProcessExited");
