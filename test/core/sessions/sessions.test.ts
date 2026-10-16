@@ -2128,7 +2128,10 @@ test("a turn taken while claude code starts is ended on close", async (t) => {
   const session = h.session();
   const turn = await session.submit("hello");
   await h.sleep(0.05); // the worker has taken the turn and waits for the CLI
-  await session.close();
+  const closing = session.close();
+  await h.sleep(0.05); // the turn is ended, yet the close waits for the CLI to finish starting
+  gate.set();
+  await closing;
   assert.ok(turn.done.isSet);
   // no reply had started: the taken message is named in one message of its own
   const [note, ...more] = h.slack.callsTo("chat.postMessage");
@@ -3385,6 +3388,26 @@ test("a close while a word starts the client leaves no process", async (t) => {
   await closing;
   await wordEnd;
   assert.ok(h.clients.length === 1 && h.clients[0]?.connected === false);
+});
+
+test("a close waits for the start the worker gave up, and disconnects it", async (t) => {
+  // `close()` cancels the worker, whose own signal ends its wait for the start while the agent's
+  // process is still launching: the close must not end, nor `doneClosing` fire (which lets a
+  // later session resume the same id), before that process is closed (issue #240).
+  const gate = new AsyncEvent();
+  const h = harnessFor(t)({ startGate: gate });
+  const session = h.session();
+  await session.submit("first");
+  await h.until(() => h.clients.length === 1);
+  const closing = session.close();
+  const closed = finishing(closing);
+  await h.sleep(0.05);
+  assert.ok(!closed.done()); // the start is still launching
+  assert.ok(!session.doneClosing.isSet);
+  gate.set();
+  await closing;
+  assert.ok(h.clients[0]?.connected === false); // closed before the close ended
+  assert.ok(session.doneClosing.isSet);
 });
 
 test("bypass asked while the session closes is not stored", async (t) => {

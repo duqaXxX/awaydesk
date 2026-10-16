@@ -197,6 +197,10 @@ export class ThreadSession {
   // The request handlers in flight (`askOwner`). A close resolves them and waits for each:
   // none may write the root's status after the close has settled it.
   private readonly asking = new Set<Promise<unknown>>();
+  // The starts a caller gave up (its signal aborted) with the process still launching, each as
+  // the promise of its disconnect. `close` waits for them before `doneClosing`: the seam's
+  // `start` takes no signal, so the process can only be closed once it is there.
+  private readonly abandoned = new Set<Promise<void>>();
   /** Task events that arrived between turns, shown in the next turn's reply. */
   private held: TaskEvent[] = [];
   // Tasks that outlived their turn, and the reply whose line each one keeps up to date, for
@@ -1335,6 +1339,9 @@ export class ThreadSession {
         await this.disconnect(client);
       }
     } finally {
+      // A start the worker gave up may still be launching: its process is closed before
+      // `doneClosing`, or a session built after this one could resume the same id meanwhile.
+      await Promise.allSettled([...this.abandoned]);
       if (this.predecessor !== null) {
         // This object's own predecessor may still be mid-teardown: `ensureConnected` never ran
         // here (this session closed with no turn ever submitted), so nothing else has waited
@@ -1445,11 +1452,14 @@ export class ThreadSession {
       return await cancellable(starting, signal);
     } catch (error) {
       if (signal?.aborted) {
-        // The start goes on by itself: a process nobody holds is closed when it is there.
-        starting.then(
+        // The start goes on by itself: a process nobody holds is closed when it is there, and
+        // `close` waits for that.
+        const closing = starting.then(
           (client) => this.disconnect(client),
           () => {},
         );
+        this.abandoned.add(closing);
+        closing.finally(() => this.abandoned.delete(closing));
       }
       throw error;
     }

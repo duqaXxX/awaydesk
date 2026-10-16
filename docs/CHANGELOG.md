@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A close while the session's own worker is waiting for the agent to start no longer ends before
+  that process is closed (issue #240): the session keeps the start the worker gave up, and
+  `close` and `doneClosing` wait for it, so a session built next on the same id cannot resume
+  it while the first process still launches.
 - A second `Start` on a session's setup while the first is applied, and a model picked just
   before `Start` but handled after it, no longer add `This question is no longer open: it was
   already answered, or awaydesk restarted.` under the summary (issue #142): the summary says
