@@ -12,10 +12,13 @@ All notable changes to this project are documented here. The format follows
   opus` on an Opus default answered `Set model to Opus 5.5` and requests kept running on the
   chosen model (measured 2026-10-16, SDK 0.3.301, Claude Code 2.1.301). The Claude back end now
   sets the model as the terminal does, by running `/model <model>` in the idle session and
-  reading that turn itself: the core sees no event of it (its `running` and `idle` states, its
-  output and its result included) and the first prompt waits for it. `Query.setModel` leaves
+  reading that turn itself: the thread shows nothing of it and the core sees no event of it (its
+  states, its output, its result and the hooks that fire in it included), and the first prompt
+  waits for its result. The command still reaches the session: the model sees it and it enters the
+  session's transcript, which `docs/limits.md` declares. `!stop` while it runs interrupts it and
+  cancels the setup (`Not sent.`). A second command while one runs is refused. `Query.setModel` leaves
   `docs/sdk-surface.md`; `docs/limits.md` declares the SDK's behaviour, and the new probe claim
-  P26 checks it on each release.
+  P27 checks it on each release.
 - A second `Start` on a session's setup while the first is applied, and a model picked just
   before `Start` but handled after it, no longer add `This question is no longer open: it was
   already answered, or awaydesk restarted.` under the summary (issue #142): the summary says

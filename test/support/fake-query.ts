@@ -92,6 +92,8 @@ export interface FakeScript {
   readonly start?: Batch;
   /** The answer to the initialize request. */
   readonly init?: unknown;
+  /** The initialize request answers after this many milliseconds. */
+  readonly initDelayMs?: number;
   /** The initialize request fails with this, as when Claude Code refuses to resume. */
   readonly initError?: Error;
   readonly contextUsage?: unknown;
@@ -262,6 +264,9 @@ export class FakeQuery implements QueryHandle {
   }
 
   async initializationResult(): Promise<unknown> {
+    if (this.#script.initDelayMs !== undefined) {
+      await new Promise((resolve) => setTimeout(resolve, this.#script.initDelayMs));
+    }
     if (this.#script.initError !== undefined) throw this.#script.initError;
     return this.#script.init ?? sdkJson("server-info");
   }

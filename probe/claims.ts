@@ -273,7 +273,7 @@ export const CLAIMS: readonly Claim[] = [
       "and say so in the issue it names",
   ),
   claim(
-    "P26",
+    "P27",
     "gesture",
     "after `setModel()` on the query, a `/model` to the alias of the model the session started " +
       "on is acknowledged and the next request still runs on the `setModel` model, as " +

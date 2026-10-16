@@ -218,14 +218,17 @@ function modeOf(mode: PermissionMode): SdkPermissionMode {
 
 /**
  * A local command's turn being read and hidden: Claude Code writes it as `running`, the command's
- * records, a `result`, then `idle` (recorded 2026-10-16, Claude Code 2.1.301, with the state
- * events on). It is over at the `idle` that follows its result, or at the result when no state
- * was reported.
+ * records, a `result`, `command_lifecycle` completed, then `idle` (recorded 2026-10-16, Claude
+ * Code 2.1.301, with the state events on). The caller's wait ends at the result, the SDK's end of
+ * a turn; the records that trail it stay hidden until that `idle`, or until the first record of
+ * another turn.
  */
 interface CommandTurn {
   running: boolean;
   resulted: boolean;
-  readonly finish: (error?: unknown) => void;
+  /** The wait is over: what is left is the hidden tail. */
+  settled: boolean;
+  readonly settle: (error?: unknown) => void;
 }
 
 export class ClaudeSession implements AgentSession {
@@ -316,24 +319,38 @@ export class ClaudeSession implements AgentSession {
 
   #hook(events: (input: unknown) => SessionEvent[]): HookCallback {
     return async (input) => {
+      // A hook of the hidden command's turn (Stop, PostToolUse) is as much the command's as its
+      // records: nothing of it reaches the core.
+      if (this.#command !== null) return {};
       for (const event of events(input)) this.#queue.push(event);
       return {};
     };
   }
 
   /**
-   * Reads a record of the model command's turn and keeps it from the core, since the owner never
-   * typed the command: not its states, its output or its result. Ends the command once its turn
-   * is over.
+   * Reads a record while the model command's turn is hidden, since the owner never typed the
+   * command: not its states, its output or its result. Settles the wait at the result. Returns
+   * whether the record is the command's own; one that is not (the first record of another turn)
+   * ends the command and is read as any record.
    */
-  #readCommand(command: CommandTurn, record: unknown): void {
-    if (!isRecord(record)) return;
+  #readCommand(command: CommandTurn, record: unknown): boolean {
+    if (!isRecord(record)) return true;
     const state = record.type === "system" && record.subtype === "session_state_changed";
-    if (state && record.state === "running") command.running = true;
-    if (record.type === "result") command.resulted = true;
-    if (command.resulted && (!command.running || (state && record.state === "idle"))) {
-      command.finish();
+    if (!command.resulted) {
+      if (state && record.state === "running") command.running = true;
+      if (record.type === "result") {
+        command.resulted = true;
+        command.settle();
+      }
+      return true;
     }
+    if (state && record.state === "idle") {
+      this.#command = null;
+      return true;
+    }
+    if (record.type === "command_lifecycle") return true;
+    this.#command = null;
+    return false;
   }
 
   /** Reads the query's stream until it ends, whatever ends it; never rejects. */
@@ -344,10 +361,7 @@ export class ClaudeSession implements AgentSession {
         if (!this.#started && isRecord(record) && record.type === "result") {
           this.#startRefused = record.is_error === true;
         }
-        if (this.#command !== null) {
-          this.#readCommand(this.#command, record);
-          continue;
-        }
+        if (this.#command !== null && this.#readCommand(this.#command, record)) continue;
         try {
           for (const event of this.#translator.translate(record)) this.#queue.push(event);
         } catch (error) {
@@ -359,7 +373,7 @@ export class ClaudeSession implements AgentSession {
       reason = lostName(error);
     }
     this.#ended = true;
-    this.#command?.finish(new SessionClosedError());
+    this.#command?.settle(new SessionClosedError());
     if (!this.#closing) {
       logger.error(`session stopped: ${reason}`);
       this.#queue.push({ type: "process_lost", reason });
@@ -411,6 +425,13 @@ export class ClaudeSession implements AgentSession {
   }
 
   async interrupt(): Promise<void> {
+    // The model command's wait ends with the interrupt, which is the owner's `!stop`. Its turn
+    // is still read to its end, but one that never began leaves nothing to wait for.
+    const command = this.#command;
+    if (command !== null && !command.settled) {
+      command.settle(new Error("the model command was interrupted"));
+      if (!command.running) this.#command = null;
+    }
     await this.#ask(() => this.#query.interrupt());
   }
 
@@ -431,21 +452,30 @@ export class ClaudeSession implements AgentSession {
    */
   async setModel(model: string | null): Promise<void> {
     if (this.#closing || this.#ended) throw new SessionClosedError();
-    if (this.#command !== null) throw new Error("a model command is already running");
     if (model !== null && !(await this.info()).models.some((entry) => entry.value === model)) {
       throw new RangeError(`unknown model: ${model}`);
     }
+    // The session may have ended during the await above, and `#pump` found no command to end.
+    if (this.#closing || this.#ended) throw new SessionClosedError();
+    // The guard and the marker follow each other with no await between them: two callers cannot
+    // both pass. A second command is refused, not queued: the setup lock already serializes its
+    // one caller, so a second is a defect. The hidden tail of one that has settled does not count.
+    if (this.#command !== null && !this.#command.settled) {
+      throw new Error("a model command is already running");
+    }
     const done = new Promise<void>((resolve, reject) => {
-      this.#command = {
+      const command: CommandTurn = {
         running: false,
         resulted: false,
-        finish: (error) => {
-          // Cleared here, not after the await: the next record is not part of the command.
-          this.#command = null;
+        settled: false,
+        settle: (error) => {
+          if (command.settled) return;
+          command.settled = true;
           if (error === undefined) resolve();
           else reject(error);
         },
       };
+      this.#command = command;
     });
     this.#input.push(userMessage({ id: randomUUID(), content: `/model ${model ?? "default"}` }));
     await done;

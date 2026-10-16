@@ -98,7 +98,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   resume: ["P6", "P7"],
   "model and effort resume": ["P15", "P16"],
   "setup model resume": ["P18"],
-  "model command after setModel": ["P26"],
+  "model command after setModel": ["P27"],
   bypass: ["P9"],
   "working folder": ["P14"],
   replay: ["P19"],
@@ -716,7 +716,7 @@ async function setupModelResume(s: Stage): Promise<Seen> {
 }
 
 /**
- * P26: after the SDK's `setModel()`, a `/model` to the alias of the model the session started on
+ * P27: after the SDK's `setModel()`, a `/model` to the alias of the model the session started on
  * leaves the next request on the `setModel` model (issue #333). The daemon no longer calls
  * `setModel`, so the scene reads the raw SDK. The startup model, which is not Haiku, runs no
  * request: the two commands cost nothing and the one-word turn runs on Haiku while the limit
@@ -742,7 +742,7 @@ async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
     )?.value;
     if (startup.includes("haiku") || typeof alias !== "string") {
       const detail = `no alias other than Haiku names the startup model ${startup}`;
-      return { P26: observation(false, false, detail) };
+      return { P27: observation(false, false, detail) };
     }
     await raw.setModel(PROBE_MODEL);
     say(`/model ${alias}`);
@@ -764,9 +764,9 @@ async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
       if (!late) throw error;
     }
     if (late) throw new ProbeTimeout("the turns did not end in time");
-    if (ranOn.length === 0) return { P26: observation(false, false, "the turn named no model") };
+    if (ranOn.length === 0) return { P27: observation(false, false, "the turn named no model") };
     const holds = ranOn.every((model) => model.includes("haiku"));
-    return { P26: observation(true, holds, holds ? "" : `the turn ran on ${ranOn.join(", ")}`) };
+    return { P27: observation(true, holds, holds ? "" : `the turn ran on ${ranOn.join(", ")}`) };
   } finally {
     clearTimeout(timer);
     input.end();

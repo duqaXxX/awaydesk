@@ -298,6 +298,8 @@ export class ThreadSession {
   private setupApplied = false;
   /** Held while Start is applied, so a `!bypass` typed meanwhile acts after it. */
   private readonly setupLock = new Mutex();
+  /** `applySetup` is running: a model command may be in flight in the agent. */
+  private applying = false;
   // What the live client was started with or switched to: the effort, and whether it
   // effectively runs in bypass (the switch, or the folder's own settings starting it so).
   // `applySetup` compares the owner's choice with these, not with what was stored, which a
@@ -995,6 +997,7 @@ export class ThreadSession {
     const release = await this.setupLock.acquire();
     try {
       this.setupApplied = true;
+      this.applying = true;
       const effort = choice.effort === DEFAULT ? null : choice.effort;
       try {
         this.deps.state.setEffort(this.channelId, this.threadId, effort);
@@ -1021,6 +1024,7 @@ export class ThreadSession {
         throw error;
       }
     } finally {
+      this.applying = false;
       release();
     }
   }
@@ -1134,7 +1138,13 @@ export class ThreadSession {
     const client = this.client;
     if (client === null) return held ? null : false;
     const tasks = this.background ? this.runningTaskIds() : [];
-    if (!this.busy && tasks.length === 0) return held ? null : false;
+    if (!this.busy && tasks.length === 0) {
+      // A Start being applied may be inside the agent's own model command, a turn no reply
+      // shows: the interrupt ends it, and the setup then fails into `forgetSetup`, which the
+      // cancelled hold turns into `Not sent.`
+      if (held && this.applying) await this.interruptApplied(client);
+      return held ? null : false;
+    }
     // What the agent said it was doing is void once the owner stops it. It says `idle` only
     // after an interrupted turn's result (recorded 2026-10-14), and no recording holds what it
     // says after a task stopped with no turn running. Its next word counts again.
@@ -1169,6 +1179,14 @@ export class ThreadSession {
     // sweep shows the same ✅ and `noteStatus` drops the persisted ⏳.
     this.react("done");
     return true;
+  }
+
+  private async interruptApplied(client: AgentSession): Promise<void> {
+    try {
+      await client.interrupt();
+    } catch (error) {
+      logger.warning(`could not interrupt a setup in ${this.where}: ${errorName(error)}`);
+    }
   }
 
   /**

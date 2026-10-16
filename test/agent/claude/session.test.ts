@@ -811,22 +811,110 @@ test(
   },
 );
 
-test("the command's turn is over at its idle state, not at its result", LIMIT, async (t) => {
-  const { session, query } = await started(t);
-  let settled = false;
-  const set = session.setModel("haiku").then(() => {
-    settled = true;
-  });
+test(
+  "the command's wait ends at its result, and the records after it stay hidden",
+  LIMIT,
+  async (t) => {
+    const { session, query, events } = await started(t);
+    const control = await started(t, { turns: [TOOLS] });
+    await control.session.send(PROMPT);
+    const alone = await until(control.events, "turn_ended");
+
+    let settled = false;
+    const set = session.setModel("haiku").then(() => {
+      settled = true;
+    });
+    await pause();
+    query.answer(MODEL_COMMAND.slice(0, COMMAND_RESULT));
+    await pause();
+    assert.equal(settled, false);
+    query.answer(MODEL_COMMAND.slice(COMMAND_RESULT, COMMAND_RESULT + 1));
+    await set;
+    // The completed and idle records come after the caller was released: the core sees neither.
+    query.answer(MODEL_COMMAND.slice(COMMAND_RESULT + 1));
+    await pause();
+    await session.send(PROMPT);
+    await pause();
+    query.answer(TOOLS);
+    assert.deepEqual(await until(events, "turn_ended"), alone);
+  },
+);
+
+test("a hook of the command's turn does not reach the core", LIMIT, async (t) => {
+  const { session, query, events } = await started(t);
+  const set = session.setModel("haiku");
   await pause();
-  query.answer(MODEL_COMMAND.slice(0, COMMAND_RESULT));
-  await pause();
-  assert.equal(settled, false);
-  query.answer(MODEL_COMMAND.slice(COMMAND_RESULT, COMMAND_RESULT + 1));
-  await pause();
-  assert.equal(settled, false, "the session still says running");
-  query.answer(MODEL_COMMAND.slice(COMMAND_RESULT + 1));
+  const batch: Batch = [
+    ...MODEL_COMMAND.slice(0, COMMAND_RESULT),
+    hook("Stop", STOP),
+    hook("PostToolUse", POST_TOOL_USE),
+    ...MODEL_COMMAND.slice(COMMAND_RESULT),
+  ];
+  query.answer(batch);
   await set;
-  assert.equal(settled, true);
+  await pause();
+  await session.close();
+  assert.deepEqual(types(await drain({ [Symbol.asyncIterator]: () => events })), []);
+});
+
+test("two model commands at once: the second is refused, the first settles", LIMIT, async (t) => {
+  const { session, query } = await started(t);
+  const first = session.setModel("haiku");
+  const second = session.setModel("opus");
+  await assert.rejects(second, /already running/);
+  await pause();
+  query.answer(MODEL_COMMAND);
+  await first;
+  assert.equal(query.sent.length, 1);
+});
+
+test("a session that ends while the model is checked fails the call", LIMIT, async (t) => {
+  const { session, query } = await started(t, { initDelayMs: 30 });
+  const set = session.setModel("haiku");
+  query.inject([END]);
+  await assert.rejects(set, SessionClosedError);
+  assert.deepEqual(query.sent, []);
+});
+
+test(
+  "an interrupt ends the command's wait with an error, and the next prompt works",
+  LIMIT,
+  async (t) => {
+    const { session, query, events } = await started(t);
+    const control = await started(t, { turns: [TOOLS] });
+    await control.session.send(PROMPT);
+    const alone = await until(control.events, "turn_ended");
+
+    const set = session.setModel("haiku");
+    await pause();
+    query.answer(MODEL_COMMAND.slice(0, 1));
+    await pause();
+    await session.interrupt();
+    await assert.rejects(set, /interrupted/);
+    // The interrupted turn's own end is still hidden.
+    query.answer(MODEL_COMMAND.slice(COMMAND_RESULT - 1));
+    await pause();
+    await session.send(PROMPT);
+    await pause();
+    query.answer(TOOLS);
+    assert.deepEqual(await until(events, "turn_ended"), alone);
+  },
+);
+
+test("an interrupt before the command's turn began leaves nothing hidden", LIMIT, async (t) => {
+  const { session, query, events } = await started(t);
+  const control = await started(t, { turns: [TOOLS] });
+  await control.session.send(PROMPT);
+  const alone = await until(control.events, "turn_ended");
+
+  const set = session.setModel("haiku");
+  await pause();
+  await session.interrupt();
+  await assert.rejects(set, /interrupted/);
+  await session.send(PROMPT);
+  await pause();
+  query.answer(TOOLS);
+  assert.deepEqual(await until(events, "turn_ended"), alone);
 });
 
 test("a session that reports no state is done at the result", LIMIT, async (t) => {
