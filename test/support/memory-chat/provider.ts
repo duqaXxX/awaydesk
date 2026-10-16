@@ -47,7 +47,9 @@ function footerLine(footer: FooterFields): string {
   return [
     footer.bypass ? "bypass" : null,
     footer.model,
-    footer.effort,
+    footer.effort === null || footer.effortObserved === null
+      ? footer.effort
+      : `${footer.effort} (${footer.effortObserved})`,
     footer.folder,
     footer.branch,
     changes === null ? null : `+${changes[0]} -${changes[1]}`,

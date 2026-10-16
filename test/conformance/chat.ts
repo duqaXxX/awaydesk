@@ -682,6 +682,20 @@ export function chatConformance(
         },
       );
 
+      check("draws the level a default effort ran at beside the effort", async (s) => {
+        const reply = s.provider.thread(s.ref).openReply(() => {});
+        await reply.text("An answer with an effort");
+        await reply.finish([]);
+        assert.equal(await reply.closeOut(), true);
+        assert.equal(await reply.waitLanded(), true);
+        const footer = { ...FOOTER, effort: "auto", effortObserved: "medium" };
+        assert.equal(await reply.showFooter(footer), true);
+        await reply.settle();
+        const shown = s.rig.read(s.ref).find((m) => m.text.includes("An answer with an effort"));
+        assert.match(shown?.text ?? "", /auto/, "the effort is drawn");
+        assert.match(shown?.text ?? "", /medium/, "and the level it ran at beside it");
+      });
+
       check("closes out with no footer", async (s) => {
         const reply = s.provider.thread(s.ref).openReply(() => {});
         await reply.text("An answer with no footer");

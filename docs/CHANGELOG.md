@@ -37,8 +37,11 @@ All notable changes to this project are documented here. The format follows
 - The footer's effort follows the terminal's `/effort` (issue #246, PR #331). A level you fixed
   shows as it is (`effort low`). When none is fixed, which is the terminal's `auto`, it shows
   `effort auto` and then `effort auto (medium)`, the level each turn's Stop hook reported; it
-  used to show that level alone, so `!effort auto` read `auto` and the next turn `medium`. A
-  model that takes no effort shows `auto` where it showed `default`. The core keeps the setting
+  used to show that level alone, so `!effort auto` read `auto` and the next turn `medium`. Once
+  a turn's Stop hook reports no level, which is a model that takes no effort, the footer and
+  `!status` show `effort not supported` (the words of the terminal's `/model` picker) whatever
+  the setting, until a turn reports a level again; before any turn they show the fixed level or
+  `auto`. The core keeps the setting
   (`ThreadSession.effortSetting`) apart from the observed level; `FooterFields.effortObserved`
   crosses the chat seam beside `effort`, the provider draws the parentheses, and `!status` writes
   the same text. An agent that declares no `effortDefault` is unchanged. `!status` before the

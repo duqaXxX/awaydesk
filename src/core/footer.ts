@@ -47,8 +47,8 @@ export interface FooterField {
   readonly key: FooterKey;
   readonly label: string;
   readonly value: string;
-  /** What a provider draws beside the value (the level a default effort ran at); null for none. */
-  readonly detail?: string | null;
+  /** What a provider draws beside the value (the level a default effort ran at); absent for none. */
+  readonly detail?: string;
 }
 
 /**
@@ -342,7 +342,7 @@ export function footerFields(data: FooterFields, now: number): FooterField[] {
       key: "effort",
       label: "Effort",
       value: data.effort,
-      detail: data.effortObserved,
+      detail: data.effortObserved ?? undefined,
     });
   }
   if (data.branch) {

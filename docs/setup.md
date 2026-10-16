@@ -815,8 +815,9 @@ its last tool; `!status` names that folder when it is not the thread's own. The 
 Claude Code's own `/effort` does. A level you fixed (at the setup, with `!effort` or `!model`, or
 stored from an earlier run) shows as itself, `effort low`. Otherwise the effort is the model's
 default and shows `effort auto`, then `effort auto (medium)` once a turn has ended, with the
-level Claude Code reported for that turn (it follows each turn). `auto` alone stays on a model
-that takes no effort level. If a turn reports a level other than the fixed one, the footer shows
+level Claude Code reported for that turn (it follows each turn). A model that takes no effort level
+shows `effort not supported` once a turn has reported that, whatever the setting, until a turn
+reports a level again. If a turn reports a level other than the fixed one, the footer shows
 the reported one, since that is what ran. A level set with `!effort` is kept for this thread and
 reapplied on every reconnect, so it survives an idle close and a restart of awaydesk. A model set
 with `!model` needs no such help, since Claude Code's own resume keeps it by itself. `!status`

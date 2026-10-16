@@ -318,6 +318,10 @@ export class ThreadSession {
   // client started (a report or a command): until then it is not known, since the settings do
   // not decide it (measured 2026-09-25).
   effortReported = false;
+  // Whether a turn has reported that the model takes no effort (the Stop hook's level is null):
+  // the footer then says so whatever the setting. Cleared by anything that may change the model
+  // or the level, and by a turn that reports one.
+  effortUnsupported = false;
   // Where the session works as its hooks last reported (`cwd` follows a `cd` and a worktree;
   // Stop and PostToolUse measured 2026-09-27 on 2.1.283); null until then: `directory`.
   workingDirectory: string | null = null;
@@ -897,6 +901,7 @@ export class ThreadSession {
       this.effortSetting = requested;
       this.effort = null;
       this.effortReported = requested !== null;
+      this.effortUnsupported = false;
       this.workingDirectory = null; // the new process starts in the bound folder
       this.sessionTokens = null; // counted by the client process, which starts at zero
       this.reader = new Task((reading) => this.read(client, reading));
@@ -1043,6 +1048,7 @@ export class ThreadSession {
     this.effortSetting = level;
     this.effort = null;
     this.effortReported = level !== null;
+    this.effortUnsupported = false;
   }
 
   /**
@@ -1698,11 +1704,13 @@ export class ThreadSession {
         // The Stop hook's input carries the level, absent when the model takes none.
         this.effort = event.level;
         this.effortReported = true;
+        this.effortUnsupported = event.level === null;
         return;
       case "effort_changed":
         // What ran before the command is no longer what runs: the next turn reports the level.
         this.effort = null;
         this.effortReported = true;
+        this.effortUnsupported = false;
         // Stored so the next connect can pass it back (a model set by command survives a
         // resume by itself; effort does not). A null level means "unknown" (a model change
         // that names no effort), not "back to default": the stored override, if any, is left
@@ -3119,9 +3127,11 @@ export class ThreadSession {
    * another one (that is what ran). The default shows as the agent's word for it, with the level
    * of the last turn beside it once there is one, as the terminal's `/effort` reads
    * `auto (currently medium)`. An agent with no such word shows the level alone, once known, and
-   * `default` for a model that takes none.
+   * `default` for a model that takes none. Once a turn has reported that the model takes no
+   * effort, the footer says so whatever the setting, as the terminal's `/model` picker does.
    */
   private effortFields(): Pick<FooterFields, "effort" | "effortObserved"> {
+    if (this.effortUnsupported) return { effort: texts.EFFORT_NOT_SUPPORTED, effortObserved: null };
     const word = this.deps.agent.capabilities.effortDefault;
     if (this.effortSetting !== null) {
       return { effort: this.effort ?? this.effortSetting, effortObserved: null };

@@ -2027,14 +2027,62 @@ test("the footer says auto, with no level, until claude code reports one", async
   assert.ok(!statuses(h).at(-1)?.includes("auto ("));
 });
 
-test("the footer says auto alone when claude code reports no effort", async (t) => {
+test("the footer says not supported when claude code reports no effort", async (t) => {
   // Claude Code leaves the field out when the model takes no effort parameter.
   const { effort: _effort, ...hookInput } = sdkJson("stop-hook") as JsonObject;
   const h = harnessFor(t)({ turns: [withStopHook(sdkMessages("tools"), hookInput)] });
   await (await h.session().submit("list the files")).done.wait();
   await h.idle(); // the footer is drawn once the session has ended
-  assert.ok(statuses(h).at(-1)?.includes("*effort* auto"));
-  assert.ok(!statuses(h).at(-1)?.includes("auto ("));
+  assert.ok(statuses(h).at(-1)?.includes("*effort* not supported"));
+  assert.ok(!statuses(h).at(-1)?.includes("auto"));
+  assert.ok((await h.session().status()).includes("Effort: `not supported`"));
+});
+
+test("a fixed level on a model a turn reports no effort for shows not supported, until a level comes", async (t) => {
+  const { effort: _effort, ...none } = sdkJson("stop-hook") as JsonObject;
+  const modelCommand = withResult(sdkMessages("usage"), "Set model to Opus 5.5", "model");
+  const h = harnessFor(t)({
+    turns: [
+      withStopHook(sdkMessages("tools"), none),
+      modelCommand,
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  h.state.setEffort(CHANNEL, THREAD, "high");
+  await session.ensureConnected();
+  assert.ok(
+    (await session.status()).includes("Effort: `high`"),
+    "before any turn: the fixed level",
+  );
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* not supported"));
+  assert.ok((await session.status()).includes("Effort: `not supported`"));
+  await (await session.submit("/model opus")).done.wait();
+  await h.idle();
+  await (await session.submit("next")).done.wait();
+  await h.idle();
+  // The turn reports medium, but the fixed level ran differently: what ran is shown.
+  assert.ok(statuses(h).at(-1)?.includes("*effort* medium"));
+});
+
+test("a session on the default shows auto again once a model with effort reports a level", async (t) => {
+  const { effort: _effort, ...none } = sdkJson("stop-hook") as JsonObject;
+  const h = harnessFor(t)({
+    turns: [
+      withStopHook(sdkMessages("tools"), none),
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  assert.ok((await session.status()).includes("Effort: `auto`"));
+  await (await session.submit("one")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* not supported"));
+  await (await session.submit("two")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto (medium)"));
 });
 
 test("a session that never fixed a level shows the level of each turn after auto", async (t) => {
@@ -2051,6 +2099,7 @@ test("the footer follows the effort commands and the level a turn ran at", async
   const command = (output: string) => withResult(sdkMessages("usage"), output, "effort");
   const h = harnessFor(t)({
     turns: [
+      command("Set effort level to low (this session only): Quick"),
       command("Set effort level to medium (this session only): Balanced"),
       command("Effort level set to auto (this session only)"),
       withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
@@ -2060,6 +2109,9 @@ test("the footer follows the effort commands and the level a turn ran at", async
   h.state.setEffort(CHANNEL, THREAD, "low");
   await session.ensureConnected();
   assert.ok((await session.status()).includes("Effort: `low`"));
+  await (await session.submit("/effort low")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* low"));
   await (await session.submit("/effort medium")).done.wait();
   await h.idle();
   assert.ok(statuses(h).at(-1)?.includes("*effort* medium"));
@@ -2067,10 +2119,23 @@ test("the footer follows the effort commands and the level a turn ran at", async
   await h.idle();
   assert.ok(statuses(h).at(-1)?.includes("*effort* auto"));
   assert.ok(!statuses(h).at(-1)?.includes("auto ("));
+  assert.equal(thread(h).effort, null, "the stored effort is back to none");
   await (await session.submit("next")).done.wait();
   await h.idle();
   assert.ok(statuses(h).at(-1)?.includes("*effort* auto (medium)"));
   assert.ok((await session.status()).includes("Effort: `auto (medium)`"));
+});
+
+test("a fixed level that a turn reports differently shows the reported one", async (t) => {
+  const h = harnessFor(t)({
+    turns: [withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject)], // medium
+  });
+  const session = h.session();
+  h.state.setEffort(CHANNEL, THREAD, "low");
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* medium"));
+  assert.ok(!statuses(h).at(-1)?.includes("medium ("));
 });
 
 test("a fixed level survives a turn that reports it", async (t) => {
@@ -2563,7 +2628,9 @@ test("status before any turn starts the client and leaves out the tokens", async
   // The version comes with a turn's `init` message, never on connect (measured 2026-09-26).
   assert.ok(text.includes(`Claude Code: \`${texts.VERSION_PENDING}\``));
   assert.ok(text.includes("Model: `Haiku 4.5`") && text.includes("Context: `7%`"));
-  // Only a turn's Stop hook, or `/effort`, reports the level: the settings do not say it.
+  // Only a turn's Stop hook, or `/effort`, reports the level: until then the line says `auto`
+  // with no level beside it, since the settings do not decide it.
+  assert.ok(text.includes("Effort: `auto`\n") || text.endsWith("Effort: `auto`"), text);
   assert.ok(!text.includes("Session tokens") && !text.includes("auto ("));
   // No session exists yet, so there is nothing the terminal could fork (#12).
   assert.ok(text.includes("Session: `new`\nMode: ") && !text.includes("Terminal:"));

@@ -966,8 +966,10 @@ agent's default) apart from the level the last turn ran at (`ThreadSession.effor
 a turn reports instead, if it differs, since that ran). With the default, the footer shows the
 agent's word for it (`Capabilities.effortDefault`; Claude: `auto`) in `FooterFields.effort`, and
 the observed level in `FooterFields.effortObserved`, which the Slack footer draws as
-`auto (medium)`, as the terminal's `/effort` reads `auto (currently medium)`; a model that takes
-no effort parameter leaves `auto` alone. An agent with no default word shows the observed level
+`auto (medium)`, as the terminal's `/effort` reads `auto (currently medium)`. Once a turn has
+reported that the model takes no effort (`effort_observed` with a null level), the footer shows
+`not supported` (`texts.EFFORT_NOT_SUPPORTED`) whatever the setting, until a turn reports a level
+or a command changes the effort or the model. An agent with no default word shows the observed level
 alone, left out until reported, unless the daemon itself just set a stored level, and `default`
 for a model that takes none. The limits come from the agent (`AgentBackend.usageLimits`, present with the
 capability `usageLimits`); for Claude they are Claude Code's `/usage`, sent on a long-lived session
