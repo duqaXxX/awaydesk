@@ -68,7 +68,7 @@ export interface ThreadState {
   // known to have landed. A sink that gave up on that write leaves its entry: the next start's
   // crash repair (`repairCrash`) finishes the message and removes it.
   readonly openReplies: readonly string[];
-  /** ts of every approval, question or same-folder hold request still carrying buttons. */
+  /** ts of every approval, question, setup form or same-folder hold request still carrying buttons. */
   readonly requests: readonly string[];
   // The kind of each request, by its ts. An entry written before the kinds existed has none; the
   // repair treats it as a request to delete.

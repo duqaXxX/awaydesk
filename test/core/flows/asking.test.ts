@@ -67,6 +67,10 @@ test("a hold is asked with the link to the other thread and sends on Send anyway
   assert.deepEqual(request, { type: "hold", requestId: open.requestId, other: other.ref, link });
   assert.equal(open.title, fill(texts.HOLD_QUESTION, { link }));
   assert.deepEqual(world.state.thread(ref.channel, ref.thread)?.requests, [open.message]);
+  // The crash repair deletes a hold: its kind is stored with it.
+  assert.deepEqual(world.state.thread(ref.channel, ref.thread)?.requestKinds, {
+    [open.message]: "hold",
+  });
 
   assert.equal(await world.answers(open.requestId, { type: "hold", send: true }), true);
   assert.equal(await sent, true);
@@ -259,6 +263,9 @@ test("a setup of an agent with no model list offers its effort levels and no byp
   });
   assert.equal(open.title, texts.SETUP_FALLBACK);
   assert.deepEqual(world.state.thread(ref.channel, ref.thread)?.requests, [open.message]);
+  assert.deepEqual(world.state.thread(ref.channel, ref.thread)?.requestKinds, {
+    [open.message]: "setup",
+  });
 
   const lines = logged(t);
   assert.equal(
@@ -565,6 +572,9 @@ test("an approved permission lets the call run and removes the request", async (
   const world = await AskingWorld.make(t);
   const { ref, session, turn, open } = await permissionAsked(world);
   assert.deepEqual(world.state.thread(ref.channel, ref.thread)?.requests, [open.message]);
+  assert.deepEqual(world.state.thread(ref.channel, ref.thread)?.requestKinds, {
+    [open.message]: "approval",
+  });
 
   assert.equal(await world.answers(open.requestId, { type: "permission", allow: true }), true);
   await turn.done.wait();
@@ -658,6 +668,9 @@ test("an answered question reaches the agent and the request is not removed by t
   const turn = await session.submit("pick one");
   const open = await world.asked(ref, "question");
   assert.equal(open.request.type, "question");
+  assert.deepEqual(world.state.thread(ref.channel, ref.thread)?.requestKinds, {
+    [open.message]: "question",
+  });
 
   assert.equal(
     await world.answers(open.requestId, {

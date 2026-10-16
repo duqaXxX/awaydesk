@@ -558,7 +558,9 @@ line. When it had none, a question or an approval (the kinds that stand for a tu
 turn, and a reply starts on its first write, so no reply message exists) is rewritten into that
 same line (`ThreadChat.rewrite`, an edit that notifies nobody) so the thread does not show the
 owner's message alone; a rewrite the chat refuses falls back to the withdrawal. A thread gets that
-line once: after the first successful rewrite the other requests are withdrawn. The setup form and
+line once per start: after the first successful rewrite the other requests are withdrawn. A second
+line can appear across two starts, when a withdrawal the chat refused at the first start is
+rewritten at the second. The setup form and
 the same-folder hold are always withdrawn, since the owner's message was never sent for them and a
 line saying an answer stopped would be false, and so is an entry with no kind. `withdraw` and
 `endReply` answer whether the chat did it; `rewrite` rejects when it did not. An entry is cleared when its repair was made or the
