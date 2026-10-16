@@ -645,8 +645,9 @@ The chat provider checks that it was the owner on every inbound path that acts (
 including a `!word`, a button, a form), each path on its own, before it calls `ChatInbound`: the
 core is never told of an act of anyone else, and the chat conformance suite holds that for every
 provider (a message, a click and a form from someone else never arrive). The Slack listeners run
-two checks, through `Answers.admitted` (the `message` listener runs its two halves itself, in the
-order [Slack handlers](slack-provider.md#slack-handlers) gives), before anything reaches Claude Code:
+two checks, through `Answers.admitted` (the `message` listener, and Answer opening a question's
+form, run the two halves themselves, in the order [Slack handlers](slack-provider.md#slack-handlers)
+gives), before anything reaches Claude Code:
 
 1. `guards.isOwner`: the Slack user is the configured owner AND the workspace is the one `auth.test`
    reported at startup. A click from a user whose home workspace differs is refused
