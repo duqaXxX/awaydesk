@@ -326,6 +326,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKUserMessage.message.role` | `"user"` | value | prompt.ts: userMessage | measured | none |
 | `SDKUserMessage.tool_use_result.type` | `"create"` | value | translate.ts: fileChange | measured | none |
 | `SDKUserMessage.type` | `"user"` | value | translate.ts: HANDLERS; prompt.ts: userMessage | reference | none |
+| `command_lifecycle.state` | `"cancelled"` | value | session.ts: ClaudeSession.#readCommand | measured | none |
 | `command_lifecycle.state` | `"completed"` | value | session.ts: ClaudeSession.#readCommand | measured | P28 |
 | `command_lifecycle.type` | `"command_lifecycle"` | value | session.ts: ClaudeSession.#readCommand | measured | P28 |
 
@@ -381,6 +382,7 @@ no check covers them here.
   `sdk.d.ts` 0.3.296: of the 23 kinds they hold, `command_lifecycle` is in no declaration and 10
   others carry fields that the declaration of their type lacks (`thinking_display` on three stream
   events, `user_message_uuids` on `status`, `logical_parent_uuid` on `compact_boundary`, and more).
+- The state `"cancelled"` is named only in comments of `sdk.d.ts` 0.3.301, never in a declaration and in no recording, so its row is `measured` only in the sense that no declaration names it. The comment of `cancel_queued` says each uuid-stamped command it cancels "is closed with a terminal 'cancelled' lifecycle", and the same comment mentions "a command_lifecycle 'cancelled' frame"; `ClaudeSession.#readCommand` ends the hidden model command on the one that names its uuid
 - `ClaudeSession` names a process that ended by the start of the message of the plain `Error`
   the SDK throws, from its stream, its start or a request: `Claude Code process exited with code `,
   `Claude Code process terminated by signal ` and `Claude Code returned an error result: `. The package declares no class, field or

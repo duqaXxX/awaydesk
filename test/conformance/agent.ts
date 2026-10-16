@@ -14,6 +14,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { describe, type TestContext, type TestOptions, test } from "node:test";
+import { setTimeout as sleep } from "node:timers/promises";
 import type {
   AgentBackend,
   AgentSession,
@@ -968,7 +969,15 @@ export function agentConformance(name: string, harness: AgentHarness): void {
         await world.modelChangeTaken();
         await session.interrupt();
         await rejected;
-        await events.finished;
+        // The stream's end is what closing means: bounded, so that a session left open fails here
+        // with its own message and not with the check's timeout.
+        const stop = new AbortController();
+        const closed = await Promise.race([
+          events.finished.then(() => true),
+          sleep(5_000, false, { signal: stop.signal }),
+        ]);
+        stop.abort();
+        assert.ok(closed, "the session was not closed");
         // Closed by the agent, as `close` leaves it: no process is left, no prompt is taken, and
         // nothing of the interrupted change reached the owner, not even a loss.
         assert.equal(world.running(), 0);

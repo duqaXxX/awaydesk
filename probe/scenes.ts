@@ -721,7 +721,8 @@ async function setupModelResume(s: Stage): Promise<Seen> {
  * `setModel`, so the scene reads the raw SDK. The startup model, which is not Haiku, runs no
  * request: the two commands cost nothing and the one-word turn runs on Haiku while the limit
  * stands. P28 rides on the same run: the command is sent under a uuid of its own, as the daemon
- * sends it, and Claude Code ends its turn with a `command_lifecycle` `completed` naming it.
+ * sends it, and Claude Code ends its turn with a `command_lifecycle` `completed` naming it. P28
+ * does not depend on P27's precondition: without it the command goes out alone and P27 is UNPROVEN.
  */
 async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
   const input = new AsyncQueue<SDKUserMessage>();
@@ -748,12 +749,11 @@ async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
     const alias = listed.find(
       (entry) => entry.value !== "default" && entry.resolvedModel === startup,
     )?.value;
-    if (startup.includes("haiku") || typeof alias !== "string") {
-      const detail = `no alias other than Haiku names the startup model ${startup}`;
-      return { P27: observation(false, false, detail), P28: observation(false, false, detail) };
-    }
-    await raw.setModel(PROBE_MODEL);
-    say(`/model ${alias}`, commandId);
+    // P27 needs a startup model that is not Haiku and an alias that names it; P28 needs neither,
+    // so the command goes out whatever the alias and the scene ends at its `completed` then.
+    const precondition = !startup.includes("haiku") && typeof alias === "string";
+    if (precondition) await raw.setModel(PROBE_MODEL);
+    say(`/model ${typeof alias === "string" ? alias : "default"}`, commandId);
     let results = 0;
     const ranOn: string[] = [];
     try {
@@ -762,11 +762,12 @@ async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
         if (!isRecord(seen)) continue;
         if (seen.type === "command_lifecycle" && seen.state === "completed") {
           completed ||= seen.command_uuid === commandId;
+          if (!precondition && completed) break;
         }
         if (seen.type === "assistant" && results === 1 && isRecord(seen.message)) {
           if (typeof seen.message.model === "string") ranOn.push(seen.message.model);
         }
-        if (seen.type !== "result") continue;
+        if (seen.type !== "result" || !precondition) continue;
         results += 1;
         if (results === 2) break;
         say("Reply with the single word: ok");
@@ -776,6 +777,10 @@ async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
     }
     if (late) throw new ProbeTimeout("the turns did not end in time");
     const ended = observation(true, completed, completed ? "" : "no completed named the command");
+    if (!precondition) {
+      const detail = `no alias other than Haiku names the startup model ${startup}`;
+      return { P27: observation(false, false, detail), P28: ended };
+    }
     if (ranOn.length === 0) {
       return { P27: observation(false, false, "the turn named no model"), P28: ended };
     }

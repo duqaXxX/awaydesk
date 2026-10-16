@@ -855,6 +855,39 @@ test("a command that wrote no result is done at its completed", LIMIT, async (t)
   await set;
 });
 
+// `sdk.d.ts` 0.3.301 (the comment of `cancel_queued`): "closed with a terminal 'cancelled' lifecycle".
+// It ends the command's turn as `completed` does, and fails a caller that had no result.
+test("a cancelled of the command ends it: an error without a result", LIMIT, async (t) => {
+  const { session, query, events } = await started(t);
+  const set = session.setModel("haiku");
+  await pause();
+  const cancelled = { ...MODEL_COMMAND[COMMAND_COMPLETED], state: "cancelled" };
+  query.answer([MODEL_COMMAND[0] as JsonObject, cancelled]);
+  await assert.rejects(set, /cancelled/);
+  // The hiding ended: what follows reaches the core.
+  query.answer(MODEL_COMMAND.slice(COMMAND_COMPLETED + 1));
+  await pause();
+  await session.close();
+  assert.deepEqual(await drain({ [Symbol.asyncIterator]: () => events }), [IDLE]);
+});
+
+test("a cancelled of another command, or after the result, changes nothing", LIMIT, async (t) => {
+  const { session, query } = await started(t);
+  let failed = false;
+  const set = session.setModel("haiku").catch(() => {
+    failed = true;
+  });
+  await pause();
+  const completed = MODEL_COMMAND[COMMAND_COMPLETED];
+  query.inject([{ ...completed, state: "cancelled", command_uuid: "another-command" }]);
+  await pause();
+  query.answer([MODEL_COMMAND[COMMAND_RESULT] as JsonObject]);
+  await set;
+  query.answer([{ ...completed, state: "cancelled" }]);
+  await pause();
+  assert.equal(failed, false);
+});
+
 test("a hook of the command's turn does not reach the core", LIMIT, async (t) => {
   const { session, query, events } = await started(t);
   const set = session.setModel("haiku");

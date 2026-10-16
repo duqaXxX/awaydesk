@@ -328,18 +328,19 @@ export class ClaudeSession implements AgentSession {
 
   /**
    * Reads a record of the hidden model command: none reaches the core. The `result` settles the
-   * wait, the command's own `completed` settles it too (a no-op after the result) and ends the
-   * hiding.
+   * wait. The command's own `completed` settles it too (a no-op after the result) and ends the
+   * hiding; so does its own `cancelled`, the other terminal state `sdk.d.ts` documents (0.3.301,
+   * the comment of `cancel_queued`: "a terminal 'cancelled' lifecycle"), which fails a caller that had no result.
    */
   #readCommand(command: CommandTurn, record: unknown): void {
     if (!isRecord(record)) return;
     if (record.type === "result") command.settle();
-    if (
-      record.type === "command_lifecycle" &&
-      record.state === "completed" &&
-      record.command_uuid === command.id
-    ) {
+    if (record.type !== "command_lifecycle" || record.command_uuid !== command.id) return;
+    if (record.state === "completed") {
       command.settle();
+      this.#command = null;
+    } else if (record.state === "cancelled") {
+      command.settle(new Error("the model command was cancelled"));
       this.#command = null;
     }
   }

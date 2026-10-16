@@ -1181,9 +1181,9 @@ closed when the start returns (`ThreadSession.connect`).
   record from the push to the `command_lifecycle` `completed` that names the uuid (the replayed
   command, its states, its output, its `result`, a status, the hooks that fire in it) stays in the
   back end and no event of it reaches the core; the caller resolves at the `result`, or at that
-  `completed` when no result came. The `idle` the session says after it is read as any state: the
-  core takes it while already idle, and the activity line stays as it was. An `interrupt()` while
-  the command runs (`!stop`, which `ThreadSession.stop` forwards while a Start is applied) makes
+  `completed` when no result came; a `cancelled` naming the uuid ends it too and rejects the caller
+  that had no result. The `idle` the session says after it is read as any state: the activity line
+  does not change. An `interrupt()` while the command runs (`!stop`, which `ThreadSession.stop` forwards while a Start is applied) makes
   `setModel` reject and closes the session, so `ThreadSession.applySetup` undoes the setup and the
   owner gets `Not sent.`; the first prompt of a setup that went through runs on the chosen model.
   It does not call the SDK's `setModel`, which leaves an override that a later `/model` to the
