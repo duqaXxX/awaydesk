@@ -1339,9 +1339,6 @@ export class ThreadSession {
         await this.disconnect(client);
       }
     } finally {
-      // A start the worker gave up may still be launching: its process is closed before
-      // `doneClosing`, or a session built after this one could resume the same id meanwhile.
-      await Promise.allSettled([...this.abandoned]);
       if (this.predecessor !== null) {
         // This object's own predecessor may still be mid-teardown: `ensureConnected` never ran
         // here (this session closed with no turn ever submitted), so nothing else has waited
@@ -1394,6 +1391,10 @@ export class ThreadSession {
           `could not clear state.json's crash-repair fields for ${this.where}: ${errorName(error)}`,
         );
       }
+      // A start the worker gave up may still be launching: its process is closed before
+      // `doneClosing`, or a session built after this one could resume the same id meanwhile.
+      // Waited for last, so the chat is settled while the agent is still coming up.
+      await Promise.allSettled([...this.abandoned]);
       // Only now: the agent's process (if any) has had its chance to flush and exit, or
       // closing failed partway through and there is nothing left worth waiting for either way.
       this.doneClosing.set();
