@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { MINIMUM_NODE, nodeRefusal } from "../src/node-version.ts";
+import { SETUP_SECTIONS, setupGuide } from "../src/version.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 
@@ -23,7 +24,7 @@ test("the minimum is the one package.json asks npm for", () => {
 test("a version below the minimum is refused with both versions named", () => {
   assert.equal(
     nodeRefusal("22.17.0"),
-    `awaydesk needs Node ${MINIMUM_NODE} or later and this is Node 22.17.0; see docs/setup.md, Requirements`,
+    `awaydesk needs Node ${MINIMUM_NODE} or later and this is Node 22.17.0; see ${setupGuide(SETUP_SECTIONS.requirements)}`,
   );
 });
 
@@ -73,7 +74,7 @@ test("the entry on an old Node prints one refusal and exits 1, before its import
   assert.equal(result.status, 1);
   assert.match(
     result.stderr,
-    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} ERROR awaydesk\.main: awaydesk needs Node 22\.18\.0 or later and this is Node 22\.17\.0; see docs\/setup\.md, Requirements\n$/,
+    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} ERROR awaydesk\.main: awaydesk needs Node 22\.18\.0 or later and this is Node 22\.17\.0; see https:\/\/github\.com\/duqaXxX\/awaydesk\/blob\/v\d+\.\d+\.\d+\/docs\/setup\.md#requirements\n$/,
   );
 });
 

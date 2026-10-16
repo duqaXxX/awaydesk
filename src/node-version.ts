@@ -4,6 +4,8 @@
  * `main` is never called and the command would end with status 0 and no output.
  * `test/node-version.test.ts` holds `MINIMUM_NODE` to `engines.node` in `package.json`.
  */
+import { SETUP_SECTIONS, setupGuide } from "./version.ts";
+
 export const MINIMUM_NODE = "22.18.0";
 
 /** `major.minor.patch` as three numbers; null for a text that does not start with them. */
@@ -26,7 +28,7 @@ export function nodeRefusal(found: string): string | null {
     const actual = have[index] as number;
     if (actual > wanted) return null;
     if (actual < wanted) {
-      return `awaydesk needs Node ${MINIMUM_NODE} or later and this is Node ${found}; see docs/setup.md, Requirements`;
+      return `awaydesk needs Node ${MINIMUM_NODE} or later and this is Node ${found}; see ${setupGuide(SETUP_SECTIONS.requirements)}`;
     }
   }
   return null;

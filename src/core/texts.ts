@@ -1,6 +1,7 @@
 /** Every sentence the owner can read in the chat. English only; one place to review the wording. */
 import type { AgentBackend } from "../agent/seam.ts";
 import type { ChatProvider } from "../chat/seam.ts";
+import { SETUP_SECTIONS, setupGuide } from "../version.ts";
 
 /**
  * Fills a template's `{name}` fields: every template below keeps its `{name}` fields as written,
@@ -126,7 +127,7 @@ export const DIRECTORY_UNTRUSTED = naming(
 );
 export const DIRECTORY_UNREADABLE =
   "macOS does not let awaydesk read `{directory}`. Grant access in System Settings, " +
-  "Privacy & Security, Full Disk Access (see docs/setup.md, Part 4).";
+  `Privacy & Security, Full Disk Access (see ${setupGuide(SETUP_SECTIONS.protectedFolders)}).`;
 export const SESSION_GONE = naming(
   "This thread's session no longer exists: {agent} deleted it or cannot find it. Send a " +
     "new message in the channel to start one.",

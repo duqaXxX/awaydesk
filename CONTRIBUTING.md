@@ -113,6 +113,21 @@ the code produces anything else. `npm run golden` writes the files again from th
 so a change to a reply shows as a diff under `test/golden/`: read that diff before committing it,
 since the tests pass on whatever was written last.
 
+### Running your own build
+
+To run the daemon from a clone instead of the version on the npm registry:
+
+```bash
+npm ci
+npm install -g "./$(npm pack --silent)"
+awaydesk service restart
+```
+
+`npm pack` builds the package (its `prepack` script runs the TypeScript compiler) into a tarball in
+the clone, from whatever the working tree holds, committed or not, and `npm install -g` installs it
+in npm's global prefix in place of any copy installed from the registry. The restart makes the
+service run it.
+
 ## SDK releases
 
 awaydesk pins `@anthropic-ai/claude-agent-sdk` to an exact version in `package.json` and runs the
