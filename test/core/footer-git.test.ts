@@ -88,9 +88,20 @@ function anEmbeddedBareLayout(): string {
   return layout;
 }
 
+/**
+ * A layout whose work tree is the trusted repository's: the planted index lists the trusted
+ * `README` at the size of its own commit, which the trusted file also has. With the size equal,
+ * whether git reads the file (and runs the filter) rested on its timestamps, and on Windows it
+ * often did not, so the control failed. A size of its own makes git read the file every time.
+ */
+function workTreeIsTheTrustedRoot(): void {
+  writeFileSync(join(app, "README"), "two\nthree\n");
+}
+
 function coreWorktreeNamingTheTrustedRoot(): string {
   const clone = planted(join(dirname(app), "clone"));
   git(clone, "config", "core.worktree", app);
+  workTreeIsTheTrustedRoot();
   return clone;
 }
 
@@ -115,6 +126,7 @@ function aGitfileToAPlantedGitDir(): string {
   const seed = planted(join(code, "seed"));
   renameSync(join(seed, ".git"), join(code, "planted-git-dir"));
   git(code, "config", "-f", "planted-git-dir/config", "core.worktree", app);
+  workTreeIsTheTrustedRoot();
   const folder = join(code, "clone");
   mkdirSync(folder);
   writeFileSync(join(folder, ".git"), `gitdir: ${code}/planted-git-dir\n`);
