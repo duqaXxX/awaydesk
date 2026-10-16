@@ -52,7 +52,8 @@ export class Requests {
   private readonly answers: Answers;
   /**
    * What the owner filled in each open question form, by request id: kept here, not in the
-   * view's `private_metadata` (which holds the ids alone), so Other and Notes are bound by no
+   * view's `private_metadata` (which holds the request's ids, the form's generation and its
+   * page), so Other and Notes are bound by no
    * Slack limit and Answer reopens a closed form with the answers kept. An entry goes when its
    * request is answered, skipped or found gone, at the next Answer for any request that ended
    * another way, and when the app closes.
@@ -211,8 +212,8 @@ export class Requests {
    * the one that was not just changed in a single `views.update`; typing then goes on with no
    * further call. `hash` makes a stale payload (the keystroke after the first) a
    * `hash_conflict`, which is ignored. Submit reads the state again, so a missed update costs a
-   * second click on the right field. The page and the block revisions are the payload's own
-   * view's (`FormIds`): two forms of one request share the answers and nothing else.
+   * second click on the right field. Only the newest form of a request counts (`Draft.generation`)
+   * and only the page it shows now (`FormIds`); anything else is ignored.
    */
   private onQuestionLive = async (
     ack: Ack,

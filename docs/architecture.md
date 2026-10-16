@@ -880,7 +880,8 @@ view's `private_metadata` holds only the request's id, channel and thread, the f
 and the page it shows (`requests.FormIds`), so Other and Notes take 300 characters each
 (`TYPED_LIMIT`, `NOTES_LIMIT`) with no Slack cap to fit. Only the newest form of a request is
 valid: every Answer opens a new generation (Later then Answer, a second click, a second device),
-and the older forms are stale. A stale form's changes are ignored, and its Next or Submit answers
+and the older forms are stale (a form whose `views.open` fails does not count: the older one
+stays valid). A stale form's changes are ignored, and its Next or Submit answers
 `response_action: errors` with `texts.QUESTION_STALE` on the question's block and sends nothing;
 a change from a page Next has already left is ignored too. Every field of the valid form
 reports each change (an option picked, a box ticked, a character typed under Other or in Notes:

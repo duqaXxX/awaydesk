@@ -5,14 +5,15 @@
  * payload and `views.update` references, read 2026-10-16), and the daemon empties the other field
  * in one `views.update`, giving its block a new id because Slack keeps an input's value while the
  * block id stays. What the owner filled lives in the provider's memory (`BuiltApp.drafts`); the
- * view's `private_metadata` names the request alone.
+ * view's `private_metadata` names the request, the form's generation and its page; only the
+ * newest form of a request is valid.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Question } from "../../../../src/agent/seam.ts";
 import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import { texts } from "../../../../src/core/port.ts";
-import { CHANNEL, rejected, STRANGER } from "../../../support/fake-slack.ts";
+import { AsyncEvent, CHANNEL, rejected, STRANGER } from "../../../support/fake-slack.ts";
 import {
   answerClick,
   type Body,
@@ -538,4 +539,73 @@ test("a stranger's note changes nothing", async (t) => {
   );
   await o.world.dispatch(body);
   assert.equal(o.world.built.drafts.get(o.approvalId)?.notes.size, 0);
+});
+
+test("the older form's Next names the block it shows, not the one the draft expects", async (t) => {
+  const o = await openForm(t);
+  const older = o.modal.view; // form A: its radio block is `q0`
+  await o.world.dispatch(answerClick(o.approvalId)); // form B
+  // In B the owner picks, then types under Other: the exclusion moves the draft to `q0.1`.
+  await o.world.dispatch(type(o, { ...radio("q0", "0"), ...other("o0", "m") }));
+  assert.deepEqual(idsOf(o.modal.view), ["q0.1", "o0", "n0"]);
+  const response = await o.world.dispatch(submit(o, radio("q0", "0"), older));
+  assert.deepEqual(response.body, { response_action: "errors", errors: { q0: STALE } });
+});
+
+test("a late keystroke from page one leaves page two's fields as they are", async (t) => {
+  const o = await openForm(t, [...QUESTIONS]);
+  const first = o.modal.view;
+  const next = await o.world.dispatch(submit(o, radio("q0", "0"), first));
+  const second = (next.body as Body).view as Body;
+  const onSecond = (id: string, block: string, type: string, values: Body): Body =>
+    formAction(second, values, { id, block, type });
+  const ticked = boxes("q1", "0");
+  await o.world.dispatch(onSecond("answer", "q1", "checkboxes", ticked));
+  await o.world.dispatch(
+    onSecond("other", "o1", "plain_text_input", { ...ticked, ...other("o1", "xl") }),
+  );
+  const noted = { n1: { notes: { type: "plain_text_input", value: "both" } } };
+  await o.world.dispatch(
+    onSecond("notes", "n1", "plain_text_input", { ...ticked, ...other("o1", "xl"), ...noted }),
+  );
+  const before = o.world.built.drafts.get(o.approvalId);
+  assert.deepEqual(before?.picks.get(1), [0]);
+  // The page-one keystroke, handled after the owner went on and typed on page two.
+  await o.world.dispatch(
+    formAction(first, other("o0", "blu"), { id: "other", block: "o0", type: "plain_text_input" }),
+  );
+  const after = o.world.built.drafts.get(o.approvalId);
+  assert.deepEqual(after?.picks, before?.picks);
+  assert.deepEqual(after?.typed, before?.typed);
+  assert.deepEqual(after?.notes, before?.notes);
+  assert.deepEqual(after?.last, before?.last);
+  assert.equal(after?.active, 1);
+});
+
+test("a form that fails to open after a newer one opened leaves the newer one valid", async (t) => {
+  const world = worldOf(t);
+  const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", [SINGLE]);
+  // The first Answer's views.open (generation 1) fails, the second's (generation 2) succeeds,
+  // and both are held until the second Answer was clicked.
+  world.slack.responses["views.open"] = (args) => {
+    const metadata = (args.view as Body).private_metadata as string;
+    if (JSON.parse(metadata).g === 1) return rejected("expired_trigger_id");
+    return { ok: true, view: { id: "V000FORM", hash: "1790000000.h1" } };
+  };
+  const gate = new AsyncEvent();
+  world.slack.gate = gate;
+  world.slack.gateMethod = "views.open";
+  await world.dispatch(answerClick(approvalId));
+  await world.dispatch(answerClick(approvalId));
+  gate.set();
+  await world.idle();
+  const opened = (world.slack.callsTo("views.open") as Body[]).map((call) => call.view as Body);
+  const newer = opened.find((view) => JSON.parse(view.private_metadata).g === 2) as Body;
+  await world.dispatch(submitOn(newer, radio("q0", "1")));
+  assert.ok(pending.decided);
+  assert.deepEqual(await pending.decision, {
+    answered: true,
+    answers: { "Colour?": "blue" },
+    notes: {},
+  });
 });
