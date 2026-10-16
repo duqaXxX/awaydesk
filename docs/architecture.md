@@ -864,16 +864,27 @@ question's header) goes to Slack with `&`, `<` and `>` escaped and a zero-width 
 backtick (`escape.shownAsWritten`), so no `<url|label>` can hide what it links and no text can close
 its code block. A clarifying question (Claude Code's `AskUserQuestion` tool, 1 to 4 questions)
 arrives the same way and is posted as one line naming the questions, with **Answer** and **Skip**.
-Answer opens a modal (`requests.questionView`) that shows one question at a time, since Slack has no
-tabs: radio buttons, or checkboxes when several may be picked, each option with its description, and
+Answer opens a modal (`requests.questionView`) that shows one question at a time: radio buttons, or checkboxes when several may be picked, each option with its description, and
 an **Other** field and a **Notes** field, as the terminal offers. Slack caps an option object's text and description at 75
 characters each and gives it no place for the option's `preview`. When an option says more than
 that, the page shows the question in bold, then every option whole in a `rich_text` block: its label
 in bold, its full description, and its preview in a preformatted element, which keeps its line
 breaks. Rich text shows its text as written, so nothing Claude wrote is read as markup. The choice
-under them keeps the labels alone, titled with the question's header. The modal's own button reads
-`Next (1/3)` and moves on (`response_action: update`) only once the question has an answer,
-otherwise the question gets an error (`response_action: errors`); it reads `Submit` on the last.
+under them keeps the labels alone, titled with the question's header. With
+several questions Slack has no tabs, so the terminal's are drawn as a context line:
+each question's header with `☒` once answered and `☐` before, the page on screen in bold, then
+`✔ Submit`; a header left empty reads `Question 2`. The modal's own button reads `Next (1/3)`
+and moves to the next page (`response_action: update`) only once the question has an answer,
+otherwise the question gets an error (`response_action: errors`), and it moves on whether or not
+the other questions already have one. On the last question it reads `Review` and opens one more
+page of the same form (its page number is the question count): the tab
+row with `✔ Submit` in bold, `Review your answers`, a section `● question` and `→ answer` per
+question (a multi-select's joined with `, `, every text shown as written), and `Submit answers`,
+which alone sends. From the second question on, and on the review page, a **← header** button
+(`question_back`, `Requests.onQuestionBack`) goes back one page: it absorbs the fields of the page
+on screen into the draft first, validates nothing, and redraws the previous page with
+`views.update` on the click's view id and `hash`, every answer kept. One question has none of this
+and its `Submit` sends.
 What was filled is kept by the Slack provider in memory (`Requests.drafts`, `requests.Draft`), by
 request id, with the page on screen and the revision of each question's clearable blocks; the
 view's `private_metadata` holds only the request's id, channel and thread, the form's generation
@@ -881,9 +892,10 @@ and the page it shows (`requests.FormIds`), so Other and Notes take 300 characte
 (`TYPED_LIMIT`, `NOTES_LIMIT`) with no Slack cap to fit. Only the newest form of a request is
 valid: every Answer opens a new generation (Later then Answer, a second click, a second device),
 and the older forms are stale (a form whose `views.open` fails does not count: the older one
-stays valid). A stale form's changes are ignored, and its Next or Submit answers
-`response_action: errors` with `texts.QUESTION_STALE` on the question's block and sends nothing;
-a change from a page Next has already left is ignored too. Every field of the valid form
+stays valid). A stale form's changes and its Back are ignored, and its Next or Submit answers
+`response_action: errors` with `texts.QUESTION_STALE` on the question's block (on the review page,
+which has no field, the form is replaced by that sentence) and sends nothing; a change or a Back
+from a page Next has already left is ignored too. Every field of the valid form
 reports each change (an option picked, a box ticked, a character typed under Other or in Notes:
 `dispatch_action`), and the draft is updated from it, with no `views.update` except the single
 select's exclusion below. An entry goes when its request is answered, skipped or found gone, at

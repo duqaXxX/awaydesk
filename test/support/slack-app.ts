@@ -785,6 +785,21 @@ export async function onSecondPage(world: World, approvalId: string, pick: strin
   return (response.body as Body).view as Body;
 }
 
+/**
+ * Answer clicked, the first question answered with `pick` and the last one with `values`: the
+ * review page of a form of two questions, as `response_action: update` gave it.
+ */
+export async function onReviewPage(
+  world: World,
+  approvalId: string,
+  pick: string,
+  values: Body,
+): Promise<Body> {
+  const second = await onSecondPage(world, approvalId, pick);
+  const response = await world.dispatch(submitOn(second, values));
+  return (response.body as Body).view as Body;
+}
+
 /** The Next or Submit of the form `view` with these values. */
 export function submitOn(view: Body, values: Body, user: Body = {}): Body {
   const body = recorded("submit");

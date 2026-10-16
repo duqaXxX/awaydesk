@@ -306,7 +306,7 @@ test("Later then Answer reopens the form with the answers already given", async 
   await o.world.dispatch(answerClick(o.approvalId));
   const reopened = o.modal.view;
   assert.equal(o.world.built.drafts.size, 1);
-  assert.equal(reopened.submit.text, "Submit"); // still the second page
+  assert.equal(reopened.submit.text, "Review"); // still the second page
 });
 
 test("the first page keeps its pick when the form is reopened", async (t) => {
@@ -401,7 +401,7 @@ test("a late keystroke from the page Next already left writes nothing", async (t
   const first = o.modal.view;
   await o.world.dispatch(type(o, other("o0", "blue")));
   const next = await o.world.dispatch(submit(o, other("o0", "blue"), first));
-  assert.equal(((next.body as Body).view as Body).submit.text, "Submit");
+  assert.equal(((next.body as Body).view as Body).submit.text, "Review");
   // The `blu` keystroke was handled after the submission, from the form as page one had it.
   await o.world.dispatch(
     formAction(first, other("o0", "blu"), { id: "other", block: "o0", type: "plain_text_input" }),

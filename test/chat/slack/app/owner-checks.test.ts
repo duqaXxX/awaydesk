@@ -150,6 +150,27 @@ const CASES: readonly Case[] = [
     }),
   ),
   {
+    listener: "action question_back",
+    arrange: async (world, sender) => {
+      const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
+      const modal = new ModalSlack(world.slack);
+      await world.dispatch(answerClick(approvalId));
+      const next = await world.dispatch(submitOn(modal.view, picked(0, "0")));
+      const second = (next.body as Body).view as Body; // the form on page two
+      world.slack.apiCalls = [];
+      const body = formAction(
+        second,
+        {},
+        { id: "question_back", block: "back", type: "button" },
+        { hash: modal.hash },
+      );
+      return {
+        body: sentBy(body, sender),
+        acted: () => world.slack.callsTo("views.update").length > 0,
+      };
+    },
+  },
+  {
     listener: "action notes",
     arrange: async (world, sender) => {
       const question = QUESTIONS[0] as (typeof QUESTIONS)[number];

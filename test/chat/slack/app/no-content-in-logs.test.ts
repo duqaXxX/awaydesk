@@ -22,7 +22,7 @@ import {
   type Body,
   FORM_THREAD,
   message,
-  onSecondPage,
+  onReviewPage,
   QUESTIONS,
   reply,
   submitOn,
@@ -79,12 +79,12 @@ test("no log line at any level holds a prompt, a reply or an owner's word", asyn
   await world.dispatch(message(`!help ${FILTER}`));
 
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-  const second = await onSecondPage(world, approvalId, "1");
   const values = {
     q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } },
     o1: { other: { type: "plain_text_input", value: OTHER } },
   };
-  await world.dispatch(submitOn(second, values));
+  const review = await onReviewPage(world, approvalId, "1", values);
+  await world.dispatch(submitOn(review, {}));
   assert.ok(pending.decided); // fails here, not at the 300 s timeout, when the form is not read
   assert.deepEqual(await pending.decision, {
     answered: true,

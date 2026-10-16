@@ -74,7 +74,7 @@ import {
   listed,
   ModalSlack,
   message,
-  onSecondPage,
+  onReviewPage,
   openedForm,
   PERMALINK,
   picked,
@@ -1087,7 +1087,7 @@ test("next with an answer moves to the next question", async (t) => {
       picks: new Map([[0, [0]]]),
     }),
   );
-  assert.equal(answer.view.submit.text, "Submit");
+  assert.equal(answer.view.submit.text, "Review");
   assert.ok(!pending.decided);
 });
 
@@ -1095,12 +1095,13 @@ test("a complete submit answers claude and leaves the request to the session", a
   const world = worldOf(t);
   const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
   pending.messageTs = "1790000000.000009";
-  const second = await onSecondPage(world, approvalId, "1");
   const values = {
     q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } },
     o1: { other: { type: "plain_text_input", value: "xl" } },
   };
-  await world.dispatch(submitOn(second, values));
+  const review = await onReviewPage(world, approvalId, "1", values);
+  assert.ok(!pending.decided); // Review shows the answers and sends nothing
+  await world.dispatch(submitOn(review, {}));
   assert.ok(pending.decided);
   assert.deepEqual(await pending.decision, {
     answered: true,
@@ -1117,9 +1118,9 @@ for (const [index, user] of OTHER_USERS.entries()) {
   test(`nobody else can submit the form [user${index}]`, async (t) => {
     const world = worldOf(t);
     const [approvalId, pending] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
-    const second = await onSecondPage(world, approvalId, "0");
     const boxes = { q1: { answer: { type: "checkboxes", selected_options: [{ value: "0" }] } } };
-    await world.dispatch(submitOn(second, boxes, user));
+    const review = await onReviewPage(world, approvalId, "0", boxes);
+    await world.dispatch(submitOn(review, {}, user));
     assert.ok(!pending.decided);
   });
 }

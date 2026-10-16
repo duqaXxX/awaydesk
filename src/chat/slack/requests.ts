@@ -20,12 +20,14 @@ export const SECTION_LIMIT = 3000;
 export const MESSAGE_BLOCKS = 50; // Slack's limit on blocks in one message
 export const OPTION_TEXT_LIMIT = 75;
 export const LABEL_LIMIT = 2000; // an input block's label
+const TAB_LIMIT = 40; // a question's header in the tab row and on the Back button
 
 export const APPROVAL_ALLOW = "approval_allow";
 export const APPROVAL_DENY = "approval_deny";
 export const QUESTION_OPEN = "question_open";
 export const QUESTION_SKIP = "question_skip";
 export const QUESTION_FORM = "question_form";
+export const QUESTION_BACK = "question_back";
 // Text typed under Other and in Notes, per question. The draft lives in the daemon's memory
 // (`Requests`), so Slack's 3,000 characters of private_metadata bound neither.
 export const TYPED_LIMIT = 300;
@@ -431,9 +433,11 @@ export function notesNeedOption(draft: Draft, at: number): boolean {
   return draft.notes.has(at) && !draft.picks.has(at);
 }
 
-/** The index of the first question with no answer, or null when every one has one. */
-export function firstUnanswered(draft: Draft, questions: readonly Question[]): number | null {
-  const found = questions.findIndex((_, at) => !isAnswered(draft, questions, at));
+/** The index of the first question with no answer or with notes and no option, else null. */
+export function firstIncomplete(draft: Draft, questions: readonly Question[]): number | null {
+  const found = questions.findIndex(
+    (_, at) => !isAnswered(draft, questions, at) || notesNeedOption(draft, at),
+  );
   return found === -1 ? null : found;
 }
 
@@ -518,10 +522,71 @@ function optionWhole(option: QuestionOption): Block {
   return { type: "rich_text", elements };
 }
 
+/** A question's header for the tab row and the Back button, as written and cut. */
+function tabName(question: Question, at: number): string {
+  const header = cut(squeezed(question.header), TAB_LIMIT);
+  return header !== ""
+    ? shownAsWritten(header)
+    : texts.fill(slackTexts.QUESTION_TAB_UNNAMED, { number: at + 1 });
+}
+
 /**
- * The form, one question at a time: Slack has no tabs, so the modal's own button reads
- * `Next (1/3)` and leads to the next question, and `Submit` on the last; each needs an answer
- * before the next. The question shows as radio buttons, or checkboxes when several may be
+ * The terminal's tab row, as one context line: each question's header with `☒` once answered
+ * and `☐` before, the page on screen in bold, then `✔ Submit` (bold on the review page).
+ */
+function tabRow(draft: Draft, questions: readonly Question[]): Block {
+  const cells = questions.map((question, at) => {
+    const cell = `${isAnswered(draft, questions, at) ? "☒" : "☐"} ${tabName(question, at)}`;
+    return at === draft.active ? `*${cell}*` : cell;
+  });
+  const review = draft.active === questions.length;
+  cells.push(review ? `*${slackTexts.QUESTION_TAB_SUBMIT}*` : slackTexts.QUESTION_TAB_SUBMIT);
+  return context(cells.join("   "));
+}
+
+/** The button that goes back to question `to`: it moves one page and keeps every answer. */
+function backBlock(questions: readonly Question[], to: number): Block {
+  const question = questions[to] as Question;
+  const label = texts.fill(slackTexts.QUESTION_BACK_TO, { header: tabName(question, to) });
+  return {
+    type: "actions",
+    elements: [
+      { type: "button", action_id: QUESTION_BACK, text: { type: "plain_text", text: label } },
+    ],
+  };
+}
+
+/** The page that ends a form of several questions: every answer, to read before it is sent. */
+function reviewView(draft: Draft, questions: readonly Question[], names: Names): Block {
+  const sections = questions.map((question, at) => {
+    const answer = answerAt(draft, questions, at) ?? "";
+    const shown = typeof answer === "string" ? answer : answer.join(", ");
+    const lines = `● ${shownAsWritten(question.text)}\n→ ${shownAsWritten(shown)}`;
+    return { type: "section", text: { type: "mrkdwn", text: cut(lines, SECTION_LIMIT) } };
+  });
+  return {
+    type: "modal",
+    callback_id: QUESTION_FORM,
+    private_metadata: dumpIds(draft),
+    title: { type: "plain_text", text: named(slackTexts.QUESTION_TITLE, names) },
+    submit: { type: "plain_text", text: slackTexts.QUESTION_SUBMIT_ALL },
+    close: { type: "plain_text", text: slackTexts.QUESTION_CLOSE },
+    blocks: [
+      tabRow(draft, questions),
+      { type: "section", text: { type: "mrkdwn", text: slackTexts.QUESTION_REVIEW_HEADING } },
+      ...sections,
+      backBlock(questions, questions.length - 1),
+    ],
+  };
+}
+
+/**
+ * The form, one question at a time, as the terminal's tabs: with several questions a tab row
+ * names them and tells which are answered, the button reads `Next (1/3)` and leads to the next
+ * question (whether or not the others have an answer), and `Review` on the last opens a page
+ * that lists every answer (`reviewView`), whose `Submit answers` sends. From the second question
+ * on a button goes back one question (`QUESTION_BACK`). One question has none of that and its
+ * `Submit` sends. Each question needs an answer before the next. The question shows as radio buttons, or checkboxes when several may be
  * picked, each option with its description, and an Other field (tools reference: "type your own
  * text through the Other row"). Both are optional in Slack's eyes: Next checks that the question
  * has one. When an option says more than a choice holds (`saysMore`), the question and every
@@ -532,13 +597,10 @@ export function questionView(draft: Draft, questions: readonly Question[], names
   const blocks: Block[] = [];
   const count = questions.length;
   const at = draft.active;
+  if (count > 1 && at === count) return reviewView(draft, questions, names);
   const question = questions[at];
   if (question === undefined) throw new RangeError(`no question ${at}`);
-  if (count > 1) {
-    const header = shownAsWritten(strip(question.header));
-    const where = texts.fill(slackTexts.QUESTION_WHERE, { number: at + 1, count });
-    blocks.push(context(header !== "" ? `${header} · ${where}` : where));
-  }
+  if (count > 1) blocks.push(tabRow(draft, questions));
   const whole = saysMore(question);
   let label = oneLine(question.text, LABEL_LIMIT);
   if (whole) {
@@ -610,6 +672,8 @@ export function questionView(draft: Draft, questions: readonly Question[], names
       element: notes,
     },
   );
+  if (at > 0) blocks.push(backBlock(questions, at - 1));
+  const last = at === count - 1;
   return {
     type: "modal",
     callback_id: QUESTION_FORM,
@@ -617,8 +681,11 @@ export function questionView(draft: Draft, questions: readonly Question[], names
     title: { type: "plain_text", text: named(slackTexts.QUESTION_TITLE, names) },
     submit: {
       type: "plain_text",
-      text:
-        at < count - 1 ? texts.fill(slackTexts.QUESTION_NEXT, { number: at + 1, count }) : "Submit",
+      text: !last
+        ? texts.fill(slackTexts.QUESTION_NEXT, { number: at + 1, count })
+        : count > 1
+          ? slackTexts.QUESTION_REVIEW
+          : "Submit",
     },
     close: { type: "plain_text", text: slackTexts.QUESTION_CLOSE },
     blocks,

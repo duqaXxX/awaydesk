@@ -11,13 +11,14 @@ import {
   draftAnswers,
   dumpIds,
   excluding,
-  firstUnanswered,
+  firstIncomplete,
   isAnswered,
   loadIds,
   NOTES_LIMIT,
   newDraft,
   notesNeedOption,
   OPTION_TEXT_LIMIT,
+  QUESTION_BACK,
   QUESTION_FORM,
   QUESTION_OPEN,
   QUESTION_SKIP,
@@ -162,7 +163,7 @@ test("the form shows one question with next until the last", () => {
     active: 0,
   });
   assert.equal(view.submit.text, "Next (1/2)");
-  assert.equal(view.blocks[0].elements[0].text, "Colour · 1 of 2");
+  assert.equal(view.blocks[0].elements[0].text, "*☐ Colour*   ☐ Sizes   ✔ Submit");
   const inputs: Json[] = view.blocks.filter((b: Json) => b.type === "input");
   assert.deepEqual(
     inputs.map((b) => b.block_id),
@@ -176,14 +177,96 @@ test("the form shows one question with next until the last", () => {
   assert.ok(view.blocks.every((b: Json) => b.type !== "actions"));
 });
 
-test("the last question holds checkboxes and submit", () => {
+const THREE: readonly Question[] = [
+  ...TWO,
+  question({ question: "Shape?", header: "Shape", options: [{ label: "round" }] }),
+];
+
+/** The tab row of a view: its first block's text. */
+const tabsOf = (view: Json): string => view.blocks[0].elements[0].text;
+
+test("the tab row marks the answered questions and bolds the one on screen", () => {
+  const picks = new Map([[0, [0]]]);
+  assert.equal(
+    tabsOf(questionView(draftOf({ active: 1, picks }), THREE)),
+    "☒ Colour   *☐ Sizes*   ☐ Shape   ✔ Submit",
+  );
+  // An answer typed under Other counts as one.
+  const typed = new Map([[2, "oval"]]);
+  assert.equal(
+    tabsOf(questionView(draftOf({ active: 2, picks, typed }), THREE)),
+    "☒ Colour   ☐ Sizes   *☒ Shape*   ✔ Submit",
+  );
+});
+
+test("a header the model wrote is shown as written in its tab", () => {
+  const odd = question({ question: "Why?", header: "a<b&c", options: [{ label: "a" }] });
+  assert.equal(
+    tabsOf(questionView(draftOf(), [odd, odd])),
+    "*☐ a&lt;b&amp;c*   ☐ a&lt;b&amp;c   ✔ Submit",
+  );
+});
+
+test("one question has no tab row, no Back and sends with Submit", () => {
+  const view = questionView(draftOf(), TWO.slice(0, 1));
+  assert.equal(view.submit.text, "Submit");
+  assert.ok(view.blocks.every((b: Json) => b.type === "input"));
+});
+
+test("from the second question on the form ends on a Back button named for the previous one", () => {
+  const first = questionView(draftOf(), THREE);
+  assert.ok(first.blocks.every((b: Json) => b.type !== "actions"));
+  const second = questionView(draftOf({ active: 1 }), THREE);
+  const back = second.blocks.at(-1);
+  assert.equal(back.type, "actions");
+  assert.equal(back.elements[0].action_id, QUESTION_BACK);
+  assert.equal(back.elements[0].text.text, "← Colour");
+  assert.equal(second.submit.text, "Next (2/3)");
+  const blank = question({ question: "Why?", header: " ", options: [{ label: "a" }] });
+  const view = questionView(draftOf({ active: 1 }), [blank, TWO[1] as Question]);
+  assert.equal(view.blocks.at(-1).elements[0].text.text, "← Question 1");
+});
+
+test("the review page lists every answer, with Submit answers and a way back", () => {
+  const draft = draftOf({
+    active: 3,
+    picks: new Map([
+      [0, [1]],
+      [1, [0, 1]],
+    ]),
+    typed: new Map([
+      [1, "xl"],
+      [2, "a<b"],
+    ]),
+  });
+  const view = questionView(draft, THREE);
+  assert.equal(view.callback_id, QUESTION_FORM);
+  assert.equal(loadIds(view.private_metadata).active, 3);
+  assert.equal(view.submit.text, "Submit answers");
+  assert.equal(view.close.text, "Later");
+  assert.equal(tabsOf(view), "☒ Colour   ☒ Sizes   ☒ Shape   *✔ Submit*");
+  assert.deepEqual(
+    view.blocks.slice(1).map((b: Json) => b.text?.text ?? b.elements[0].action_id),
+    [
+      "*Review your answers*",
+      "● Colour?\n→ blue",
+      "● Sizes?\n→ s, l, xl",
+      "● Shape?\n→ a&lt;b",
+      QUESTION_BACK,
+    ],
+  );
+  assert.equal(view.blocks.at(-1).elements[0].text.text, "← Shape");
+  assert.ok(view.blocks.every((b: Json) => b.type !== "input"));
+});
+
+test("the last question holds checkboxes and Review", () => {
   const draft = draftOf({
     active: 1,
     picks: new Map([[1, [0, 1]]]),
     typed: new Map([[1, "xl"]]),
   });
   const view = questionView(draft, TWO);
-  assert.equal(view.submit.text, "Submit");
+  assert.equal(view.submit.text, "Review");
   const inputs: Json[] = view.blocks.filter((b: Json) => b.type === "input");
   assert.deepEqual(
     inputs.map((b) => b.block_id),
@@ -309,7 +392,7 @@ test("a question of several keeps its counter above the options shown whole", ()
     view.blocks.map((b: Json) => b.type),
     ["context", "rich_text", "rich_text", "input", "input", "input"],
   );
-  assert.equal(view.blocks[0].elements[0].text, "Why · 1 of 2");
+  assert.equal(view.blocks[0].elements[0].text, "*☐ Why*   ☐ Colour   ✔ Submit");
 });
 
 test("a header of blanks alone never leaves the choice an empty label", () => {
@@ -319,7 +402,7 @@ test("a header of blanks alone never leaves the choice an empty label", () => {
     options: [{ label: "a", description: "d".repeat(76) }],
   });
   const view = questionView(draftOf(), [blank, TWO[0] as Question]);
-  assert.equal(view.blocks[0].elements[0].text, "1 of 2");
+  assert.equal(view.blocks[0].elements[0].text, "*☐ Question 1*   ☐ Colour   ✔ Submit");
   const choices: Json[] = view.blocks.filter((b: Json) => b.type === "input");
   assert.equal(choices.length, 3);
   assert.equal(choices[0]?.label.text, "Answer");
@@ -393,13 +476,22 @@ test("answers are the labels and the typed text", () => {
     answers: { "Colour?": "purple", "Sizes?": ["s", "xl"] },
     notes: {},
   });
-  assert.equal(firstUnanswered(draft, TWO), null);
+  assert.equal(firstIncomplete(draft, TWO), null);
 });
 
 test("the first unanswered question is found", () => {
   const draft = draftOf({ picks: new Map([[0, [1]]]) });
-  assert.equal(firstUnanswered(draft, TWO), 1);
+  assert.equal(firstIncomplete(draft, TWO), 1);
   assert.equal(draftAnswers(draft, TWO), null);
+});
+
+test("notes with no option make a question incomplete", () => {
+  const draft = draftOf({
+    picks: new Map([[1, [0]]]),
+    typed: new Map([[0, "purple"]]),
+    notes: new Map([[0, "why"]]),
+  });
+  assert.equal(firstIncomplete(draft, TWO), 0);
 });
 
 test("the form names its request, its generation and its page", () => {
