@@ -43,8 +43,9 @@ detail the sequence leaves out.
 `prepack` script runs the TypeScript compiler) and prints the name of the tarball it wrote in the
 clone, which `npm install -g` then installs. That puts the `awaydesk` command in the `bin` folder
 of npm's global prefix (`npm prefix -g`) and the package beside it, in `lib/node_modules/awaydesk`;
-the LaunchAgent of Part 4 runs that copy, not the clone. To update, pull and run the last two
-commands again. The tarball can be deleted once it is installed.
+the service of Part 4 runs that copy, not the clone. To update, pull, run the last two commands
+again, then `awaydesk service restart`: the running daemon keeps the old copy until it restarts.
+The tarball can be deleted once it is installed.
 
 awaydesk runs the Claude Code CLI that ships inside the Claude Agent SDK it depends on,
 not the `claude` on your `PATH`. Both read the same login, so logging in once with `claude` and
@@ -299,7 +300,7 @@ start while another instance holds its lock.
 macOS keeps `~/Documents`, `~/Desktop`, `~/Downloads` and a few other folders private to the
 apps you allowed. A program started from Terminal uses Terminal's permission; awaydesk,
 started by launchd, has none, and Claude Code fails to start in a directory there. The permission
-goes to the Node executable that runs awaydesk, the one the plist of the next step names:
+goes to the Node executable that runs awaydesk, the one the service of the next step starts:
 
 - Show the executable in Finder (it can sit in a folder Finder does not show, so this is the
   simplest way to reach it):
@@ -314,91 +315,51 @@ goes to the Node executable that runs awaydesk, the one the plist of the next st
   file (`node`) from Finder into the list. Alternatively choose **+** and press **⌘⇧.** in the
   file picker to show hidden folders.
 - Check that the new entry is turned on. If the service is already running, restart it:
-  `launchctl kill TERM gui/$(id -u)/local.awaydesk`.
+  `awaydesk service restart`.
 
 The permission belongs to that executable: any other program started outside Terminal with the
 same `node` gets the same access. Projects outside the protected folders need no permission at
 all.
 
-### Write the plist and start it
+### Install the service
 
-The plist lives at `~/Library/LaunchAgents/local.awaydesk.plist`. launchd does not expand
-`~` or `$HOME` and gives a service a minimal `PATH`, so the plist names its program by absolute
-paths: the command below asks the shell for them and writes them in full wherever the file needs
-them. `ProgramArguments` has two entries. The first is the Node executable, `command -v node`; the
-second is the file Node runs, the `dist/main.js` of the installed package, which `command -v
-awaydesk` links to. The `PATH` the service gives Claude Code's commands starts with the folder of
-that Node, so a session finds `node` and `npm` as your terminal does.
-
-11. Write the plist, then check it with `plutil`:
-
-```bash
-NODE="$(command -v node)"
-MAIN="$(readlink -f "$(command -v awaydesk)")"
-mkdir -p ~/Library/LaunchAgents ~/Library/Logs/awaydesk
-cat > ~/Library/LaunchAgents/local.awaydesk.plist <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>local.awaydesk</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>$NODE</string>
-    <string>$MAIN</string>
-  </array>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>PATH</key>
-    <string>$(dirname "$NODE"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-  </dict>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>ExitTimeOut</key>
-  <integer>60</integer>
-  <key>StandardOutPath</key>
-  <string>$HOME/Library/Logs/awaydesk/awaydesk.log</string>
-  <key>StandardErrorPath</key>
-  <string>$HOME/Library/Logs/awaydesk/awaydesk.log</string>
-</dict>
-</plist>
-EOF
-plutil -lint ~/Library/LaunchAgents/local.awaydesk.plist
-```
-
-`plutil -lint` prints `<path>/local.awaydesk.plist: OK` when the file is well formed. A plist
-that names a Node installed under a version folder (nvm, for one) stops working when that
-version goes: write it again after changing Node.
-
-12. Load it. It starts at once, and again at every login:
+11. Install and start the service:
 
     ```bash
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.awaydesk.plist
+    awaydesk service install
     ```
 
-    The command prints nothing when it works. `Bootstrap failed: 5: Input/output error` is the one
-    answer `launchctl` gives for a job that is already loaded, a plist that is missing, and a plist
-    it cannot read (measured on macOS 27.0.1, 2026-10-12). Check the file again with the `plutil`
-    line of step 11, then unload the job and load it again:
+    It writes the plist `~/Library/LaunchAgents/local.awaydesk.plist`, checks it with `plutil
+    -lint`, and loads it with `launchctl bootstrap` in your login session. awaydesk starts at once,
+    and again at every login. The command prints the plist's path and the log's,
+    `~/Library/Logs/awaydesk/awaydesk.log`, and ends with status 0.
 
-    ```bash
-    launchctl bootout gui/$(id -u)/local.awaydesk
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.awaydesk.plist
-    ```
+launchd does not expand `~` or `$HOME` and gives a service a minimal `PATH`, so the plist names
+everything by absolute paths. `ProgramArguments` has two entries: the first `node` on the `PATH`
+of the terminal you ran the command from (a link such as `/opt/homebrew/bin/node` stays valid
+across Node upgrades; a Node installed under a version folder, as nvm does, stops working when that
+version goes), and the real path of the `dist/main.js` the command belongs to. The `PATH` the
+service gives Claude Code's commands starts with the folder of that Node, then npm's global `bin`
+folder, then `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`, so a session finds `node`, `npm` and
+the commands you installed with npm as your terminal does. The plist also sets `RunAtLoad`,
+`KeepAlive` (launchd starts the daemon again after any exit) and an `ExitTimeOut` of 60 seconds,
+and sends both outputs to the log.
 
-    Do the same after changing the plist, or when checkpoint 3 fails: repeat step 11, then these
-    two lines.
+Running `awaydesk service install` again changes nothing while the service is loaded with the same
+plist. When the plist it would write differs (another Node, the package moved, a plist written by
+hand before this command existed), it refuses and writes nothing: run `awaydesk service uninstall`,
+then `awaydesk service install`. The uninstall stops the daemon, and ends turns still running after
+60 seconds.
 
-### Checkpoint 3: the LaunchAgent runs it
+### Checkpoint 3: the service runs it
 
 ```bash
+awaydesk service status
 tail -n 5 ~/Library/Logs/awaydesk/awaydesk.log
 ```
 
-After a few seconds the log ends with the line of checkpoint 2:
+The first prints `local.awaydesk is running, pid` and the pid, and ends with status 0 (3 when the
+service is not running). After a few seconds the log ends with the line of checkpoint 2:
 
 ```
 2026-10-10 09:05:03,042 INFO awaydesk.chat.slack.thread: connected to Slack workspace <workspace id>
@@ -409,24 +370,26 @@ after each exit (`KeepAlive`), so the same line repeats until you fix it and res
 
 The log holds what the service did, never the content of your messages.
 
-To restart it, stop it, or read its state later:
+To restart it, read its state, or remove it:
 
 ```bash
-launchctl kill TERM gui/$(id -u)/local.awaydesk
-launchctl bootout gui/$(id -u)/local.awaydesk
-launchctl print gui/$(id -u)/local.awaydesk
+awaydesk service restart
+awaydesk service status
+awaydesk service uninstall
 ```
 
-For a service that runs, `launchctl print` shows `state = running` and a `pid`; after a restart
-with `kill TERM` it also shows `last exit code = 0` (seen on macOS 27.0.1 on 2026-10-12). What it
-shows for a daemon that fails at start was not looked at: the log is where that is said.
+`restart` sends `SIGTERM` to the running daemon (`launchctl kill TERM gui/$(id -u)/local.awaydesk`):
+running turns finish first, then launchd starts it again. `status` reads `launchctl list`.
+`uninstall` unloads the service (`launchctl bootout`) and removes the plist; it leaves
+`~/.config/awaydesk/` (`.env`, `state.json`) and the log folder, and names both. On a system other
+than macOS, `awaydesk service` answers that the service exists on macOS only, with status 1.
 
 What a restart waits for, and what each way of stopping does, is under
 [Restarts and shutdown](#restarts-and-shutdown).
 
 ### Bind the channel and send the first message
 
-13. In the channel of step 6, send `!bind <folder>`, with the folder given relative to
+12. In the channel of step 6, send `!bind <folder>`, with the folder given relative to
     `ALLOWED_ROOT` (`!bind my-project`) and trusted in step 9. The folder must already exist
     under `ALLOWED_ROOT`: for one that does not, the answer starts with the path you typed and
     `is not a folder under`. For one that does, the answer starts `Bound this channel to`. Then
