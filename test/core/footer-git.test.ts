@@ -175,18 +175,19 @@ function gitDiffsThere(folder: string): string {
     env: { ...gitEnv(), GIT_TRACE: "1" },
     encoding: "utf8",
   });
+  return `status ${run.status}\nstdout ${run.stdout}\nstderr ${run.stderr}`;
+}
+
+/** Diagnostics read after the control, once the filter's marker has been looked at. */
+function whyNot(folder: string, trace: string): string {
   const more = (args: string[]) =>
     spawnSync("git", ["-C", folder, ...args], { env: gitEnv(), encoding: "utf8" });
   const config = more(["config", "--show-origin", "--list"]);
   const debug = more(["ls-files", "--debug"]);
-  const status = more(["status", "--porcelain=v1", "--untracked-files=no"]);
   return [
-    `status ${run.status}`,
-    `stdout ${run.stdout}`,
-    `stderr ${run.stderr}`,
+    trace,
     `config ${config.stdout}${config.stderr}`,
     `ls-files ${debug.stdout}${debug.stderr}`,
-    `porcelain ${status.stdout}${status.stderr}`,
   ].join("\n");
 }
 
@@ -197,7 +198,8 @@ for (const [name, plant] of PLANTED) {
     filterRan(); // building the folder ran it once
     // The control: git, left to find the repository from the folder, runs the filter.
     const trace = gitDiffsThere(folder);
-    assert.ok(filterRan(), trace);
+    const ran = filterRan();
+    assert.ok(ran, ran ? "" : whyNot(folder, trace));
     assert.deepEqual(await gitState(folder, repository), [null, null]);
     assert.ok(!filterRan());
   });
