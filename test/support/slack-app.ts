@@ -817,7 +817,7 @@ export function submitOn(view: Body, values: Body, user: Body = {}): Body {
   const ids = [
     `q${at}`,
     ...(chosen.some((option) => option.value === "other") ? [`o${at}`] : []),
-    ...(chosen.length > 0 ? [`n${at}`] : []),
+    ...(chosen.some((option) => option.value !== "other") ? [`n${at}`] : []),
   ];
   const shown = ids.map((block_id) => ({ type: "input", block_id }));
   return submitAsShown({ ...view, blocks: shown }, values, user);

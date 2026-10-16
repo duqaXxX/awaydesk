@@ -1,15 +1,14 @@
 /**
- * The way back in the question form and its review page (issue #325). The terminal keeps a
- * question's answer when the owner returns to its tab, and ends a form of several questions on
- * `Review your answers`. Back is a button of the form: its block_actions payload and the
- * `views.update` it answers follow the references read 2026-10-16 (block_actions payload of a
- * modal, `views.update` with `hash`); `formAction` builds the payload, `ModalSlack` is Slack's
- * side of the modal. Next and Review answer the submission with `response_action: update`.
+ * The tabs of the question form (issue #325): a row of buttons, one per question and a Submit
+ * tab, that jump to a page with every answer kept, as the terminal's tab row does. A tab is a
+ * button of the form: its block_actions payload and the `views.update` it answers follow the
+ * references read 2026-10-16 (block_actions payload of a modal, `views.update` with `hash`);
+ * `formAction` builds the payload, `ModalSlack` is Slack's side of the modal. Next and Review
+ * answer the submission with `response_action: update`.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Question } from "../../../../src/agent/seam.ts";
-import { QUESTION_BACK } from "../../../../src/chat/slack/requests.ts";
 import * as slackTexts from "../../../../src/chat/slack/texts.ts";
 import { AsyncEvent, CHANNEL, rejected, STRANGER } from "../../../support/fake-slack.ts";
 import {
@@ -69,32 +68,37 @@ async function forward(o: Open, values: Body): Promise<Body> {
   return o.modal.view;
 }
 
-/** The Back click on the form `view` (the one on screen unless said), with these values. */
-function backClick(o: Open, values: Body, view: Body = o.modal.view): Body {
+/** A tab click: the tab for `target` (the question count is Submit) on the form `view`. */
+function tabClick(o: Open, target: number, values: Body, view: Body = o.modal.view): Body {
   return formAction(
     view,
     values,
-    { id: QUESTION_BACK, block: "back", type: "button" },
+    { id: `question_tab_${target}`, block: "tabs", type: "button" },
     { hash: o.modal.hash },
   );
 }
 
 const inputs = (view: Body): Body[] =>
   (view.blocks as Body[]).filter((block) => block.type === "input");
-const tabs = (view: Body): string => (view.blocks as Body[])[0]?.elements[0].text;
+/** The tab row as text: the primary button in brackets. */
+const tabs = (view: Body): string =>
+  (((view.blocks as Body[])[0] as Body).elements as Body[])
+    .map((b) => (b.style === "primary" ? `[${b.text.text}]` : b.text.text))
+    .join(" | ");
+const pageOf = (view: Body): number => JSON.parse(view.private_metadata as string).n;
 
-test("Back keeps the answers of both pages, Other, Notes and a multi-select included", async (t) => {
+test("a tab keeps the answers of both pages, Other, Notes and a multi-select included", async (t) => {
   const o = await openForm(t, QUESTIONS);
   await forward(o, { ...radio("q0", "1"), ...noted("n0", "darker") });
-  // Nothing was reported live on page two: Back itself carries what is typed there.
+  // Nothing was reported live on page two: the click itself carries what is typed there.
   const state = { ...boxes("q1", "0", "other"), ...typed("o1", "xl"), ...noted("n1", "both") };
-  await o.world.dispatch(backClick(o, state));
+  await o.world.dispatch(tabClick(o, 0, state));
   assert.equal(o.modal.written.length, 1);
   const first = inputs(o.modal.view);
   assert.equal(first[0]?.element.initial_option.value, "1");
   assert.equal(first[1]?.element.initial_value, "darker");
-  assert.equal(tabs(o.modal.view), "*☒ Colour*   ☒ Sizes   ✔ Submit");
-  // Forward again: page two shows what it had when Back was clicked.
+  assert.equal(tabs(o.modal.view), "[☒ Colour] | ☒ Sizes | ✔ Submit");
+  // Forward again: page two shows what it had when the tab was clicked.
   const second = await forward(o, radio("q0", "1"));
   const again = inputs(second);
   assert.deepEqual(
@@ -105,33 +109,73 @@ test("Back keeps the answers of both pages, Other, Notes and a multi-select incl
   assert.equal(again[2]?.element.initial_value, "both");
 });
 
-test("Back updates the view the click came from, with its hash", async (t) => {
+test("a tab updates the view the click came from, with its hash", async (t) => {
   const o = await openForm(t, QUESTIONS);
   await forward(o, radio("q0", "0"));
   const shown = o.modal.hash;
-  await o.world.dispatch(backClick(o, boxes("q1", "0")));
+  await o.world.dispatch(tabClick(o, 0, boxes("q1", "0")));
   const [hash, view] = o.modal.calls[0] as [string, Body];
   assert.equal(hash, shown);
-  assert.equal(JSON.parse(view.private_metadata as string).n, 0);
-  assert.ok((view.blocks as Body[]).every((block) => block.type !== "actions"));
+  assert.equal(pageOf(view), 0);
   assert.equal(o.world.built.drafts.get(o.approvalId)?.active, 0);
 });
 
-test("Back never validates: a page left empty is left", async (t) => {
+test("a tab goes to any page, forward too, and never validates the page it leaves", async (t) => {
+  const o = await openForm(t, THREE);
+  // Page one is left with nothing chosen and a note alone: no error, the page changes.
+  await o.world.dispatch(tabClick(o, 2, noted("n0", "only notes")));
+  assert.equal(pageOf(o.modal.view), 2);
+  assert.equal(o.modal.written.length, 1);
+  assert.equal(o.world.built.drafts.get(o.approvalId)?.notes.get(0), "only notes");
+  assert.equal(tabs(o.modal.view), "☐ Colour | ☐ Sizes | [☐ Shape] | ✔ Submit");
+});
+
+test("the tab of the page on screen does nothing", async (t) => {
   const o = await openForm(t, QUESTIONS);
   await forward(o, radio("q0", "0"));
-  await o.world.dispatch(backClick(o, noted("n1", "only notes")));
-  assert.equal(o.modal.written.length, 1);
-  assert.equal(o.world.built.drafts.get(o.approvalId)?.notes.get(1), "only notes");
+  const before = o.world.built.drafts.get(o.approvalId);
+  await o.world.dispatch(tabClick(o, 1, boxes("q1", "1")));
+  assert.deepEqual(o.modal.calls, []);
+  assert.equal(o.world.built.drafts.get(o.approvalId), before);
+});
+
+test("the Submit tab opens the review page when every question has an answer", async (t) => {
+  const o = await openForm(t, QUESTIONS);
+  await forward(o, radio("q0", "1"));
+  await o.world.dispatch(tabClick(o, 2, boxes("q1", "0")));
+  assert.equal(pageOf(o.modal.view), 2);
+  assert.equal(o.modal.view.submit.text, "Submit answers");
+  assert.equal(tabs(o.modal.view), "☒ Colour | ☒ Sizes | [✔ Submit]");
+  await o.world.idle();
+  assert.ok(!o.pending.decided);
+});
+
+test("the Submit tab goes to the first question with no answer, with no error text", async (t) => {
+  const o = await openForm(t, THREE);
+  await forward(o, radio("q0", "0"));
+  await o.world.dispatch(tabClick(o, 2, {})); // page two is left empty
+  await o.world.dispatch(tabClick(o, 3, radio("q2", "0")));
+  assert.equal(pageOf(o.modal.view), 1);
+  assert.ok(!JSON.stringify(o.modal.view).includes(slackTexts.QUESTION_MISSING));
+  assert.equal(tabs(o.modal.view), "☒ Colour | [☐ Sizes] | ☒ Shape | ✔ Submit");
+  await o.world.idle();
+  assert.ok(!o.pending.decided);
+});
+
+test("the Submit tab on a page that is itself the first gap changes nothing", async (t) => {
+  const o = await openForm(t, QUESTIONS);
+  await o.world.dispatch(tabClick(o, 2, {}));
+  assert.deepEqual(o.modal.calls, []);
+  assert.equal(pageOf(o.modal.view), 0);
 });
 
 test("Next moves on even when every question already has an answer", async (t) => {
   const o = await openForm(t, QUESTIONS);
   await forward(o, radio("q0", "0"));
-  await o.world.dispatch(backClick(o, boxes("q1", "1")));
+  await o.world.dispatch(tabClick(o, 0, boxes("q1", "1")));
   // Both questions are answered now; Next on the first page still goes to the second.
   const second = await forward(o, radio("q0", "0"));
-  assert.equal(JSON.parse(second.private_metadata as string).n, 1);
+  assert.equal(pageOf(second), 1);
   await o.world.idle();
   assert.ok(!o.pending.decided);
 });
@@ -142,9 +186,9 @@ test("the last question's Review opens the review page and sends nothing", async
   const review = await forward(o, { ...boxes("q1", "0", "other"), ...typed("o1", "xl") });
   await o.world.idle();
   assert.ok(!o.pending.decided);
-  assert.equal(JSON.parse(review.private_metadata as string).n, 2);
+  assert.equal(pageOf(review), 2);
   assert.equal(review.submit.text, "Submit answers");
-  assert.equal(tabs(review), "☒ Colour   ☒ Sizes   *✔ Submit*");
+  assert.equal(tabs(review), "☒ Colour | ☒ Sizes | [✔ Submit]");
   const texts = (review.blocks as Body[]).slice(1).map((block) => block.text?.text);
   assert.deepEqual(texts.slice(0, 3), [
     "*Review your answers*",
@@ -168,27 +212,25 @@ test("only Submit answers on the review page sends", async (t) => {
   assert.equal(o.world.built.drafts.size, 0);
 });
 
-test("Back from the review page returns to the last question with its answer", async (t) => {
+test("a tab from the review page returns to that question with its answer", async (t) => {
   const o = await openForm(t, THREE);
   await forward(o, radio("q0", "0"));
   await forward(o, boxes("q1", "1"));
   await forward(o, radio("q2", "1"));
-  assert.equal(tabs(o.modal.view), "☒ Colour   ☒ Sizes   ☒ Shape   *✔ Submit*");
-  await o.world.dispatch(backClick(o, {}));
+  assert.equal(tabs(o.modal.view), "☒ Colour | ☒ Sizes | ☒ Shape | [✔ Submit]");
+  await o.world.dispatch(tabClick(o, 2, {}));
   const last = o.modal.view;
-  assert.equal(JSON.parse(last.private_metadata as string).n, 2);
+  assert.equal(pageOf(last), 2);
   assert.equal(inputs(last)[0]?.element.initial_option.value, "1");
   assert.equal(last.submit.text, "Review");
-  assert.equal((last.blocks as Body[]).at(-1)?.elements[0].text.text, "Previous");
 });
 
-test("going back from the third question to the first, a change shows in the review", async (t) => {
+test("jumping from the third question to the first, a change shows in the review", async (t) => {
   const o = await openForm(t, THREE);
   await forward(o, radio("q0", "0"));
   await forward(o, boxes("q1", "1"));
-  await o.world.dispatch(backClick(o, radio("q2", "0")));
-  await o.world.dispatch(backClick(o, boxes("q1", "1")));
-  assert.equal(JSON.parse(o.modal.view.private_metadata as string).n, 0);
+  await o.world.dispatch(tabClick(o, 0, radio("q2", "0")));
+  assert.equal(pageOf(o.modal.view), 0);
   await forward(o, radio("q0", "1")); // red becomes blue
   await forward(o, boxes("q1", "1"));
   const review = await forward(o, radio("q2", "0"));
@@ -202,7 +244,7 @@ test("going back from the third question to the first, a change shows in the rev
   });
 });
 
-test("one question: Submit sends, with no tabs, no review and no Back", async (t) => {
+test("one question: Submit sends, with no tabs, no review and no Previous", async (t) => {
   const o = await openForm(t, [QUESTIONS[0] as Question]);
   const view = o.modal.view;
   assert.equal(view.submit.text, "Submit");
@@ -212,10 +254,10 @@ test("one question: Submit sends, with no tabs, no review and no Back", async (t
   assert.ok(o.pending.decided);
 });
 
-test("a stranger's Back does nothing", async (t) => {
+test("a stranger's tab does nothing", async (t) => {
   const o = await openForm(t, QUESTIONS);
   await forward(o, radio("q0", "0"));
-  const body = backClick(o, boxes("q1", "0"));
+  const body = tabClick(o, 0, boxes("q1", "0"));
   Object.assign(body.user, { id: STRANGER });
   await o.world.dispatch(body);
   assert.deepEqual(o.modal.calls, []);
@@ -223,52 +265,52 @@ test("a stranger's Back does nothing", async (t) => {
   assert.equal(o.world.built.drafts.get(o.approvalId)?.picks.has(1), false);
 });
 
-test("a Back from another workspace does nothing", async (t) => {
+test("a tab from another workspace does nothing", async (t) => {
   const o = await openForm(t, QUESTIONS);
   await forward(o, radio("q0", "0"));
-  const body = backClick(o, boxes("q1", "0"));
+  const body = tabClick(o, 0, boxes("q1", "0"));
   body.user.team_id = "T000OTHER";
   await o.world.dispatch(body);
   assert.deepEqual(o.modal.calls, []);
 });
 
-test("Back from an older form is ignored", async (t) => {
+test("a tab of an older form is ignored", async (t) => {
   const o = await openForm(t, QUESTIONS);
   await forward(o, radio("q0", "0"));
   const older = o.modal.view;
   await o.world.dispatch(answerClick(o.approvalId)); // Answer again: a newer form, same page
   const before = o.modal.calls.length;
-  await o.world.dispatch(backClick(o, boxes("q1", "0"), older));
+  await o.world.dispatch(tabClick(o, 0, boxes("q1", "0"), older));
   assert.equal(o.modal.calls.length, before);
   const kept = o.world.built.drafts.get(o.approvalId);
   assert.equal(kept?.active, 1);
   assert.equal(kept?.picks.has(1), false); // nothing from the older form was written
 });
 
-test("Back from a page the draft has left is ignored", async (t) => {
+test("a tab from a page the draft has left is ignored", async (t) => {
   const o = await openForm(t, THREE);
   await forward(o, radio("q0", "0"));
   const second = o.modal.view;
   await forward(o, boxes("q1", "0"));
   const before = o.modal.calls.length;
-  await o.world.dispatch(backClick(o, boxes("q1", "1"), second));
+  await o.world.dispatch(tabClick(o, 0, boxes("q1", "1"), second));
   assert.equal(o.modal.calls.length, before);
   assert.equal(o.world.built.drafts.get(o.approvalId)?.active, 2);
 });
 
-test("a Back whose request is gone does nothing", async (t) => {
+test("a tab whose request is gone does nothing", async (t) => {
   const o = await openForm(t, QUESTIONS);
   await forward(o, radio("q0", "0"));
   o.world.approvals.giveUp(o.approvalId);
-  await o.world.dispatch(backClick(o, boxes("q1", "0")));
+  await o.world.dispatch(tabClick(o, 0, boxes("q1", "0")));
   assert.deepEqual(o.modal.calls, []);
   assert.equal(o.world.built.drafts.size, 0);
 });
 
-test("a Back that meets a hash_conflict is dropped and the page stays the draft's", async (t) => {
+test("a tab that meets a hash_conflict is dropped and the page stays the draft's", async (t) => {
   const o = await openForm(t, QUESTIONS);
   await forward(o, radio("q0", "0"));
-  const body = backClick(o, boxes("q1", "1"));
+  const body = tabClick(o, 0, boxes("q1", "1"));
   body.view.hash = "1790000000.stale";
   await o.world.dispatch(body);
   assert.equal(o.modal.calls.length, 1);
@@ -277,11 +319,12 @@ test("a Back that meets a hash_conflict is dropped and the page stays the draft'
   assert.equal(kept?.active, 1); // the screen still shows page two
   assert.deepEqual(kept?.picks.get(1), [1]); // and what it held is kept
   o.world.slack.responses["views.update"] = rejected("not_found");
-  await o.world.dispatch(backClick(o, boxes("q1", "1")));
+  await o.world.dispatch(tabClick(o, 0, boxes("q1", "1")));
   assert.deepEqual(o.world.ephemerals(), []);
+  assert.equal(o.world.built.drafts.get(o.approvalId)?.active, 1);
 });
 
-test("a refused Back does not undo a Next that moved the draft on meanwhile", async (t) => {
+test("a refused tab does not undo a Next that moved the draft on meanwhile", async (t) => {
   const o = await openForm(t, THREE);
   await forward(o, radio("q0", "0"));
   const second = o.modal.view;
@@ -289,7 +332,7 @@ test("a refused Back does not undo a Next that moved the draft on meanwhile", as
   o.world.slack.gate = gate;
   o.world.slack.gateMethod = "views.update";
   o.world.slack.responses["views.update"] = rejected("hash_conflict");
-  await o.world.dispatch(backClick(o, boxes("q1", "0"))); // held in Slack's call
+  await o.world.dispatch(tabClick(o, 0, boxes("q1", "0"))); // held in Slack's call
   assert.equal(o.world.built.drafts.get(o.approvalId)?.active, 0);
   // Next from the same page is accepted while the update is held: the draft moves on.
   const next = await o.world.dispatch(submitOn(second, boxes("q1", "0")));

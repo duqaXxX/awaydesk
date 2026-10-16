@@ -881,30 +881,34 @@ Answer opens a modal (`requests.questionView`) that shows one question at a time
 **Other** as the last option of the list, as the terminal's list ends with its own row for a typed
 answer. The choice is required (no `optional`, so Slack shows no `(optional)` beside the question).
 While Other is chosen an input block under the choice, **Other** (required, placeholder
-`Type your own answer`), takes the text; **Notes** (optional) shows once an option or Other is
-chosen. Slack caps an option object's text and description at 75
+`Type your own answer`), takes the text; **Notes** (optional) shows while a real option is
+chosen, not for Other alone (with a multi-select, while at least one real box is ticked, Other
+ticked or not), and a note kept in the draft is sent only then. Slack caps an option object's text and description at 75
 characters each and gives it no place for the option's `preview`. When an option says more than
 that, the page shows the question in bold, then every option whole in a `rich_text` block: its label
 in bold, its full description, and its preview in a preformatted element, which keeps its line
 breaks. Rich text shows its text as written, so nothing Claude wrote is read as markup. The choice
 under them keeps the labels alone, titled with the question's header. With
-several questions Slack has no tabs, so the terminal's are drawn as a context line:
-each question's header with `☒` once answered and `☐` before, the page on screen in bold, then
-`✔ Submit`; a header left empty reads `Question 2`. The modal's own button reads `Next (1/3)`
+several questions the terminal's tabs are drawn as an `actions` block of buttons, one per
+question (`question_tab_0`, `question_tab_1`, ...) and a last one for `✔ Submit` (`question_tab_{count}`):
+each question's header with `☒` once answered and `☐` before, cut at 40 characters, a header left
+empty reading `Question 2`; the page on screen is the `primary` button. A tap jumps to that page
+(`Requests.onQuestionTab`); see below. The modal's own button reads `Next (1/3)`
 and moves to the next page (`response_action: update`) only once the question has an answer,
 otherwise the question gets an error (`response_action: errors`), and it moves on whether or not
 the other questions already have one. On the last question it reads `Review` and opens one more
 page of the same form (its page number is the question count): the tab
-row with `✔ Submit` in bold, `Review your answers`, a section `● question` and `→ answer` per
-question (a multi-select's joined with `, `) and, when the question has notes, a line
-`Notes: …` under it; each text goes through `escape.shownAsWritten`, which escapes `&`, `<`, `>`
+row with `✔ Submit` as the primary button, `Review your answers`, a section `● question` and
+`→ answer` per question (a multi-select's joined with `, `) and, when a real option was chosen
+and the question has notes, a line `Notes: …` under it; each text goes through `escape.shownAsWritten`, which escapes `&`, `<`, `>`
 and backticks (so `*` and `_` still format), and a section is cut to 3,000 characters before the
-escape, never inside one. `Submit answers` alone sends. From the second question on, and on the review page, a **Previous** button
-(`question_back`, `Requests.onQuestionBack`) goes back one page: it absorbs the fields of the page
-on screen into the draft first, validates nothing, and redraws the previous page with
-`views.update` on the click's view id and `hash`, every answer kept. The button is an `actions`
-block in the body: a modal's footer holds only submit and close (modals reference, read
-2026-10-16). One question has none of this and its `Submit` sends.
+escape, never inside one. `Submit answers` alone sends. A tab tap absorbs the fields of the page
+on screen into the draft first, validates nothing, and redraws the chosen page with
+`views.update` on the click's view id and `hash`, every answer kept; the tab of the page on screen
+does nothing. The `✔ Submit` tab opens the review page when every question has an answer and goes
+to the first question without one otherwise, with no error text. The tabs are buttons in the body:
+a modal's footer holds only submit and close (modals reference, read 2026-10-16), and in a desktop
+modal Slack lays four buttons as a 2x2 grid. One question has none of this and its `Submit` sends.
 What was filled is kept by the Slack provider in memory (`Requests.drafts`, `requests.Draft`), by
 request id, with the page on screen; the
 view's `private_metadata` holds only the request's id, channel and thread, the form's generation
@@ -912,10 +916,10 @@ and the page it shows (`requests.FormIds`), so Other and Notes take 300 characte
 (`TYPED_LIMIT`, `NOTES_LIMIT`) with no Slack cap to fit. Only the newest form of a request is
 valid: every Answer opens a new generation (Later then Answer, a second click, a second device),
 and the older forms are stale (a form whose `views.open` fails does not count: the older one
-stays valid). A stale form's changes and its Back are ignored, and its Next or Submit answers
+stays valid). A stale form's changes and its tabs are ignored, and its Next or Submit answers
 `response_action: errors` with `texts.QUESTION_STALE` on the question's block (on the review page,
-which has no field, the form is replaced by that sentence) and sends nothing; a change or a Back
-from a page Next has already left is ignored too. Every field of the valid form
+which has no field, the form is replaced by that sentence) and sends nothing; a change or a tab
+tap from a page Next has already left is ignored too. Every field of the valid form
 reports each change (an option picked, a box ticked, a character typed under Other or in Notes:
 `dispatch_action`), and the draft is updated from it. Only a change of the choice redraws the
 form with `views.update` (Other's field and Notes come and go with it); typing never does. A

@@ -1,6 +1,7 @@
 /**
  * The question form while it is open (issue #325). Other is the last option of the list and its
- * text field shows only while Other is chosen; Notes shows once something is chosen. Slack
+ * text field shows only while Other is chosen; Notes shows while a real option is chosen, never
+ * for Other alone. Slack
  * dispatches a `block_actions` payload when the choice changes (input block `dispatch_action`;
  * block_actions payload and `views.update` references, read 2026-10-16) and the daemon redraws
  * the form in one `views.update`; typing in Other or Notes only reaches the draft. What the owner
@@ -93,18 +94,17 @@ test("a question opens with its choice alone, required", async (t) => {
   assert.equal(inputsOf(o.modal.view)[0]?.optional, undefined);
 });
 
-test("choosing Other shows its field and Notes with one update", async (t) => {
+test("choosing Other shows its field, and no Notes, with one update", async (t) => {
   const o = await openForm(t);
   const shown = o.modal.hash;
   await o.world.dispatch(choose(o, radio("q0", "other")));
   assert.equal(o.modal.calls.length, 1);
   const [hash, view] = o.modal.calls[0] as [string, Body];
   assert.equal(hash, shown); // the hash of the view the payload came from
-  assert.deepEqual(idsOf(view), ["q0", "o0", "n0"]);
+  assert.deepEqual(idsOf(view), ["q0", "o0"]);
   const inputs = inputsOf(view);
   assert.equal(inputs[0]?.element.initial_option.value, "other");
   assert.equal(inputs[1]?.element.max_length, 300);
-  assert.equal(inputs[2]?.element.max_length, 300);
   assert.equal(JSON.parse(view.private_metadata as string).a, o.approvalId);
   assert.deepEqual(draftOf(o)?.other, new Set([0]));
 });
@@ -126,11 +126,11 @@ test("choosing an option after Other removes its field; Other again finds the te
   assert.deepEqual(draftOf(o)?.other, new Set());
   assert.equal(draftOf(o)?.typed.get(0), "mauve"); // kept in the draft
   await o.world.dispatch(choose(o, radio("q0", "other")));
-  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0", "n0"]);
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0"]);
   assert.equal(inputsOf(o.modal.view)[1]?.element.initial_value, "mauve");
 });
 
-test("a multi select shows the Other field while Other is ticked, Notes while any is", async (t) => {
+test("a multi select shows the Other field while Other is ticked, Notes while a real box is", async (t) => {
   const o = await openForm(t, [MULTI]);
   const tick = (...values: string[]): Body => ({
     q0: {
@@ -141,6 +141,8 @@ test("a multi select shows the Other field while Other is ticked, Notes while an
   assert.deepEqual(idsOf(o.modal.view), ["q0", "n0"]);
   await o.world.dispatch(choose(o, tick("0", "other")));
   assert.deepEqual(idsOf(o.modal.view), ["q0", "o0", "n0"]);
+  await o.world.dispatch(choose(o, tick("other"))); // Other alone: its field, no Notes
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0"]);
   await o.world.dispatch(choose(o, tick("0")));
   assert.deepEqual(idsOf(o.modal.view), ["q0", "n0"]);
   await o.world.dispatch(choose(o, tick()));
@@ -240,12 +242,32 @@ test("notes travel with the option picked", async (t) => {
   });
 });
 
-test("a single select with Other sends the typed text, and its notes", async (t) => {
+test("a single select with Other sends the typed text and no note", async (t) => {
   const o = await openForm(t);
-  assert.deepEqual(
-    await sent(o, { ...radio("q0", "other"), ...other("o0", " mauve "), ...notes("why") }),
-    { answered: true, answers: { "Colour?": "mauve" }, notes: { "Colour?": "why" } },
-  );
+  assert.deepEqual(await sent(o, { ...radio("q0", "other"), ...other("o0", " mauve ") }), {
+    answered: true,
+    answers: { "Colour?": "mauve" },
+    notes: {},
+  });
+});
+
+test("a note typed with an option is not sent once the choice turns to Other", async (t) => {
+  const o = await openForm(t);
+  await o.world.dispatch(choose(o, radio("q0", "1")));
+  await o.world.dispatch(typeIn(o, "notes", "n0", { ...radio("q0", "1"), ...notes("darker") }));
+  await o.world.dispatch(choose(o, { ...radio("q0", "other"), ...notes("darker") }));
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0"]);
+  assert.equal(draftOf(o)?.notes.get(0), "darker"); // kept, not sent
+  const state = { ...radio("q0", "other"), ...other("o0", "mauve") };
+  // The form as it stands has no Notes field, and nothing bounces for the note kept.
+  const response = await o.world.dispatch(submitAsShown(o.modal.view, state));
+  assert.equal((response.body as Body | undefined)?.response_action, undefined);
+  await o.world.idle();
+  assert.deepEqual(await o.pending.decision, {
+    answered: true,
+    answers: { "Colour?": "mauve" },
+    notes: {},
+  });
 });
 
 test("a multi select with Other sends the labels and the typed text, and its notes", async (t) => {
@@ -335,7 +357,7 @@ test("a single select whose redraw was dropped does not send an Other text the o
   const response = await o.world.dispatch(submitAsShown(o.modal.view, radio("q0", "other")));
   const body = response.body as Body;
   assert.equal(body.response_action, "update");
-  assert.deepEqual(idsOf(body.view), ["q0", "o0", "n0"]);
+  assert.deepEqual(idsOf(body.view), ["q0", "o0"]);
   assert.equal(inputsOf(body.view)[1]?.element.initial_value, "mauve");
   await o.world.idle();
   assert.ok(!o.pending.decided);
@@ -363,7 +385,7 @@ test("an Other chosen with its field not on screen bounces and sends nothing", a
   const response = await o.world.dispatch(submitAsShown(o.modal.view, state));
   const body = response.body as Body;
   assert.equal(body.response_action, "update");
-  assert.deepEqual(idsOf(body.view), ["q0", "o0", "n0"]);
+  assert.deepEqual(idsOf(body.view), ["q0", "o0"]);
   await o.world.idle();
   assert.ok(!o.pending.decided);
 });
@@ -371,9 +393,9 @@ test("an Other chosen with its field not on screen bounces and sends nothing", a
 test("a field on screen that the choice no longer needs does not leak its text", async (t) => {
   const o = await openForm(t);
   await o.world.dispatch(choose(o, radio("q0", "other")));
-  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0", "n0"]);
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0"]);
   await o.world.dispatch(late(o, radio("q0", "1"))); // refused: Other's field stays on screen
-  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0", "n0"]);
+  assert.deepEqual(idsOf(o.modal.view), ["q0", "o0"]);
   const state = { ...radio("q0", "1"), ...other("o0", "mauve") };
   const response = await o.world.dispatch(submitAsShown(o.modal.view, state));
   assert.equal((response.body as Body | undefined)?.response_action, undefined);

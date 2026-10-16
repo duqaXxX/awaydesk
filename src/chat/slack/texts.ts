@@ -124,7 +124,6 @@ export const QUESTION_REVIEW_HEADING = "*Review your answers*";
 // The tab row of a form of several questions, as the terminal draws it (Claude Code 2.1.301).
 export const QUESTION_TAB_SUBMIT = "✔ Submit";
 export const QUESTION_TAB_UNNAMED = "Question {number}";
-export const QUESTION_PREVIOUS = "Previous";
 export const QUESTION_OTHER = "Other";
 export const QUESTION_OTHER_HINT = "Type your own answer";
 export const QUESTION_NOTES = "Notes";

@@ -27,7 +27,8 @@ export const APPROVAL_DENY = "approval_deny";
 export const QUESTION_OPEN = "question_open";
 export const QUESTION_SKIP = "question_skip";
 export const QUESTION_FORM = "question_form";
-export const QUESTION_BACK = "question_back";
+/** The tab buttons: `question_tab_{n}`, n a question's index, or the question count for Submit. */
+export const QUESTION_TAB = /^question_tab_(\d+)$/;
 // Text typed under Other and in Notes, per question. The draft lives in the daemon's memory
 // (`Requests`), so Slack's 3,000 characters of private_metadata bound neither.
 export const TYPED_LIMIT = 300;
@@ -350,6 +351,14 @@ function answerAt(
   return typed === undefined ? null : answerOf(question, picked, typed);
 }
 
+/**
+ * Whether a note belongs to the answer of question `at`: only a real option carries one, so Other
+ * alone shows no Notes field and sends no note.
+ */
+function takesNotes(draft: Draft, at: number): boolean {
+  return (draft.picks.get(at) ?? []).length > 0;
+}
+
 /** An option, or Other with its text, makes an answer, as in the terminal. */
 export function isAnswered(draft: Draft, questions: readonly Question[], at: number): boolean {
   return answerAt(draft, questions, at) !== null;
@@ -363,7 +372,8 @@ export function firstIncomplete(draft: Draft, questions: readonly Question[]): n
 
 /**
  * Every question's answer by its text and the notes added to it by the question's text, or null
- * while one question is unanswered. A note kept for a question with no answer is not sent.
+ * while one question is unanswered. A note kept for a question with no answer, or whose answer
+ * is Other alone, is not sent.
  */
 export function draftAnswers(
   draft: Draft,
@@ -376,7 +386,7 @@ export function draftAnswers(
     if (answer === null) return null;
     answers.push([question.text, answer]);
     const note = draft.notes.get(at);
-    if (note !== undefined) notes.push([question.text, note]);
+    if (note !== undefined && takesNotes(draft, at)) notes.push([question.text, note]);
   }
   return { answers: Object.fromEntries(answers), notes: Object.fromEntries(notes) };
 }
@@ -448,32 +458,30 @@ function tabName(question: Question, at: number): string {
   return header !== "" ? header : texts.fill(slackTexts.QUESTION_TAB_UNNAMED, { number: at + 1 });
 }
 
-/**
- * The terminal's tab row, as one context line: each question's header with `☒` once answered
- * and `☐` before, the page on screen in bold, then `✔ Submit` (bold on the review page).
- */
-function tabRow(draft: Draft, questions: readonly Question[]): Block {
-  const cells = questions.map((question, at) => {
-    const cell = `${isAnswered(draft, questions, at) ? "☒" : "☐"} ${shownAsWritten(tabName(question, at))}`;
-    return at === draft.active ? `*${cell}*` : cell;
-  });
-  const review = draft.active === questions.length;
-  cells.push(review ? `*${slackTexts.QUESTION_TAB_SUBMIT}*` : slackTexts.QUESTION_TAB_SUBMIT);
-  return context(cells.join("   "));
+/** The tab for `target` (a question's index, or the question count for Submit). */
+function tabButton(text: string, target: number, onScreen: boolean): Block {
+  return {
+    type: "button",
+    action_id: `question_tab_${target}`,
+    text: { type: "plain_text", text },
+    ...(onScreen ? { style: "primary" } : {}),
+  };
 }
 
-/** The button that goes back one page: it keeps every answer. */
-function backBlock(): Block {
-  return {
-    type: "actions",
-    elements: [
-      {
-        type: "button",
-        action_id: QUESTION_BACK,
-        text: { type: "plain_text", text: slackTexts.QUESTION_PREVIOUS },
-      },
-    ],
-  };
+/**
+ * The terminal's tab row, as buttons that jump to a page: one per question, its header with `☒`
+ * once answered and `☐` before, then `✔ Submit`; the page on screen is the primary one. A button's
+ * text is plain text, so the header goes in as written.
+ */
+function tabRow(draft: Draft, questions: readonly Question[]): Block {
+  const tabs = questions.map((question, at) => {
+    const mark = isAnswered(draft, questions, at) ? "☒" : "☐";
+    return tabButton(`${mark} ${tabName(question, at)}`, at, at === draft.active);
+  });
+  tabs.push(
+    tabButton(slackTexts.QUESTION_TAB_SUBMIT, questions.length, draft.active === questions.length),
+  );
+  return { type: "actions", block_id: "tabs", elements: tabs };
 }
 
 /** The page that ends a form of several questions: every answer, to read before it is sent. */
@@ -482,9 +490,10 @@ function reviewView(draft: Draft, questions: readonly Question[], names: Names):
     const answer = answerAt(draft, questions, at);
     const shown = typeof answer === "string" ? answer : (answer ?? []).join(", ");
     let lines = `● ${question.text}\n→ ${shown}`;
-    // A note kept for a question with no answer is not sent, so the page does not show it.
+    // A note kept for a question with no answer, or answered by Other alone, is not sent, so the
+    // page does not show it.
     const noted = draft.notes.get(at);
-    if (answer !== null && noted !== undefined) {
+    if (answer !== null && noted !== undefined && takesNotes(draft, at)) {
       lines += `\n${slackTexts.QUESTION_NOTES}: ${noted}`;
     }
     // Cut as written, on the room the escaped text takes, so no escape is split.
@@ -503,22 +512,22 @@ function reviewView(draft: Draft, questions: readonly Question[], names: Names):
       tabRow(draft, questions),
       { type: "section", text: { type: "mrkdwn", text: slackTexts.QUESTION_REVIEW_HEADING } },
       ...sections,
-      backBlock(),
     ],
   };
 }
 
 /**
- * The form, one question at a time, as the terminal's tabs: with several questions a tab row
- * names them and tells which are answered, the button reads `Next (1/3)` and leads to the next
- * question (whether or not the others have an answer), and `Review` on the last opens a page
- * that lists every answer (`reviewView`), whose `Submit answers` sends. From the second question
- * on a `Previous` button goes back one page (`QUESTION_BACK`). One question has none of that and
+ * The form, one question at a time, as the terminal's tabs: with several questions a row of tab
+ * buttons names them, tells which are answered and jumps to any page or to Submit
+ * (`Requests.onQuestionTab`), the button reads `Next (1/3)` and leads to the next question
+ * (whether or not the others have an answer), and `Review` on the last opens a page that lists
+ * every answer (`reviewView`), whose `Submit answers` sends. One question has none of that and
  * its `Submit` sends. Each question needs an answer before the next. The question shows as radio
  * buttons, or checkboxes when several may be picked, each option with its description, and Other
  * as the last option, as the terminal's list ends with its own row for a typed answer (tools
  * reference: "type your own text through the Other row"). The choice is required. While Other is
- * chosen its text field shows, required too; Notes shows once something is chosen. When an
+ * chosen its text field shows, required too; Notes shows while a real option is chosen, not for
+ * Other alone. When an
  * option says more than a choice holds (`saysMore`), the question and every option are shown
  * whole above the choice, which keeps the labels alone under the question's
  * header (issue #47).
@@ -553,10 +562,8 @@ export function questionView(draft: Draft, questions: readonly Question[], names
     action_id: "answer",
     options: [...options, otherOption],
   };
-  const picked = [
-    ...(draft.picks.get(at) ?? []).flatMap((i) => options[i] ?? []),
-    ...(wantsOther ? [otherOption] : []),
-  ];
+  const real = (draft.picks.get(at) ?? []).flatMap((i) => options[i] ?? []);
+  const picked = [...real, ...(wantsOther ? [otherOption] : [])];
   if (picked.length > 0 && question.multiSelect) {
     element.initial_options = picked;
   } else if (picked.length > 0) {
@@ -591,7 +598,7 @@ export function questionView(draft: Draft, questions: readonly Question[], names
       element: other,
     });
   }
-  if (picked.length > 0) {
+  if (real.length > 0) {
     const notes: Block = {
       type: "plain_text_input",
       action_id: "notes",
@@ -610,7 +617,6 @@ export function questionView(draft: Draft, questions: readonly Question[], names
       element: notes,
     });
   }
-  if (at > 0) blocks.push(backBlock());
   const last = at === count - 1;
   return {
     type: "modal",

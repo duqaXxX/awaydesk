@@ -26,6 +26,7 @@ import {
   STATUS_ACTION,
   TODAY,
 } from "../../../../src/chat/slack/home.ts";
+import { QUESTION_TAB } from "../../../../src/chat/slack/requests.ts";
 import {
   SETUP_BYPASS,
   SETUP_EFFORT,
@@ -153,7 +154,7 @@ const CASES: readonly Case[] = [
     }),
   ),
   {
-    listener: "action question_back",
+    listener: `action ${QUESTION_TAB}`,
     arrange: async (world, sender) => {
       const [approvalId] = world.approvals.open(CHANNEL, FORM_THREAD, "Colour", QUESTIONS);
       const modal = new ModalSlack(world.slack);
@@ -164,7 +165,7 @@ const CASES: readonly Case[] = [
       const body = formAction(
         second,
         {},
-        { id: "question_back", block: "back", type: "button" },
+        { id: "question_tab_0", block: "tabs", type: "button" },
         { hash: modal.hash },
       );
       return {

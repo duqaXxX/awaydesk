@@ -67,10 +67,10 @@ import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
   type Draft,
-  QUESTION_BACK,
   QUESTION_FORM,
   QUESTION_OPEN,
   QUESTION_SKIP,
+  QUESTION_TAB,
 } from "../requests.ts";
 import { RESUME_ACTION } from "../resume.ts";
 import { SETUP_BYPASS, SETUP_EFFORT, SETUP_MODEL, SETUP_START } from "../setup.ts";
@@ -133,7 +133,7 @@ export interface BuildAppOptions {
 /** One thing the app registered a listener for. */
 export interface Registration {
   readonly kind: "event" | "action" | "view";
-  /** The event type, the `action_id` or the `callback_id`. */
+  /** The event type, the `action_id` (a pattern as written, `/.../`) or the `callback_id`. */
   readonly id: string;
   /** The listener only acknowledges: it reads nothing and does nothing, whoever sent the payload. */
   readonly acknowledgeOnly: boolean;
@@ -320,13 +320,13 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
 
   /** A click or a select: the listener acknowledges, then checks, on its own. */
   const action = (
-    actionId: string,
+    actionId: string | RegExp,
     listener: (ack: Ack, body: Payload) => Promise<void>,
     options: { readonly acknowledgeOnly?: boolean } = {},
   ): void => {
     registered.push({
       kind: "action",
-      id: actionId,
+      id: String(actionId),
       acknowledgeOnly: options.acknowledgeOnly ?? false,
     });
     app.action(actionId, ({ ack, body }) => listener(() => ack(), body as unknown as Payload));
@@ -351,7 +351,7 @@ export function buildApp(options: BuildAppOptions): BuiltApp {
   action("answer", requests.onQuestionChoice);
   action("other", requests.onQuestionTyping);
   action("notes", requests.onQuestionTyping);
-  action(QUESTION_BACK, requests.onQuestionBack);
+  action(QUESTION_TAB, requests.onQuestionTab);
   action(QUESTION_OPEN, requests.onQuestionOpen);
   view(QUESTION_FORM, requests.onQuestionSubmit);
 

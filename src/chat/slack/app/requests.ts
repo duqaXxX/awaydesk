@@ -23,6 +23,7 @@ import {
   newDraft,
   QUESTION_FORM,
   QUESTION_SKIP,
+  QUESTION_TAB,
   questionView,
   refusedView,
 } from "../requests.ts";
@@ -273,16 +274,18 @@ export class Requests {
     this.onQuestionLive(ack, body, false);
 
   /**
-   * Back, in the question form: the page before, with every answer kept. The payload's state
-   * holds what the page on screen shows, so it is absorbed into the draft first (Back never
-   * validates), then the form is redrawn with `views.update` (block_actions payload and
-   * `views.update` references, read 2026-10-16). It checks the owner and the workspace like any
+   * A tab, in the question form: a jump to that question, or Submit, with every answer kept. The
+   * payload's state holds what the page on screen shows, so it is absorbed into the draft first
+   * (a tab never validates), then the form is redrawn with `views.update` (block_actions payload
+   * and `views.update` references, read 2026-10-16). Submit goes to the review page when every
+   * question has an answer and to the first question without one otherwise, with no error text.
+   * The tab of the page on screen does nothing. It checks the owner and the workspace like any
    * inbound path, follows the newest-form rule of `onQuestionLive` and never reaches the core.
    * The draft's page moves before the call so that a late change from the page left is ignored;
    * when Slack refuses the update (`hash_conflict`: the form moved on, `not_found`: it closed)
-   * the page goes back to the one still on screen.
+   * the page goes back to the one still on screen, unless another click moved the draft since.
    */
-  onQuestionBack = async (ack: Ack, body: Payload): Promise<void> => {
+  onQuestionTab = async (ack: Ack, body: Payload): Promise<void> => {
     await ack();
     const { approvals, identity, slack } = this.parts;
     const [user, team] = interactionActor(body);
@@ -304,21 +307,28 @@ export class Requests {
       this.drafts.delete(ids.approvalId);
       return;
     }
+    const count = questions.length;
+    const target = Number(QUESTION_TAB.exec(str(firstAction(body).action_id))?.[1] ?? Number.NaN);
     const kept = this.drafts.get(ids.approvalId);
     if (
       kept === undefined ||
       kept.generation !== ids.generation ||
       kept.active !== ids.active ||
-      ids.active === 0
+      count < 2 ||
+      !Number.isInteger(target) ||
+      target > count ||
+      target === ids.active
     ) {
       return;
     }
     // (sync) Kept before any await: a payload handled next finds what this one saw. The review
     // page has no field to read.
-    const shown = questions.length > 1 && ids.active === questions.length;
-    const here = shown ? kept : absorb(kept, record(view.state).values);
-    const back = { ...here, active: ids.active - 1 };
-    this.drafts.set(ids.approvalId, back);
+    const here = ids.active === count ? kept : absorb(kept, record(view.state).values);
+    this.drafts.set(ids.approvalId, here);
+    const to = target === count ? (firstIncomplete(here, questions) ?? count) : target;
+    if (to === ids.active) return;
+    const moved = { ...here, active: to };
+    this.drafts.set(ids.approvalId, moved);
     const viewId = text(view.id);
     if (viewId === null || this.answers.stopped) return;
     const hash = text(view.hash);
@@ -326,13 +336,13 @@ export class Requests {
       await slack.views.update({
         view_id: viewId,
         ...(hash === null ? {} : { hash }),
-        view: questionView(back, questions, this.parts.names) as unknown as ModalView,
+        view: questionView(moved, questions, this.parts.names) as unknown as ModalView,
       });
     } catch (error) {
       if (isCancelled(error)) throw error;
       // The form on screen is still the page the click came from.
-      if (this.drafts.get(ids.approvalId) === back) this.drafts.set(ids.approvalId, here);
-      logger.warning(`could not go back in the question form: ${describe(error)}`);
+      if (this.drafts.get(ids.approvalId) === moved) this.drafts.set(ids.approvalId, here);
+      logger.warning(`could not change the page of the question form: ${describe(error)}`);
     }
   };
 

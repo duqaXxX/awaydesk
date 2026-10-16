@@ -7,21 +7,23 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- The question form lists Other as its last option, has a way back and a review page, and takes
+- The question form lists Other as its last option, has tabs and a review page, and takes
   optional Notes (issue #325). Other is the last option of the radio buttons and of the
   checkboxes (`Other`, `Type your own answer`), as the terminal's list ends with its own row. Its
-  text field, required, shows only while Other is chosen, and the optional Notes field only once
-  something is chosen. The choice is required, so Slack shows no `(optional)` beside the question.
+  text field, required, shows only while Other is chosen, and the optional Notes field only while a
+  real option is chosen (a single select with Other shows only Other's field; a multi select shows
+  Notes while at least one real box is ticked, Other ticked or not). The choice is required, so Slack shows no `(optional)` beside the question.
   The form redraws only when the choice changes; typing in Other or Notes reaches the draft and
   redraws nothing. A text or a note kept in the draft is sent only with a choice (Other's text
-  only while Other is chosen). Next and Submit redraw the form and send nothing in two cases:
+  only while Other is chosen, a note only while a real option is). Next and Submit redraw the form and send nothing in two cases:
   Other is chosen and its field is not on screen, or the draft holds a note and the form draws a
   Notes field that is not on screen (a redraw Slack refused). Any other difference between the
   screen and the draft sends the draft, so a fast Next passes at once. A text of spaces alone in Other is a field error. With several
-  questions the `1 of 3` line becomes the terminal's tab row (`☒ Colour  *☐ Sizes*  ☐ Shape
-  ✔ Submit`: answered, open, the page on screen in bold). From the second question on, and on the
-  review page, a `Previous` button goes back one page and keeps every answer; the fields of the
-  page it leaves are kept first, and Previous checks nothing. Next always moves to the next page,
+  questions the `1 of 3` line becomes the terminal's tab row, as buttons: one per question with
+  `☒` once answered and `☐` before, the page on screen in the primary style, then `✔ Submit`. A tap
+  jumps to that page and keeps every answer; the fields of the page it leaves are kept first, and
+  a tab checks nothing. The tab of the page on screen does nothing, and `✔ Submit` opens the review
+  page when every question has an answer, else the first question without one. Next always moves to the next page,
   also when every question already has an answer; the last question's button reads `Review` and
   opens a page that lists each question with its answer and the notes of an answered one, whose `Submit answers`
   alone sends. One question is unchanged. Notes reach the agent as that question's `annotations`
