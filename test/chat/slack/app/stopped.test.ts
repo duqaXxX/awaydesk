@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { DELETE_ACTION } from "../../../../src/chat/slack/home.ts";
-import { AsyncEvent, CHANNEL, OWNER, THREAD } from "../../../support/fake-slack.ts";
+import { AsyncEvent, BOT, CHANNEL, OWNER, STRANGER, THREAD } from "../../../support/fake-slack.ts";
 import {
   type Body,
   CLICK_THREAD,
@@ -21,6 +21,7 @@ import {
   FORM_THREAD,
   homeAction,
   listed,
+  ModalSlack,
   message,
   QUESTIONS,
   reply,
@@ -153,11 +154,17 @@ const CLICKS: ReadonlyArray<readonly [string, (world: World) => Body, (world: Wo
       "question_open",
       (world) => {
         const [approvalId] = world.approvals.open(CHANNEL, CLICK_THREAD, "Colour", QUESTIONS);
+        // The form opens before the channel check (#325); a refused channel would replace it.
+        new ModalSlack(world.slack);
+        world.slack.responses["conversations.members"] = {
+          ok: true,
+          members: [OWNER, BOT, STRANGER],
+        };
         const body = click("question_open", approvalId);
         body.trigger_id = "0000000000.0000000000.fake";
         return body;
       },
-      (world) => world.slack.callsTo("views.open").length > 0,
+      (world) => world.slack.callsTo("views.update").length > 0,
     ],
     [
       "folder_bind",
@@ -212,6 +219,23 @@ test("a Home control used after the stop does nothing", async (t) => {
   await world.dispatch(homeAction({ type: "button", action_id: DELETE_ACTION, value }));
   assert.deepEqual(world.deleted, []);
   assert.deepEqual(world.slack.apiCalls, []);
+});
+
+test("a question form whose opening ends after the stop calls nothing more", async (t) => {
+  // The form opens before the channel check (#325): it is held on views.open instead.
+  const world = worldOf(t);
+  const [approvalId] = world.approvals.open(CHANNEL, CLICK_THREAD, "Colour", QUESTIONS);
+  new ModalSlack(world.slack);
+  const gate = new AsyncEvent();
+  world.slack.gate = gate;
+  world.slack.gateMethod = "views.open";
+  const crossed = crossings(t, world);
+  const body = click("question_open", approvalId);
+  body.trigger_id = "0000000000.0000000000.fake";
+  await world.dispatch(body);
+  assert.ok(world.slack.gated.isSet(), "the listener never reached views.open");
+  await stop(world);
+  assert.deepEqual(await release(world, gate, crossed), ["views.open"]);
 });
 
 test("closing the app twice is harmless", async (t) => {

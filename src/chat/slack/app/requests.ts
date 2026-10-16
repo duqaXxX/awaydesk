@@ -22,6 +22,7 @@ import {
   newDraft,
   QUESTION_SKIP,
   questionView,
+  refusedView,
 } from "../requests.ts";
 import { readChoice, readSelection, setupBlocks } from "../setup.ts";
 import * as slackTexts from "../texts.ts";
@@ -175,31 +176,59 @@ export class Requests {
     await ack();
   };
 
-  /** Answer, on a question of Claude's: opens the form. */
+  /**
+   * Answer, on a question of Claude's: opens the form, then checks the channel. The form shows
+   * the owner alone what the request already shows, and Submit checks the channel again before
+   * anything reaches the agent; a refused channel turns the open form into the reason.
+   */
   onQuestionOpen = async (ack: Ack, body: Payload): Promise<void> => {
     await ack();
-    const { approvals, slack } = this.parts;
+    const { approvals, guard, names, slack } = this.parts;
     const [user, team] = interactionActor(body);
     const channel = text(record(body.channel).id);
     const threadTs = clickThread(body);
-    if (!(await this.answers.admitted(user, team, channel, threadTs)) || channel === null) return;
+    if (!this.answers.fromOwner(user, team, channel) || channel === null) return;
     const approvalId = str(firstAction(body).value);
     const questions = approvals.questions(approvalId, channel, threadTs);
     if (questions === null) {
       await this.answers.tellOwner(channel, threadTs, texts.APPROVAL_GONE);
       return;
     }
-    // trigger_id lives 3 seconds: the checks above are the only work before this call.
-    const view = questionView(newDraft(approvalId, channel, threadTs), questions, this.parts.names);
+    // trigger_id lives 3 seconds: no network call before this one (#325).
+    const view = questionView(newDraft(approvalId, channel, threadTs), questions, names);
+    let opened: { id?: string; hash?: string } | undefined;
     try {
       const trigger = text(body.trigger_id);
       if (trigger === null) throw new TypeError("the click carries no trigger_id");
-      await slack.views.open({ trigger_id: trigger, view: view as unknown as ModalView });
+      const answer = await slack.views.open({
+        trigger_id: trigger,
+        view: view as unknown as ModalView,
+      });
+      opened = answer.view;
     } catch (error) {
       if (isCancelled(error)) throw error;
       // an expired trigger_id, say: the turn must not wait unseen
       const message = fill(slackTexts.QUESTION_NOT_OPENED, { error: describe(error) });
       await this.answers.tellOwner(channel, threadTs, message);
+      return;
+    }
+    if (this.answers.stopped) return;
+    const reason = await guard.refusal(channel);
+    if (this.answers.stopped || reason === null) return;
+    const told = fill(slackTexts.CHANNEL_REFUSED, { reason });
+    try {
+      if (opened?.id === undefined) throw new TypeError("views.open answered no view id");
+      // The hash it was opened with: a Next clicked meanwhile is not overwritten.
+      await slack.views.update({
+        view_id: opened.id,
+        ...(opened.hash === undefined ? {} : { hash: opened.hash }),
+        view: refusedView(told, names) as unknown as ModalView,
+      });
+    } catch (error) {
+      if (isCancelled(error)) throw error;
+      // Closed, or moved on: Submit refuses it, and the owner learns why here.
+      logger.warning(`could not show the refusal in the question form: ${describe(error)}`);
+      await this.answers.tellOwner(channel, threadTs, told);
     }
   };
 

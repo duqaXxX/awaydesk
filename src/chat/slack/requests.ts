@@ -470,3 +470,16 @@ export function questionView(draft: Draft, questions: readonly Question[], names
     blocks,
   };
 }
+
+/**
+ * The question form once its channel is refused: `told` alone, with no Submit and no draft.
+ * Slack lets an app close a modal only in answer to a submission, so the open one is replaced.
+ */
+export function refusedView(told: string, names: Names): Block {
+  return {
+    type: "modal",
+    title: { type: "plain_text", text: named(slackTexts.QUESTION_TITLE, names) },
+    close: { type: "plain_text", text: slackTexts.QUESTION_CLOSE },
+    blocks: [{ type: "section", text: { type: "mrkdwn", text: told } }],
+  };
+}
