@@ -326,6 +326,9 @@ export class ThreadSession {
   // usage names it too: after a command the usage still names the model before it. Null when
   // none is awaited.
   modelSwitched: string | null = null;
+  // Whether that switch came inside a turn: such a turn's usage may still name the model it
+  // started on, so the turn's end keeps the switch; the next turn that went to the model drops it.
+  modelSwitchedInTurn = false;
   // Where the session works as its hooks last reported (`cwd` follows a `cd` and a worktree;
   // Stop and PostToolUse measured 2026-09-27 on 2.1.283); null until then: `directory`.
   workingDirectory: string | null = null;
@@ -907,7 +910,7 @@ export class ThreadSession {
       this.effortReported = requested !== null;
       this.effortUnsupported = false;
       this.workingDirectory = null; // the new process starts in the bound folder
-      this.modelSwitched = null; // its usage names the model it runs
+      this.modelSwitched = null; // the new client starts from its own state
       this.sessionTokens = null; // counted by the client process, which starts at zero
       this.reader = new Task((reading) => this.read(client, reading));
       this.idleTimerCheck(); // a daemon word (`!status`, say) connects with no turn
@@ -1731,6 +1734,7 @@ export class ThreadSession {
         return;
       case "model_changed":
         this.modelSwitched = event.model;
+        this.modelSwitchedInTurn = this.active !== null;
         return;
       case "folder_changed":
         this.workingDirectory = event.folder;
@@ -1952,8 +1956,11 @@ export class ThreadSession {
       this.showRunning();
     if (event.type === "turn_ended") {
       // A turn that went to the model leaves the usage naming the model it ran on, whatever
-      // the id a switch said (`model_changed`).
-      if (event.steps !== null && event.steps > 0) this.modelSwitched = null;
+      // the id a switch before it said (`model_changed`). A switch inside this turn is newer
+      // than that usage and waits for the next one.
+      if (event.steps !== null && event.steps > 0 && !this.modelSwitchedInTurn)
+        this.modelSwitched = null;
+      this.modelSwitchedInTurn = false;
       // The turn stays active until its reply is closed: the footer is read first, and a
       // drain that saw this thread idle meanwhile would exit before the reply's end, leaving
       // its stream open (#25).

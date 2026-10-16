@@ -933,7 +933,7 @@ that never comes (a misattributed turn), the footer waits for `constants.INJECTE
 (`footer.formatFooter`): `⚡ bypass` when bypass is on, the model from `AgentSession.contextUsage`
 (the SDK's `getContextUsage()`, named by the display name of the agent's model list, `core/models.ts`;
 after a model switch, the id of the latest `model_changed` until a turn that went to the model ends
-or the usage names that id, `ThreadSession.modelSwitched`), the effort level, the name of the folder this thread was opened in,
+or the usage names that id, `ThreadSession.modelSwitched`; a switch inside a turn waits for the next one), the effort level, the name of the folder this thread was opened in,
 the git branch and the uncommitted changes of the folder the session works in, the session's tokens
 from the turn's `turn_ended` event (the `modelUsage` of the `result` record, summed by
 `footer.sessionTokens`), the context percentage from the same `contextUsage`, and the 5-hour and
@@ -967,7 +967,8 @@ The model follows the event `model_changed`, which the Claude back end reads fro
 the `PostModelSwitch` hook, run before the command's result: `getContextUsage()` still names the
 model before the command after it (measured 2026-10-16, Claude Code 2.1.301). Every `source` of the
 hook counts, since each is a change of the model the footer names. A connect to a new process drops
-the event's model, as that process's own usage names the model it runs.
+the event's model: a new client starts from its own state, and the `PostModelSwitch` of a resume, if
+the hook runs on one, sets it again.
 The core keeps the owner's setting (`ThreadSession.effortSetting`: a fixed level, or null for the
 agent's default) apart from the level the last turn ran at (`ThreadSession.effort`), and
 `ThreadSession.effortFields` builds the footer from both. A fixed level shows as itself (the level

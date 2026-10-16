@@ -318,7 +318,7 @@ class ClaudeWorld implements AgentWorld {
 
   modelCommand(): { readonly prompt: string; readonly model: string } {
     // The model's turn is `/model haiku`'s; the CLI runs the PostModelSwitch hook before its result.
-    const model = "claude-haiku-4-5-20251001";
+    const model = "claude-haiku-5-5";
     const [assistant, user, result] = withSession(
       sdkRecords("effort-model-commands").slice(3, 6),
       this.#sessionId(),

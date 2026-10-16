@@ -64,7 +64,7 @@ All notable changes to this project are documented here. The format follows
   The Claude back end now registers the `PostModelSwitch` hook, which runs before the command's
   result (measured 2026-10-16, Claude Code 2.1.301), and emits the new seam event
   `model_changed` with its `to_model`, for every `source` of the hook. The core keeps the id
-  (`ThreadSession.modelSwitched`) until a turn that went to the model ends, or the usage names
+  (`ThreadSession.modelSwitched`) until a turn that went to the model ends (a switch inside that turn waits for the next), or the usage names
   that id, or a new process connects; from then the usage speaks alone. The event needs the
   `models` capability. `PostModelSwitchHookInput.to_model` and `HookEvent` `"PostModelSwitch"` are
   rows of `docs/sdk-surface.md`, and probe claim P26 checks the event on a switch to Sonnet and back.

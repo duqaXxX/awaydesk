@@ -3959,6 +3959,30 @@ test("the footer and status name the model a command switched to, and keep it", 
   assert.ok((await session.status()).includes("Model: `Opus 5.5`"));
 });
 
+test("a switch inside a model turn outlives that turn and goes to the usage at the next", async (t) => {
+  // A fallback switches the model mid-turn while the usage still names the one the turn started on.
+  const hookInput = {
+    ...(sdkJson("post-model-switch-hook") as JsonObject),
+    to_model: "claude-opus-5-5",
+  };
+  const tools = withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject);
+  const h = harnessFor(t)({
+    turns: [
+      [...tools.slice(0, -1), hookRun(hookInput, "PostModelSwitch"), at(tools, -1)],
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => "claude-sonnet-5-5");
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Opus 5.5 · "), "the footer after the switching turn");
+  await (await session.submit("list the files")).done.wait(); // the usage names another id
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Sonnet 5.5 · "), "the usage speaks alone");
+});
+
 test("a model turn after a switch gives the footer back to the usage", async (t) => {
   // The id a switch names need not be the one the usage names: once a request has gone to the
   // model, the usage speaks alone and the footer cannot stay on the switch.
