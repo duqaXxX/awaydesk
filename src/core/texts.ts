@@ -288,6 +288,8 @@ export const SETUP_FALLBACK = "Set up this session";
 // The line that replaces the setup's controls once the owner started the session.
 export const SETUP_SUMMARY = "Model: {model} · Effort: {effort} · Bypass: {bypass}";
 export const SETUP_EFFORT_DEFAULT = "Default";
+/** The effort the footer shows for a model a turn reported takes none. */
+export const EFFORT_NOT_SUPPORTED = "not supported";
 export const STATUS = "Directory: `{directory}`\nSession: `{session}`";
 export const STATUS_STATE = naming("Mode: `{mode}`\n{agent}: `{version}`\nNow: {activity}");
 // The line between the two once the thread has a session id (issue #12). Claude Code leaves a

@@ -1202,7 +1202,9 @@ test("every result gives exactly one end of turn", () => {
     perRecord(name).forEach((made, index) => {
       const ends = of(made, "turn_ended").length;
       assert.equal(ends, wire[index]?.type === "result" ? 1 : 0, `${name} record ${index}`);
-      if (ends === 1) assert.equal(made.length, 1, `${name} record ${index}`);
+      // A command that set the effort says so first.
+      const effort = of(made, "effort_changed").length;
+      if (ends === 1) assert.equal(made.length, 1 + effort, `${name} record ${index}`);
     });
   }
 });
@@ -1403,3 +1405,61 @@ test("a result that names no model ends its call with none", () => {
       assert.equal(event.model, null);
   }
 });
+
+// `effort-model-commands.jsonl`: `/effort low`, `/model haiku`, `/model sonnet` and an ordinary
+// prompt, Claude Code 2.1.301, TypeScript SDK 0.3.301 (2026-10-16). The command turns end with a
+// result that names the command in `local_command`; the level only the result's text says.
+
+function resultEvents(wire: JsonObject): SessionEvent[] {
+  return new Translator().translate(wire);
+}
+
+test("an effort command's result gives the level it set before the turn's end", () => {
+  const made = resultEvents(record("effort-model-commands", 2));
+  assert.deepEqual(types(made), ["effort_changed", "turn_ended"]);
+  assert.deepEqual(of(made, "effort_changed"), [{ type: "effort_changed", level: "low" }]);
+});
+
+test("a model command's result says no level, the CLI's text naming none", () => {
+  for (const index of [5, 8]) {
+    assert.deepEqual(of(resultEvents(record("effort-model-commands", index)), "effort_changed"), [
+      { type: "effort_changed", level: null },
+    ]);
+  }
+});
+
+test("an ordinary turn's result changes no effort", () => {
+  assert.deepEqual(types(resultEvents(record("effort-model-commands", 11))), ["turn_ended"]);
+});
+
+for (const [command, text, level] of [
+  ["effort", "Effort level set to auto (this session only)", "auto"],
+  ["effort", "Set effort level to HIGH (this session only): Comprehensive", "high"],
+  ["effort", "\u0085Set effort level to high", "high"],
+  ["model", "Set model to Opus with xhigh effort", "xhigh"],
+  ["model", "Set model to `Sonnet 5` for this session only", null],
+] as const) {
+  test(`a ${command} result [${text}] gives the level ${level}`, () => {
+    const wire = { ...record("effort-model-commands", 2), local_command: command, result: text };
+    assert.deepEqual(of(resultEvents(wire), "effort_changed"), [{ type: "effort_changed", level }]);
+  });
+}
+
+for (const [command, text] of [
+  // The command read a level instead of setting one, or failed.
+  ["effort", "Current effort level: high"],
+  ["model", "Model 'nope' not found"],
+  ["effort", "﻿Set effort level to high"],
+  // The text of any other turn is the model's, which what the agent read can shape.
+  ["usage", "Set effort level to low (this session only): Quick"],
+  [null, "Set effort level to low (this session only): Quick"],
+] as const) {
+  test(`a ${command} result [${text}] changes no effort`, () => {
+    const { local_command: _, ...base } = record("effort-model-commands", 2);
+    const wire =
+      command === null
+        ? { ...base, result: text }
+        : { ...base, local_command: command, result: text };
+    assert.deepEqual(of(resultEvents(wire), "effort_changed"), []);
+  });
+}

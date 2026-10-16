@@ -70,12 +70,10 @@ import { getLogger } from "../../log.ts";
 import { strip } from "../../text.ts";
 import { errorName } from "../../values.ts";
 import {
-  effortChange,
   footerFields,
   formatStatusFields,
   gitState,
   sessionTokens,
-  setsEffort,
   type UsageCache,
 } from "../footer.ts";
 import { modelName } from "../models.ts";
@@ -315,12 +313,28 @@ export class ThreadSession {
   // then whatever the agent reports (`dispatch`).
   mode: string;
   cliVersion: string | null = null;
-  // The effort level the agent last reported: its Stop hook, or the output of `/effort` and
-  // `/model`, which run no hook. Null for a model without effort.
+  // The level the owner fixed (setup, `/effort`, `/model ... with X effort`, the stored one), or
+  // null for the agent's default. Kept apart from `effort`: a default setting still runs at some
+  // level, and the footer says both (`auto (medium)`), as the terminal's `/effort` does.
+  effortSetting: string | null = null;
+  // The level the last turn ran at (`effort_observed`), cleared by a command that sets the
+  // effort. Null for a model without effort, and until a turn has reported one.
   effort: string | null = null;
-  // Whether the agent has reported the level since the client started: until then it is not
-  // known, since the settings do not decide it (measured 2026-09-25).
+  // Whether an agent without a word for its default has said anything about the level since the
+  // client started (a report or a command): until then it is not known, since the settings do
+  // not decide it (measured 2026-09-25).
   effortReported = false;
+  // Whether a turn has reported that the model takes no effort (the Stop hook's level is null):
+  // the footer then says so whatever the setting. Cleared by anything that may change the model
+  // or the level, and by a turn that reports one.
+  effortUnsupported = false;
+  // The model the agent last said it switched to (`model_changed`), kept until the context
+  // usage names it too: after a command the usage still names the model before it. Null when
+  // none is awaited.
+  modelSwitched: string | null = null;
+  // Whether that switch came inside a turn: such a turn's usage may still name the model it
+  // started on, so the turn's end keeps the switch; the next turn that went to the model drops it.
+  modelSwitchedInTurn = false;
   // Where the session works as its hooks last reported (`cwd` follows a `cd` and a worktree;
   // Stop and PostToolUse measured 2026-09-27 on 2.1.283); null until then: `directory`.
   workingDirectory: string | null = null;
@@ -897,9 +911,12 @@ export class ThreadSession {
       // unless the daemon itself just asked for a stored level: that request is shown at once,
       // until the agent's own report (every turn ends with one) corrects it.
       const requested = this.validEffort(effort);
-      this.effort = requested;
+      this.effortSetting = requested;
+      this.effort = null;
       this.effortReported = requested !== null;
+      this.effortUnsupported = false;
       this.workingDirectory = null; // the new process starts in the bound folder
+      this.modelSwitched = null; // the new client starts from its own state
       this.sessionTokens = null; // counted by the client process, which starts at zero
       this.reader = new Task((reading) => this.read(client, reading));
       this.idleTimerCheck(); // a daemon word (`!status`, say) connects with no turn
@@ -1044,8 +1061,10 @@ export class ThreadSession {
     }
     await client.setEffort(level);
     this.clientEffort = effort;
-    this.effort = level;
+    this.effortSetting = level;
+    this.effort = null;
     this.effortReported = level !== null;
+    this.effortUnsupported = false;
   }
 
   /**
@@ -1457,8 +1476,8 @@ export class ThreadSession {
         resume: sessionId,
         settingsSources: ["user", "project", "local"],
         model: null,
-        // The model set with `/model` survives a resume by itself (measured); the effort
-        // `/effort` set does not, so the daemon stores it per thread and passes it back here.
+        // A model set by command survives a resume by itself (measured); the effort a command
+        // set does not, so the daemon stores it per thread and passes it back here.
         effort: valid,
       },
       {
@@ -1672,6 +1691,8 @@ export class ThreadSession {
         return declared.declaredState ? null : "declaredState";
       case "limits_changed":
         return declared.usageLimits ? null : "usageLimits";
+      case "model_changed":
+        return declared.models ? null : "models";
       case "task_started": {
         const needs = event.kind === "subagent" ? "subagents" : "backgroundTasks";
         if (declared[needs]) return null;
@@ -1722,6 +1743,27 @@ export class ThreadSession {
         // The Stop hook's input carries the level, absent when the model takes none.
         this.effort = event.level;
         this.effortReported = true;
+        this.effortUnsupported = event.level === null;
+        return;
+      case "effort_changed":
+        // What ran before the command is no longer what runs: the next turn reports the level.
+        this.effort = null;
+        this.effortReported = true;
+        this.effortUnsupported = false;
+        // Stored so the next connect can pass it back (a model set by command survives a
+        // resume by itself; effort does not). A null level means "unknown" (a model change
+        // that names no effort), not "back to default": the stored override, if any, is left
+        // alone. The agent's word for its default (`effortDefault`) IS an explicit reset,
+        // stored as none.
+        if (event.level !== null) {
+          const reset = event.level === this.deps.agent.capabilities.effortDefault;
+          this.effortSetting = reset ? null : event.level;
+          this.deps.state.setEffort(this.channelId, this.threadId, this.effortSetting);
+        }
+        return;
+      case "model_changed":
+        this.modelSwitched = event.model;
+        this.modelSwitchedInTurn = this.active !== null;
         return;
       case "folder_changed":
         this.workingDirectory = event.folder;
@@ -1942,6 +1984,12 @@ export class ThreadSession {
     if (event.type === "call_ended" && active.renderer.backgroundTasks.length > 0)
       this.showRunning();
     if (event.type === "turn_ended") {
+      // A turn that went to the model leaves the usage naming the model it ran on, whatever
+      // the id a switch before it said (`model_changed`). A switch inside this turn is newer
+      // than that usage and waits for the next one.
+      if (event.steps !== null && event.steps > 0 && !this.modelSwitchedInTurn)
+        this.modelSwitched = null;
+      this.modelSwitchedInTurn = false;
       // The turn stays active until its reply is closed: the footer is read first, and a
       // drain that saw this thread idle meanwhile would exit before the reply's end, leaving
       // its stream open (#25).
@@ -2897,29 +2945,6 @@ export class ThreadSession {
       if (result.sessionId) {
         this.deps.state.setSession(this.channelId, this.threadId, result.sessionId);
       }
-      // The prompt this result answers, as `settle` reads it: none in a turn the agent started,
-      // and the first one waiting when the turn was guessed to be a report.
-      const prompt = injected ? undefined : (active.turn ?? this.sent[0])?.prompt;
-      const [changed, effort] =
-        prompt !== undefined && setsEffort(prompt)
-          ? effortChange(result.finalText ?? "")
-          : [false, null];
-      if (changed) {
-        this.effort = effort;
-        this.effortReported = true;
-        // Stored so the next connect can pass it back (the model set with `/model` survives a
-        // resume by itself; effort does not). `effortChange`'s own null means "unknown" (a
-        // `/model` change with no effort in its output), not "back to default": the stored
-        // override, if any, is left alone. "auto" is the CLI's own word for the default: that
-        // IS an explicit reset, stored as none.
-        if (effort !== null) {
-          this.deps.state.setEffort(
-            this.channelId,
-            this.threadId,
-            effort === "auto" ? null : effort,
-          );
-        }
-      }
       // Kept for `!status`, even when this result reports none (`/usage`, `/clear`): the two
       // lines never disagree.
       this.sessionTokens = sessionTokens(result.tokens);
@@ -3147,6 +3172,27 @@ export class ThreadSession {
   }
 
   /**
+   * What the footer says of the effort. A fixed level shows as it is, unless a turn ran at
+   * another one (that is what ran). The default shows as the agent's word for it, with the level
+   * of the last turn beside it once there is one, as the terminal's `/effort` reads
+   * `auto (currently medium)`. An agent with no such word shows the level alone, once known, and
+   * `default` for a model that takes none. Once a turn has reported that the model takes no
+   * effort, the footer says so whatever the setting, as the terminal's `/model` picker does.
+   */
+  private effortFields(): Pick<FooterFields, "effort" | "effortObserved"> {
+    if (this.effortUnsupported) return { effort: texts.EFFORT_NOT_SUPPORTED, effortObserved: null };
+    const word = this.deps.agent.capabilities.effortDefault;
+    if (this.effortSetting !== null) {
+      return { effort: this.effort ?? this.effortSetting, effortObserved: null };
+    }
+    if (word !== null) return { effort: word, effortObserved: this.effort };
+    return {
+      effort: this.effortReported ? this.effort || "default" : null,
+      effortObserved: null,
+    };
+  }
+
+  /**
    * The footer's values from what the session knows now and `tokens`: the one source for both
    * the footer and `!status`, so the two never disagree.
    */
@@ -3165,10 +3211,14 @@ export class ThreadSession {
     const here = this.workingDirectory || this.directory;
     const [branch, changes] = await gitState(here, repositoryBy(this.deps.agent));
     const usage = this.usage?.current ?? null;
+    // A switch the usage does not name yet is the newer word; once a request has gone to the
+    // new model the usage names it, and from then on the usage alone speaks.
+    if (context.model === this.modelSwitched) this.modelSwitched = null;
+    const model = this.modelSwitched ?? context.model;
     return {
       bypass: this.bypass,
-      model: context.model === null ? null : modelName(this.models, context.model),
-      effort: this.effortReported ? this.effort || "default" : null,
+      model: model === null ? null : modelName(this.models, model),
+      ...this.effortFields(),
       folder: this.directory,
       branch,
       changes,

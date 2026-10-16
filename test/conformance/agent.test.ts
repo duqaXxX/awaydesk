@@ -22,10 +22,12 @@ import {
   type FakeScript,
   FakeSdk,
   fail,
+  hook,
 } from "../support/fake-query.ts";
 import { type JsonObject, sdkJson, sdkRecords } from "../support/fixtures.ts";
 import {
   call,
+  effort,
   fail as failedRequest,
   hold,
   PLAIN_CAPABILITIES,
@@ -35,6 +37,7 @@ import {
   plainAgent,
   question,
   say,
+  modelSwitched as switched,
 } from "../support/plain-agent.ts";
 import {
   type AgentHarness,
@@ -302,6 +305,31 @@ class ClaudeWorld implements AgentWorld {
     return { prompt: "/usage", includes: "Current session" };
   }
 
+  effortCommand(to: "level" | "default"): { readonly prompt: string; readonly level: string } {
+    const level = to === "level" ? "low" : (CAPABILITIES.effortDefault ?? "");
+    const recorded = sdkRecords("effort-model-commands").slice(0, 3);
+    const batch = recorded.map((item) =>
+      item.type === "result"
+        ? { ...item, result: `Effort level set to ${level} (this session only)` }
+        : item,
+    );
+    this.#plays.push({ kind: "other", batch: withSession(batch, this.#sessionId()) });
+    return { prompt: `/effort ${level}`, level };
+  }
+
+  modelCommand(): { readonly prompt: string; readonly model: string } {
+    // The model's turn is `/model haiku`'s; the CLI runs the PostModelSwitch hook before its result.
+    const model = "claude-haiku-5-5";
+    const [assistant, user, result] = withSession(
+      sdkRecords("effort-model-commands").slice(3, 6),
+      this.#sessionId(),
+    );
+    const input = { ...(sdkJson("post-model-switch-hook") as JsonObject), to_model: model };
+    const batch: Batch = [assistant, user, hook("PostModelSwitch", input), result] as Batch;
+    this.#plays.push({ kind: "other", batch });
+    return { prompt: "/model haiku", model };
+  }
+
   modelChange(): void {
     this.#plays.push({
       kind: "other",
@@ -477,6 +505,18 @@ class PlainWorld implements AgentWorld {
   // A command takes no turn of the script.
   command(): { readonly prompt: string; readonly includes: string } {
     return { prompt: "/echo hello", includes: "hello" };
+  }
+
+  effortCommand(to: "level" | "default"): { readonly prompt: string; readonly level: string } {
+    const level = to === "level" ? "full" : (PLAIN_CAPABILITIES.effortDefault ?? "");
+    this.#turns.push([effort(level)]);
+    return { prompt: "set the effort", level };
+  }
+
+  modelCommand(): { readonly prompt: string; readonly model: string } {
+    const model = "plain-large";
+    this.#turns.push([switched(model)]);
+    return { prompt: "switch the model", model };
   }
 
   // The plain agent has no model to change.

@@ -1988,6 +1988,7 @@ test("the footer follows an effort set from slack", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),
     "Set effort level to high (this session only): Comprehensive",
+    "effort",
   );
   const h = harnessFor(t)({ turns: [effortTurn, sdkMessages("tools")] });
   const session = h.session();
@@ -2012,24 +2013,150 @@ test("the footer shows the effort claude code reports", async (t) => {
   writeFileSync(join(h.tmpPath, ".claude", "settings.json"), '{"effortLevel": "high"}');
   await (await h.session().submit("list the files")).done.wait();
   await h.idle(); // the footer is drawn once the session has ended
-  assert.ok(statuses(h).at(-1)?.includes("*effort* medium"));
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto (medium)"));
 });
 
-test("the footer leaves out the effort until claude code reports it", async (t) => {
-  // A local command's turn (`/usage`) runs no Stop hook: the level is not known yet.
+test("the footer says auto, with no level, until claude code reports one", async (t) => {
+  // A local command's turn (`/usage`) runs no Stop hook: the level is not known yet. A session
+  // that never fixed a level is at the terminal's `auto`.
   const h = harnessFor(t)({ turns: [sdkMessages("usage")] });
   await (await h.session().submit("/usage")).done.wait();
   await h.idle(); // the footer is drawn once the session has ended
-  assert.ok(statuses(h).length > 0 && !statuses(h).at(-1)?.includes("effort"));
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto"));
+  assert.ok(!statuses(h).at(-1)?.includes("auto ("));
 });
 
-test("the footer says default when claude code reports no effort", async (t) => {
+test("the footer says not supported when claude code reports no effort", async (t) => {
   // Claude Code leaves the field out when the model takes no effort parameter.
   const { effort: _effort, ...hookInput } = sdkJson("stop-hook") as JsonObject;
   const h = harnessFor(t)({ turns: [withStopHook(sdkMessages("tools"), hookInput)] });
   await (await h.session().submit("list the files")).done.wait();
   await h.idle(); // the footer is drawn once the session has ended
-  assert.ok(statuses(h).at(-1)?.includes("*effort* default"));
+  assert.ok(statuses(h).at(-1)?.includes("*effort* not supported"));
+  assert.ok(!statuses(h).at(-1)?.includes("auto"));
+  assert.ok((await h.session().status()).includes("Effort: `not supported`"));
+});
+
+test("a fixed level on a model a turn reports no effort for shows not supported, until a level comes", async (t) => {
+  const { effort: _effort, ...none } = sdkJson("stop-hook") as JsonObject;
+  const modelCommand = withResult(sdkMessages("usage"), "Set model to Opus 5.5", "model");
+  const h = harnessFor(t)({
+    turns: [
+      withStopHook(sdkMessages("tools"), none),
+      modelCommand,
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  h.state.setEffort(CHANNEL, THREAD, "high");
+  await session.ensureConnected();
+  assert.ok(
+    (await session.status()).includes("Effort: `high`"),
+    "before any turn: the fixed level",
+  );
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* not supported"));
+  assert.ok((await session.status()).includes("Effort: `not supported`"));
+  await (await session.submit("/model opus")).done.wait();
+  await h.idle();
+  await (await session.submit("next")).done.wait();
+  await h.idle();
+  // The turn reports medium, but the fixed level ran differently: what ran is shown.
+  assert.ok(statuses(h).at(-1)?.includes("*effort* medium"));
+});
+
+test("a session on the default shows auto again once a model with effort reports a level", async (t) => {
+  const { effort: _effort, ...none } = sdkJson("stop-hook") as JsonObject;
+  const h = harnessFor(t)({
+    turns: [
+      withStopHook(sdkMessages("tools"), none),
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  assert.ok((await session.status()).includes("Effort: `auto`"));
+  await (await session.submit("one")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* not supported"));
+  await (await session.submit("two")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto (medium)"));
+});
+
+test("a session that never fixed a level shows the level of each turn after auto", async (t) => {
+  const hookInput = sdkJson("stop-hook") as JsonObject; // reports medium
+  const h = harnessFor(t)({ turns: [withStopHook(sdkMessages("tools"), hookInput)] });
+  await (await h.session().submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto (medium)"));
+});
+
+test("the footer follows the effort commands and the level a turn ran at", async (t) => {
+  // The sequence seen in Slack on 2026-10-16: setup low, /effort medium, /effort auto, then a prompt whose
+  // Stop hook reports medium. The terminal reads `auto (currently medium)` for the last.
+  const command = (output: string) => withResult(sdkMessages("usage"), output, "effort");
+  const h = harnessFor(t)({
+    turns: [
+      command("Set effort level to low (this session only): Quick"),
+      command("Set effort level to medium (this session only): Balanced"),
+      command("Effort level set to auto (this session only)"),
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  h.state.setEffort(CHANNEL, THREAD, "low");
+  await session.ensureConnected();
+  assert.ok((await session.status()).includes("Effort: `low`"));
+  await (await session.submit("/effort low")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* low"));
+  await (await session.submit("/effort medium")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* medium"));
+  await (await session.submit("/effort auto")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto"));
+  assert.ok(!statuses(h).at(-1)?.includes("auto ("));
+  assert.equal(thread(h).effort, null, "the stored effort is back to none");
+  await (await session.submit("next")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* auto (medium)"));
+  assert.ok((await session.status()).includes("Effort: `auto (medium)`"));
+});
+
+test("a fixed level that a turn reports differently shows the reported one", async (t) => {
+  const h = harnessFor(t)({
+    turns: [withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject)], // medium
+  });
+  const session = h.session();
+  h.state.setEffort(CHANNEL, THREAD, "low");
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* medium"));
+  assert.ok(!statuses(h).at(-1)?.includes("medium ("));
+});
+
+test("a fixed level survives a turn that reports it", async (t) => {
+  const hookInput = { ...(sdkJson("stop-hook") as JsonObject), effort: { level: "high" } };
+  const h = harnessFor(t)({ turns: [withStopHook(sdkMessages("tools"), hookInput)] });
+  const session = h.session();
+  h.state.setEffort(CHANNEL, THREAD, "high");
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.includes("*effort* high"));
+  assert.ok(!statuses(h).at(-1)?.includes("high ("));
+});
+
+test("a resumed session with no stored level shows auto, then auto with the level", async (t) => {
+  const h = harnessFor(t)({
+    turns: [withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject)],
+  });
+  const session = h.session();
+  assert.ok((await session.status()).includes("Effort: `auto`"));
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok((await session.status()).includes("Effort: `auto (medium)`"));
 });
 
 test("an effort set before a restart is not carried over", async (t) => {
@@ -2037,6 +2164,7 @@ test("an effort set before a restart is not carried over", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),
     "Set effort level to low (this session only): Quick",
+    "effort",
   );
   const h = harnessFor(t)(
     { turns: [effortTurn] },
@@ -2491,7 +2619,7 @@ test("status lists the footer s values of the latest reply", async (t) => {
   const lines = text.split("\n");
   assert.deepEqual(lines.slice(lines.indexOf("Now: idle") + 1), [
     "Model: `Haiku 4.5`",
-    "Effort: `medium`",
+    "Effort: `auto (medium)`",
     `Session tokens: \`${tokens?.[1]}\``,
     "Context: `7%`",
     "5h limit: `5%`",
@@ -2505,8 +2633,10 @@ test("status before any turn starts the client and leaves out the tokens", async
   // The version comes with a turn's `init` message, never on connect (measured 2026-09-26).
   assert.ok(text.includes(`Claude Code: \`${texts.VERSION_PENDING}\``));
   assert.ok(text.includes("Model: `Haiku 4.5`") && text.includes("Context: `7%`"));
-  // Only a turn's Stop hook, or `/effort`, reports the level: the settings do not say it.
-  assert.ok(!text.includes("Session tokens") && !text.includes("Effort"));
+  // Only a turn's Stop hook, or `/effort`, reports the level: until then the line says `auto`
+  // with no level beside it, since the settings do not decide it.
+  assert.ok(text.includes("Effort: `auto`\n") || text.endsWith("Effort: `auto`"), text);
+  assert.ok(!text.includes("Session tokens") && !text.includes("auto ("));
   // No session exists yet, so there is nothing the terminal could fork (#12).
   assert.ok(text.includes("Session: `new`\nMode: ") && !text.includes("Terminal:"));
 });
@@ -2667,12 +2797,12 @@ test("status after claude code restarts leaves out the old process s tokens", as
   const session = h.session();
   await (await session.submit("list the files")).done.wait();
   let text = await session.status();
-  assert.ok(text.includes("Session tokens") && text.includes("Effort: `medium`"));
+  assert.ok(text.includes("Session tokens") && text.includes("Effort: `auto (medium)`"));
   h.clients[0]?.inject([END_OF_STREAM]);
   await h.until(() => inside(session).client === null);
   text = await session.status();
   assert.ok(h.clients.length === 2 && text.includes("Context: `7%`"));
-  assert.ok(!text.includes("Session tokens") && !text.includes("Effort"));
+  assert.ok(!text.includes("Session tokens") && !text.includes("auto ("));
 });
 
 test("status says claude code s error when it fails to start", async (t) => {
@@ -3473,6 +3603,7 @@ test("a result reporting an effort change stores it", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),
     "Set effort level to high (this session only): Comprehensive",
+    "effort",
   );
   const h = harnessFor(t)({ turns: [effortTurn] });
   await (await h.session().submit("/effort high")).done.wait();
@@ -3498,6 +3629,7 @@ test("setting effort back to auto stores the default", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),
     "Effort level set to auto (this session only)",
+    "effort",
   );
   const h = harnessFor(t)({ turns: [effortTurn] });
   const session = h.session(); // opens the thread
@@ -3638,6 +3770,7 @@ test("the next message after an idle close resumes with effort", async (t) => {
   const effortTurn = withResult(
     sdkMessages("usage"),
     "Set effort level to high (this session only): Comprehensive",
+    "effort",
   );
   const h = harnessFor(t)({ turns: [effortTurn] }, { turns: [sdkMessages("tools")] });
   const session = h.session();
@@ -3804,12 +3937,135 @@ test("a model change with no effort does not clear the stored level", async (t) 
   const modelTurn = withResult(
     sdkMessages("usage"),
     "Set model to `Sonnet 5` for this session only",
+    "model",
   );
   const h = harnessFor(t)({ turns: [modelTurn] });
   const session = h.session(); // opens the thread
   h.state.setEffort(CHANNEL, THREAD, "high"); // stored from an earlier turn
   await (await session.submit("/model sonnet")).done.wait();
   assert.equal(thread(h).effort, "high"); // unknown, not cleared
+});
+
+/** A `/model` command's turn: the CLI's PostModelSwitch hook comes before the result. */
+function modelCommandTurn(to: string, text: string): Item[] {
+  const hookInput = { ...(sdkJson("post-model-switch-hook") as JsonObject), to_model: to };
+  const turn = withResult(sdkMessages("usage"), text, "model");
+  return [...turn.slice(0, -1), hookRun(hookInput, "PostModelSwitch"), at(turn, -1)];
+}
+
+/** The usage the agent reports, which a test moves as the real agent does after a request. */
+function usageNaming(h: Harness, model: () => string): void {
+  for (const client of h.clients) {
+    client.contextUsage = async () => ({ model: model(), percentage: 7 });
+  }
+}
+
+test("the footer and status name the model a command switched to, and keep it", async (t) => {
+  // After a command the agent's usage still names the model before it (measured 2026-10-16).
+  const SONNET = "claude-sonnet-5-5";
+  const OPUS = "claude-opus-5-5";
+  let reported = SONNET;
+  const h = harnessFor(t)({
+    turns: [
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+      modelCommandTurn(OPUS, "Set model to `Opus 5.5` for this session only"),
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => reported);
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Sonnet 5.5 · "));
+  await (await session.submit("/model opus")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Opus 5.5 · "), "the footer under the command");
+  assert.ok((await session.status()).includes("Model: `Opus 5.5`"));
+  reported = OPUS; // the next request goes to the new model
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Opus 5.5 · "), "the next model turn keeps it");
+  assert.ok((await session.status()).includes("Model: `Opus 5.5`"));
+});
+
+test("a switch inside a model turn outlives that turn and goes to the usage at the next", async (t) => {
+  // A fallback switches the model mid-turn while the usage still names the one the turn started on.
+  const hookInput = {
+    ...(sdkJson("post-model-switch-hook") as JsonObject),
+    to_model: "claude-opus-5-5",
+  };
+  const tools = withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject);
+  const h = harnessFor(t)({
+    turns: [
+      [...tools.slice(0, -1), hookRun(hookInput, "PostModelSwitch"), at(tools, -1)],
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => "claude-sonnet-5-5");
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Opus 5.5 · "), "the footer after the switching turn");
+  await (await session.submit("list the files")).done.wait(); // the usage names another id
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Sonnet 5.5 · "), "the usage speaks alone");
+});
+
+test("a model turn after a switch gives the footer back to the usage", async (t) => {
+  // The id a switch names need not be the one the usage names: once a request has gone to the
+  // model, the usage speaks alone and the footer cannot stay on the switch.
+  let reported = "claude-sonnet-5-5";
+  const h = harnessFor(t)({
+    turns: [
+      modelCommandTurn("an-id-the-usage-spells-otherwise", "Set model to `Opus 5.5`"),
+      withStopHook(sdkMessages("tools"), sdkJson("stop-hook") as JsonObject),
+    ],
+  });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => reported);
+  await (await session.submit("/model opus")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("an-id-the-usage-spells-otherwise · "));
+  reported = "claude-opus-5-5";
+  await (await session.submit("list the files")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Opus 5.5 · "));
+});
+
+test("a command that names the model already in use leaves the footer on it", async (t) => {
+  const h = harnessFor(t)({
+    turns: [
+      modelCommandTurn("claude-sonnet-5-5", "Set model to `Sonnet 5.5` for this session only"),
+    ],
+  });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => "claude-sonnet-5-5");
+  await (await session.submit("/model sonnet")).done.wait();
+  await h.idle();
+  assert.ok(statuses(h).at(-1)?.startsWith("Sonnet 5.5 · "));
+  assert.ok((await session.status()).includes("Model: `Sonnet 5.5`"));
+});
+
+test("a switch of a process that is gone does not outlive it", async (t) => {
+  // The process that replaces it resumes the session and its usage names the model it runs.
+  const h = harnessFor(t)({
+    turns: [modelCommandTurn("claude-opus-5-5", "Set model to `Opus 5.5`")],
+  });
+  const session = h.session();
+  await session.ensureConnected();
+  usageNaming(h, () => "claude-sonnet-5-5");
+  await (await session.submit("/model opus")).done.wait();
+  await h.idle();
+  assert.ok((await session.status()).includes("Model: `Opus 5.5`"));
+  h.clients[0]?.inject([END_OF_STREAM]);
+  await h.until(() => inside(session).client === null);
+  const text = await session.status(); // connects the new process
+  assert.equal(h.clients.length, 2);
+  assert.ok(text.includes("Model: `Haiku 4.5`"), text); // the fake's own usage
 });
 
 test("an unrecognized stored effort is dropped not sent", async (t) => {

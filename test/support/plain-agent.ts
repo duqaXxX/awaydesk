@@ -66,6 +66,7 @@ export const PLAIN_MODE = "standard";
 
 export const PLAIN_CAPABILITIES: Capabilities = Object.freeze({
   effortLevels: Object.freeze(["brief", "full"]),
+  effortDefault: "standard",
   liveEffort: false,
   permissionModes: Object.freeze({ default: PLAIN_MODE, auto: null, bypass: null }),
   subagents: false,
@@ -113,6 +114,8 @@ export type PlainStep =
     }
   | { readonly question: readonly Question[]; readonly giveUp: boolean }
   | { readonly fail: string }
+  | { readonly effort: string | null }
+  | { readonly model: string }
   | { readonly hold: true }
   | { readonly die: true };
 
@@ -162,6 +165,16 @@ export function question(
 /** The agent answers with a message about a failed request of its own; the turn ends as `error`. */
 export function fail(text: string): PlainStep {
   return { fail: text };
+}
+
+/** A command of the owner's changed the effort (null: it names none), as a turn's first step. */
+export function effort(level: string | null): PlainStep {
+  return { effort: level };
+}
+
+/** A command of the owner's switched the model to `id`, as a turn's first step. */
+export function modelSwitched(id: string): PlainStep {
+  return { model: id };
 }
 
 /** The turn waits here until `interrupt()` (it ends as `interrupted`) or `release()`. */
@@ -505,6 +518,10 @@ export class PlainSession implements AgentSession {
         });
         turn.ending = "error";
         return;
+      } else if ("effort" in step) {
+        this.#push({ type: "effort_changed", level: step.effort });
+      } else if ("model" in step) {
+        this.#push({ type: "model_changed", model: step.model });
       } else if ("hold" in step) {
         await orAborted(
           new Promise<void>((resolve) => {

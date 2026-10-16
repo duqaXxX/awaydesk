@@ -4,6 +4,8 @@ import type { Capabilities } from "../seam.ts";
 export const CAPABILITIES: Capabilities = Object.freeze({
   // The SDK's `EffortLevel`.
   effortLevels: Object.freeze(["low", "medium", "high", "xhigh", "max"]),
+  // The CLI's word for the model's default, set with `/effort auto`: not an `EffortLevel`.
+  effortDefault: "auto",
   // The TypeScript SDK changes the effort of a live session (`applyFlagSettings`, no reconnect,
   // SDK 0.3.296): 36 ms in the spike's measurement, 28 ms in the back end's own live check, both
   // on 2026-10-10.

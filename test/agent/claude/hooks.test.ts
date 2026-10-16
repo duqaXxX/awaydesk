@@ -1,14 +1,21 @@
 /**
- * The inputs of the two hooks the daemon registers, as Claude Code 2.1.280 and later hand them:
- * `stop-hook.json` and `post-tool-use-hook.json`, recorded from real sessions.
+ * The inputs of the three hooks the daemon registers, as Claude Code 2.1.280 and later hand them:
+ * `stop-hook.json` and `post-tool-use-hook.json`, recorded from real sessions, and
+ * `post-model-switch-hook.json`, written to the shape of `PostModelSwitchHookInput` in the SDK's
+ * `sdk.d.ts` (0.3.301).
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { postToolUseHookEvents, stopHookEvents } from "../../../src/agent/claude/hooks.ts";
+import {
+  postModelSwitchHookEvents,
+  postToolUseHookEvents,
+  stopHookEvents,
+} from "../../../src/agent/claude/hooks.ts";
 import { type JsonObject, sdkJson } from "../../support/fixtures.ts";
 
 const STOP = sdkJson("stop-hook") as JsonObject;
 const POST_TOOL_USE = sdkJson("post-tool-use-hook") as JsonObject;
+const MODEL_SWITCH = sdkJson("post-model-switch-hook") as JsonObject;
 const PROJECT = "/home/dev/project";
 
 test("a Stop hook gives the effort the session runs at, then the folder it works in", () => {
@@ -60,4 +67,25 @@ test("what is no hook input gives the Stop hook's unknown effort and nothing els
     assert.deepEqual(stopHookEvents(input), [{ type: "effort_observed", level: null }]);
     assert.deepEqual(postToolUseHookEvents(input), []);
   }
+});
+
+test("a PostModelSwitch hook gives the model the session runs after the switch", () => {
+  assert.deepEqual(postModelSwitchHookEvents(MODEL_SWITCH), [
+    { type: "model_changed", model: "claude-opus-5-5" },
+  ]);
+});
+
+test("every source of a switch gives the model", () => {
+  for (const source of ["command", "picker", "sdk", "auto", "resume"]) {
+    assert.deepEqual(postModelSwitchHookEvents({ ...MODEL_SWITCH, source }), [
+      { type: "model_changed", model: "claude-opus-5-5" },
+    ]);
+  }
+});
+
+test("a PostModelSwitch input with no model says nothing", () => {
+  for (const to_model of [undefined, null, "", 7]) {
+    assert.deepEqual(postModelSwitchHookEvents({ ...MODEL_SWITCH, to_model }), []);
+  }
+  assert.deepEqual(postModelSwitchHookEvents(null), []);
 });

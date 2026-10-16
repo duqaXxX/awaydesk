@@ -60,6 +60,40 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The footer's effort follows the terminal's `/effort` (issue #246, PR #331). A level you fixed
+  shows as it is (`effort low`). When none is fixed, which is the terminal's `auto`, it shows
+  `effort auto` and then `effort auto (medium)`, the level each turn's Stop hook reported; it
+  used to show that level alone, so `!effort auto` read `auto` and the next turn `medium`. Once
+  a turn's Stop hook reports no level, which is a model that takes no effort, the footer and
+  `!status` show `effort not supported` (the words of the terminal's `/model` picker) whatever
+  the setting, until a turn reports a level again; before any turn they show the fixed level or
+  `auto`. The core keeps the setting
+  (`ThreadSession.effortSetting`) apart from the observed level; `FooterFields.effortObserved`
+  crosses the chat seam beside `effort`, the provider draws the parentheses, and `!status` writes
+  the same text. An agent that declares no `effortDefault` shows the observed level as before, and `not supported` in place of `default`. `!status` before the
+  first turn now shows `Effort: auto` where it left the line out.
+- The core no longer reads the effort an `/effort` or `/model` command set from the turn's
+  result text (issue #246). The agent seam has a new event, `effort_changed`, said before the
+  `turn_ended` of the command's turn, and the Claude back end emits it: it takes the level from
+  the output of a result whose `local_command` is `effort` or `model` (`translate.effortChanged`),
+  so the text of any other turn is never read as an output, which the core guarded against by
+  matching the prompt (`footer.setsEffort`, removed with `footer.effortChange`). What the footer
+  shows is unchanged. The agent declares its word for the default effort in the new capability
+  `effortDefault` (Claude: `auto`, the CLI's word, which is no `EffortLevel`); the session
+  stores that level as no override instead of comparing with the literal. Probe claim P26 checks
+  that the results of `/effort` and `/model` name their command.
+  `SDKResultMessage.local_command` is a row of `docs/sdk-surface.md`
+  (recorded 2026-10-16, Claude Code 2.1.301, `effort-model-commands.jsonl`).
+- The footer and `!status` show the model a `/model` command switched to at once (issue #246).
+  They read it from `getContextUsage()`, which after a command still names the model before it,
+  so `!model opus` was answered `Set model to Opus 5.5` under a footer that said `Sonnet 5.5`.
+  The Claude back end now registers the `PostModelSwitch` hook, which runs before the command's
+  result (measured 2026-10-16, Claude Code 2.1.301), and emits the new seam event
+  `model_changed` with its `to_model`, for every `source` of the hook. The core keeps the id
+  (`ThreadSession.modelSwitched`) until a turn that went to the model ends (a switch inside that turn waits for the next), or the usage names
+  that id, or a new process connects; from then the usage speaks alone. The event needs the
+  `models` capability. `PostModelSwitchHookInput.to_model` and `HookEvent` `"PostModelSwitch"` are
+  rows of `docs/sdk-surface.md`, and probe claim P26 checks the event on a switch to Sonnet and back.
 - A rate limited Slack call waits out at most 60 seconds of Slack's pauses in all
   (`clients.RATE_LIMIT_WAIT_SECONDS`, issue #236). It was sent again up to 3 times after any
   `Retry-After`, so one call could hold a reply's lock, and a `!stop` behind it, for minutes. A

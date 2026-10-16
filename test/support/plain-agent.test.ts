@@ -19,6 +19,8 @@ import { ResumeRefused } from "../../src/agent/seam.ts";
 import {
   call,
   die,
+  effort,
+  modelSwitched,
   PLAIN_CAPABILITIES,
   PLAIN_COMMANDS,
   PLAIN_MODE,
@@ -214,6 +216,28 @@ test("a command runs without a turn of the script, by its name or its alias", LI
   }
   assert.deepEqual(outputs, ["hi there", "again", "3 words", "Unknown command: /nope"]);
   assert.equal(agent.turns.length, 1, "the scripted turn is still waiting");
+});
+
+test("an effort step says the level a command set, before the turn ends", LIMIT, async () => {
+  const agent = new PlainAgent().next(effort("full"), whole("Done.")).next(effort(null));
+  const { session, events } = await started(agent);
+  for (const level of ["full", null]) {
+    await session.send(prompt("go"));
+    const turn = await turnOf(events);
+    const changed = turn.findIndex((e) => e.type === "effort_changed");
+    assert.deepEqual(turn[changed], { type: "effort_changed", level });
+    assert.ok(changed < turn.findIndex((e) => e.type === "turn_ended"));
+  }
+});
+
+test("a model step says the model a command switched to, before the turn ends", LIMIT, async () => {
+  const agent = new PlainAgent().next(modelSwitched("plain-large"));
+  const { session, events } = await started(agent);
+  await session.send(prompt("go"));
+  const turn = await turnOf(events);
+  const changed = turn.findIndex((e) => e.type === "model_changed");
+  assert.deepEqual(turn[changed], { type: "model_changed", model: "plain-large" });
+  assert.ok(changed < turn.findIndex((e) => e.type === "turn_ended"));
 });
 
 test("the store outlives the agent: a new agent resumes, lists and refuses", LIMIT, async () => {

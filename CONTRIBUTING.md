@@ -51,7 +51,7 @@ may find a seam that needs a change: open an issue before writing one.
 4. Run the conformance suite against it. In `test/conformance/agent.test.ts`, call
    `agentConformance` with a harness (`AgentHarness` in `test/conformance/agent.ts`) that creates
    an instance of the agent in a world of its own (`AgentWorld`) and plays it: the suite asks it to
-   say a text, call a tool, ask a question or die, and reads the events. In
+   say a text, call a tool, ask a question, run its effort command or die, and reads the events. In
    `test/conformance/chat.test.ts`, call `chatConformance` with a function (`MakeRig` in
    `test/conformance/chat.ts`) that builds a rig (`ChatRig`): the provider, a channel and a thread,
    the owner and somebody else as people who write and click, whether the chat can show a line to

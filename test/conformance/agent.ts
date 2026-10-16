@@ -85,6 +85,16 @@ export interface AgentWorld {
   /** The next prompt is a command of the agent's own: the prompt to send, and a word its output holds. */
   command(): { readonly prompt: string; readonly includes: string };
   /**
+   * The next prompt is a command of the owner's that sets the effort to a level the agent
+   * declares, or to its word for the default: the prompt to send and the level the agent says.
+   */
+  effortCommand(to: "level" | "default"): { readonly prompt: string; readonly level: string };
+  /**
+   * The next prompt is a command of the owner's that switches the model: the prompt to send and
+   * the model id the agent then runs, as its context usage will name it.
+   */
+  modelCommand(): { readonly prompt: string; readonly model: string };
+  /**
    * The next model change is one the agent takes. A back end that changes the model with a turn
    * of its own (a command the agent runs) plays that turn; one that sets it directly does nothing.
    */
@@ -318,9 +328,16 @@ function assertDeclared(events: readonly SessionEvent[], caps: Capabilities): vo
       assert.ok(!event.type.startsWith("compaction_") && event.type !== "compacted");
     }
     if (!caps.usageLimits) assert.notEqual(event.type, "limits_changed");
+    if (!caps.models) assert.notEqual(event.type, "model_changed");
     if (!caps.declaredState) assert.notEqual(event.type, "state_changed");
-    if (event.type === "effort_observed" && event.level !== null) {
-      assert.ok(caps.effortLevels.includes(event.level), "an effort the back end declares");
+    if (
+      (event.type === "effort_observed" || event.type === "effort_changed") &&
+      event.level !== null
+    ) {
+      assert.ok(
+        caps.effortLevels.includes(event.level) || event.level === caps.effortDefault,
+        "an effort the back end declares, or its word for the default",
+      );
     }
   }
 }
@@ -737,6 +754,51 @@ export function agentConformance(name: string, harness: AgentHarness): void {
           end.steps === null || end.steps === 0,
           "a command turn is not a step of the model",
         );
+        assertWellFormed(turn);
+        assertDeclared(turn, caps);
+      },
+    );
+
+    for (const to of ["level", "default"] as const) {
+      check(
+        `a command that sets the effort to ${to === "level" ? "a level" : "the default"} says so before the turn ends`,
+        {
+          ...LIMIT,
+          skip:
+            caps.effortLevels.length === 0 || (to === "default" && caps.effortDefault === null)
+              ? `${name} declares no ${to === "level" ? "effort levels" : "default effort word"}`
+              : false,
+        },
+        async (world, t) => {
+          const { prompt: text, level } = world.effortCommand(to);
+          assert.ok(
+            to === "default" ? level === caps.effortDefault : caps.effortLevels.includes(level),
+          );
+          const { session, events } = await open(t, world);
+          await session.send(prompt(text));
+          const turn = await events.turn();
+          const changed = turn.filter((event) => event.type === "effort_changed");
+          assert.deepEqual(changed, [{ type: "effort_changed", level }]);
+          const at = turn.findIndex((event) => event.type === "effort_changed");
+          assert.ok(at < turn.findIndex((event) => event.type === "turn_ended"));
+          assertWellFormed(turn);
+          assertDeclared(turn, caps);
+        },
+      );
+    }
+
+    check(
+      "a command that switches the model says so before the turn ends",
+      lacks(caps.models, "models"),
+      async (world, t) => {
+        const { prompt: text, model } = world.modelCommand();
+        const { session, events } = await open(t, world);
+        await session.send(prompt(text));
+        const turn = await events.turn();
+        const changed = turn.filter((event) => event.type === "model_changed");
+        assert.deepEqual(changed, [{ type: "model_changed", model }]);
+        const at = turn.findIndex((event) => event.type === "model_changed");
+        assert.ok(at < turn.findIndex((event) => event.type === "turn_ended"));
         assertWellFormed(turn);
         assertDeclared(turn, caps);
       },

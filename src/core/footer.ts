@@ -1,6 +1,6 @@
 /** The context line under every reply as data: git state, usage limits, tokens and the fields. */
 import { spawn } from "node:child_process";
-import type { ModelTokens, PromptContent, Repository } from "../agent/seam.ts";
+import type { ModelTokens, Repository } from "../agent/seam.ts";
 import type { FooterFields, UsageLimit } from "../chat/seam.ts";
 import { getLogger } from "../log.ts";
 import { strip } from "../text.ts";
@@ -11,12 +11,6 @@ export const logger = getLogger("awaydesk.core.footer");
 export const USAGE_TTL = 300_000;
 // For every git call of one footer together: the reply waits for it.
 export const GIT_TIMEOUT = 5_000;
-// Outputs measured on Claude Code 2.1.280 (2026-09-23); the "with X effort" form is the one
-// ccstatusline reads from transcripts.
-const EFFORT_OUTPUT = /^(?:Set effort level to|Effort level set to) ([a-z0-9-]+)/i;
-const MODEL_OUTPUT = /^Set model to\b(?:.*? with ([a-z0-9-]+) effort)?/is;
-// The commands that write those outputs.
-const EFFORT_COMMAND = /^\/(?:effort|model)(?:\s|$)/;
 // ` 2 files changed, 42 insertions(+), 10 deletions(-)`, as every --shortstat writes it, git 2.54
 // (2026-09-27).
 const SHORTSTAT_INSERTIONS = /(\d+) insertions?\(\+\)/;
@@ -53,6 +47,8 @@ export interface FooterField {
   readonly key: FooterKey;
   readonly label: string;
   readonly value: string;
+  /** What a provider draws beside the value (the level a default effort ran at); absent for none. */
+  readonly detail?: string;
 }
 
 /**
@@ -273,33 +269,6 @@ export async function gitState(
   return [branch, changes];
 }
 
-/**
- * Whether a command's output changes the effort level, and to what (null: back to unknown).
- *
- * `/effort` and `/model` run no Stop hook, the footer's other source (Claude Code 2.1.280), so
- * the footer follows their output. A model change without an effort clears the level.
- */
-export function effortChange(output: string): [changed: boolean, effort: string | null] {
-  const text = strip(output);
-  const effort = EFFORT_OUTPUT.exec(text);
-  if (effort) {
-    return [true, (effort[1] as string).toLowerCase()];
-  }
-  const model = MODEL_OUTPUT.exec(text);
-  if (model) {
-    return [true, model[1] ? model[1].toLowerCase() : null];
-  }
-  return [false, null];
-}
-
-/**
- * Whether `prompt` runs a command whose output `effortChange` reads. The final text of any other
- * turn is the model's, which what the agent read can shape: it is never read as an output.
- */
-export function setsEffort(prompt: PromptContent): boolean {
-  return typeof prompt === "string" && EFFORT_COMMAND.test(strip(prompt));
-}
-
 /** The tokens of a turn summed over its models; null when it used none. */
 export function sessionTokens(tokens: Readonly<Record<string, ModelTokens>>): number | null {
   const models = Object.values(tokens);
@@ -369,7 +338,12 @@ export function footerFields(data: FooterFields, now: number): FooterField[] {
     fields.push({ key: "model", label: "Model", value: data.model });
   }
   if (data.effort) {
-    fields.push({ key: "effort", label: "Effort", value: data.effort });
+    fields.push({
+      key: "effort",
+      label: "Effort",
+      value: data.effort,
+      detail: data.effortObserved ?? undefined,
+    });
   }
   if (data.branch) {
     fields.push({ key: "branch", label: "Branch", value: data.branch });
@@ -408,10 +382,15 @@ export function footerFields(data: FooterFields, now: number): FooterField[] {
   return fields;
 }
 
+/** `auto (medium)`: a value and what it ran at, or the value alone. */
+export function valueWithDetail(field: FooterField): string {
+  return !field.detail ? field.value : `${field.value} (${field.detail})`;
+}
+
 /**
  * The footer's values as `!status` lines, one per field; bypass and the folder are left out,
  * since the status's Mode and Directory lines already show them.
  */
 export function formatStatusFields(data: FooterFields, now: number): string[] {
-  return footerFields(data, now).map((field) => `${field.label}: \`${field.value}\``);
+  return footerFields(data, now).map((field) => `${field.label}: \`${valueWithDetail(field)}\``);
 }

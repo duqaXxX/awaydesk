@@ -273,6 +273,16 @@ export const CLAIMS: readonly Claim[] = [
       "and say so in the issue it names",
   ),
   claim(
+    "P26",
+    "gesture",
+    "the result of `/effort` and of `/model` names the command in `local_command`, and its text " +
+      "says the level a command set, so the back end can tell the core; the PostModelSwitch hook " +
+      "of `/model` gives `to_model` before that result",
+    "src/agent/claude/translate.ts#effortChanged",
+    "in a thread, send `!effort low`; the footer shows `low`, then `!effort auto`; it shows `auto`; " +
+      "send `!model opus`: the footer shows `Opus 5.5` at once, not the model before it",
+  ),
+  claim(
     "P27",
     "gesture",
     "with a model named in the project settings, after `setModel()` on the query a `/model` to " +

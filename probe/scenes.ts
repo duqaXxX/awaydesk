@@ -102,6 +102,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   bypass: ["P9"],
   "working folder": ["P14"],
   replay: ["P19"],
+  "effort commands": ["P26"],
   goal: ["P20"],
   compact: ["P21", "P22"],
   "commands not offered": ["P23"],
@@ -897,6 +898,41 @@ async function replay(s: Stage): Promise<Seen> {
   };
 }
 
+/**
+ * P26: the result of `/effort` and of `/model` names the command in `local_command`, so the back
+ * end says the level each set (`effort_changed`), and the PostModelSwitch hook before the result
+ * of `/model` gives the model it switched to (`model_changed`). The scene crosses to Sonnet and
+ * back, since `/model haiku` on a session already on Haiku may switch nothing. The session ends
+ * on `auto`, the default it started with, and on the model it started on; no command costs a
+ * token.
+ */
+async function effortCommands(s: Stage): Promise<Seen> {
+  const levels: (string | null | undefined)[] = [];
+  for (const command of ["/effort low", "/model haiku", "/effort auto"]) {
+    const turn = await s.main.turn(command);
+    const changed = ofType(turn.events, "effort_changed");
+    levels.push(changed.length === 1 ? changed[0]?.level : undefined);
+  }
+  const holds = levels[0] === "low" && levels[1] === null && levels[2] === "auto";
+  const detail = holds
+    ? ""
+    : `the level each command said: ${levels.map((l) => (l === undefined ? "no event" : String(l))).join(", ")}`;
+  const models: (string | undefined)[] = [];
+  for (const command of ["/model sonnet", "/model haiku"]) {
+    const turn = await s.main.turn(command);
+    const changed = ofType(turn.events, "model_changed");
+    const before =
+      turn.events.findIndex((event) => event.type === "model_changed") <
+      turn.events.findIndex((event) => event.type === "turn_ended");
+    models.push(changed.length === 1 && before ? changed[0]?.model : undefined);
+  }
+  const switched = models[0] !== undefined && models[1] !== undefined && models[0] !== models[1];
+  const said = switched
+    ? ""
+    : `the model each command said: ${models.map((m) => m ?? "no event").join(", ")}`;
+  return { P26: observation(true, holds && switched, [detail, said].filter(Boolean).join("; ")) };
+}
+
 async function goal(s: Stage): Promise<Seen> {
   // A goal met by its first turn, so the scene is one turn and leaves no goal behind.
   const condition = "Reply with the single word tick.";
@@ -1160,6 +1196,7 @@ export async function runScenes(log: Log): Promise<Seen> {
       Object.assign(seen, await attempt("bypass", s, () => bypass(s)));
       Object.assign(seen, await attempt("working folder", s, () => workingFolder(s)));
       Object.assign(seen, await attempt("replay", s, () => replay(s)));
+      Object.assign(seen, await attempt("effort commands", s, () => effortCommands(s)));
       Object.assign(seen, await attempt("goal", s, () => goal(s)));
       Object.assign(seen, await attempt("compact", s, () => compact(s)));
       Object.assign(seen, await attempt("commands not offered", s, () => commandsNotOffered(s)));

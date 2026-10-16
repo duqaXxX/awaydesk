@@ -32,7 +32,7 @@ import {
   type StartOptions,
 } from "../seam.ts";
 import { CAPABILITIES } from "./capabilities.ts";
-import { postToolUseHookEvents, stopHookEvents } from "./hooks.ts";
+import { postModelSwitchHookEvents, postToolUseHookEvents, stopHookEvents } from "./hooks.ts";
 import { agentInfo, contextUsage as contextUsageOf } from "./info.ts";
 import { userMessage } from "./prompt.ts";
 import { permissionResult, questionResult, toRequest } from "./requests.ts";
@@ -306,10 +306,13 @@ export class ClaudeSession implements AgentSession {
       // The Stop hook's input carries the effort level Claude Code runs at: the footer's only
       // source for it, since no message reports it. Every hook input carries the `cwd` the
       // session works in; PostToolUse reports it after each tool, so a turn stopped or failed
-      // before its Stop still moves the footer's branch.
+      // before its Stop still moves the footer's branch. PostModelSwitch names the model a
+      // `/model` command switched to, before the command's result: the context usage still
+      // names the old one after a command.
       hooks: {
         Stop: [{ hooks: [this.#hook(stopHookEvents)] }],
         PostToolUse: [{ hooks: [this.#hook(postToolUseHookEvents)] }],
+        PostModelSwitch: [{ hooks: [this.#hook(postModelSwitchHookEvents)] }],
       },
       // The process's stderr may quote the conversation: only its size is kept.
       stderr: (line) => logger.debug(`claude stderr: ${line.length} chars`),

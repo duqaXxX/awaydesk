@@ -128,6 +128,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `BaseHookInput` | `cwd` | field | hooks.ts: folderChanged | reference | P14 |
 | `BaseHookInput` | `effort` | field | hooks.ts: stopHookEvents | reference | none |
 | `BaseHookInput.effort` | `level` | field | hooks.ts: stopHookEvents | package | none |
+| `PostModelSwitchHookInput` | `to_model` | field | hooks.ts: postModelSwitchHookEvents | reference | P26 |
 | `CanUseTool` | `description` | field | requests.ts: toRequest, CallContext | package | none |
 | `CanUseTool` | `signal` | field | session.ts: ClaudeSession.#options | package | none |
 | `CanUseTool` | `title` | field | requests.ts: toRequest, CallContext | package | none |
@@ -161,10 +162,11 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKPartialAssistantMessage` | `event` | field | translate.ts: kindOf, messageStart, contentBlockStart, contentBlockDelta | reference | none |
 | `SDKPartialAssistantMessage` | `parent_tool_use_id` | field | translate.ts: parentOf | reference | none |
 | `SDKResultMessage` | `is_error` | field | translate.ts: endingOf; session.ts: ClaudeSession.#pump | reference | none |
+| `SDKResultMessage` | `local_command` | field | translate.ts: effortChanged | package | P26 |
 | `SDKResultMessage` | `modelUsage` | field | translate.ts: result | reference | none |
 | `SDKResultMessage` | `num_turns` | field | translate.ts: result | reference | none |
 | `SDKResultMessage` | `origin` | field | translate.ts: result | reference | P25 |
-| `SDKResultMessage` | `result` | field | translate.ts: result | reference | none |
+| `SDKResultMessage` | `result` | field | translate.ts: result, effortChanged | reference | none |
 | `SDKResultMessage` | `session_id` | field | translate.ts: result | reference | P3 |
 | `SDKResultMessage` | `terminal_reason` | field | translate.ts: endingOf | reference | none |
 | `SDKSessionInfo` | `customTitle` | field | info.ts: listedSession | reference | none |
@@ -267,6 +269,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `EffortLevel` | `"max"` | value | capabilities.ts: CAPABILITIES | package | none |
 | `EffortLevel` | `"medium"` | value | capabilities.ts: CAPABILITIES | package | none |
 | `EffortLevel` | `"xhigh"` | value | capabilities.ts: CAPABILITIES | package | none |
+| `HookEvent` | `"PostModelSwitch"` | value | session.ts: ClaudeSession.#options | reference | P26 |
 | `HookEvent` | `"PostToolUse"` | value | session.ts: ClaudeSession.#options | reference | none |
 | `HookEvent` | `"Stop"` | value | session.ts: ClaudeSession.#options | reference | none |
 | `PermissionMode` | `"acceptEdits"` | value | session.ts: PERMISSION_MODES | reference | none |
@@ -297,6 +300,8 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `SDKPartialAssistantMessage.event.type` | `"message_stop"` | value | translate.ts: HANDLERS | measured | none |
 | `SDKPartialAssistantMessage.type` | `"stream_event"` | value | translate.ts: kindOf | reference | none |
 | `SDKRateLimitEvent.type` | `"rate_limit_event"` | value | translate.ts: HANDLERS | reference | none |
+| `SDKResultMessage.local_command` | `"effort"` | value | translate.ts: effortChanged | measured | P26 |
+| `SDKResultMessage.local_command` | `"model"` | value | translate.ts: effortChanged | measured | P26 |
 | `SDKResultMessage.terminal_reason` | `"aborted_streaming"` | value | translate.ts: INTERRUPTED | reference | none |
 | `SDKResultMessage.terminal_reason` | `"aborted_tools"` | value | translate.ts: INTERRUPTED | reference | none |
 | `SDKResultMessage.type` | `"result"` | value | translate.ts: HANDLERS; session.ts: ClaudeSession.#pump, ClaudeSession.#readCommand | reference | none |

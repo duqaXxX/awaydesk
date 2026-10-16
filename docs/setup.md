@@ -800,7 +800,7 @@ it; a prompt that could not start has none. After a forced end it has no model o
 A thread with `Working…` or the card at its bottom has not ended; the footer says it has:
 
 ```
-⚡ bypass · claude-opus-5-5 · effort medium · my-project · main · (+42,-10) · 10.2M tok · ctx 15% · 5h 16% ↻ 43m · 7d 46% ↻ 3d 4h
+⚡ bypass · claude-opus-5-5 · effort auto (medium) · my-project · main · (+42,-10) · 10.2M tok · ctx 15% · 5h 16% ↻ 43m · 7d 46% ↻ 3d 4h
 ```
 
 It holds `⚡ bypass` when bypass is on, the model, the effort level, the name of the folder this
@@ -811,15 +811,17 @@ subscription. The labels (`effort`, `tok`, `ctx`, `5h`, `7d`) are bold. A field 
 is left out.
 The branch and the changes are those of the folder the session works in: the thread's own folder
 at first, then the one Claude moved to with `cd` or a worktree, as Claude Code reported it after
-its last tool; `!status` names that folder when it is not the thread's own. The effort level is
-the one Claude Code reported at the end of the last turn, or the one set since with `!effort` (or
-`!model`); it reads `default` on a model that takes no effort level. A level set with `!effort` is
-kept for this thread and reapplied on every reconnect, so it survives an idle close and a restart
-of awaydesk: the footer shows that level at once after the reconnect, until Claude Code's
-own report at the end of the next turn corrects it. With no stored level, the field is left out
-after a restart or an idle close until a turn ends normally (an interrupted turn or an API error
-reports no level either way). A model set with `!model` needs no such help, since Claude Code's
-own resume keeps it by itself.
+its last tool; `!status` names that folder when it is not the thread's own. The effort reads as
+Claude Code's own `/effort` does. A level you fixed (at the setup, with `!effort` or `!model`, or
+stored from an earlier run) shows as itself, `effort low`. Otherwise the effort is the model's
+default and shows `effort auto`, then `effort auto (medium)` once a turn has ended, with the
+level Claude Code reported for that turn (it follows each turn). A model that takes no effort level
+shows `effort not supported` once a turn has reported that, whatever the setting, until a turn
+reports a level again. If a turn reports a level other than the fixed one, the footer shows
+the reported one, since that is what ran. A level set with `!effort` is kept for this thread and
+reapplied on every reconnect, so it survives an idle close and a restart of awaydesk. A model set
+with `!model` needs no such help, since Claude Code's own resume keeps it by itself. `!status`
+writes the same value on its `Effort` line.
 
 ### Notifications
 

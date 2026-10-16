@@ -606,8 +606,8 @@ test("a report turn that starts while a prompt waits does not take its reply", a
   assert.notEqual(replyWith(h, "PINEAPPLE"), replyWith(h, "REPORTED"));
 });
 
-// The effort level is read from the output of the command that sets it (`setsEffort`), and the
-// result says whose turn it was: the guess made at the turn's start can be wrong.
+// The back end says the effort a command set, from the result that names the command, so the
+// guess made at a turn's start about whose turn it is cannot change what is read.
 
 test("a report turn is not read as the output of an effort command that waits", async (t) => {
   // A command has no replay, so the report turn that starts while it waits is guessed to be its
@@ -619,7 +619,7 @@ test("a report turn is not read as the output of an effort command that waits", 
   await h.sleep(0.05);
   h.clients[0]?.inject(withResult(c.report, "Set effort level to low (this session only): Quick"));
   await h.until(() => inside(session).active === null && inside(session).settled.isSet);
-  assert.equal(inside(session).effort, null);
+  assert.equal(inside(session).effortSetting, null);
 });
 
 test("an effort command s output is read in a turn guessed to be a report", async (t) => {
@@ -631,9 +631,9 @@ test("an effort command s output is read in a turn guessed to be a report", asyn
   const command = await send(h, session, "/effort high");
   inside(session).injectedExpected = true;
   const output = "Set effort level to high (this session only): Comprehensive";
-  h.clients[0]?.inject(withResult(sdkMessages("usage"), output));
+  h.clients[0]?.inject(withResult(sdkMessages("usage"), output, "effort"));
   await command.done.wait();
-  assert.equal(inside(session).effort, "high");
+  assert.equal(inside(session).effortSetting, "high");
 });
 
 test("a turn with no replay and no notification waiting is the prompt s", async (t) => {

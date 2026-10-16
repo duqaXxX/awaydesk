@@ -45,6 +45,12 @@ export interface Capabilities {
    * sent: the core drops it, with a line in the log.
    */
   readonly effortLevels: readonly string[];
+  /**
+   * The word the agent uses for "the model's own default effort", which an `effort_changed` or
+   * `effort_observed` level may carry though it is no level `setEffort` takes. The core stores
+   * it as no override. Null when the agent has no such word.
+   */
+  readonly effortDefault: string | null;
   /** `setEffort` changes the live session; without it the core restarts the session. */
   readonly liveEffort: boolean;
   readonly permissionModes: PermissionModes;
@@ -365,6 +371,19 @@ export type SessionEvent =
   | { readonly type: "mode_changed"; readonly mode: PermissionMode }
   /** The effort the agent runs at; null is its default. */
   | { readonly type: "effort_observed"; readonly level: string | null }
+  /**
+   * A command of the owner's changed the effort, or the model, which takes its own. `level` is
+   * the effort the command says the agent now runs at; null when it says none (the new model
+   * has its default). Said before the end of the turn that ran the command.
+   */
+  | { readonly type: "effort_changed"; readonly level: string | null }
+  /**
+   * The agent runs another model from now on, however the switch came (a command, the daemon's
+   * own `setModel`, a fallback, a resume): the id its `ContextUsage` will name once a request
+   * has gone to it. Said before the end of the turn that ran a command, ahead of the usage,
+   * which after a command still names the model before it.
+   */
+  | { readonly type: "model_changed"; readonly model: string }
   | { readonly type: "folder_changed"; readonly folder: string }
   /** The cached usage limits are stale. */
   | { readonly type: "limits_changed" }

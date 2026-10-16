@@ -46,7 +46,7 @@ export interface AskCall {
 
 /** A run of the registered hooks of `event`, at this point of a batch. */
 export interface HookRun {
-  readonly hook: "Stop" | "PostToolUse";
+  readonly hook: "Stop" | "PostToolUse" | "PostModelSwitch";
   readonly input: Record<string, unknown>;
 }
 
