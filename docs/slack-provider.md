@@ -60,16 +60,28 @@ by the tool's name and its first argument, or by its description for a command
 the calls before. With no call running, the card holds the counts of what ended, in the
 terminal's words where the terminal has words (`previews.folded`:
 `Ran 2 shell commands, read 1 file`): a comma between two counts, a capital on the first, no
-mark, and a failed command counted with the others. The card carries no `details` or `output`:
-Slack appends both to what a card already holds (measured: "Card text is appended"), so a card
-that is reused keeps its text in its title.
+mark, and a failed command counted with the others. The card carries no `output`, and no
+`details` but one line per command of the run, `$ <command>` (`previews.commandLine`): Slack
+appends both fields to what a card already holds (measured: "Card text is appended"), so each
+command adds its line, and a card that is reused keeps the rest of its text in its title.
+
+While a command runs, its title ends with its seconds once it has run
+`sinks.RUNNING_REFRESH_SECONDS` (30): `Pinging localhost · 30s`, then `· 1m 0s`, as the
+terminal's line reads (captured on Claude Code 2.1.301), counted from `TaskUpdate.startedAt`.
+While the stream lives the sink writes the title again every 30 seconds, an append that replaces
+the title alone; once the stream has stopped no write is made for the seconds, and they move only
+when the message is written again for another reason, since a `chat.update` writes the whole
+message.
 
 A call with a view of its own has a card of its own, keyed by its call id, and ends the run: a
 subagent the call waits for, whose title counts its calls and whose `details` say what it is doing
 now, a
 stopped call, and a failed call of any tool but a command (`previews.failsCounted`), whose card
 says why. A subagent in the background has no card: the core writes its launch line as text
-of the reply (`TurnRenderer`, `previews.launched`). A call that
+of the reply (`TurnRenderer`, `previews.launched`). A message that continues a subagent that has
+ended (`previews.continued`) has no card either: the core writes `⎿ Resuming agent <id>` as a line
+about the work, with the first 7 characters of the id, as the terminal does
+(`previews.resuming`). A call that
 turns into one of these keeps the run's card when it was the run's only call. An `Edit` or a `Write` that
 ended well also ends the run, and has no card: its preview is all that shows it.
 

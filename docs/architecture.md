@@ -753,7 +753,7 @@ left unfinished does not hide the next turn's text.
 | `text_delta` | a top-level `stream_event` of type `content_block_delta` carrying a `text_delta`; a subagent's gives none | the text, as it is written |
 | none | a top-level text block in an `assistant` record whose message id a `message_start` announced | nothing more: the same text already arrived as deltas |
 | `text` | the same in a top-level `assistant` record whose message id no `message_start` announced; a subagent's gives none | the text, where it arrives, a paragraph apart from text before it (note 1) |
-| `call_started` with no parent call | a `tool_use` or `server_tool_use` block | a new tool line, in progress, titled `Name: first string argument`, or with its description for a command (`previews.described`), as the terminal titles its line. A call of a tool that starts an agent is held until its task starts (note 2) |
+| `call_started` with no parent call | a `tool_use` or `server_tool_use` block | a new tool line, in progress, titled `Name: first string argument`, or with its description for a command (`previews.described`), as the terminal titles its line. A command's line also carries `$ <command>` as its `details` (`previews.commandLine`) and when it started (`TaskUpdate.startedAt`), for a chat that shows its seconds. A call of a tool that starts an agent is held until its task starts, and a message that continues an agent that has ended is no line (note 2) |
 | the same with `parentCallId` set, from the record's `parent_tool_use_id` (a subagent, or a skill run in a forked context) | the same blocks | the parent's line counts the subagent's calls and holds its latest ones; nothing under the call of a subagent in the background (note 2) |
 | `call_ended` for a line | a `tool_result` or `advisor_tool_result` block; `model` is `resolvedModel` of the Agent call's `tool_use_result` when it differs from the main thread's last `message.model` | the line completes, or shows an error with the output's first line when `isError`; a line whose task already ended as stopped keeps `Stopped` |
 | `task_started` | a `system` record of subtype `task_started`; `agentType` is its `subagent_type`, `background` its `is_backgrounded` | for a tool call, nothing yet; a task's line once the call's result arrives with the task still running (note 3). For a subagent in the background, its launch line as text and no line (note 2) |
@@ -790,7 +790,13 @@ Notes on the table:
    runs, below the cards of the message's calls and before anything else the reply writes. A
    task that starts again under another call (a subagent a message continues) writes no second
    line when the reply saw it start before, or the session did, which counts each task's starts
-   past its end: a resumed task keeps its id, and nothing else says it is one. Nothing under a held call writes
+   past its end: a resumed task keeps its id, and nothing else says it is one. A message to an
+   agent whose task has ended (`previews.continued`, `SendMessage` naming the task in `to`) draws
+   no line at all: the reply writes `⎿ Resuming agent <id>` as a line about the work
+   (`previews.resuming`), as the terminal does (captured on Claude Code 2.1.301), and the task that
+   starts again under it gets no card and no launch line; such a message that fails shows its
+   error as any failed call. A message to an agent still running, or one the session never saw
+   start (after a restart), keeps its card. Nothing under a held call writes
    a line from then on, and the task stays one of the reply's running tasks. A subagent the call waits
    for (a skill run in a fork) gets its card when its task starts: the count reads
    `Skill: review · 12 calls`, the line holds its latest calls (`renderer.CHILD_LINES`) as the
