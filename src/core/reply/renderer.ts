@@ -15,6 +15,7 @@ import { blank } from "../../text.ts";
 import { formatTokens } from "../footer.ts";
 import * as texts from "../texts.ts";
 import {
+  ASKERS,
   answered,
   commandLine,
   continued,
@@ -573,9 +574,13 @@ export class TurnRenderer {
         line(event.callId, title, "in_progress", { name: event.toolName }),
       );
       await this.feedLine(resuming(continued(event.toolName, event.input) as string));
-    } else if (PREVIEWED.has(event.toolName) || LAUNCHERS.has(event.toolName)) {
-      // Kept from the sink until it ends: what shows it then is its preview with no card, or
-      // a card that says why it failed. An approval has a message of its own. A call that
+    } else if (
+      PREVIEWED.has(event.toolName) ||
+      ASKERS.has(event.toolName) ||
+      LAUNCHERS.has(event.toolName)
+    ) {
+      // Kept from the sink until it ends: what shows it then is its preview with no card (a
+      // question's record, once answered), or a card that says why it failed. An approval has a message of its own. A call that
       // starts an agent is kept until its task starts (`#taskStarted`).
       if (LAUNCHERS.has(event.toolName)) this.#undecided.add(event.callId);
       this.#lines.set(

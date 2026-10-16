@@ -926,15 +926,20 @@ in (`Approvals.resolve`), and tells the owner when the request is gone (`texts.A
 What the request shows and which controls it has are the provider's drawing of a
 `PermissionRequest` or a `QuestionRequest`; what an answer means is the core's. Once decided, the
 request message is deleted: the tool's line in the reply records the call. For an answered question that
-line is the record of the answers, as the terminal keeps it: the call's card reads
-`User answered Claude's questions:` and a `context` block under it holds `⎿ · question → answer` for
-each question, cut at Slack's 3,000 characters (`previews.answered`, drawn by `sinks.pieceBlocks`).
-It sits in the reply where the question was asked, so what Claude does next shows below it. The
+line is the record of the answers, as the terminal keeps it: one `context` block whose first line is
+`✓ User answered Claude's questions:` and whose next lines are `⎿ · question → answer`, one per
+question, cut at Slack's 3,000 characters (`previews.answered`, a `Preview.record`, drawn by
+`sinks.pieceBlocks`). There is no card, so no gap opens under the heading. The reply holds the
+call's line while the question waits (`previews.ASKERS`, as it holds an Edit or a Write), because a
+stream cannot take a card back: while the owner decides, the reply shows nothing for the call and
+the request message is the only sign. A call that ends with no answer kept (skipped, denied,
+failed, stopped) writes its card then. The record sits in the reply where the question was asked,
+so what Claude does next shows below it. The
 session hands the answers to the reply itself (`ThreadSession.keepAnswers`,
 `TurnRenderer.answered`), keyed by the call id the permission request carries, and then deletes the
 request. When the reply has no line of its own for that call (a question asked inside a subagent
 shows on the subagent's line), the request is rewritten instead, with no buttons, into the same
-record (`ThreadChat.keepAnswers`, `requests.answeredBlocks`); if Slack refuses that rewrite, the
+record, with the same `✓ ` first line (`ThreadChat.keepAnswers`, `requests.answeredBlocks`); if Slack refuses that rewrite, the
 request is deleted, so no button is left that no longer works. `!stop` denies every request still
 pending in the session's own thread and deletes its message, and a request still waiting when the
 session closes or loses its process is answered as refused (`Approvals.denyAll`): a denial for a

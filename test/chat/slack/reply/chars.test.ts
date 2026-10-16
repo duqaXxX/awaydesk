@@ -116,7 +116,7 @@ function view(
   language: "" | "diff" = "",
   plain = false,
 ): Preview {
-  return { title, summary, body, language, plain };
+  return { title, summary, body, language, plain, record: false };
 }
 
 function lines(count: number, line: (i: number) => string, first = 0): string[] {

@@ -280,8 +280,9 @@ function preview(
   body: string,
   language: "" | "diff" = "",
   plain = false,
+  record = false,
 ): Preview {
-  return { title, summary, body, language, plain };
+  return { title, summary, body, language, plain, record };
 }
 
 type Maybe = Json | undefined;
@@ -1958,15 +1959,14 @@ test("an answered question shows in the reply where it was answered", async () =
     await renderer.feed(event);
   }
   await renderer.close();
-  const card = only(slack.messageCards()[0] ?? []);
-  assert.deepEqual([card.title, card.status], ["User answered Claude's questions:", "complete"]);
-  assert.ok(!("output" in card) && !("details" in card));
+  assert.deepEqual(slack.messageCards()[0] ?? [], []); // the record is no card
   const chunks = allChunks(slack);
   const kinds = chunks.map((c) => c.type);
   const answers = only(chunks.filter((c) => c.type === "blocks"));
   assert.deepEqual(answers.blocks, [
     contextBlock(
-      `${texts.NESTED}· Which color do you prefer? → Blue\n` +
+      `✓ User answered Claude's questions:\n` +
+        `${texts.NESTED}· Which color do you prefer? → Blue\n` +
         `${texts.NESTED}· Do you also like green? → Yes, Only in spring`,
     ),
   ]);
@@ -1979,7 +1979,7 @@ test("answers to a call the reply has no line for are not kept", () => {
   assert.ok(!renderer.answered("toolu_unseen", [{ text: "Colour?" }], { "Colour?": "blue" }));
 });
 
-test("a stopped message shows the answers under their card", async () => {
+test("a stopped message shows the answers as one block", async () => {
   const slack = new FakeSlack();
   const clock = new FakeClock();
   const sink = reply(slack, { clock });
@@ -1988,6 +1988,7 @@ test("a stopped message shows the answers under their card", async () => {
     "",
     "· Colour? → <b> `x`",
     "",
+    true,
     true,
   );
   await sink.task(tool("q", "AskUserQuestion", "complete", { preview: answered }));
@@ -1998,14 +1999,13 @@ test("a stopped message shows the answers under their card", async () => {
   const blocks = list(last(slack.callsTo("chat.update")).blocks);
   assert.deepEqual(
     blocks.map((b) => b.type),
-    ["task_card", "context", "markdown"],
+    ["context", "markdown"],
   );
-  assert.ok(blocks[0] !== undefined && !("output" in blocks[0]));
   // Shown as written: no markup of the question's or the answer's is read as Slack's.
   const zero = ZERO_WIDTH_SPACE;
   assert.equal(
-    get(blocks[1], "elements", 0, "text"),
-    `${texts.NESTED}· Colour? → &lt;b&gt; \`${zero}x\`${zero}`,
+    get(blocks[0], "elements", 0, "text"),
+    `✓ User answered Claude's questions:\n${texts.NESTED}· Colour? → &lt;b&gt; \`${zero}x\`${zero}`,
   );
 });
 
@@ -2017,7 +2017,7 @@ test("answers longer than a context block are cut", async () => {
   );
   await sink.task(
     tool("q", "AskUserQuestion", "complete", {
-      preview: preview("User answered", "", body, "", true),
+      preview: preview("User answered", "", body, "", true, true),
     }),
   );
   await settled();
@@ -2035,14 +2035,14 @@ test("answers longer than a message still show and the reply goes on", async () 
   const body = `· ${"q".repeat(MESSAGE_LIMIT + 4_000)} → yes`;
   await sink.task(
     tool("q", "AskUserQuestion", "complete", {
-      preview: preview("User answered", "", body, "", true),
+      preview: preview("User answered", "", body, "", true, true),
     }),
   );
   await sink.text("And then.");
   await settled();
   assert.deepEqual(
     allChunks(slack).map((c) => c.type),
-    ["task_update", "blocks", "markdown_text"],
+    ["blocks", "markdown_text"],
   );
   assert.equal(slack.createdTs.length, 1);
 });

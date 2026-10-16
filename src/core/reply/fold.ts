@@ -85,7 +85,8 @@ function samePreview(a: Preview | null, b: Preview | null): boolean {
     a.summary === b.summary &&
     a.body === b.body &&
     a.language === b.language &&
-    a.plain === b.plain
+    a.plain === b.plain &&
+    a.record === b.record
   );
 }
 

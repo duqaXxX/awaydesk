@@ -1466,6 +1466,71 @@ test("a reply keeps the answers of a question it holds the line of, and shows th
     shown.map((t) => [t.status, t.preview?.body, t.preview?.plain]),
     [["complete", "· Which color do you prefer? → Blue", true]],
   );
+  // Held until it ends: a stream cannot take back a card, and the record replaces it.
+  assert.deepEqual(
+    sink.tasks.map((t) => [t.status, t.preview?.record]),
+    [["complete", true]],
+  );
+});
+
+const ASK_START: SessionEvent = {
+  type: "call_started",
+  callId: "toolu_ask",
+  toolName: "AskUserQuestion",
+  input: { questions: [{ question: "Colour?" }] },
+  parentCallId: null,
+};
+
+function askEnd(isError: boolean, output: string): SessionEvent {
+  return {
+    type: "call_ended",
+    callId: "toolu_ask",
+    isError,
+    output,
+    fileChange: null,
+    model: null,
+    parentCallId: null,
+  };
+}
+
+test("a question waiting for its answer has no card in the reply", async () => {
+  const [sink] = await render([ASK_START]);
+  assert.deepEqual(sink.tasks, []);
+});
+
+test("a question that ends with no answer kept writes its card at the end", async () => {
+  for (const [isError, status] of [
+    [false, "complete"],
+    [true, "error"],
+  ] as const) {
+    const [sink] = await render([ASK_START, askEnd(isError, "skipped")]);
+    assert.deepEqual(
+      sink.tasks.map((t) => [t.status, t.preview]),
+      [[status, null]],
+    );
+  }
+});
+
+test("a question cut short by a stop shows as stopped", async () => {
+  const stopped = translated([{ ...silentResult(), terminal_reason: "aborted_tools" }]);
+  const [sink] = await render([ASK_START, ...stopped]);
+  assert.deepEqual(sink.tasks, []);
+  assert.deepEqual(
+    (sink.finished ?? []).map((t) => [t.name, t.status, t.output]),
+    [["AskUserQuestion", "complete", STOPPED]],
+  );
+});
+
+test("a question asked inside a subagent has no line of its own to keep answers on", async () => {
+  const parent: SessionEvent = {
+    type: "call_started",
+    callId: "toolu_skill",
+    toolName: "Skill",
+    input: { skill: "Scan" },
+    parentCallId: null,
+  };
+  const [, renderer] = await render([parent, { ...ASK_START, parentCallId: "toolu_skill" }]);
+  assert.equal(renderer.answered("toolu_ask", [{ text: "Colour?" }], { "Colour?": "red" }), false);
 });
 
 /** What a sink was handed, in order: a text with its options, or a task line by its id. */

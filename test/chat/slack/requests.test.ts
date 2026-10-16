@@ -6,6 +6,7 @@ import {
   APPROVAL_ALLOW,
   APPROVAL_DENY,
   absorb,
+  answeredBlocks,
   approvalBlocks as approvalBlocksOf,
   type Draft,
   draftAnswers,
@@ -102,6 +103,21 @@ function recordedQuestions(name: string): Question[] {
 function draftOf(known: Parameters<typeof newDraft>[3] = {}): Draft {
   return newDraft("abc", "C1", THREAD, known);
 }
+
+test("an answered request is one block headed like the reply's record", () => {
+  const blocks = answeredBlocks(
+    [{ text: "Colour?" }, { text: "Sizes?" }] as Question[],
+    { "Colour?": "red", "Sizes?": ["s", "l"] },
+    NAMES,
+  ) as unknown as Json[];
+  assert.equal(blocks.length, 1);
+  assert.equal(
+    blocks[0]?.elements[0].text,
+    "✓ User answered Claude's questions:\n" +
+      "\u00a0\u00a0\u00a0\u00a0⎿ · Colour? → red\n" +
+      "\u00a0\u00a0\u00a0\u00a0⎿ · Sizes? → s, l",
+  );
+});
 
 test("approval blocks carry the id and the input", () => {
   const request = permission({

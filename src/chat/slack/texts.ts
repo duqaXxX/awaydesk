@@ -228,3 +228,6 @@ export const HOME_LAST_7 = "Last 7 days";
 export const HOME_LAST_30 = "Last 30 days";
 export const HOME_SEARCH_LABEL = "Search titles";
 export const HOME_SEARCH_HINT = "Type a word and press Enter";
+// Opens the first line of a record, which stands for a call that ended well (an answered
+// question).
+export const RECORD_MARK = "✓ ";

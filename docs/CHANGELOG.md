@@ -7,6 +7,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The record of answered questions is one block with no gap under its heading (issue #325). It
+  was a task card titled `User answered Claude's questions:` with the rows in a `context` block
+  under it, and Slack draws a space between the two. It is now a single `context` block:
+  `✓ User answered Claude's questions:`, then a `⎿ · question → answer` row for each question. The
+  reply no longer draws a card for a question while it waits (a stream cannot take a card back, so
+  the call's line is held until it ends, as an Edit's or a Write's is); a question that ends
+  skipped, denied, failed or stopped still gets its card then. The request message rewritten for a
+  question asked inside a subagent starts with the same `✓ `. New `Preview.record` on the chat
+  seam.
+
 - The question form has a way back and a review page (issue #325). With several questions the
   `1 of 3` line becomes the terminal's tab row (`☒ Colour  *☐ Sizes*  ☐ Shape  ✔ Submit`:
   answered, open, the page on screen in bold). From the second question on a button named for
