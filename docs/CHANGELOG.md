@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `/model` to the model a session started on works again in a thread whose setup picked another
+  model (issue #333). The setup set the model with the SDK's `setModel`, after which `/model
+  opus` on an Opus default answered `Set model to Opus 5.5` and requests kept running on the
+  chosen model (measured 2026-10-16, SDK 0.3.301, Claude Code 2.1.301). The Claude back end now
+  sets the model as the terminal does, by running `/model <model>` in the idle session and
+  reading that turn itself: the core sees no event of it (its `running` and `idle` states, its
+  output and its result included) and the first prompt waits for it. `Query.setModel` leaves
+  `docs/sdk-surface.md`; `docs/limits.md` declares the SDK's behaviour, and the new probe claim
+  P26 checks it on each release.
 - A second `Start` on a session's setup while the first is applied, and a model picked just
   before `Start` but handled after it, no longer add `This question is no longer open: it was
   already answered, or awaydesk restarted.` under the summary (issue #142): the summary says

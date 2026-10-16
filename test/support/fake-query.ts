@@ -81,7 +81,6 @@ export type ControlCall =
   | { readonly method: "interrupt" }
   | { readonly method: "stopTask"; readonly taskId: string }
   | { readonly method: "setPermissionMode"; readonly mode: PermissionMode }
-  | { readonly method: "setModel"; readonly model: string | undefined }
   | { readonly method: "applyFlagSettings"; readonly effortLevel: EffortLevel | null }
   | { readonly method: "getContextUsage" }
   | { readonly method: "close" };
@@ -256,10 +255,6 @@ export class FakeQuery implements QueryHandle {
 
   async setPermissionMode(mode: PermissionMode): Promise<void> {
     this.#record({ method: "setPermissionMode", mode });
-  }
-
-  async setModel(model?: string): Promise<void> {
-    this.#record({ method: "setModel", model });
   }
 
   async applyFlagSettings(settings: { effortLevel: EffortLevel | null }): Promise<void> {

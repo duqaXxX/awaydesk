@@ -199,7 +199,7 @@ export const CLAIMS: readonly Claim[] = [
   claim(
     "P18",
     "gesture",
-    "a resumed session keeps the model set with `setModel()`",
+    "a resumed session keeps the model the setup set with `/model`",
     "src/agent/claude/session.ts#ClaudeSession.setModel",
     "at the top level, pick a model in the setup and press Start, restart the daemon, reply " +
       "in the thread; `!status` shows the model",
@@ -271,6 +271,17 @@ export const CLAIMS: readonly Claim[] = [
       "the turn the line `tick` opens is Claude's text alone, with no line before it. If the " +
       "SDK now says what woke the turn, the limit is gone: take its row out of `docs/limits.md` " +
       "and say so in the issue it names",
+  ),
+  claim(
+    "P26",
+    "gesture",
+    "after `setModel()` on the query, a `/model` to the alias of the model the session started " +
+      "on is acknowledged and the next request still runs on the `setModel` model, as " +
+      "`docs/limits.md` says",
+    "src/agent/claude/session.ts#ClaudeSession.setModel",
+    "the scene calls the SDK's `setModel` itself, since the daemon does not. If the request now " +
+      "runs on the startup model the limit is gone: take its row out of `docs/limits.md` and say " +
+      "so in the issue it names",
   ),
 ];
 

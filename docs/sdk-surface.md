@@ -91,7 +91,6 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Query` | `getContextUsage` | method | session.ts: ClaudeSession.contextUsage | reference | P2 |
 | `Query` | `initializationResult` | method | session.ts: ClaudeSession.ready, ClaudeSession.info | reference | P2 |
 | `Query` | `interrupt` | method | session.ts: ClaudeSession.interrupt | reference | P8 |
-| `Query` | `setModel` | method | session.ts: ClaudeSession.setModel | reference | P18 |
 | `Query` | `setPermissionMode` | method | session.ts: ClaudeSession.setPermissionMode | reference | P9 |
 | `Query` | `stopTask` | method | session.ts: ClaudeSession.stopTask | reference | P12 |
 | `HookCallbackMatcher` | `hooks` | option | session.ts: ClaudeSession.#options | reference | none |

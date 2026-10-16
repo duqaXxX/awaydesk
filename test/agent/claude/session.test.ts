@@ -9,6 +9,7 @@
  */
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
+import type { SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import {
   ClaudeSession,
   logger,
@@ -772,14 +773,90 @@ test(
   },
 );
 
-test("a model reaches Claude Code, none meaning its default", LIMIT, async (t) => {
+// What Claude Code writes for a `/model` typed to a session: a local command, so a turn with no
+// model request in it, bracketed by the session's `running` and `idle` states. Recorded
+// 2026-10-16 on Claude Code 2.1.301 with the daemon's options, ids replaced and the init record
+// of `goal.jsonl` in place of the recorded one.
+const MODEL_COMMAND = sdkJson("model-command") as JsonObject[];
+const COMMAND_RESULT = MODEL_COMMAND.findIndex((record) => record.type === "result");
+
+/** The content of a user message the session sent. */
+function textOf(message: SDKUserMessage | undefined): unknown {
+  return message?.message.content;
+}
+
+function pause(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 20));
+}
+
+test(
+  "a model is set with Claude Code's own command, and its turn shows nothing",
+  LIMIT,
+  async (t) => {
+    const { session, query, events } = await started(t, { turns: [MODEL_COMMAND, TOOLS] });
+    const control = await started(t, { turns: [TOOLS] });
+    await control.session.send(PROMPT);
+    const alone = await until(control.events, "turn_ended");
+
+    await session.setModel("haiku");
+    // No control call: the SDK's own `setModel` leaves an override that a later `/model` to the
+    // default model's alias does not undo (issue #333).
+    assert.deepEqual(query.calls, []);
+    assert.equal(textOf(query.sent[0]), "/model haiku");
+    assert.match(String(query.sent[0]?.uuid), /^[0-9a-f-]{36}$/);
+    // The next prompt is a turn of its own: the events up to its end are those it gives alone.
+    await session.send(PROMPT);
+    assert.deepEqual(await until(events, "turn_ended"), alone);
+    assert.equal(query.sent.length, 2);
+  },
+);
+
+test("the command's turn is over at its idle state, not at its result", LIMIT, async (t) => {
   const { session, query } = await started(t);
-  await session.setModel("haiku");
+  let settled = false;
+  const set = session.setModel("haiku").then(() => {
+    settled = true;
+  });
+  await pause();
+  query.answer(MODEL_COMMAND.slice(0, COMMAND_RESULT));
+  await pause();
+  assert.equal(settled, false);
+  query.answer(MODEL_COMMAND.slice(COMMAND_RESULT, COMMAND_RESULT + 1));
+  await pause();
+  assert.equal(settled, false, "the session still says running");
+  query.answer(MODEL_COMMAND.slice(COMMAND_RESULT + 1));
+  await set;
+  assert.equal(settled, true);
+});
+
+test("a session that reports no state is done at the result", LIMIT, async (t) => {
+  const { session, query } = await started(t);
+  const set = session.setModel("haiku");
+  await pause();
+  query.answer(MODEL_COMMAND.filter((record) => record.subtype !== "session_state_changed"));
+  await set;
+});
+
+test("no model means the agent's default: the command names it", LIMIT, async (t) => {
+  const { session, query } = await started(t, { turns: [MODEL_COMMAND] });
   await session.setModel(null);
-  assert.deepEqual(query.calls, [
-    { method: "setModel", model: "haiku" },
-    { method: "setModel", model: undefined },
-  ]);
+  assert.equal(textOf(query.sent[0]), "/model default");
+});
+
+test("a model the session does not list is refused and nothing is sent", LIMIT, async (t) => {
+  const { session, query } = await started(t, { turns: [MODEL_COMMAND] });
+  await assert.rejects(session.setModel("nosuchmodel"), RangeError);
+  await assert.rejects(session.setModel("haiku\nrm -rf /"), RangeError);
+  assert.deepEqual(query.sent, []);
+});
+
+test("a model set fails when the session ends first, and after it", LIMIT, async (t) => {
+  const { session, query } = await started(t);
+  const pending = session.setModel("haiku");
+  await pause();
+  query.answer([MODEL_COMMAND[0] as JsonObject, END]);
+  await assert.rejects(pending, SessionClosedError);
+  await assert.rejects(session.setModel("haiku"), SessionClosedError);
 });
 
 test("an effort level is applied to the live session, none clearing it", LIMIT, async (t) => {
@@ -895,13 +972,9 @@ test(
     // Not measured on a real process: which message a request on a dead process is rejected with.
     const failure = new Error("Claude Code process exited with code 1. stderr: a secret sentence");
     const { session } = await started(t, {
-      rejects: { setModel: failure, interrupt: failure, getContextUsage: failure },
+      rejects: { interrupt: failure, getContextUsage: failure },
     });
-    for (const request of [
-      () => session.setModel("haiku"),
-      () => session.interrupt(),
-      () => session.contextUsage(),
-    ]) {
+    for (const request of [() => session.interrupt(), () => session.contextUsage()]) {
       await assert.rejects(request(), (error) => {
         assert.ok(error instanceof Error);
         assert.equal(error.name, "ProcessExited");

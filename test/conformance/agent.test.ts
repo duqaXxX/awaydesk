@@ -23,7 +23,7 @@ import {
   FakeSdk,
   fail,
 } from "../support/fake-query.ts";
-import { type JsonObject, sdkRecords } from "../support/fixtures.ts";
+import { type JsonObject, sdkJson, sdkRecords } from "../support/fixtures.ts";
 import {
   call,
   fail as failedRequest,
@@ -57,6 +57,7 @@ const CONTEXT: AgentContext = { variables: {}, clock: systemClock };
 const TOOLS = sdkRecords("tools");
 const ASKED = sdkRecords("ask-answered");
 const INTERRUPTED = sdkRecords("interrupt");
+const MODEL_COMMAND = sdkJson("model-command") as JsonObject[];
 
 function record(records: readonly JsonObject[], index: number, ...is: string[]): JsonObject {
   const found = records[index];
@@ -301,6 +302,13 @@ class ClaudeWorld implements AgentWorld {
     return { prompt: "/usage", includes: "Current session" };
   }
 
+  modelChange(): void {
+    this.#plays.push({
+      kind: "other",
+      batch: withSession(MODEL_COMMAND, this.#sessionId()),
+    });
+  }
+
   failTurn(): string {
     this.#plays.push({
       kind: "other",
@@ -456,6 +464,9 @@ class PlainWorld implements AgentWorld {
   command(): { readonly prompt: string; readonly includes: string } {
     return { prompt: "/echo hello", includes: "hello" };
   }
+
+  // The plain agent has no model to change.
+  modelChange(): void {}
 
   failTurn(): string {
     this.#turns.push([failedRequest("The request failed.")]);

@@ -496,6 +496,11 @@ export interface AgentSession {
   interrupt(): Promise<void>;
   stopTask(taskId: string): Promise<void>;
   setPermissionMode(mode: PermissionMode): Promise<void>;
+  /**
+   * Sets the model of the next turns and resolves once it is in force: the session is idle, and
+   * whatever the agent does to change it (Claude Code: its own `/model`, a turn of its own) is no
+   * event. Null is the agent's default. Rejects a model `AgentInfo.models` does not list.
+   */
   setModel(model: string | null): Promise<void>;
   setEffort(level: string | null): Promise<void>;
   contextUsage(): Promise<ContextUsage>;

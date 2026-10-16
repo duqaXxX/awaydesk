@@ -1175,7 +1175,11 @@ closed when the start returns (`ThreadSession.connect`).
   "Effort set on a live session"). A back end without that capability would get a fresh session,
   which loses nothing since no prompt has been sent. A non-default model is `AgentSession.setModel`
   on the live session (not stored: it survives a resume and leaves the owner's default alone,
-  measured: "Model survives resume"), and bypass goes through `ThreadSession.setBypass` when the
+  measured: "Model survives resume"). The Claude back end types `/model <model>` into the idle
+  session, reads that turn itself and shows the core none of it (no event, no state, no
+  `turn_ended`), and resolves once the session says idle, so the first prompt runs on the chosen
+  model; it does not call the SDK's `setModel`, which leaves an override a later `/model` to the
+  startup model's alias does not undo (issue #333, `docs/limits.md`), and bypass goes through `ThreadSession.setBypass` when the
   choice differs from what the live session effectively runs (`ThreadSession.clientBypass`: the
   choice, or the folder's own bypass). The message then becomes one summary line, written inside the
   same wait (a cancel that already deleted the message skips the edit), and stays; the held message

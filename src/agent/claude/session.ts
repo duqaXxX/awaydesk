@@ -8,6 +8,8 @@
  * seam's events, and as the calls of the permission callback and of the two hooks the daemon
  * registers. A task of its own (`#pump`) reads that stream.
  */
+
+import { randomUUID } from "node:crypto";
 import {
   type EffortLevel,
   type HookCallback,
@@ -84,7 +86,6 @@ export interface QueryHandle extends AsyncIterable<unknown> {
   interrupt(): Promise<unknown>;
   stopTask(taskId: string): Promise<void>;
   setPermissionMode(mode: SdkPermissionMode): Promise<void>;
-  setModel(model?: string): Promise<void>;
   applyFlagSettings(settings: { effortLevel: EffortLevel | null }): Promise<void>;
   initializationResult(): Promise<unknown>;
   getContextUsage(): Promise<unknown>;
@@ -215,6 +216,18 @@ function modeOf(mode: PermissionMode): SdkPermissionMode {
   return mode as SdkPermissionMode;
 }
 
+/**
+ * A local command's turn being read and hidden: Claude Code writes it as `running`, the command's
+ * records, a `result`, then `idle` (recorded 2026-10-16, Claude Code 2.1.301, with the state
+ * events on). It is over at the `idle` that follows its result, or at the result when no state
+ * was reported.
+ */
+interface CommandTurn {
+  running: boolean;
+  resulted: boolean;
+  readonly finish: (error?: unknown) => void;
+}
+
 export class ClaudeSession implements AgentSession {
   readonly events: AsyncIterable<SessionEvent>;
   readonly #config: SessionConfig;
@@ -226,6 +239,7 @@ export class ClaudeSession implements AgentSession {
   #closing = false;
   #ended = false;
   #started = false;
+  #command: CommandTurn | null = null;
   // An error result arrived before the process answered the start: a resume it refused.
   #startRefused = false;
 
@@ -307,6 +321,21 @@ export class ClaudeSession implements AgentSession {
     };
   }
 
+  /**
+   * Reads a record of the model command's turn and keeps it from the core, since the owner never
+   * typed the command: not its states, its output or its result. Ends the command once its turn
+   * is over.
+   */
+  #readCommand(command: CommandTurn, record: unknown): void {
+    if (!isRecord(record)) return;
+    const state = record.type === "system" && record.subtype === "session_state_changed";
+    if (state && record.state === "running") command.running = true;
+    if (record.type === "result") command.resulted = true;
+    if (command.resulted && (!command.running || (state && record.state === "idle"))) {
+      command.finish();
+    }
+  }
+
   /** Reads the query's stream until it ends, whatever ends it; never rejects. */
   async #pump(): Promise<void> {
     let reason = PROCESS_EXITED;
@@ -314,6 +343,10 @@ export class ClaudeSession implements AgentSession {
       for await (const record of this.#query) {
         if (!this.#started && isRecord(record) && record.type === "result") {
           this.#startRefused = record.is_error === true;
+        }
+        if (this.#command !== null) {
+          this.#readCommand(this.#command, record);
+          continue;
         }
         try {
           for (const event of this.#translator.translate(record)) this.#queue.push(event);
@@ -326,6 +359,7 @@ export class ClaudeSession implements AgentSession {
       reason = lostName(error);
     }
     this.#ended = true;
+    this.#command?.finish(new SessionClosedError());
     if (!this.#closing) {
       logger.error(`session stopped: ${reason}`);
       this.#queue.push({ type: "process_lost", reason });
@@ -388,8 +422,33 @@ export class ClaudeSession implements AgentSession {
     await this.#ask(() => this.#query.setPermissionMode(modeOf(mode)));
   }
 
+  /**
+   * Runs Claude Code's own `/model` on the idle session and resolves once its turn is over; the
+   * turn is read here and no event of it reaches the core. The SDK's `setModel` is not used: it
+   * leaves an override that a later `/model` to the default model's alias does not undo
+   * (measured 2026-10-16, SDK 0.3.301, issue #333). A model the initialization result does not
+   * list is refused, since Claude Code answers an unknown one as a success.
+   */
   async setModel(model: string | null): Promise<void> {
-    await this.#ask(() => this.#query.setModel(model ?? undefined));
+    if (this.#closing || this.#ended) throw new SessionClosedError();
+    if (this.#command !== null) throw new Error("a model command is already running");
+    if (model !== null && !(await this.info()).models.some((entry) => entry.value === model)) {
+      throw new RangeError(`unknown model: ${model}`);
+    }
+    const done = new Promise<void>((resolve, reject) => {
+      this.#command = {
+        running: false,
+        resulted: false,
+        finish: (error) => {
+          // Cleared here, not after the await: the next record is not part of the command.
+          this.#command = null;
+          if (error === undefined) resolve();
+          else reject(error);
+        },
+      };
+    });
+    this.#input.push(userMessage({ id: randomUUID(), content: `/model ${model ?? "default"}` }));
+    await done;
   }
 
   /**

@@ -223,6 +223,29 @@ test("start applies model effort and bypass", async (t) => {
   assert.equal(summaryOf(manual), "Model: Opus 5.5 · Effort: high · Bypass: on");
 });
 
+test("the first prompt is sent once the model change has settled", async (t) => {
+  const manual = manualWorld(t);
+  // The back end changes the model with a turn of its own: a prompt sent before that turn ends
+  // would run on the old model (issue #333).
+  const gate = new AsyncEvent();
+  t.mock.method(
+    FakeAgentSession.prototype,
+    "setModel",
+    async function (this: FakeAgentSession, model: string | null): Promise<void> {
+      this.modelsSet.push(model);
+      await gate.wait();
+    },
+  );
+  await manual.dispatch(message("hello", { ts: THREAD }));
+  await manual.dispatch(setupClick(manual, SETUP_START, { model: "opus" }));
+  await manual.idle();
+  assert.deepEqual(manual.clients.at(-1)?.modelsSet, ["opus"]);
+  assert.deepEqual(manual.queries(), []);
+  gate.set();
+  await manual.settle();
+  assert.deepEqual(manual.queries(), ["hello"]);
+});
+
 test("start applies model effort and bypass with a live effort change", async (t) => {
   const manual = manualWorld(t);
   await manual.dispatch(message("hello", { ts: THREAD }));

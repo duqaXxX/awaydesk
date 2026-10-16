@@ -84,6 +84,11 @@ export interface AgentWorld {
   hangTurn(text: string): void;
   /** The next prompt is a command of the agent's own: the prompt to send, and a word its output holds. */
   command(): { readonly prompt: string; readonly includes: string };
+  /**
+   * The next model change is one the agent takes. A back end that changes the model with a turn
+   * of its own (a command the agent runs) plays that turn; one that sets it directly does nothing.
+   */
+  modelChange(): void;
   /** The next prompt fails as a request of the agent's own does. Returns a word its message holds. */
   failTurn(): string;
   /** The agent's process dies now. */
@@ -910,11 +915,34 @@ export function agentConformance(name: string, harness: AgentHarness): void {
       "setModel takes a listed model or null",
       lacks(caps.models, "models"),
       async (world, t) => {
+        world.modelChange();
+        world.modelChange();
         const { session } = await open(t, world);
         const [first] = (await session.info()).models;
         assert.ok(first !== undefined);
         await session.setModel(first.value);
         await session.setModel(null);
+      },
+    );
+
+    check(
+      "a model change shows nothing, and the next turn runs after it",
+      lacks(caps.models, "models"),
+      async (world, t) => {
+        world.modelChange();
+        world.say("after the change");
+        const { session, events } = await open(t, world);
+        const [first] = (await session.info()).models;
+        assert.ok(first !== undefined);
+        await session.setModel(first.value);
+        await session.send(prompt());
+        const turn = await events.turn();
+        // Whatever the agent did to change the model is no event: the first turn the session
+        // reports is the owner's prompt.
+        assert.deepEqual(events.seen, turn);
+        assert.equal(written(turn).includes("after the change"), true);
+        assertWellFormed(turn);
+        assertDeclared(turn, caps);
       },
     );
 

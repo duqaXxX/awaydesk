@@ -98,6 +98,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   resume: ["P6", "P7"],
   "model and effort resume": ["P15", "P16"],
   "setup model resume": ["P18"],
+  "model command after setModel": ["P26"],
   bypass: ["P9"],
   "working folder": ["P14"],
   replay: ["P19"],
@@ -674,7 +675,7 @@ async function modelEffortResume(s: Stage): Promise<Seen> {
 }
 
 /**
- * P18: a model set with `setModel()` (what the setup's Start does) survives a resume that passes
+ * P18: a model set with `/model` (what the setup's Start does) survives a resume that passes
  * none. The session starts on the default model, so Haiku showing after the resume can only come
  * from the session's own record.
  */
@@ -712,6 +713,65 @@ async function setupModelResume(s: Stage): Promise<Seen> {
       kept.includes("haiku") ? "" : `the resumed session reports ${kept}`,
     ),
   };
+}
+
+/**
+ * P26: after the SDK's `setModel()`, a `/model` to the alias of the model the session started on
+ * leaves the next request on the `setModel` model (issue #333). The daemon no longer calls
+ * `setModel`, so the scene reads the raw SDK. The startup model, which is not Haiku, runs no
+ * request: the two commands cost nothing and the one-word turn runs on Haiku while the limit
+ * stands.
+ */
+async function modelCommandAfterSetModel(s: Stage): Promise<Seen> {
+  const input = new AsyncQueue<SDKUserMessage>();
+  const raw = query({ prompt: input, options: { cwd: s.workdir, settingSources: [] } });
+  const say = (content: string) =>
+    input.push({ type: "user", message: { role: "user", content }, parent_tool_use_id: null });
+  let late = false;
+  const timer = setTimeout(() => {
+    late = true;
+    raw.close();
+  }, TURN_LIMIT);
+  try {
+    const init: unknown = await raw.initializationResult();
+    const listed = isRecord(init) ? records(init.models) : [];
+    const usage: unknown = await raw.getContextUsage();
+    const startup = isRecord(usage) && typeof usage.model === "string" ? usage.model : "none";
+    const alias = listed.find(
+      (entry) => entry.value !== "default" && entry.resolvedModel === startup,
+    )?.value;
+    if (startup.includes("haiku") || typeof alias !== "string") {
+      const detail = `no alias other than Haiku names the startup model ${startup}`;
+      return { P26: observation(false, false, detail) };
+    }
+    await raw.setModel(PROBE_MODEL);
+    say(`/model ${alias}`);
+    let results = 0;
+    const ranOn: string[] = [];
+    try {
+      for await (const record of raw) {
+        const seen: unknown = record;
+        if (!isRecord(seen)) continue;
+        if (seen.type === "assistant" && results === 1 && isRecord(seen.message)) {
+          if (typeof seen.message.model === "string") ranOn.push(seen.message.model);
+        }
+        if (seen.type !== "result") continue;
+        results += 1;
+        if (results === 2) break;
+        say("Reply with the single word: ok");
+      }
+    } catch (error) {
+      if (!late) throw error;
+    }
+    if (late) throw new ProbeTimeout("the turns did not end in time");
+    if (ranOn.length === 0) return { P26: observation(false, false, "the turn named no model") };
+    const holds = ranOn.every((model) => model.includes("haiku"));
+    return { P26: observation(true, holds, holds ? "" : `the turn ran on ${ranOn.join(", ")}`) };
+  } finally {
+    clearTimeout(timer);
+    input.end();
+    raw.close();
+  }
 }
 
 async function bypass(s: Stage): Promise<Seen> {
@@ -1066,6 +1126,10 @@ export async function runScenes(log: Log): Promise<Seen> {
       Object.assign(seen, await attempt("resume", s, () => resume(s, word, sessionId)));
       Object.assign(seen, await attempt("model and effort resume", s, () => modelEffortResume(s)));
       Object.assign(seen, await attempt("setup model resume", s, () => setupModelResume(s)));
+      Object.assign(
+        seen,
+        await attempt("model command after setModel", s, () => modelCommandAfterSetModel(s)),
+      );
       Object.assign(seen, await attempt("bypass", s, () => bypass(s)));
       Object.assign(seen, await attempt("working folder", s, () => workingFolder(s)));
       Object.assign(seen, await attempt("replay", s, () => replay(s)));
