@@ -664,6 +664,16 @@ claude --resume <session id> --fork-session`, the login's folder quoted for the 
 project folder is. The default instance, and any instance whose `.env` does not set it, keep using
 `~/.claude`, and its line is the one shown in "Continuing a session in the terminal".
 
+### One bot per channel
+
+Invite each instance's bot only to its own channels. A channel that holds two instances' bots has
+a member other than you and each bot, so both refuse it, each with its own line for you alone, and
+neither starts a session (measured 2026-10-17 with a release and a development instance):
+
+```
+awaydesk does not work in this channel: it has members other than you and the bot. It answers only in a private channel whose only members are you and the bot.
+```
+
 ### Instances that share a login and a folder
 
 Two instances that use the same Claude Code login and are bound to the same folder list each
