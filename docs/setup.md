@@ -462,8 +462,8 @@ awaydesk service uninstall
 `restart` sends `SIGTERM` to the running daemon (`launchctl kill TERM gui/$(id -u)/local.awaydesk`):
 running turns finish first, then launchd starts it again. `status` reads `launchctl list`.
 `uninstall` unloads the service (`launchctl bootout`) and removes the plist; it leaves
-`~/.config/awaydesk/` (`.env`, `state.json`) and the log folder, and names both. On a system other
-than macOS, `awaydesk service` answers that the service exists on macOS only, with status 1.
+`~/.config/awaydesk/` (`.env`, `state.json`) and the log folder, and names both; removing
+awaydesk entirely is under [Uninstalling](#uninstalling). On a system other than macOS, `awaydesk service` answers that the service exists on macOS only, with status 1.
 
 What a restart waits for, and what each way of stopping does, is under
 [Restarts and shutdown](#restarts-and-shutdown).
@@ -1164,6 +1164,49 @@ own list, the upgrade notice): with **Just mentions** those stay silent, since t
 
 The measurements behind this (what was tried, on what Slack plan and app, and on what date) are
 in [features.md](features.md#notifications), not restated here.
+
+## Uninstalling
+
+Remove each instance's service first, then the package, then the files awaydesk left. Run the
+commands with the Node awaydesk was installed with (`nvm exec 22 …` if you followed
+[A Node of its own](#a-node-of-its-own)).
+
+1. For each instance `awaydesk service list` shows, stop and remove its service. The uninstall
+   ends turns still running after 60 seconds:
+
+   ```bash
+   awaydesk service uninstall                    # the default instance
+   awaydesk service uninstall --instance <name>  # each named one
+   ```
+
+2. Remove the package, and a development copy if you installed one in a prefix of its own:
+
+   ```bash
+   npm uninstall -g awaydesk
+   rm -rf ~/.local/share/awaydesk-dev           # only for a copy installed there
+   ```
+
+3. Delete what awaydesk kept on the Mac:
+
+   | Path | What it holds |
+   |---|---|
+   | `~/.config/awaydesk/`, `~/.config/awaydesk-<name>/` | each instance's `.env` (the tokens) and `state.json` |
+   | `~/.config/awaydesk_identities/` | the empty folders of the chat identity locks |
+   | `~/Library/Logs/awaydesk/` | the services' logs |
+   | `$TMPDIR/awaydesk/`, `$TMPDIR/awaydesk-<name>/` | the files you attached, kept 3 days |
+
+   ```bash
+   rm -rf ~/.config/awaydesk ~/.config/awaydesk-* ~/.config/awaydesk_identities
+   rm -rf ~/Library/Logs/awaydesk "${TMPDIR:?}"/awaydesk*
+   ```
+
+4. In Slack, delete each instance's app: open it at <https://api.slack.com/apps>, then **Basic
+   Information**, **Delete App**. Its bot leaves the channels, and its tokens stop working.
+
+What stays is not awaydesk's: Claude Code's login, settings, sessions and trusted folders
+(`~/.claude`, `~/.claude.json`, and any folder you named in `CLAUDE_CONFIG_DIR` for an instance,
+which you remove with `rm -rf` once you have run `/logout` in it), and the Full Disk Access entry
+of the Node executable in System Settings, if you gave it one.
 
 ## Troubleshooting
 
