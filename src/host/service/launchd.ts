@@ -13,7 +13,8 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { copyOf, copyVersion, type Program, servicePath } from "../program.ts";
+import { packageVersion } from "../../version.ts";
+import { copyOf, type Program, servicePath } from "../program.ts";
 import type { Report, Run, ServiceManager } from "./seam.ts";
 
 const DEFAULT_LABEL = "local.awaydesk";
@@ -319,7 +320,7 @@ export class Launchd implements ServiceManager {
       }
       this.#launchctl(["bootstrap", `gui/${this.#options.uid}`, this.#plist]);
       const copy = copyOf(program.main);
-      const version = copyVersion(copy);
+      const version = packageVersion(copy);
       return ok([
         `Wrote ${this.#plist}.`,
         `Loaded ${this.#label}: awaydesk starts now and at every login.`,
@@ -434,7 +435,7 @@ export class Launchd implements ServiceManager {
         if (plistGone) return [name, `${state}; its plist is gone`, "-", "-"];
         if (main === undefined) return [name, state, "unreadable plist", "-"];
         const copy = copyOf(main);
-        return [name, state, copy, copyVersion(copy) ?? "unknown"];
+        return [name, state, copy, packageVersion(copy) ?? "unknown"];
       });
       // What no command of an instance could find or remove is named, not listed as one.
       const refused = found.flatMap(({ file, what }) =>

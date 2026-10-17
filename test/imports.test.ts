@@ -197,6 +197,8 @@ test("the host layer and the other layers do not import each other", () => {
   assert.equal(refusal("main.ts", "./host/program.ts"), null);
   assert.equal(refusal("host/service/launchd.ts", "../program.ts"), null);
   assert.equal(refusal("host/program.ts", "node:fs"), null);
+  // The version file is above the layers: any of them may read it.
+  assert.equal(refusal("host/service/launchd.ts", "../../version.ts"), null);
 });
 
 test("only main.ts imports the registry, and nothing imports main.ts", () => {

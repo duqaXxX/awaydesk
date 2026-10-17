@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { SETUP_SLACK_APP } from "../src/chat/slack/texts.ts";
-import { installedVersion, SETUP_SECTIONS, setupGuide } from "../src/version.ts";
+import { installedVersion, packageVersion, SETUP_SECTIONS, setupGuide } from "../src/version.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 
@@ -12,6 +13,18 @@ test("the version is the one package.json holds", () => {
     version: string;
   };
   assert.equal(installedVersion(), manifest.version);
+});
+
+test("a package's version is the version of its package.json, null when it cannot be read", (t) => {
+  const copy = mkdtempSync(join(tmpdir(), "awaydesk-version-"));
+  t.after(() => rmSync(copy, { recursive: true, force: true }));
+  assert.equal(packageVersion(copy), null);
+  writeFileSync(join(copy, "package.json"), "not json");
+  assert.equal(packageVersion(copy), null);
+  writeFileSync(join(copy, "package.json"), JSON.stringify({ name: "awaydesk" }));
+  assert.equal(packageVersion(copy), null);
+  writeFileSync(join(copy, "package.json"), JSON.stringify({ version: "0.2.0" }));
+  assert.equal(packageVersion(copy), "0.2.0");
 });
 
 test("the guide's address names the setup page at the version's tag", () => {
