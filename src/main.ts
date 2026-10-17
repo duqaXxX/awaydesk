@@ -138,9 +138,10 @@ export interface RunOptions {
    */
   readonly home?: string;
   /**
-   * `process.env`: the environment every session inherits. The daemon writes the instance's name
-   * to it (`AWAYDESK_INSTANCE`, and removes it for the default instance), so that an `awaydesk`
-   * command a session runs is about the instance that session belongs to.
+   * `process.env`: the environment the daemon writes the instance's name into
+   * (`AWAYDESK_INSTANCE`, removed for the default instance). Sessions build their own from
+   * `process.env`, so with the default an `awaydesk` command a session runs is about the instance
+   * that session belongs to; a test passes a detached object and leaves the runner's alone.
    */
   readonly environment?: NodeJS.ProcessEnv;
   /**

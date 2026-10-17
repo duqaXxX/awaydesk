@@ -121,7 +121,10 @@ function registryOf(built: Built): Registry {
 test("absent variables select the registry's defaults", async (t) => {
   const built: Built = { agents: [], chats: [] };
   const dir = configDirectory(t);
-  await assert.rejects(run({ configDir: dir, registry: registryOf(built) }), STOPPED);
+  await assert.rejects(
+    run({ configDir: dir, environment: {}, registry: registryOf(built) }),
+    STOPPED,
+  );
   assert.deepEqual(built, { agents: [["first", undefined]], chats: [["one", undefined]] });
 });
 
@@ -134,7 +137,10 @@ test("the two variables select the modules and each gets its own variables", asy
     "SECOND_KEY=agent-value",
     "TWO_KEY=chat-value",
   );
-  await assert.rejects(run({ configDir: dir, registry: registryOf(built) }), STOPPED);
+  await assert.rejects(
+    run({ configDir: dir, environment: {}, registry: registryOf(built) }),
+    STOPPED,
+  );
   assert.deepEqual(built, {
     agents: [["second", "agent-value"]],
     chats: [["two", "chat-value"]],
@@ -145,7 +151,7 @@ test("a variable a module requires and the file lacks stops the start before it 
   const built: Built = { agents: [], chats: [] };
   const dir = configDirectory(t, "AWAYDESK_AGENT=second", "AWAYDESK_CHAT=two");
   await assert.rejects(
-    run({ configDir: dir, registry: registryOf(built) }),
+    run({ configDir: dir, environment: {}, registry: registryOf(built) }),
     (error: unknown) =>
       error instanceof ConfigError &&
       error.message === `missing in ${join(dir, ".env")}: TWO_KEY, SECOND_KEY`,
@@ -167,7 +173,7 @@ test("a name the registry does not hold stops the start with the valid ones", as
     const built: Built = { agents: [], chats: [] };
     const dir = configDirectory(t, line);
     await assert.rejects(
-      run({ configDir: dir, registry: registryOf(built) }),
+      run({ configDir: dir, environment: {}, registry: registryOf(built) }),
       (error: unknown) => error instanceof ConfigError && error.message === message,
     );
     assert.deepEqual(built, { agents: [], chats: [] });
@@ -180,7 +186,7 @@ test("a state.json written for other modules stops the start naming both pairs",
   const state = join(dir, "state.json");
   writeFileSync(state, JSON.stringify({ version: 3, agent: "first", chat: "one", channels: {} }));
   await assert.rejects(
-    run({ configDir: dir, registry: registryOf(built) }),
+    run({ configDir: dir, environment: {}, registry: registryOf(built) }),
     (error: unknown) =>
       error instanceof Error &&
       error.name === "StateError" &&

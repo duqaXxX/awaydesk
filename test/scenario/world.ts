@@ -296,6 +296,8 @@ export class World {
       registry: this.registry,
       clock: this.clock,
       signals: this.signals as SignalSource,
+      // Detached: `run` writes the instance's name to it, and a test must not change the runner's.
+      environment: {},
     };
   }
 

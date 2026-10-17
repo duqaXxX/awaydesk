@@ -33,7 +33,13 @@ import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import type { App } from "@slack/bolt";
 import { type FetchFunction, LogLevel, WebAPIRequestError } from "@slack/web-api";
-import { type AgentBackend, AgentConfigError } from "../src/agent/seam.ts";
+import { claudeAgent } from "../src/agent/claude/module.ts";
+import {
+  type AgentBackend,
+  AgentConfigError,
+  type RequestHandler,
+  type StartOptions,
+} from "../src/agent/seam.ts";
 import type { BuildAppOptions } from "../src/chat/slack/app/app.ts";
 import { DELETE_ACTION, EDIT_ACTION, EDIT_ON } from "../src/chat/slack/home.ts";
 import {
@@ -66,6 +72,7 @@ import {
   StopSignals,
 } from "../src/main.ts";
 import type { Registry } from "../src/registry.ts";
+import { FakeSdk } from "./support/fake-query.ts";
 import {
   AGENT,
   AsyncEvent,
@@ -240,6 +247,8 @@ class Daemon {
       }),
       clock: this.clock,
       signals: this.signals as SignalSource,
+      // Detached: `run` writes the instance's name to it, and a test must not change the runner's.
+      environment: {},
       ...extra,
     };
   }
@@ -298,7 +307,12 @@ test("a bad config exits 1 with the reason", async (t) => {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const errors = written(t, logger, "error");
   const exits: number[] = [];
-  await main({ configDir: dir, exit: (code) => exits.push(code), process: new EventEmitter() });
+  await main({
+    configDir: dir,
+    environment: {},
+    exit: (code) => exits.push(code),
+    process: new EventEmitter(),
+  });
   assert.deepEqual(exits, [1]);
   assert.ok(errors().some((line) => line.includes("docs/setup.md")));
 });
@@ -307,6 +321,7 @@ test("a second instance stops before slack", async (t) => {
   const dir = configDirectory(t);
   const unreached: RunOptions = {
     configDir: dir,
+    environment: {},
     registry: registryOf(new FakeAgentBackend([]), {
       clients: {
         bot: () => assert.fail("Slack was reached"),
@@ -391,13 +406,61 @@ test("the chat saves files in the scratch folder of the instance the daemon was 
   await d.stop();
 });
 
-test("a named instance's name reaches the sessions it starts through the environment", async (t) => {
+test("a named instance's name is written to the environment it was given", async (t) => {
   const d = new Daemon(t);
   const environment: NodeJS.ProcessEnv = {};
   d.start({ instance: { name: "work" }, environment });
   await d.booted();
-  // Sessions inherit the daemon's environment: `awaydesk ...` run by one is about this instance.
   assert.equal(environment.AWAYDESK_INSTANCE, "work");
+  await d.stop();
+});
+
+// The sessions build their `env` from `process.env`, the environment `run` writes to by default:
+// the one place a session can tell which instance it belongs to.
+test("a session the daemon starts receives the name of its instance", async (t) => {
+  const before = process.env.AWAYDESK_INSTANCE;
+  t.after(() => {
+    if (before === undefined) delete process.env.AWAYDESK_INSTANCE;
+    else process.env.AWAYDESK_INSTANCE = before;
+  });
+  const d = new Daemon(t);
+  const claudeHome = join(d.dir, "claude-home");
+  mkdirSync(claudeHome);
+  writeFileSync(join(claudeHome, ".claude.json"), JSON.stringify({}));
+  const sdk = new FakeSdk();
+  let backend: AgentBackend | null = null;
+  const base = d.options().registry as Registry;
+  const registry: Registry = {
+    ...base,
+    agents: {
+      claude: {
+        required: [],
+        optional: [],
+        build: (context) => {
+          backend = claudeAgent({ query: sdk.query, home: claudeHome }).build(context);
+          return backend;
+        },
+      },
+    },
+  };
+  // The real environment, which the sessions inherit; restored above.
+  d.start({ registry, instance: { name: "work" }, environment: process.env });
+  await d.booted();
+  assert.ok(backend !== null, "the daemon did not build the agent");
+  const start: StartOptions = {
+    folder: d.dir,
+    resume: null,
+    settingsSources: ["user", "project", "local"],
+    model: null,
+    effort: null,
+  };
+  const requests: RequestHandler = {
+    permission: async () => ({ allow: true }),
+    question: async () => ({ answered: false, message: "" }),
+  };
+  const session = await (backend as AgentBackend).start(start, requests);
+  assert.equal(sdk.only.options.env?.AWAYDESK_INSTANCE, "work");
+  await session.close();
   await d.stop();
 });
 
