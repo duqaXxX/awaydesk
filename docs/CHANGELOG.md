@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [0.2.0] - 2026-10-17
+
 ### Added
 
 - `slack-app-manifest.json` asks for the user scope `chat:write` (`oauth_config.scopes.user`), so
