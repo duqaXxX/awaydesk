@@ -750,8 +750,15 @@ test("service list with no plist says so, and fails when launchctl does", (t) =>
   const path = home(t);
   const none = manager(path, listingRun(ABSENT, {})).list();
   assert.deepEqual(none, { code: 0, out: ["No awaydesk service is installed."], err: [] });
-  agents(path, ["local.awaydesk.plist"]);
   const run: Run = () => ({ status: 1, stdout: "", stderr: "Could not connect\n" });
+  // With no plist either: a loaded job can have lost its plist, so the listing cannot answer
+  // "none installed" without launchctl.
+  assert.deepEqual(manager(path, run).list(), {
+    code: 1,
+    out: [],
+    err: ["launchctl list failed: Could not connect"],
+  });
+  agents(path, ["local.awaydesk.plist"]);
   assert.deepEqual(manager(path, run).list(), {
     code: 1,
     out: [],
