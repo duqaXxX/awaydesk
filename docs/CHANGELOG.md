@@ -49,7 +49,7 @@ All notable changes to this project are documented here. The format follows
 - The instance name `awaydesk` is refused beside `default`: its log would be the default
   instance's, `awaydesk.log`.
 - The rule that one daemon runs per machine is now one daemon per instance
-  (`docs/setup.md`, Several instances).
+  (`docs/setup.md`, Part 6).
 
 ## [0.1.1] - 2026-10-17
 

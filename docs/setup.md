@@ -9,9 +9,10 @@ Status: an early release (0.x); [CHANGELOG.md](CHANGELOG.md) lists each one, and
 
 The install is one numbered sequence that runs through Parts 0 to 4. Three checkpoints in it say
 what to run and what you should see, so a wrong turn shows up where it happened. Part 5 is the
-security checklist, "Using it" describes the daily use, [Several instances](#several-instances)
-covers more than one daemon on a Mac, and the reference at the end holds the detail the sequence
-leaves out.
+security checklist. [Part 6](#part-6-a-second-instance) adds a second daemon on the same Mac, with
+a Slack app of its own and, if you want, a Claude Code login of its own, and has a checkpoint of
+its own. "Using it" describes the daily use, and the reference at the end holds the detail the
+sequence leaves out.
 
 ## Requirements
 
@@ -145,7 +146,7 @@ The bot sees private channels it was invited to, and nothing else.
 ## Part 2: configuration
 
 awaydesk keeps its files in `~/.config/awaydesk/` (a named instance has a folder of its own, see
-[Several instances](#several-instances)). `.env` is the one you write;
+[Part 6](#part-6-a-second-instance)). `.env` is the one you write;
 `state.json` is written by awaydesk and never needs editing (what it holds is under
 [The config directory and `state.json`](#the-config-directory-and-statejson)).
 
@@ -187,7 +188,7 @@ named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one
 | `AWAYDESK_AGENT` | optional: the agent awaydesk drives; `claude` when absent, the only one this release has |
 | `AWAYDESK_CHAT` | optional: the chat awaydesk is driven from; `slack` when absent, the only one this release has |
 | `BASH_DEFAULT_TIMEOUT_MS` | optional: Claude Code's own variable, in milliseconds, for how long a command may run; see below |
-| `CLAUDE_CONFIG_DIR` | optional: Claude Code's own variable, the folder of a login of its own, for an instance that drives a second account; see [Several instances](#an-instance-with-its-own-claude-code-login) |
+| `CLAUDE_CONFIG_DIR` | optional: Claude Code's own variable, the folder of a login of its own, for an instance that drives a second account; see [Part 6](#an-instance-with-its-own-claude-code-login) |
 
 `AWAYDESK_AGENT` and `AWAYDESK_CHAT` can be set or left out: `claude` and `slack` are the only
 agent and chat this release has, and a file without them works as one with them. A value awaydesk does not know
@@ -302,7 +303,7 @@ One daemon runs per instance. Slack spreads a Socket Mode app's events across al
 connections, so a second daemon on the same Slack app would receive part of your messages;
 awaydesk refuses to start while another daemon holds its instance's lock, or the lock of its Slack app. This part sets up the
 default instance; a second daemon on the Mac is a second instance, under
-[Several instances](#several-instances).
+[Part 6](#part-6-a-second-instance).
 
 ### Folders macOS protects
 
@@ -393,7 +394,7 @@ awaydesk service uninstall
 ```
 
 `awaydesk service list` shows every instance's service on the Mac
-(see [Several instances](#several-instances)).
+(see [Part 6](#part-6-a-second-instance)).
 
 `restart` sends `SIGTERM` to the running daemon (`launchctl kill TERM gui/$(id -u)/local.awaydesk`):
 running turns finish first, then launchd starts it again. `status` reads `launchctl list`.
@@ -448,6 +449,219 @@ The bot answers one person, and the rest of this list protects what that person 
 - With a static public IP, you can also restrict the tokens to it under **OAuth & Permissions**,
   **Restrict API Token Usage**. With a dynamic IP, the first address change stops the bot with
   `invalid_auth`.
+
+## Part 6: a second instance
+
+One daemon serves one Slack app. A second daemon on the same Mac is a second instance, with a name
+and files of its own. Two reasons to run one: a second login for the agent, and a copy of awaydesk
+under development beside the release you use every day. This part adds an instance beside the
+default one that Parts 0 to 4 installed. Its steps continue the numbering of Part 4, and its
+commands use the name `work`.
+
+### Name the instance
+
+13. Choose a name of 1 to 32 characters of `a-z`, `0-9` and `-`, starting with a letter or a
+    digit. `default` and `awaydesk` are refused. Everything the instance owns derives from the name
+    (the table under [What an instance owns](#what-an-instance-owns)), and `--instance <name>`
+    tells a command which instance it is about.
+
+### Create its Slack app
+
+14. Create a Slack app for the instance from the same manifest: repeat steps 2 to 4 of Part 1,
+    with a name of its own in both `display_information.name` and
+    `features.bot_user.display_name`, for example `awaydesk work`. Slack shows the second on every
+    reply. Then repeat step 6 for the channels this bot serves, inviting it by that name. Your
+    member ID (step 5) is the same.
+
+Each instance needs an app of its own. Slack spreads a Socket Mode app's events across its open
+connections, so two daemons on one app would each receive part of your messages, and awaydesk
+refuses to start the second ([One app per instance](#one-app-per-instance)).
+
+### Write its `.env`
+
+15. Create the instance's folder and `.env` as in step 7, with the name in the folder:
+
+    ```bash
+    mkdir -p ~/.config/awaydesk-work
+    touch ~/.config/awaydesk-work/.env
+    chmod 600 ~/.config/awaydesk-work/.env
+    ```
+
+    Write the variables of step 8 in it, with the two tokens of the new app and your member ID.
+    The instance does not read `~/.config/awaydesk/.env`.
+
+### Optional: its own Claude Code login
+
+16. Skip this step to let the instance drive the login of the machine and the folders you trusted
+    in step 9. To give it another account:
+
+    - Log in once, in a terminal, with a folder of your choice:
+      `CLAUDE_CONFIG_DIR=~/.claude-work claude`, then `/login`.
+    - In that same terminal session, trust each project folder the instance will be bound to, as
+      in step 9.
+    - Add `CLAUDE_CONFIG_DIR=~/.claude-work` to the instance's `.env`, written exactly as you
+      typed it for `/login`.
+
+    What this changes, and the rules for the path, are under
+    [An instance with its own Claude Code login](#an-instance-with-its-own-claude-code-login).
+
+### Install its service
+
+17. Install and start the instance's service:
+
+    ```bash
+    awaydesk service install --instance work
+    ```
+
+    It writes `~/Library/LaunchAgents/local.awaydesk.work.plist`, loads it, and prints the plist's
+    path, the log's (`~/Library/Logs/awaydesk/work.log`) and the copy of the package the plist
+    starts, as in step 11. `uninstall`, `status` and `restart` take the same flag. In a terminal,
+    `awaydesk --instance work` runs the daemon in the foreground, as in checkpoint 2.
+
+### Checkpoint 4: both instances run
+
+```bash
+awaydesk service list
+awaydesk service status --instance work
+tail -n 5 ~/Library/Logs/awaydesk/work.log
+```
+
+The first prints a table with one row for `default` and one for `work`, each with the state
+`running, pid` and a pid. The second prints `local.awaydesk.work is running, pid` and the pid.
+After a few seconds the log ends with the line of checkpoint 2, `connected to Slack workspace`.
+Then bind a channel of the new bot with `!bind <folder>` and send a message, as in step 12: each
+bot answers only in the channels it was invited to, and the other one stays silent there.
+
+### What an instance owns
+
+Everything that is an instance's own derives from its name:
+
+| What | Default instance | Instance `work` |
+|---|---|---|
+| Configuration folder (`.env`, `state.json`, the lock) | `~/.config/awaydesk/` | `~/.config/awaydesk-work/` |
+| Files you attach | `$TMPDIR/awaydesk/` | `$TMPDIR/awaydesk-work/` |
+| LaunchAgent label | `local.awaydesk` | `local.awaydesk.work` |
+| Plist | `~/Library/LaunchAgents/local.awaydesk.plist` | `~/Library/LaunchAgents/local.awaydesk.work.plist` |
+| Log | `~/Library/Logs/awaydesk/awaydesk.log` | `~/Library/Logs/awaydesk/work.log` |
+| Arguments of the plist after the entry file | none | `--instance work` |
+
+The default instance's plist is the one earlier versions wrote, so the default instance runs the
+same under a version that knows instances and one that does not.
+
+### Choosing the instance a command is about
+
+`--instance <name>` picks the instance a command is about, and so does `AWAYDESK_INSTANCE` in the
+environment of the command when the flag is absent; the flag wins. With neither, the command is
+about the default instance, which has no name and keeps the paths of Parts 2 to 4. A name that
+breaks the rule of step 13 ends the command with status 2 and the reason on stderr. `--version`
+and `--help` take no instance.
+
+The daemon sets `AWAYDESK_INSTANCE` to its name in its own environment (and removes it for the
+default instance), which every session it starts inherits. A session of `work` that runs
+`awaydesk service status` therefore asks about `work`, under launchd and in a foreground run
+alike, with no flag typed. To reach the default instance from such a session, empty the variable:
+`AWAYDESK_INSTANCE= awaydesk service status`.
+
+### Listing the instances
+
+`awaydesk service list` shows every instance's service, whatever `--instance` or
+`AWAYDESK_INSTANCE` say: it takes no instance. It reads each `local.awaydesk.plist` and
+`local.awaydesk.<name>.plist` in `~/Library/LaunchAgents/`, takes the instance from the plist's
+`--instance <name>` argument (none means the default instance), and prints it, whether
+`launchctl` has it loaded (with the pid when it runs), the copy of the package the plist starts and
+that copy's version:
+
+```
+INSTANCE  STATE              COPY                                                     VERSION
+default   running, pid 4242  /opt/homebrew/lib/node_modules/awaydesk                  0.1.1
+dev       not loaded         /usr/local/share/awaydesk-dev/lib/node_modules/awaydesk  0.2.0
+```
+
+A plist with no entry file is listed with `unreadable plist` as its copy, and a copy whose
+`package.json` is gone with the version `unknown`. A plist that does not agree with itself is not
+listed as an instance: the command names the file below the table, as `<file>: not an awaydesk
+instance it can manage: <reason>`. That is a plist that cannot be read, whose arguments are
+anything but the entry file with an optional `--instance <name>`, whose name breaks the name rule
+(including `default` and `awaydesk`), whose `Label` is not `local.awaydesk` or
+`local.awaydesk.<name>` for the instance its arguments start, or whose file name is not that label
+with `.plist`. `service install`, `uninstall`, `status` and `restart` could not find such a file by
+an instance name. Instances installed from one copy run it
+together: `npm install -g awaydesk@latest` replaces that copy, and each of them needs its own
+`awaydesk service restart --instance <name>` to run the new one.
+
+### One app per instance
+
+Each instance has its own lock, in its own configuration folder, so copying an instance's `.env`
+to start another and leaving the old tokens in it would give two daemons on one Slack app. Slack
+would then send each event to one of the two connections, and half of your messages would reach
+the wrong daemon with no error. A second lock guards against it. Once the daemon has asked Slack
+who its bot is, and before it opens its connection, it takes two locks: one named after the
+workspace and the bot (the bot token), one named after a hash of the app-level token (`xapp-`),
+which is what the connection uses. They are in `~/.config/awaydesk_identities/<16 hex digits>/`
+(the same folder for every instance of the user, created at mode `700`; no instance name can hold
+the underscore, so no instance's folder can be it). Both are checked because a copied `.env` with
+only one token replaced, say a new bot token and the old `xapp-` token, still connects to the first
+app. The hash is all that is stored: the token itself is never written to the folder name. A daemon
+that finds either lock held ends with status 1 and this line in its log:
+
+```
+ERROR awaydesk.main: another awaydesk instance is connected to this chat app (lock on <folder>): give each instance its own app
+```
+
+The lock is held for as long as the daemon runs and is released with it. A folder left behind
+after a stop is empty and harmless.
+
+### A development copy beside the release
+
+Install a build of a clone in a prefix of its own, never in npm's global one, which holds the
+release and which `npm install -g` replaces:
+
+```bash
+npm install -g --prefix ~/.local/share/awaydesk-dev "./$(npm pack --silent)"
+alias awaydesk-dev=~/.local/share/awaydesk-dev/bin/awaydesk
+awaydesk-dev service install --instance dev
+```
+
+Run from the clone, `npm pack` builds the tarball. The alias (put it in the shell's profile) makes
+`awaydesk-dev` the command of that copy, and `awaydesk-dev service install --instance dev` writes
+a plist that starts it; its output names the copy and its version. The release keeps running as
+the default instance from the global prefix.
+
+### An instance with its own Claude Code login
+
+An instance drives the Claude Code login of the machine unless its `.env` names another folder
+with `CLAUDE_CONFIG_DIR`. Claude Code keeps a login, its settings, its trust record and its
+sessions in such a folder, and on macOS the Keychain entry of the login is keyed to the folder
+([authentication](https://code.claude.com/docs/en/authentication), read 2026-10-17). A Claude
+Console sign-in made without an API key is stored outside that folder, so two folders do not keep
+two of those apart. Step 16 gives an instance a second account. awaydesk reads the trust record
+of the instance's folder, so a project folder trusted only in `~/.claude` is not trusted there.
+After changing the line in an existing instance's `.env`, restart the instance.
+
+Write in `.env` exactly the path you used with `/login`. On macOS Claude Code keys the Keychain
+entry of the login by the folder's string as it is written, so `~/.claude-work/` (with a trailing
+slash) is another entry from `~/.claude-work`, and the instance would find no login. awaydesk
+reads `~` as your home and passes the rest on unchanged. The value must be absolute or start with
+`~/`; a relative path ends the start with an error that names the variable. The same rule holds
+for a `CLAUDE_CONFIG_DIR` the daemon inherits from its environment when `.env` sets none, and the
+error then says it came from the environment.
+
+That instance then reads the settings of `~/.claude-work`, not those of `~/.claude`: your
+`CLAUDE.md`, skills, hooks, MCP servers and permission rules are the other folder's, and have to
+be set there. Its sessions are written there as well, so in a terminal `claude --resume <id>`
+finds them only with the same variable: `CLAUDE_CONFIG_DIR=~/.claude-work claude --resume <id>`.
+The command `!status` prints carries it: `cd <folder> && CLAUDE_CONFIG_DIR=<folder of the login>
+claude --resume <session id> --fork-session`, the login's folder quoted for the shell as the
+project folder is. The default instance, and any instance whose `.env` does not set it, keep using
+`~/.claude`, and its line is the one shown in "Continuing a session in the terminal".
+
+### Instances that share a login and a folder
+
+Two instances that use the same Claude Code login and are bound to the same folder list each
+other's sessions in `!resume`, since Claude Code keeps the sessions of a folder in one place.
+Resuming a session that another process has open gives two branches of one transcript, as it does
+with two terminals. Keep the instances' folders apart, or resume only sessions of the instance you
+are in.
 
 ## Using it
 
@@ -706,7 +920,7 @@ A message with files: Claude sees a JPEG, PNG, GIF or WebP image (up to 7.5 MB a
 at most 5 images and 15 MB of images per message) as an image. Any other image type (SVG, HEIC,
 TIFF...) is refused. A text, source code, PDF, JSON, XML, YAML or Jupyter notebook file, up to 100
 MB, reaches Claude as the path of a copy in `$TMPDIR/awaydesk/` (an instance's own folder, see
-[Several instances](#several-instances)), kept 3 days; any other
+[Part 6](#part-6-a-second-instance)), kept 3 days; any other
 file (archives, Office documents, binaries) is refused. A file past a limit, or one that fails to
 download, stops the whole message, and the reply says which file and why.
 
@@ -840,156 +1054,6 @@ own list, the upgrade notice): with **Just mentions** those stay silent, since t
 
 The measurements behind this (what was tried, on what Slack plan and app, and on what date) are
 in [features.md](features.md#notifications), not restated here.
-
-## Several instances
-
-One daemon serves one Slack app. A second daemon on the same Mac is a second instance, with a name
-and files of its own. Two reasons to run one: a second login for the agent, and a copy of awaydesk
-under development beside the release you use every day.
-
-`--instance <name>` picks the instance a command is about, and so does `AWAYDESK_INSTANCE` in the
-environment of the command when the flag is absent; the flag wins. With neither, the command is
-about the default instance, which has no name and keeps the paths of Parts 2 to 4. A name is 1 to
-32 characters of `a-z`, `0-9` and `-`, and starts with a letter or a digit; `default` (it would
-read as the default instance) and `awaydesk` (its log would be the default instance's) are
-refused. A name that breaks the rule ends the command with status 2 and the reason on stderr.
-`--version` and `--help` take no instance.
-
-The daemon sets `AWAYDESK_INSTANCE` to its name in its own environment (and removes it for the
-default instance), which every session it starts inherits. A session of `work` that runs
-`awaydesk service status` therefore asks about `work`, under launchd and in a foreground run
-alike, with no flag typed. To reach the default instance from such a session, empty the variable:
-`AWAYDESK_INSTANCE= awaydesk service status`.
-
-Everything that is an instance's own derives from its name:
-
-| What | Default instance | Instance `work` |
-|---|---|---|
-| Configuration folder (`.env`, `state.json`, the lock) | `~/.config/awaydesk/` | `~/.config/awaydesk-work/` |
-| Files you attach | `$TMPDIR/awaydesk/` | `$TMPDIR/awaydesk-work/` |
-| LaunchAgent label | `local.awaydesk` | `local.awaydesk.work` |
-| Plist | `~/Library/LaunchAgents/local.awaydesk.plist` | `~/Library/LaunchAgents/local.awaydesk.work.plist` |
-| Log | `~/Library/Logs/awaydesk/awaydesk.log` | `~/Library/Logs/awaydesk/work.log` |
-| Arguments of the plist after the entry file | none | `--instance work` |
-
-The default instance's plist is the one earlier versions wrote, so the default instance runs the
-same under a version that knows instances and one that does not.
-
-To add an instance:
-
-1. Create a Slack app for it, from the same manifest (Part 1), with a bot name of its own in
-   `features.bot_user.display_name`: Slack shows it on every reply. Two instances never share an
-   app, since Slack spreads an app's events across its open connections (see
-   [One app per instance](#one-app-per-instance)).
-2. Write its `.env` in its folder (Part 2), with the tokens of that app:
-   `mkdir -p ~/.config/awaydesk-work`, then `~/.config/awaydesk-work/.env` at mode `600`.
-3. Install its service: `awaydesk service install --instance work`. `uninstall`, `status` and
-   `restart` take the same flag. In a terminal, `awaydesk --instance work` runs its daemon in the
-   foreground.
-
-`awaydesk service list` shows every instance's service, whatever `--instance` or
-`AWAYDESK_INSTANCE` say: it takes no instance. It reads each `local.awaydesk.plist` and
-`local.awaydesk.<name>.plist` in `~/Library/LaunchAgents/`, takes the instance from the plist's
-`--instance <name>` argument (none means the default instance), and prints it, whether
-`launchctl` has it loaded (with the pid when it runs), the copy of the package the plist starts and
-that copy's version:
-
-```
-INSTANCE  STATE              COPY                                                     VERSION
-default   running, pid 4242  /opt/homebrew/lib/node_modules/awaydesk                  0.1.1
-dev       not loaded         /usr/local/share/awaydesk-dev/lib/node_modules/awaydesk  0.2.0
-```
-
-A plist with no entry file is listed with `unreadable plist` as its copy, and a copy whose
-`package.json` is gone with the version `unknown`. A plist that does not agree with itself is not
-listed as an instance: the command names the file below the table, as `<file>: not an awaydesk
-instance it can manage: <reason>`. That is a plist that cannot be read, whose arguments are
-anything but the entry file with an optional `--instance <name>`, whose name breaks the name rule
-(including `default` and `awaydesk`), whose `Label` is not `local.awaydesk` or
-`local.awaydesk.<name>` for the instance its arguments start, or whose file name is not that label
-with `.plist`. `service install`, `uninstall`, `status` and `restart` could not find such a file by
-an instance name. Instances installed from one copy run it
-together: `npm install -g awaydesk@latest` replaces that copy, and each of them needs its own
-`awaydesk service restart --instance <name>` to run the new one.
-
-### One app per instance
-
-Each instance has its own lock, in its own configuration folder, so copying an instance's `.env`
-to start another and leaving the old tokens in it would give two daemons on one Slack app. Slack
-would then send each event to one of the two connections, and half of your messages would reach
-the wrong daemon with no error. A second lock guards against it. Once the daemon has asked Slack
-who its bot is, and before it opens its connection, it takes two locks: one named after the
-workspace and the bot (the bot token), one named after a hash of the app-level token (`xapp-`),
-which is what the connection uses. They are in `~/.config/awaydesk_identities/<16 hex digits>/`
-(the same folder for every instance of the user, created at mode `700`; no instance name can hold
-the underscore, so no instance's folder can be it). Both are checked because a copied `.env` with
-only one token replaced, say a new bot token and the old `xapp-` token, still connects to the first
-app. The hash is all that is stored: the token itself is never written to the folder name. A daemon
-that finds either lock held ends with status 1 and this line in its log:
-
-```
-ERROR awaydesk.main: another awaydesk instance is connected to this chat app (lock on <folder>): give each instance its own app
-```
-
-The lock is held for as long as the daemon runs and is released with it. A folder left behind
-after a stop is empty and harmless.
-
-### A development copy beside the release
-
-Install a build of a clone in a prefix of its own, never in npm's global one, which holds the
-release and which `npm install -g` replaces:
-
-```bash
-npm install -g --prefix ~/.local/share/awaydesk-dev "./$(npm pack --silent)"
-alias awaydesk-dev=~/.local/share/awaydesk-dev/bin/awaydesk
-awaydesk-dev service install --instance dev
-```
-
-Run from the clone, `npm pack` builds the tarball. The alias (put it in the shell's profile) makes
-`awaydesk-dev` the command of that copy, and `awaydesk-dev service install --instance dev` writes
-a plist that starts it; its output names the copy and its version. The release keeps running as
-the default instance from the global prefix.
-
-### An instance with its own Claude Code login
-
-An instance drives the Claude Code login of the machine unless its `.env` names another folder
-with `CLAUDE_CONFIG_DIR`. Claude Code keeps a login, its settings, its trust record and its
-sessions in such a folder, and on macOS the Keychain entry of the login is keyed to the folder
-([authentication](https://code.claude.com/docs/en/authentication), read 2026-10-17). A Claude
-Console sign-in made without an API key is stored outside that folder, so two folders do not keep
-two of those apart. To give an instance a second account:
-
-1. Log in once, in a terminal, with the folder you chose:
-   `CLAUDE_CONFIG_DIR=~/.claude-work claude`, then `/login`.
-2. In that same terminal session, trust each project folder the instance will be bound to, as in
-   Part 3: awaydesk reads the trust record of that folder, and a folder trusted only in
-   `~/.claude` is not trusted there.
-3. Put `CLAUDE_CONFIG_DIR=~/.claude-work` in the instance's `.env` and restart the instance.
-
-Write in `.env` exactly the path you used with `/login`. On macOS Claude Code keys the Keychain
-entry of the login by the folder's string as it is written, so `~/.claude-work/` (with a trailing
-slash) is another entry from `~/.claude-work`, and the instance would find no login. awaydesk
-reads `~` as your home and passes the rest on unchanged. The value must be absolute or start with
-`~/`; a relative path ends the start with an error that names the variable. The same rule holds
-for a `CLAUDE_CONFIG_DIR` the daemon inherits from its environment when `.env` sets none, and the
-error then says it came from the environment.
-
-That instance then reads the settings of `~/.claude-work`, not those of `~/.claude`: your
-`CLAUDE.md`, skills, hooks, MCP servers and permission rules are the other folder's, and have to
-be set there. Its sessions are written there as well, so in a terminal `claude --resume <id>`
-finds them only with the same variable: `CLAUDE_CONFIG_DIR=~/.claude-work claude --resume <id>`.
-The command `!status` prints carries it: `cd <folder> && CLAUDE_CONFIG_DIR=<folder of the login>
-claude --resume <session id> --fork-session`, the login's folder quoted for the shell as the
-project folder is. The default instance, and any instance whose `.env` does not set it, keep using
-`~/.claude`, and its line is the one shown in "Continuing a session in the terminal".
-
-### Instances that share a login and a folder
-
-Two instances that use the same Claude Code login and are bound to the same folder list each
-other's sessions in `!resume`, since Claude Code keeps the sessions of a folder in one place.
-Resuming a session that another process has open gives two branches of one transcript, as it does
-with two terminals. Keep the instances' folders apart, or resume only sessions of the instance you
-are in.
 
 ## Troubleshooting
 

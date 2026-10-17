@@ -54,6 +54,7 @@ npm install -g awaydesk
 - Claude Code's own commands with `!` in place of `/`, such as `!compact` or `!model opus`.
 - Images and files attached to a message reach Claude.
 - A Home tab that lists your sessions by channel, the last used first.
+- Several daemons on one Mac, one per Slack app: a second Claude Code login, or a development copy beside the release. `--instance <name>` gives each one its own settings, service and log; `awaydesk service list` shows them all.
 
 ## Commands
 

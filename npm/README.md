@@ -22,6 +22,8 @@ the settings, and the service that starts awaydesk at login:
 awaydesk service install
 ```
 
+One computer can run several instances, one per Slack app, each with its own settings and agent login: see [the guide's Part 6](https://github.com/duqaXxX/awaydesk/blob/v{{VERSION}}/docs/setup.md#part-6-a-second-instance).
+
 ## Update
 
 ```sh
