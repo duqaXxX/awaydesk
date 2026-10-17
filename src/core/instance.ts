@@ -19,7 +19,8 @@ export interface Instance {
 
 export const DEFAULT_INSTANCE: Instance = { name: null };
 
-// 32 characters at most: the lock of a Linux instance is a socket, whose path has 104 bytes.
+// 32 characters at most: the lock of a Linux instance is a socket, whose path has 108 bytes on
+// Linux (`sun_path`); macOS, whose limit is 104, takes the directory lock instead.
 const NAME = /^[a-z0-9][a-z0-9-]{0,31}$/;
 
 /** A name that follows the rule, or the sentence that says why `text` is refused. */
@@ -27,6 +28,11 @@ export function parseInstanceName(text: string): { name: string } | { refusal: s
   if (text === "default") {
     return {
       refusal: `the instance name "default" would read as the default instance, which has no name: leave the instance out to use it`,
+    };
+  }
+  if (text === "awaydesk") {
+    return {
+      refusal: `the instance name "awaydesk" would share the default instance's log, awaydesk.log: choose another name`,
     };
   }
   if (!NAME.test(text)) {

@@ -16,7 +16,9 @@ All notable changes to this project are documented here. The format follows
   removes it for the default instance), which its sessions inherit, so an `awaydesk` command a
   session runs is about its own instance, under launchd and in a foreground run.
 - `awaydesk service list` shows every instance's service: loaded or not, the pid, the copy of the
-  package it runs and that copy's version. `awaydesk service install` prints the copy it puts in
+  package it runs and that copy's version. The instance comes from the plist's `--instance`
+  argument, checked against the plist's `Label`, its file name and the name rule; a plist that
+  disagrees is named below the table as not an instance it can manage. `awaydesk service install` prints the copy it puts in
   the plist and its version.
 - A second lock, on the chat app. `ChatProvider.identities` is a list of opaque keys, and for Slack
   it holds two: `<team id>:<bot user id>` (the bot token) and `app-token:<SHA-256 of the app-level
@@ -44,6 +46,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The instance name `awaydesk` is refused beside `default`: its log would be the default
+  instance's, `awaydesk.log`.
 - The rule that one daemon runs per machine is now one daemon per instance
   (`docs/setup.md`, Several instances).
 

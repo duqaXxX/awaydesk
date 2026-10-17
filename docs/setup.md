@@ -850,9 +850,10 @@ under development beside the release you use every day.
 `--instance <name>` picks the instance a command is about, and so does `AWAYDESK_INSTANCE` in the
 environment of the command when the flag is absent; the flag wins. With neither, the command is
 about the default instance, which has no name and keeps the paths of Parts 2 to 4. A name is 1 to
-32 characters of `a-z`, `0-9` and `-`, and starts with a letter or a digit; `default` is refused.
-A name that breaks the rule ends the command with status 2 and the reason on stderr. `--version`
-and `--help` take no instance.
+32 characters of `a-z`, `0-9` and `-`, and starts with a letter or a digit; `default` (it would
+read as the default instance) and `awaydesk` (its log would be the default instance's) are
+refused. A name that breaks the rule ends the command with status 2 and the reason on stderr.
+`--version` and `--help` take no instance.
 
 The daemon sets `AWAYDESK_INSTANCE` to its name in its own environment (and removes it for the
 default instance), which every session it starts inherits. A session of `work` that runs
@@ -887,7 +888,8 @@ To add an instance:
 
 `awaydesk service list` shows every instance's service, whatever `--instance` or
 `AWAYDESK_INSTANCE` say: it takes no instance. It reads each `local.awaydesk.plist` and
-`local.awaydesk.<name>.plist` in `~/Library/LaunchAgents/`, and prints the instance, whether
+`local.awaydesk.<name>.plist` in `~/Library/LaunchAgents/`, takes the instance from the plist's
+`--instance <name>` argument (none means the default instance), and prints it, whether
 `launchctl` has it loaded (with the pid when it runs), the copy of the package the plist starts and
 that copy's version:
 
@@ -897,8 +899,15 @@ default   running, pid 4242  /opt/homebrew/lib/node_modules/awaydesk            
 dev       not loaded         /usr/local/share/awaydesk-dev/lib/node_modules/awaydesk  0.2.0
 ```
 
-A plist it cannot read is listed with `unreadable plist` as its copy, and a copy whose
-`package.json` is gone with the version `unknown`. Instances installed from one copy run it
+A plist with no entry file is listed with `unreadable plist` as its copy, and a copy whose
+`package.json` is gone with the version `unknown`. A plist that does not agree with itself is not
+listed as an instance: the command names the file below the table, as `<file>: not an awaydesk
+instance it can manage: <reason>`. That is a plist that cannot be read, whose arguments are
+anything but the entry file with an optional `--instance <name>`, whose name breaks the name rule
+(including `default` and `awaydesk`), whose `Label` is not `local.awaydesk` or
+`local.awaydesk.<name>` for the instance its arguments start, or whose file name is not that label
+with `.plist`. `service install`, `uninstall`, `status` and `restart` could not find such a file by
+an instance name. Instances installed from one copy run it
 together: `npm install -g awaydesk@latest` replaces that copy, and each of them needs its own
 `awaydesk service restart --instance <name>` to run the new one.
 

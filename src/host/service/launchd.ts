@@ -18,6 +18,17 @@ import type { Report, Run, ServiceManager } from "./seam.ts";
 
 const DEFAULT_LABEL = "local.awaydesk";
 
+// The rule of an instance's name (`core/instance.ts`, `parseInstanceName`), kept here because the
+// host layer imports nothing of the core; `test/host/service/launchd.test.ts` holds the two
+// together. `service list` reads plists it did not write, so it checks the name itself.
+const INSTANCE_NAME = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const RESERVED_NAMES = ["default", "awaydesk"];
+
+/** Whether `name` is a name an instance may have. */
+export function isInstanceName(name: string): boolean {
+  return INSTANCE_NAME.test(name) && !RESERVED_NAMES.includes(name);
+}
+
 /** The service's label: `local.awaydesk` for the default instance, `local.awaydesk.<name>` else. */
 export function labelOf(instance: string | null): string {
   return instance === null ? DEFAULT_LABEL : `${DEFAULT_LABEL}.${instance}`;
@@ -134,24 +145,71 @@ function table(rows: readonly Row[]): string[] {
   );
 }
 
-// `local.awaydesk.plist` is the default instance, `local.awaydesk.<name>.plist` a named one.
-const OWN_PLIST = /^local\.awaydesk(?:\.(.+))?\.plist$/;
+// The files that may be an awaydesk service: `local.awaydesk.plist` and `local.awaydesk.<...>.plist`.
+// Which instance one is comes from what it says inside (`inspected`), not from this name.
+const OWN_PLIST = /^local\.awaydesk(?:\..+)?\.plist$/;
 
-/** The program arguments of the plist at `file`, or null when `plutil` cannot read them. */
-function programArguments(run: Run, file: string): string[] | null {
+const NOT_MANAGEABLE = "not an awaydesk instance it can manage";
+
+/** What `service list` reads of a plist: its Label (null when it has none) and its arguments. */
+interface PlistFacts {
+  label: string | null;
+  args: string[];
+}
+
+/** The Label and program arguments of the plist at `file`, or null when `plutil` cannot read them. */
+function plistFacts(run: Run, file: string): PlistFacts | null {
   const result = run("plutil", ["-convert", "json", "-o", "-", file]);
   if (result.status !== 0) return null;
   try {
     const parsed: unknown = JSON.parse(result.stdout);
-    const found =
-      typeof parsed === "object" && parsed !== null && "ProgramArguments" in parsed
-        ? parsed.ProgramArguments
-        : null;
-    if (!Array.isArray(found) || !found.every((item) => typeof item === "string")) return null;
-    return found;
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const args = "ProgramArguments" in parsed ? parsed.ProgramArguments : null;
+    if (!Array.isArray(args) || !args.every((item) => typeof item === "string")) return null;
+    const label = "Label" in parsed && typeof parsed.Label === "string" ? parsed.Label : null;
+    return { label, args };
   } catch {
     return null;
   }
+}
+
+/** The instance a plist starts and its entry file, or the reason it is not one `file` can manage. */
+function inspected(
+  file: string,
+  facts: PlistFacts | null,
+): { instance: string | null; main: string | undefined } | { reason: string } {
+  if (facts === null) return { reason: "its plist cannot be read" };
+  const [, main, ...rest] = facts.args;
+  let instance: string | null = null;
+  if (rest.length === 1 && rest[0] === "--instance") {
+    return { reason: "its program arguments end with --instance and no name" };
+  }
+  if (rest.length === 2 && rest[0] === "--instance") instance = rest[1] as string;
+  else if (rest.length !== 0) {
+    return {
+      reason:
+        "its program arguments are the entry file alone, or the entry file and --instance <name>",
+    };
+  }
+  if (instance !== null && !isInstanceName(instance)) {
+    return {
+      reason: `${JSON.stringify(instance)} is not an instance name: 1 to 32 characters of a-z, 0-9 and "-", starting with a letter or a digit, and not "default" or "awaydesk"`,
+    };
+  }
+  const expected = labelOf(instance);
+  const named = instance === null ? "the default instance" : `instance ${JSON.stringify(instance)}`;
+  if (facts.label === null) return { reason: "it has no Label" };
+  if (facts.label !== expected) {
+    return {
+      reason: `its Label is ${facts.label}, but its program arguments start ${named} (Label ${expected})`,
+    };
+  }
+  if (file !== `${expected}.plist`) {
+    return {
+      reason: `its file name says another instance than its program arguments, which name ${named} (${expected}.plist)`,
+    };
+  }
+  return { instance, main };
 }
 
 /** The launchd implementation of `ServiceManager`. */
@@ -312,28 +370,41 @@ export class Launchd implements ServiceManager {
     return this.#guarded(() => {
       const directory = agentsDir(this.#options.home);
       const files = existsSync(directory)
-        ? readdirSync(directory).filter((name) => OWN_PLIST.test(name))
+        ? readdirSync(directory)
+            .filter((name) => OWN_PLIST.test(name))
+            .sort()
         : [];
       if (files.length === 0) return ok(["No awaydesk service is installed."]);
       const listing = this.#launchctl(["list"]);
-      const instances = files
-        .map((file) => ({ file, name: OWN_PLIST.exec(file)?.[1] ?? null }))
+      const found = files.map((file) => ({
+        file,
+        what: inspected(file, plistFacts(this.#options.run, join(directory, file))),
+      }));
+      const instances = found
+        .flatMap(({ what }) => ("reason" in what ? [] : [what]))
         // The default instance first, then the others by name.
-        .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
-      const rows: Row[] = instances.map(({ file, name }) => {
-        const job = listedJob(listing, labelOf(name));
+        .sort((a, b) => (a.instance ?? "").localeCompare(b.instance ?? ""));
+      const rows: Row[] = instances.map(({ instance, main }) => {
+        const job = listedJob(listing, labelOf(instance));
         const state =
           job === null
             ? "not loaded"
             : job.pid === null
               ? "loaded, not running"
               : `running, pid ${job.pid}`;
-        const main = programArguments(this.#options.run, join(directory, file))?.[1];
-        if (main === undefined) return [name ?? "default", state, "unreadable plist", "-"];
+        const name = instance ?? "default";
+        if (main === undefined) return [name, state, "unreadable plist", "-"];
         const copy = copyOf(main);
-        return [name ?? "default", state, copy, copyVersion(copy) ?? "unknown"];
+        return [name, state, copy, copyVersion(copy) ?? "unknown"];
       });
-      return ok(table([["INSTANCE", "STATE", "COPY", "VERSION"], ...rows]));
+      // What no command of an instance could find or remove is named, not listed as one.
+      const refused = found.flatMap(({ file, what }) =>
+        "reason" in what ? [`${file}: ${NOT_MANAGEABLE}: ${what.reason}`] : [],
+      );
+      return ok([
+        ...(rows.length === 0 ? [] : table([["INSTANCE", "STATE", "COPY", "VERSION"], ...rows])),
+        ...refused,
+      ]);
     });
   }
 }

@@ -500,7 +500,8 @@ rule on every system: its configuration folder (`instance.configDirOf`: `~/.conf
 (`instance.scratchDirOf`: `$TMPDIR/awaydesk`, or `$TMPDIR/awaydesk-<name>`), and, on macOS, the
 LaunchAgent's label, plist and log (`launchd.labelOf`, `launchd.plistPath`, `launchd.logPath`). A
 name is 1 to 32 characters of `a-z`, `0-9` and `-`, starting with a letter or a digit, and
-`default` is refused (`instance.parseInstanceName`); the length keeps the lock socket's path inside
+`default` and `awaydesk` are refused (`instance.parseInstanceName`: the first would read as the
+default instance, the second would share its log); the length keeps the lock socket's path inside
 `sun_path`. The command line (`src/cli.ts`) takes the name from `--instance`, else from
 `AWAYDESK_INSTANCE`; it is the only reader of that variable, and the host layer, which imports
 nothing of the core, receives the name as a string. `main.run` takes the instance and derives the

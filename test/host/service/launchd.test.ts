@@ -16,9 +16,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { parseInstanceName } from "../../../src/core/instance.ts";
 import type { Program } from "../../../src/host/program.ts";
 import { runCommand } from "../../../src/host/run.ts";
 import {
+  isInstanceName,
   Launchd,
   labelOf,
   listedJob,
@@ -490,9 +492,16 @@ test("a named instance that is not installed or not loaded says its own command"
 
 // ---- service list
 
-/** The JSON `plutil -convert json -o -` prints for a plist that starts `main`, with `extra` args. */
-function converted(main: string, extra: string[] = []): string {
-  return JSON.stringify({ Label: "x", ProgramArguments: ["/n/node", main, ...extra] });
+/**
+ * The JSON `plutil -convert json -o -` prints for a plist that starts `main`, with `extra` args.
+ * Its Label is the one `--instance` implies unless `label` says another.
+ */
+function converted(main: string, extra: string[] = [], label?: string): string {
+  const named = extra[0] === "--instance" ? extra[1] : null;
+  return JSON.stringify({
+    Label: label ?? labelOf(named ?? null),
+    ProgramArguments: ["/n/node", main, ...extra],
+  });
 }
 
 /**
@@ -556,13 +565,13 @@ test("service list shows every awaydesk plist: instance, state, copy and version
   // The columns line up, whatever each cell holds.
   const starts = report.out.map((line) => line.indexOf(line.split(/ {2,}/)[2] as string));
   assert.equal(new Set(starts).size, 1);
-  // One `launchctl list`, then one reading of each plist, in the order listed.
+  // One `launchctl list`, then one reading of each plist, in the order of the file names.
   assert.deepEqual(
     run.calls.map((call) => [call.command, call.args[0], String(call.args[4]).split("/").at(-1)]),
     [
       ["launchctl", "list", "undefined"],
-      ["plutil", "-convert", "local.awaydesk.plist"],
       ["plutil", "-convert", "local.awaydesk.dev.plist"],
+      ["plutil", "-convert", "local.awaydesk.plist"],
       ["plutil", "-convert", "local.awaydesk.work.plist"],
     ],
   );
@@ -573,30 +582,114 @@ function cells(lines: readonly string[]): string[][] {
   return lines.map((line) => line.split(/ {2,}/));
 }
 
-test("service list names a plist it cannot read, and a copy whose package.json is gone", (t) => {
+test("service list names a copy whose package.json is gone, and a plist with no entry file", (t) => {
   const path = home(t);
   const gone = copyIn(path, null);
-  agents(path, [
-    "local.awaydesk.plist",
-    "local.awaydesk.bad.plist",
-    "local.awaydesk.json.plist",
-    "local.awaydesk.noargs.plist",
-  ]);
+  agents(path, ["local.awaydesk.plist", "local.awaydesk.gone.plist"]);
   const run = listingRun(`PID\tStatus\tLabel\n7\t0\t${LABEL}\n`, {
-    "local.awaydesk.plist": { stdout: converted(gone.main) },
-    "local.awaydesk.bad.plist": { status: 1 },
-    "local.awaydesk.json.plist": { stdout: "not json" },
-    "local.awaydesk.noargs.plist": { stdout: JSON.stringify({ ProgramArguments: ["/n/node"] }) },
+    "local.awaydesk.plist": {
+      stdout: JSON.stringify({ Label: LABEL, ProgramArguments: ["/n/node"] }),
+    },
+    "local.awaydesk.gone.plist": { stdout: converted(gone.main, ["--instance", "gone"]) },
   });
   const report = manager(path, run).list();
   assert.equal(report.code, 0);
   assert.deepEqual(cells(report.out), [
     ["INSTANCE", "STATE", "COPY", "VERSION"],
-    ["default", "running, pid 7", join(path, "lib", "node_modules", "awaydesk"), "unknown"],
-    ["bad", "not loaded", "unreadable plist", "-"],
-    ["json", "not loaded", "unreadable plist", "-"],
-    ["noargs", "not loaded", "unreadable plist", "-"],
+    ["default", "running, pid 7", "unreadable plist", "-"],
+    ["gone", "not loaded", join(path, "lib", "node_modules", "awaydesk"), "unknown"],
   ]);
+});
+
+// The instance is what the plist says, not what its file is called: a file that disagrees with
+// its own label or breaks the name rule is one `service uninstall --instance <name>` could not
+// find, so it is never listed as an instance.
+const NOT_MANAGEABLE = "not an awaydesk instance it can manage";
+
+test("service list takes the instance from the program arguments and checks the rest", (t) => {
+  const path = home(t);
+  const release = copyIn(path, "0.1.1");
+  const files: Record<string, string> = {
+    // Dots in a name, and a capital: the file's name says an instance, the rule says no.
+    "local.awaydesk.foo.bar.plist": converted(release.main, ["--instance", "foo.bar"]),
+    "local.awaydesk.Bak.plist": converted(release.main, ["--instance", "Bak"]),
+    // Named by its file and its Label, started with no `--instance`: it would run the default.
+    "local.awaydesk.dev.plist": converted(release.main, [], "local.awaydesk.dev"),
+    // Arguments and Label of another instance than the file's.
+    "local.awaydesk.one.plist": converted(release.main, ["--instance", "two"]),
+    // Arguments that name an instance and a Label that does not.
+    "local.awaydesk.work.plist": converted(release.main, ["--instance", "work"], LABEL),
+    // The names the rule reserves.
+    "local.awaydesk.default.plist": converted(release.main, ["--instance", "default"]),
+    "local.awaydesk.awaydesk.plist": converted(release.main, ["--instance", "awaydesk"]),
+    // No Label at all, a flag with no name, a trailing argument.
+    "local.awaydesk.nolabel.plist": JSON.stringify({
+      ProgramArguments: ["/n/node", release.main, "--instance", "nolabel"],
+    }),
+    "local.awaydesk.noname.plist": converted(release.main, ["--instance"]),
+    "local.awaydesk.extra.plist": converted(release.main, ["--instance", "extra", "--other"]),
+    // Cannot be read as a plist at all.
+    "local.awaydesk.bad.plist": "",
+    // The one that agrees.
+    "local.awaydesk.good.plist": converted(release.main, ["--instance", "good"]),
+  };
+  agents(path, Object.keys(files));
+  const run = listingRun(
+    `PID\tStatus\tLabel\n9\t0\t${labelOf("good")}\n`,
+    Object.fromEntries(
+      Object.entries(files).map(([file, stdout]) =>
+        file === "local.awaydesk.bad.plist" ? [file, { status: 1 }] : [file, { stdout }],
+      ),
+    ),
+  );
+  const report = manager(path, run).list();
+  assert.equal(report.code, 0);
+  const copyOfRelease = join(path, "lib", "node_modules", "awaydesk");
+  const rows = report.out.filter((line) => !line.includes(NOT_MANAGEABLE));
+  assert.deepEqual(cells(rows), [
+    ["INSTANCE", "STATE", "COPY", "VERSION"],
+    ["good", "running, pid 9", copyOfRelease, "0.1.1"],
+  ]);
+  const refused = Object.fromEntries(
+    report.out
+      .filter((line) => line.includes(NOT_MANAGEABLE))
+      .map((line) => [line.split(":")[0], line]),
+  );
+  assert.deepEqual(
+    Object.keys(refused).sort(),
+    Object.keys(files)
+      .filter((f) => !f.includes("good"))
+      .sort(),
+  );
+  const said = (file: string): string => refused[file] as string;
+  assert.match(said("local.awaydesk.foo.bar.plist"), /"foo\.bar" is not an instance name/);
+  assert.match(said("local.awaydesk.Bak.plist"), /"Bak" is not an instance name/);
+  assert.match(said("local.awaydesk.dev.plist"), /Label is local\.awaydesk\.dev.*default instance/);
+  assert.match(said("local.awaydesk.one.plist"), /instance "two".*local\.awaydesk\.two/);
+  assert.match(
+    said("local.awaydesk.work.plist"),
+    /Label is local\.awaydesk,.*local\.awaydesk\.work/,
+  );
+  assert.match(said("local.awaydesk.default.plist"), /"default"/);
+  assert.match(said("local.awaydesk.awaydesk.plist"), /"awaydesk"/);
+  assert.match(said("local.awaydesk.nolabel.plist"), /no Label/);
+  assert.match(said("local.awaydesk.noname.plist"), /--instance/);
+  assert.match(said("local.awaydesk.extra.plist"), /arguments/);
+  assert.match(said("local.awaydesk.bad.plist"), /cannot be read/);
+});
+
+test("service list with only plists it cannot manage prints no table", (t) => {
+  const path = home(t);
+  const release = copyIn(path, "0.1.1");
+  agents(path, ["local.awaydesk.dev.plist"]);
+  const run = listingRun(ABSENT, {
+    "local.awaydesk.dev.plist": { stdout: converted(release.main, [], "local.awaydesk.dev") },
+  });
+  const report = manager(path, run).list();
+  assert.equal(report.code, 0);
+  assert.equal(report.out.length, 1);
+  assert.ok((report.out[0] as string).startsWith("local.awaydesk.dev.plist: "));
+  assert.ok((report.out[0] as string).includes(NOT_MANAGEABLE));
 });
 
 test("service list with no plist says so, and fails when launchctl does", (t) => {
@@ -610,4 +703,35 @@ test("service list with no plist says so, and fails when launchctl does", (t) =>
     out: [],
     err: ["launchctl list failed: Could not connect"],
   });
+});
+
+// The host layer imports nothing of the core, so it keeps its own copy of the name rule; this is
+// the test that the two do not drift.
+test("the host's name rule is the core's", () => {
+  const names = [
+    "dev",
+    "work",
+    "a",
+    "0",
+    "2nd-login",
+    "a-b-c",
+    "x".repeat(32),
+    "awaydesk-dev",
+    "",
+    "Work",
+    "-dev",
+    "dev_1",
+    "dev.1",
+    "foo.bar",
+    "Bak",
+    "a b",
+    "é",
+    "x".repeat(33),
+    "../x",
+    "default",
+    "awaydesk",
+  ];
+  for (const name of names) {
+    assert.equal(isInstanceName(name), "name" in parseInstanceName(name), JSON.stringify(name));
+  }
 });

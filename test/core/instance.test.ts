@@ -37,6 +37,16 @@ test("the name default is refused: it would read as the default instance", () =>
   assert.match(parsed.refusal, /the default instance/);
 });
 
+test("the name awaydesk is refused: its log would be the default instance's", () => {
+  const parsed = parseInstanceName("awaydesk");
+  assert.ok("refusal" in parsed);
+  assert.match(parsed.refusal, /"awaydesk"/);
+  assert.match(parsed.refusal, /awaydesk\.log/);
+  assert.match(parsed.refusal, /default instance/);
+  // Only the whole name: a longer one starts with it and has a log of its own.
+  assert.deepEqual(parseInstanceName("awaydesk-dev"), { name: "awaydesk-dev" });
+});
+
 test("the default instance keeps today's folders", () => {
   assert.equal(configDirOf(DEFAULT_INSTANCE, HOME), join(HOME, ".config", "awaydesk"));
   assert.equal(scratchDirOf(DEFAULT_INSTANCE, TMP), join(TMP, "awaydesk"));
