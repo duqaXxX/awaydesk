@@ -462,6 +462,11 @@ under development beside the release you use every day. This part adds an instan
 default one that Parts 0 to 4 installed. Its steps continue the numbering of Part 4, and its
 commands use the name `work`.
 
+The instance's app can live in the workspace of the first instance or in another one: each
+instance has its own app, its own tokens and its own owner check, whatever the workspace. A daemon
+on another Mac is not a second instance of this one: it is that Mac's default instance, set up
+with Parts 0 to 5 and an app of its own.
+
 ### Name the instance
 
 13. Choose a name of 1 to 32 characters of `a-z`, `0-9` and `-`, starting with a letter or a
@@ -475,8 +480,9 @@ commands use the name `work`.
     with a name of its own in both `display_information.name` and
     `features.bot_user.display_name`, for example `awaydesk-work` for the app and `Alice (work)`
     for the bot. Slack shows the bot's name on every reply. Then repeat step 6 for the channels
-    this bot serves, inviting it by that name. Your
-    member ID (step 5) is the same. To tell apart an app you created earlier under the default
+    this bot serves, inviting it by that name. To create the app in another workspace, pick that
+    workspace in step 2. Your member ID (step 5) is the same in the same workspace; in another
+    workspace you have another one, copied there as in step 5. To tell apart an app you created earlier under the default
     names, open it at <https://api.slack.com/apps>, choose **App Manifest** in the sidebar, change
     the same two fields, and save.
 
@@ -616,6 +622,10 @@ that finds either lock held ends with status 1 and this line in its log:
 ```
 ERROR awaydesk.main: another awaydesk instance is connected to this chat app (lock on <folder>): give each instance its own app
 ```
+
+The locks are files of one Mac: they stop a second daemon on the same Mac, not one on another
+Mac started with the same tokens, which would split the events with no error. A daemon on each
+Mac needs an app of its own, as each instance does.
 
 The lock is held for as long as the daemon runs and is released with it. A folder left behind
 after a stop is empty and harmless.
