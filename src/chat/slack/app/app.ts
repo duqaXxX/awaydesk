@@ -115,7 +115,7 @@ export interface BuildAppOptions {
   readonly names: Names;
   /** What the listeners tell the core of what the owner did. */
   readonly inbound: ChatInbound;
-  /** The folder a message's files that are no image are saved in (`attachments.uploadsDir`). */
+  /** The folder a message's files that are no image are saved in (`ChatContext.scratchDir`). */
   readonly uploads: string;
   readonly home: Home;
   /** Where Slack's payloads come from: `socketReceiver(config.appToken)` in the daemon. */

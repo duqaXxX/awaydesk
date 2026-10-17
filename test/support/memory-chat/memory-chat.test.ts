@@ -22,6 +22,7 @@ async function built(chat = memoryChat()) {
   const provider = await chat.build({
     variables: {},
     allowedRoot: "/work",
+    scratchDir: "/scratch",
     clock: CLOCK,
     steady: CLOCK,
     core: () => {
@@ -46,6 +47,16 @@ function line(id: string, title: string, folded: string | null = null): TaskUpda
     startedAt: null,
   };
 }
+
+test("its identities are the ones it is given, and one default otherwise", async () => {
+  assert.deepEqual(
+    (await built(memoryChat({ identities: ["T000ACME:U000BOT", "app-token:0123abcd"] }))).provider
+      .identities,
+    ["T000ACME:U000BOT", "app-token:0123abcd"],
+  );
+  const { provider } = await built();
+  assert.deepEqual(provider.identities, ["memory:daemon"]);
+});
 
 test("its names are no numbers, and a thread is dated from the clock of its context", async () => {
   const { chat, provider, channel } = await built();

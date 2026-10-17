@@ -23,9 +23,9 @@ import type { ChatProvider, Reply, ThreadChat, ThreadRef } from "../../src/chat/
 import type { ChatEntry } from "../../src/core/port.ts";
 import { StateStore } from "../../src/core/state.ts";
 import type { Names } from "../../src/core/texts.ts";
-import { run, type SignalSource, type Stop } from "../../src/main.ts";
+import { type RunOptions, run, type SignalSource, type Stop } from "../../src/main.ts";
 import type { Registry } from "../../src/registry.ts";
-import { type MemoryChat, memoryChat, OWNER } from "../support/memory-chat.ts";
+import { MEMORY_IDENTITY, type MemoryChat, memoryChat, OWNER } from "../support/memory-chat.ts";
 import {
   type PlainAgent,
   type PlainEntry,
@@ -33,7 +33,7 @@ import {
   PlainStore,
   plainAgent,
 } from "../support/plain-agent.ts";
-import { HELD_BY_A_RUNNING_DAEMON, realWorkDone, SettledClock } from "../support/sessions.ts";
+import { heldByARunningDaemon, realWorkDone, SettledClock } from "../support/sessions.ts";
 
 /** The names the registry holds the two modules under, and so the values of the `.env`. */
 export const AGENT_NAME = "plain";
@@ -117,6 +117,10 @@ export interface WorldOptions {
   };
   /** The entries taken when the `.env` selects none; the two modules under test when absent. */
   readonly defaults?: { readonly agent: string; readonly chat: string };
+  /** The home folder whose identity locks the daemon takes; a private one when absent. */
+  readonly home?: string;
+  /** The identities of the memory chat (`ChatProvider.identities`); its default when absent. */
+  readonly identities?: readonly string[];
 }
 
 /** A promise settled from outside. */
@@ -133,12 +137,18 @@ export class World {
   readonly config: string;
   /** The temp folder that holds the other two. */
   readonly base: string;
+  /** The home folder: the chat identity's lock lives under it, never under the real one. */
+  readonly home: string;
+  /** The calls the daemon made on the chat that mark its life: `start`, `stop`, `close`. */
+  readonly chatCalls: string[] = [];
   /** `ALLOWED_ROOT`. */
   readonly root: string;
   /** The folder the channel is bound to. */
   readonly folder: string;
   readonly channel: string;
   readonly chat: MemoryChat;
+  /** How many locks the chat's identity takes: one per key. */
+  readonly identityKeys: number;
   /** The plain agent's entry: `built` holds every agent a start made. */
   readonly entry: PlainEntry;
   /** What the agent keeps of its sessions: it outlives a stop of the daemon. */
@@ -158,6 +168,7 @@ export class World {
   private constructor(t: TestContext, options: WorldOptions) {
     const base = realpathSync(mkdtempSync(join(tmpdir(), "awaydesk-scenario-")));
     this.base = base;
+    this.home = options.home ?? join(base, "home");
     this.root = join(base, "root");
     mkdirSync(this.root);
     this.config = join(base, "config");
@@ -179,7 +190,10 @@ export class World {
     this.signals.setMaxListeners(0);
     this.store = new PlainStore({ now: () => START_TIME * 1000 });
     this.entry = plainAgent({ store: this.store, turns: this.turns });
-    this.chat = memoryChat();
+    this.chat = memoryChat(
+      options.identities === undefined ? {} : { identities: options.identities },
+    );
+    this.identityKeys = (options.identities ?? [MEMORY_IDENTITY]).length;
     this.channel = this.chat.openChannel("work");
     // The channel is bound before the first start, as the owner's `!bind` of an earlier day left it.
     const state = new StateStore(join(this.config, "state.json"), {
@@ -224,13 +238,21 @@ export class World {
   #watchStart(provider: ChatProvider): ChatProvider {
     const started = this.#started;
     const handed = this.handed;
+    const calls = this.chatCalls;
     return new Proxy(provider, {
       get(target, property) {
         const member = Reflect.get(target, property, target);
         if (property === "start") {
           return async (...args: Parameters<ChatProvider["start"]>) => {
+            calls.push("start");
             await target.start(...args);
             started.open();
+          };
+        }
+        if (property === "stop" || property === "close") {
+          return async () => {
+            calls.push(property);
+            await target[property]();
           };
         }
         if (property === "thread") {
@@ -269,16 +291,24 @@ export class World {
     return built;
   }
 
+  /** What `run` is given for this world. */
+  runOptions(): RunOptions {
+    return {
+      configDir: this.config,
+      home: this.home,
+      registry: this.registry,
+      clock: this.clock,
+      signals: this.signals as SignalSource,
+      // Detached: `run` writes the instance's name to it, and a test must not change the runner's.
+      environment: {},
+    };
+  }
+
   /** The daemon starts, and is waited for until it hears the owner. */
   async start(): Promise<void> {
     assert.equal(this.running, null, "the daemon is running");
     this.#started = latch();
-    this.running = run({
-      configDir: this.config,
-      registry: this.registry,
-      clock: this.clock,
-      signals: this.signals as SignalSource,
-    });
+    this.running = run(this.runOptions());
     await Promise.race([
       this.#started.promise,
       this.running.then(() => assert.fail("run ended before it started the chat")),
@@ -308,8 +338,8 @@ export class World {
     for (let round = 0; round < 20; round += 1) {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
-    // The daemon's lock stays open while it runs: it is not work to wait for.
-    await realWorkDone(this.running === null ? 0 : HELD_BY_A_RUNNING_DAEMON);
+    // The daemon's locks stay open while it runs: they are not work to wait for.
+    await realWorkDone(this.running === null ? 0 : heldByARunningDaemon(this.identityKeys));
   }
 
   /** Settles until `done` holds; fails with `what` when it never does. */

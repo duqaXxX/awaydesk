@@ -57,6 +57,10 @@ class Faulty implements ChatProvider {
     return this.#inner.name;
   }
 
+  get identities(): readonly string[] {
+    return this.#inner.identities;
+  }
+
   get capabilities(): ChatCapabilities {
     return this.#inner.capabilities;
   }
@@ -185,6 +189,7 @@ export class ListsWorld {
     const provider = await chat.build({
       variables: {},
       allowedRoot: root,
+      scratchDir: join(root, "scratch"),
       clock,
       steady: clock,
       core: () => {

@@ -528,15 +528,19 @@ const REAL_WORK_LIMIT_MS = 10_000;
 
 /**
  * What a running daemon keeps open for as long as it runs, and so is no work in flight: outside
- * macOS its single-instance lock is a listening socket or pipe (`src/core/lock.ts`).
+ * macOS each of its locks is a listening socket or pipe (`src/core/lock.ts`), the instance's and
+ * one per key of its chat identity (`ChatProvider.identities`). On macOS a lock is a `flock` on a
+ * folder, which holds nothing open that counts as work.
  */
-export const HELD_BY_A_RUNNING_DAEMON = process.platform === "darwin" ? 0 : 1;
+export function heldByARunningDaemon(identityKeys: number): number {
+  return process.platform === "darwin" ? 0 : 1 + identityKeys;
+}
 
 /**
  * Wait until no real work started by the daemon is in flight (a file call, a `git` process): it
  * answers on the operating system's time, so under load it outlasts any fixed number of turns.
  * Returns at once when nothing is in flight. `held` counts what stays open on purpose while the
- * caller's daemon runs (`HELD_BY_A_RUNNING_DAEMON`), which would otherwise be waited for until
+ * caller's daemon runs (`heldByARunningDaemon`), which would otherwise be waited for until
  * the limit, every time.
  */
 export async function realWorkDone(held = 0): Promise<void> {

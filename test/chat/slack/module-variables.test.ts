@@ -17,6 +17,7 @@ function contextOf(variables: Record<string, string>): ChatContext {
   return {
     variables,
     allowedRoot: "/",
+    scratchDir: "/scratch",
     clock,
     steady: clock,
     core: () => assert.fail("the core was read"),

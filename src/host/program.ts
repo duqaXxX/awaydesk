@@ -53,3 +53,8 @@ export function servicePath(program: Program, system: readonly string[]): string
   const folders = [dirname(program.node), program.npmBin, ...system];
   return [...new Set(folders.filter((folder) => folder !== null))].join(":");
 }
+
+/** The package folder of the copy whose entry file is `main`: the folder above `dist/`. */
+export function copyOf(main: string): string {
+  return dirname(dirname(main));
+}

@@ -1,6 +1,6 @@
 /**
  * Strings the way Python's `str` treats them, where JavaScript's `String` differs: what counts
- * as whitespace, and the order of two strings. The texts the daemon cuts and sorts come out as
+ * as whitespace, and the order of two strings, and the quoting of a word for a shell. The texts the daemon cuts and sorts come out as
  * Python cut and sorted them, and the goldens hold those results. Any layer imports this.
  */
 
@@ -86,4 +86,11 @@ export function len(text: string): number {
     }
   }
   return count;
+}
+
+/** `shlex.quote`: the word as one shell argument, quoted only when it needs to be. */
+export function shellQuote(word: string): string {
+  if (word === "") return "''";
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(word)) return word;
+  return `'${word.replaceAll("'", "'\"'\"'")}'`;
 }

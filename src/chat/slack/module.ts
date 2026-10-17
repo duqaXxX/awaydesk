@@ -5,6 +5,7 @@
  * is read through `context.core()` when it is first used, which is after `build` returned.
  */
 
+import { createHash } from "node:crypto";
 import type { Receiver } from "@slack/bolt";
 import {
   type ChatContext,
@@ -18,7 +19,7 @@ import { ChatError, type ChatProvider } from "../seam.ts";
 import type { Fetch } from "./app/answers.ts";
 import { socketReceiver } from "./app/app.ts";
 import { ChannelGuard, type Identity } from "./app/guards.ts";
-import { prepareUploads, uploadsDir } from "./attachments.ts";
+import { prepareUploads } from "./attachments.ts";
 import { type DeleterState, ThreadDeleter } from "./delete.ts";
 import { Home } from "./home.ts";
 import { type ClientOptions, repliesClient, sharedClient } from "./reply/clients.ts";
@@ -61,7 +62,7 @@ export interface SlackOptions {
   readonly clients?: Clients | undefined;
   /** Where Slack's payloads come from: `socketReceiver`. */
   readonly receiver?: ((appToken: string) => Receiver) | undefined;
-  /** The folder of the files saved from messages: `$TMPDIR/awaydesk`. */
+  /** The folder of the files saved from messages; `ChatContext.scratchDir` when absent. */
   readonly uploads?: string | undefined;
   /** How a file is downloaded. */
   readonly fetch?: Fetch | undefined;
@@ -111,6 +112,15 @@ export async function deleter(
     release: (channelId, threadId) => sessions.release(channelId, threadId),
     free: (channelId, threadId) => sessions.free(channelId, threadId),
   });
+}
+
+/**
+ * The lock key of an app-level token: its SHA-256 in hex, so that the key says which app without
+ * the token ever leaving this module (Slack documents no call that maps an `xapp-` token to its
+ * app).
+ */
+export function appTokenKey(appToken: string): string {
+  return `app-token:${createHash("sha256").update(appToken).digest("hex")}`;
 }
 
 /** The variable `context` must hold for `name`: the daemon does not start without the required. */
@@ -204,7 +214,7 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
     }),
     clock: context.clock,
   });
-  const uploads = options.uploads ?? uploadsDir();
+  const uploads = options.uploads ?? context.scratchDir;
   await prepareUploads(uploads);
   const chat = new SlackChat({
     slack,
@@ -221,6 +231,7 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
       home,
       uploads,
       receiver: (options.receiver ?? socketReceiver)(appToken),
+      appKey: appTokenKey(appToken),
       ...(options.fetch !== undefined && { fetch: options.fetch }),
       ...(options.listings !== undefined && { listings: options.listings }),
       ...(options.now !== undefined && { now: options.now }),

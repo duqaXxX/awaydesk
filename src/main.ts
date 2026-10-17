@@ -58,18 +58,31 @@
  *   refusal on an older Node (see `node-version.ts`); it does not rest on `import.meta.main`.
  */
 import "./require-node.ts";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentEntry } from "./agent/seam.ts";
+import { AgentConfigError, type AgentEntry } from "./agent/seam.ts";
 import { answer, parseArguments } from "./cli.ts";
 import { type Clock, monotonicClock, systemClock } from "./clock.ts";
 import { CLEAN_EVERY_SECONDS, clean } from "./core/cleanup.ts";
-import { CONFIG_DIR, ConfigError, loadConfig } from "./core/config.ts";
+import { ConfigError, loadConfig } from "./core/config.ts";
 import { buildFlows } from "./core/flows/flows.ts";
 import { postUpgradeNotices } from "./core/flows/notices.ts";
 import { repair } from "./core/flows/repair.ts";
 import { UsageCache } from "./core/footer.ts";
 import { Holds } from "./core/hold.ts";
-import { AlreadyRunning, singleInstance } from "./core/lock.ts";
+import {
+  configDirOf,
+  DEFAULT_INSTANCE,
+  INSTANCE_VARIABLE,
+  type Instance,
+  scratchDirOf,
+} from "./core/instance.ts";
+import {
+  AlreadyRunning,
+  chatIdentityLocks,
+  type InstanceLock,
+  singleInstance,
+} from "./core/lock.ts";
 import type { ChatContext, ChatEntry, CorePort } from "./core/port.ts";
 import { Approvals } from "./core/requests.ts";
 import { SessionManager } from "./core/sessions/manager.ts";
@@ -113,8 +126,24 @@ export interface ProcessEvents {
 
 /** Every outside thing `run` uses, with the real one as the default. */
 export interface RunOptions {
-  /** `~/.config/awaydesk`. */
+  /** The default instance. A named one has folders of its own (`core/instance.ts`). */
+  readonly instance?: Instance;
+  /** `configDirOf(instance, homedir())`: `~/.config/awaydesk` for the default instance. */
   readonly configDir?: string;
+  /** `scratchDirOf(instance, tmpdir())`: the folder handed to the chat for the files it saves. */
+  readonly scratchDir?: string;
+  /**
+   * `homedir()`: the owner's home, under which the lock of the chat's identity lives
+   * (`.config/awaydesk_identities`), shared by every instance.
+   */
+  readonly home?: string;
+  /**
+   * `process.env`: the environment the daemon writes the instance's name into
+   * (`AWAYDESK_INSTANCE`, removed for the default instance). Sessions build their own from
+   * `process.env`, so with the default an `awaydesk` command a session runs is about the instance
+   * that session belongs to; a test passes a detached object and leaves the runner's alone.
+   */
+  readonly environment?: NodeJS.ProcessEnv;
   /**
    * The agents and the chats the configuration may select: `REGISTRY`. What a test replaces of a
    * module is an option of that module's entry (`slackChat({ clients })`), never of `run`.
@@ -267,7 +296,13 @@ async function step(name: string, work: () => unknown, done: () => void): Promis
  * asked for (`RunOptions.failure`).
  */
 export async function run(options: RunOptions = {}): Promise<number> {
-  const configDir = options.configDir ?? CONFIG_DIR;
+  const instance = options.instance ?? DEFAULT_INSTANCE;
+  const configDir = options.configDir ?? configDirOf(instance, homedir());
+  const scratchDir = options.scratchDir ?? scratchDirOf(instance, tmpdir());
+  const home = options.home ?? homedir();
+  const environment = options.environment ?? process.env;
+  if (instance.name === null) delete environment[INSTANCE_VARIABLE];
+  else environment[INSTANCE_VARIABLE] = instance.name;
   // Wall time for what is dated (a reply's footer, the page's hours), the monotonic clock for
   // what is paced.
   const wall = options.clock ?? systemClock;
@@ -276,6 +311,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
   const registry = options.registry ?? REGISTRY;
   const config = loadConfig(registry, configDir);
   const lock = await singleInstance(configDir);
+  let identityLock: InstanceLock | null = null;
   let stop: StopSignals | null = null;
   const onFailure = (): void => stop?.fail();
   try {
@@ -294,6 +330,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
     const context: ChatContext = {
       variables: config.chatVariables,
       allowedRoot: config.allowedRoot,
+      scratchDir,
       clock: wall,
       steady,
       core: () => {
@@ -302,6 +339,19 @@ export async function run(options: RunOptions = {}): Promise<number> {
       },
     };
     const chat = await chatEntry.build(context);
+    // After the build, which knows what the daemon connects to in the chat, and before
+    // `chat.start`, which is what connects: a second daemon on the same chat app would be sent
+    // half of its events.
+    try {
+      identityLock = await chatIdentityLocks(chat.identities, home);
+    } catch (error) {
+      // Nothing is connected yet: what the chat and the agent hold is let go of, as a stop does.
+      const none = (): void => {};
+      await step("stop the chat", () => chat.stop(), none);
+      await step("close the chat", () => chat.close(), none);
+      await step("close the agent", () => backend.close(), none);
+      throw error;
+    }
     const names = namesOf(backend, chat);
     const approvals = new Approvals(names);
     const holds = new Holds();
@@ -409,9 +459,13 @@ export async function run(options: RunOptions = {}): Promise<number> {
   } finally {
     options.failure?.removeEventListener("abort", onFailure);
     try {
-      await lock.release();
+      await identityLock?.release();
     } finally {
-      stop?.dispose();
+      try {
+        await lock.release();
+      } finally {
+        stop?.dispose();
+      }
     }
   }
   return stop?.failed ? 1 : 0;
@@ -469,6 +523,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
   } catch (error) {
     if (
       error instanceof ConfigError ||
+      error instanceof AgentConfigError ||
       error instanceof StateError ||
       error instanceof AlreadyRunning
     ) {
@@ -481,9 +536,9 @@ export async function main(options: MainOptions = {}): Promise<void> {
 }
 
 if (import.meta.main) {
-  const invocation = parseArguments(process.argv.slice(2));
+  const invocation = parseArguments(process.argv.slice(2), process.env);
   if (invocation.kind === "run") {
-    void main();
+    void main({ instance: invocation.instance });
   } else {
     // An exit code, not `process.exit`: a write to a pipe can still be pending on macOS.
     process.exitCode = answer(invocation, {

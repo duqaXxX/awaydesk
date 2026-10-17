@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -327,3 +327,15 @@ function isRecordOrigin(record: JsonObject, kind: string): boolean {
   const origin = record.origin;
   return typeof origin === "object" && origin !== null && (origin as JsonObject).kind === kind;
 }
+
+// P29 needs no token, so the scene that proves it runs here, on the installed SDK.
+test("P29: the SDK lists a transcript under the folder CLAUDE_CONFIG_DIR names", async () => {
+  const { configFolderListing } = await import("../../probe/scenes.ts");
+  // The real path, as the probe's own root is: Claude Code names a project by it.
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "awaydesk-probe-test-")));
+  const before = process.env.CLAUDE_CONFIG_DIR;
+  const seen = await configFolderListing(root);
+  assert.deepEqual(seen.P29, observation(true, true, ""));
+  // The environment is back as it was: the sessions of the scenes after it inherit it.
+  assert.equal(process.env.CLAUDE_CONFIG_DIR, before);
+});

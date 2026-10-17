@@ -15,9 +15,9 @@
  */
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
+import { recordPath } from "./record.ts";
 
 export const logger = getLogger("awaydesk.agent.claude.chrome");
 
@@ -26,12 +26,16 @@ const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 /**
  * Whether the owner turned Chrome on by default in Claude Code; false when its record cannot be
- * read. Read at every call, so a change in `/chrome` holds from a session's next start.
+ * read. The record is the config folder's when the login has one (`recordPath`). Read at every
+ * call, so a change in `/chrome` holds from a session's next start.
  */
-export async function chromeEnabled(home: string = homedir()): Promise<boolean> {
+export async function chromeEnabled(
+  home: string = homedir(),
+  configDir?: string,
+): Promise<boolean> {
   let record: unknown;
   try {
-    record = JSON.parse(STRICT_UTF8.decode(await readFile(join(home, ".claude.json"))));
+    record = JSON.parse(STRICT_UTF8.decode(await readFile(recordPath(home, configDir))));
   } catch (error) {
     logger.warning(`could not read Claude Code's Chrome setting: ${errorName(error)}`);
     return false;

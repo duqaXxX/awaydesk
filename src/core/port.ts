@@ -46,6 +46,11 @@ export interface ChatContext {
   readonly variables: Readonly<Record<string, string>>;
   /** The folder the owner allowed sessions under. */
   readonly allowedRoot: string;
+  /**
+   * The folder for the files the chat saves while it runs, the instance's own
+   * (`core/instance.ts`). The chat checks it is private and prunes what it leaves there.
+   */
+  readonly scratchDir: string;
   /** Wall time, for what is dated. */
   readonly clock: Clock;
   /** Seconds that only move forward, for what is paced. */

@@ -5,6 +5,60 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- `slack-app-manifest.json` asks for the user scope `chat:write` (`oauth_config.scopes.user`), so
+  an app created from it issues the owner's User OAuth Token at install, beside the bot token,
+  for the Home tab's Delete and Clean up. `docs/setup.md` copies it in step 3, writes
+  `SLACK_USER_TOKEN` in step 8's `.env`, and keeps the note for an app created from the earlier
+  manifest: add `chat:write` under User Token Scopes, reinstall and copy the token. The variable
+  stays optional in the code: without it the daemon starts and the Home tab has no Edit button.
+- Several daemons on one machine, one per instance. An instance is a name: `--instance <name>`, or
+  `AWAYDESK_INSTANCE` when the flag is absent (`src/core/instance.ts`, read by `src/cli.ts`). The configuration folder
+  (`~/.config/awaydesk-<name>`), the folder for attached files (`$TMPDIR/awaydesk-<name>`, handed to the chat as `ChatContext.scratchDir`), the LaunchAgent
+  (`local.awaydesk.<name>`, started with `--instance <name>`) and the log
+  (`~/Library/Logs/awaydesk/<name>.log`) derive from it. The default instance keeps today's paths
+  and its plist, byte for byte. The daemon writes its name to its own `AWAYDESK_INSTANCE` (and
+  removes it for the default instance), which its sessions inherit, so an `awaydesk` command a
+  session runs is about its own instance, under launchd and in a foreground run.
+- `awaydesk service list` shows every instance's service: loaded or not, the pid, the copy of the
+  package it runs and that copy's version. The instance comes from the plist's `--instance`
+  argument, checked against the plist's `Label`, its file name and the name rule; a plist that
+  disagrees is named below the table as not an instance it can manage. A job `launchctl list` shows
+  loaded whose plist file is gone is listed too, with `its plist is gone` after its state. The
+  default instance is written `(default)`, a word `--instance` refuses. `awaydesk service install`
+  prints the copy it puts in the plist and its version.
+- A second lock, on the chat app. `ChatProvider.identities` is a list of opaque keys, and for Slack
+  it holds two: `<team id>:<bot user id>` (the bot token) and `app-token:<SHA-256 of the app-level
+  token>` (the token Socket Mode connects with, hashed in the Slack module so the token never
+  reaches the core). After the chat is built and before it connects, the daemon takes a lock on
+  each key, in order, in `~/.config/awaydesk_identities/<16 hex digits>/`, shared by every instance
+  of the user, and releases the ones it took if a later one is refused. A copied `.env` with the old
+  tokens left in it, or with only one of the two replaced, no longer gives two daemons on one app:
+  the second ends before it opens its connection, with `another awaydesk instance is connected to
+  this chat app (lock on <folder>): give each instance its own app`.
+
+- `CLAUDE_CONFIG_DIR` in an instance's `.env` gives it a Claude Code login of its own. The Claude
+  module declares the variable, expands `~`, refuses a relative path with `AgentConfigError`, and
+  gives the folder to the trust record, the Chrome setting and the transcripts it reads
+  (`<folder>/.claude.json`, `<folder>/projects`); absent, the daemon's environment's folder, else
+  `~/.claude`. A `CLAUDE_CONFIG_DIR` inherited from the daemon's environment follows the same rule
+  (absolute, or `~/` expanded), and the error says it came from the environment. The value is
+  passed on as written after the tilde, since the Keychain entry of a login is keyed by the string.
+  The module writes the folder into the daemon's environment once, at build, since the SDK's
+  `listSessions` reads it from there alone; without that `!resume` and the Home tab's session list
+  would be empty (the cleanup reads the back end's own folder and does not depend on it).
+  `docs/sdk-surface.md` lists the dependency, and the probe's claim P29 checks it with no token.
+  The `Terminal:` line of `!status` names the folder: `cd <folder> && CLAUDE_CONFIG_DIR=<login
+  folder> claude --resume <id> --fork-session`.
+
+### Changed
+
+- The instance name `awaydesk` is refused beside `default`: its log would be the default
+  instance's, `awaydesk.log`.
+- The rule that one daemon runs per machine is now one daemon per instance
+  (`docs/setup.md`, Part 6).
+
 ## [0.1.1] - 2026-10-17
 
 ### Added

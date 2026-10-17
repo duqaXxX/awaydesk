@@ -23,15 +23,27 @@ export const SETUP_SECTIONS = {
 
 let version: string | null = null;
 
+/**
+ * The `version` of the package whose `package.json` is `manifest`, or null when it cannot be read
+ * or has none. It names `node:fs` alone: this file is loaded before the Node is known to be new
+ * enough (`main.ts`).
+ */
+export function packageVersion(manifest: string | URL): string | null {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(manifest, "utf8"));
+    const found =
+      typeof parsed === "object" && parsed !== null && "version" in parsed ? parsed.version : null;
+    return typeof found === "string" && found !== "" ? found : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The `version` field of the package's `package.json`; throws when the file has none. */
 export function installedVersion(): string {
   if (version !== null) return version;
-  const parsed: unknown = JSON.parse(
-    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-  );
-  const found =
-    typeof parsed === "object" && parsed !== null && "version" in parsed ? parsed.version : null;
-  if (typeof found !== "string" || found === "") throw new Error("package.json has no version");
+  const found = packageVersion(new URL("../package.json", import.meta.url));
+  if (found === null) throw new Error("package.json has no version");
   version = found;
   return version;
 }

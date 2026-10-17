@@ -921,3 +921,39 @@ test("a file that grows after its size was read is read up to git s limit", POSI
   assert.ok(grown);
   assert.equal(found?.gitDir, join(x, "a", "b"));
 });
+
+// An instance with its own Claude Code login (`CLAUDE_CONFIG_DIR`): Claude Code keeps the record
+// of trust in that folder, and the owner's `~/.claude.json` belongs to another login.
+test("the record of trust is the config folder's when one is given", async () => {
+  const config = join(tmp, "config");
+  mkdirSync(config);
+  const repo = gitInit(join(tmp, "app"));
+  const folder = join(tmp, "notes", "day");
+  mkdirSync(folder, { recursive: true });
+  trust(home, [repo, folder]);
+  assert.ok(!(await workspaceTrusted(repo, home, config))); // trusted in the home's record alone
+  assert.equal(await trustedRepository(repo, home, config), null);
+  assert.ok(!(await workspaceTrusted(folder, home, config)));
+  trust(config, [repo]);
+  assert.ok(await workspaceTrusted(repo, home, config));
+  assert.notEqual(await trustedRepository(repo, home, config), null);
+  assert.ok(!(await workspaceTrusted(folder, home, config))); // the home's record is not read
+});
+
+test("with no config folder the record is the home's", async () => {
+  const repo = gitInit(join(tmp, "app"));
+  trust(home, [repo]);
+  assert.ok(await workspaceTrusted(repo, home));
+  assert.ok(await workspaceTrusted(repo, home, undefined));
+  assert.notEqual(await trustedRepository(repo, home, undefined), null);
+});
+
+test("two records are cached apart: a read of one does not stand for the other", async () => {
+  const config = join(tmp, "config");
+  mkdirSync(config);
+  const repo = gitInit(join(tmp, "app"));
+  trust(home, [repo]);
+  assert.ok(await workspaceTrusted(repo, home));
+  assert.ok(!(await workspaceTrusted(repo, home, config)));
+  assert.ok(await workspaceTrusted(repo, home));
+});

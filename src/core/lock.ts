@@ -22,6 +22,7 @@ import {
   closeSync,
   constants,
   lstatSync,
+  mkdirSync,
   openSync,
   realpathSync,
   rmSync,
@@ -51,6 +52,21 @@ export class AlreadyRunning extends Error {
   constructor(message: string) {
     super(message);
     this.name = "AlreadyRunning";
+  }
+}
+
+/**
+ * Another daemon holds the lock of this daemon's chat identity (the chat app's bot): two
+ * instances would share one app, and the chat then sends each event to one of the two
+ * connections at random. Its own class so that the message can tell it from the instance lock's.
+ */
+export class ChatIdentityTaken extends AlreadyRunning {
+  constructor(directory: string) {
+    super(
+      `another awaydesk instance is connected to this chat app (lock on ${directory}): ` +
+        "give each instance its own app",
+    );
+    this.name = "ChatIdentityTaken";
   }
 }
 
@@ -272,4 +288,60 @@ async function directoryLock(directory: string): Promise<InstanceLock> {
  */
 export function singleInstance(directory: string): Promise<InstanceLock> {
   return process.platform === "darwin" ? directoryLock(directory) : socketLock(directory);
+}
+
+/**
+ * The folder whose lock stands for `identity` (one of `ChatProvider.identities`): per user and outside
+ * every instance's folder. The underscore keeps it apart from them, since an instance name
+ * cannot hold one (`core/instance.ts`).
+ */
+export function identityDirectory(home: string, identity: string): string {
+  const digest = createHash("sha256").update(identity).digest("hex").slice(0, 16);
+  return join(home, ".config", "awaydesk_identities", digest);
+}
+
+/**
+ * Takes the lock of a chat identity by the mechanism of this platform (see the header), in
+ * `identityDirectory(home, identity)`, which it creates private to the owner. Rejects with
+ * `ChatIdentityTaken` while another process holds it. Held until `release`, which the daemon
+ * calls after its chat has stopped.
+ */
+export async function chatIdentityLock(identity: string, home: string): Promise<InstanceLock> {
+  const directory = identityDirectory(home, identity);
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  try {
+    return await singleInstance(directory);
+  } catch (error) {
+    throw error instanceof AlreadyRunning ? new ChatIdentityTaken(directory) : error;
+  }
+}
+
+/**
+ * Takes the lock of every key of `ChatProvider.identities`, in order, each by `chatIdentityLock`.
+ * A refusal of one releases the ones already taken and rejects with `ChatIdentityTaken`; the
+ * returned lock releases them all, last taken first.
+ */
+export async function chatIdentityLocks(
+  identities: readonly string[],
+  home: string,
+): Promise<InstanceLock> {
+  const taken: InstanceLock[] = [];
+  const releaseAll = async (): Promise<void> => {
+    let failure: unknown = null;
+    for (const lock of taken.splice(0).reverse()) {
+      try {
+        await lock.release();
+      } catch (error) {
+        failure ??= error;
+      }
+    }
+    if (failure !== null) throw failure;
+  };
+  try {
+    for (const identity of identities) taken.push(await chatIdentityLock(identity, home));
+  } catch (error) {
+    await releaseAll().catch(() => {});
+    throw error;
+  }
+  return { release: releaseAll };
 }

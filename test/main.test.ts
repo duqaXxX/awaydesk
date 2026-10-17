@@ -19,22 +19,42 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import type { App } from "@slack/bolt";
 import { type FetchFunction, LogLevel, WebAPIRequestError } from "@slack/web-api";
-import type { AgentBackend } from "../src/agent/seam.ts";
+import { claudeAgent } from "../src/agent/claude/module.ts";
+import {
+  type AgentBackend,
+  AgentConfigError,
+  type RequestHandler,
+  type StartOptions,
+} from "../src/agent/seam.ts";
 import type { BuildAppOptions } from "../src/chat/slack/app/app.ts";
 import { DELETE_ACTION, EDIT_ACTION, EDIT_ON } from "../src/chat/slack/home.ts";
-import { deleter, makeClients, type SlackOptions, slackChat } from "../src/chat/slack/module.ts";
+import {
+  appTokenKey,
+  deleter,
+  makeClients,
+  type SlackOptions,
+  slackChat,
+} from "../src/chat/slack/module.ts";
 import { SlackChat } from "../src/chat/slack/thread.ts";
 import type { Clock } from "../src/clock.ts";
 import { CLEAN_EVERY_SECONDS, logger as cleanupLogger } from "../src/core/cleanup.ts";
 import { ConfigError } from "../src/core/config.ts";
 import { postUpgradeNotices } from "../src/core/flows/notices.ts";
-import { AlreadyRunning, singleInstance } from "../src/core/lock.ts";
+import { AlreadyRunning, identityDirectory, singleInstance } from "../src/core/lock.ts";
 import { StateError, StateStore } from "../src/core/state.ts";
 import * as texts from "../src/core/texts.ts";
 import {
@@ -52,6 +72,7 @@ import {
   StopSignals,
 } from "../src/main.ts";
 import type { Registry } from "../src/registry.ts";
+import { FakeSdk } from "./support/fake-query.ts";
 import {
   AGENT,
   AsyncEvent,
@@ -67,12 +88,15 @@ import { slackPayload } from "./support/fixtures.ts";
 import { NAMES } from "./support/names.ts";
 import {
   FakeAgentBackend,
-  HELD_BY_A_RUNNING_DAEMON,
+  heldByARunningDaemon,
   realWorkDone,
   type Script,
   sdkMessages,
 } from "./support/sessions.ts";
 import { homeAction, reply } from "./support/slack-app.ts";
+
+// The Slack provider's identity has two keys: the workspace and bot, and the app-level token.
+const HELD = heldByARunningDaemon(2);
 
 const ROOT = join(import.meta.dirname, "..");
 const GONE = "C000GONE";
@@ -152,11 +176,21 @@ class Daemon {
   /** The app the receiver was given, once built: where a test delivers a payload from. */
   app: App | null = null;
   readonly dir: string;
+  /** The home the daemon takes the lock of its chat identity under, never the real one. */
+  home: string;
   running: Promise<number> | null = null;
   startFails: Error | null = null;
 
-  constructor(t: TestContext, options: { scripts?: Script[]; userToken?: boolean } = {}) {
+  /** Whether the chat saves into the folder the daemon hands it, as it does outside a test. */
+  readonly scratch: boolean;
+
+  constructor(
+    t: TestContext,
+    options: { scripts?: Script[]; userToken?: boolean; scratch?: boolean } = {},
+  ) {
+    this.scratch = options.scratch ?? false;
     this.dir = configDirectory(t, options);
+    this.home = join(this.dir, "home");
     this.backend = new FakeAgentBackend(options.scripts ?? []);
     this.signals.setMaxListeners(0);
     t.after(async () => {
@@ -195,6 +229,7 @@ class Daemon {
   options(extra: RunOptions = {}): RunOptions {
     return {
       configDir: this.dir,
+      home: this.home,
       registry: registryOf(this.backend, {
         clients: {
           bot: (token, stopped) => {
@@ -211,10 +246,12 @@ class Daemon {
           this.tokens.push(["receiver", token]);
           return this.receiver;
         },
-        uploads: join(this.dir, "uploads"),
+        ...(!this.scratch && { uploads: join(this.dir, "uploads") }),
       }),
       clock: this.clock,
       signals: this.signals as SignalSource,
+      // Detached: `run` writes the instance's name to it, and a test must not change the runner's.
+      environment: {},
       ...extra,
     };
   }
@@ -248,7 +285,7 @@ class Daemon {
     for (let round = 0; round < 100; round += 1) {
       if (done()) return;
       await this.clock.advance(1);
-      await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
+      await realWorkDone(HELD);
     }
     assert.ok(done(), "the daemon never reached the state the test waited for");
   }
@@ -273,7 +310,12 @@ test("a bad config exits 1 with the reason", async (t) => {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const errors = written(t, logger, "error");
   const exits: number[] = [];
-  await main({ configDir: dir, exit: (code) => exits.push(code), process: new EventEmitter() });
+  await main({
+    configDir: dir,
+    environment: {},
+    exit: (code) => exits.push(code),
+    process: new EventEmitter(),
+  });
   assert.deepEqual(exits, [1]);
   assert.ok(errors().some((line) => line.includes("docs/setup.md")));
 });
@@ -282,6 +324,7 @@ test("a second instance stops before slack", async (t) => {
   const dir = configDirectory(t);
   const unreached: RunOptions = {
     configDir: dir,
+    environment: {},
     registry: registryOf(new FakeAgentBackend([]), {
       clients: {
         bot: () => assert.fail("Slack was reached"),
@@ -297,6 +340,55 @@ test("a second instance stops before slack", async (t) => {
   }
 });
 
+test("a second daemon on the same Slack app refuses before it connects", async (t) => {
+  const first = new Daemon(t);
+  first.start();
+  await first.booted();
+  // Its own configuration folder, with the tokens of the same app: a copied `.env`.
+  const second = new Daemon(t);
+  second.home = first.home;
+  const errors = written(t, logger, "error");
+  const exits: number[] = [];
+  await main({
+    ...second.options(),
+    exit: (code) => exits.push(code),
+    process: new EventEmitter(),
+  });
+  assert.deepEqual(exits, [1]);
+  assert.deepEqual(errors(), [
+    `another awaydesk instance is connected to this chat app (lock on ${identityDirectory(first.home, `${TEAM}:${BOT}`)}): give each instance its own app`,
+  ]);
+  // Built (auth.test answered) and never connected; what it built is let go of.
+  assert.ok(second.slack.callsTo("auth.test").length > 0);
+  assert.deepEqual(second.events, []);
+  assert.deepEqual(first.events, ["connect"]);
+  await first.stop();
+});
+
+test("a copied .env with a new bot token and the old app token refuses before it connects", async (t) => {
+  const first = new Daemon(t);
+  first.start();
+  await first.booted();
+  const second = new Daemon(t);
+  second.home = first.home;
+  // Another bot in the same workspace; the app-level token is the first's.
+  second.slack.responses["auth.test"] = { ok: true, team_id: TEAM, user_id: "U000BOT2" };
+  const errors = written(t, logger, "error");
+  const exits: number[] = [];
+  await main({
+    ...second.options(),
+    exit: (code) => exits.push(code),
+    process: new EventEmitter(),
+  });
+  assert.deepEqual(exits, [1]);
+  assert.deepEqual(errors(), [
+    `another awaydesk instance is connected to this chat app (lock on ${identityDirectory(first.home, appTokenKey(APP_TOKEN))}): give each instance its own app`,
+  ]);
+  assert.deepEqual(second.events, []);
+  assert.deepEqual(first.events, ["connect"]);
+  await first.stop();
+});
+
 // Issue #236: a call Slack rate limited waits as long as Slack says before it is sent again, and
 // a stop does not wait for that pause.
 test("the clients are told when the daemon stops, and not before", async (t) => {
@@ -306,6 +398,85 @@ test("the clients are told when the daemon stops, and not before", async (t) => 
   assert.equal(d.clientsStopped?.aborted, false);
   await d.stop();
   assert.equal(d.clientsStopped?.aborted, true);
+});
+
+test("the chat saves files in the scratch folder of the instance the daemon was given", async (t) => {
+  const d = new Daemon(t, { scratch: true });
+  const scratchDir = join(d.dir, "scratch-dev");
+  d.start({ scratchDir });
+  await d.booted();
+  const mode = statSync(scratchDir).mode & 0o777;
+  // Windows keeps no POSIX mode: a folder reports 0o666 there.
+  if (process.platform !== "win32") assert.equal(mode, 0o700);
+  await d.stop();
+});
+
+test("a named instance's name is written to the environment it was given", async (t) => {
+  const d = new Daemon(t);
+  const environment: NodeJS.ProcessEnv = {};
+  d.start({ instance: { name: "work" }, environment });
+  await d.booted();
+  assert.equal(environment.AWAYDESK_INSTANCE, "work");
+  await d.stop();
+});
+
+// The sessions build their `env` from `process.env`, the environment `run` writes to by default:
+// the one place a session can tell which instance it belongs to.
+test("a session the daemon starts receives the name of its instance", async (t) => {
+  const before = process.env.AWAYDESK_INSTANCE;
+  t.after(() => {
+    if (before === undefined) delete process.env.AWAYDESK_INSTANCE;
+    else process.env.AWAYDESK_INSTANCE = before;
+  });
+  const d = new Daemon(t);
+  const claudeHome = join(d.dir, "claude-home");
+  mkdirSync(claudeHome);
+  writeFileSync(join(claudeHome, ".claude.json"), JSON.stringify({}));
+  const sdk = new FakeSdk();
+  let backend: AgentBackend | null = null;
+  const base = d.options().registry as Registry;
+  const registry: Registry = {
+    ...base,
+    agents: {
+      claude: {
+        required: [],
+        optional: [],
+        build: (context) => {
+          backend = claudeAgent({ query: sdk.query, home: claudeHome }).build(context);
+          return backend;
+        },
+      },
+    },
+  };
+  // The real environment, which the sessions inherit; restored above.
+  d.start({ registry, instance: { name: "work" }, environment: process.env });
+  await d.booted();
+  assert.ok(backend !== null, "the daemon did not build the agent");
+  const start: StartOptions = {
+    folder: d.dir,
+    resume: null,
+    settingsSources: ["user", "project", "local"],
+    model: null,
+    effort: null,
+  };
+  const requests: RequestHandler = {
+    permission: async () => ({ allow: true }),
+    question: async () => ({ answered: false, message: "" }),
+  };
+  const session = await (backend as AgentBackend).start(start, requests);
+  assert.equal(sdk.only.options.env?.AWAYDESK_INSTANCE, "work");
+  await session.close();
+  await d.stop();
+});
+
+test("the default instance leaves no instance name in the environment", async (t) => {
+  const d = new Daemon(t);
+  // A caller that hands `run` an environment holding another instance's name.
+  const environment: NodeJS.ProcessEnv = { AWAYDESK_INSTANCE: "work", PATH: "/usr/bin" };
+  d.start({ environment });
+  await d.booted();
+  assert.deepEqual(environment, { PATH: "/usr/bin" });
+  await d.stop();
 });
 
 test("run prunes stale threads and survives alive raising", async (t) => {
@@ -570,6 +741,9 @@ test("the manifest asks for the minimum", () => {
     "groups:read",
     "reactions:write", // the status reaction on a session's root message
   ]);
+  // The owner's own token, for the Home tab's Delete and Clean up (`chat.delete` on messages the
+  // bot did not post); an install yields it beside the bot token. Nothing else acts as the owner.
+  assert.deepEqual(manifest.oauth_config.scopes.user, ["chat:write"]);
   assert.deepEqual(manifest.settings.event_subscriptions.bot_events, [
     "message.groups",
     // Slack sends it while it writes a clip's transcript, the only sign that one is ready
@@ -889,6 +1063,35 @@ test("an unexpected error ends with 1 and logs only its name", async (t) => {
   assert.deepEqual(errors(), ["stopped by an unexpected error: invalid_auth"]);
 });
 
+test("an agent setting that cannot be used ends with 1 and logs its sentence", async (t) => {
+  const d = new Daemon(t);
+  const errors = written(t, logger, "error");
+  const exits: number[] = [];
+  const options = d.options();
+  const registry: Registry = {
+    ...(options.registry as Registry),
+    agents: {
+      claude: {
+        required: [],
+        optional: [],
+        build: () => {
+          throw new AgentConfigError("SETTING must be an absolute path");
+        },
+      },
+    },
+  };
+  await main({
+    ...options,
+    registry,
+    exit: (code) => exits.push(code),
+    process: new EventEmitter(),
+  });
+  assert.deepEqual(exits, [1]);
+  assert.deepEqual(errors(), ["SETTING must be an absolute path"]);
+  // The lock is free again for the next start.
+  await (await singleInstance(d.dir)).release();
+});
+
 test("a rejection and an exception nobody handled are logged by name, and the exception alone stops the daemon", (t) => {
   const errors = written(t, logger, "error");
   const events = new EventEmitter();
@@ -1020,7 +1223,7 @@ test("a stop by a signal that waits on a start of the agent ends the process aft
   await d.clock.advance(20);
   hung.set(); // the last step that completes: the shutdown then waits on the start
   await d.clock.advance(0);
-  await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
+  await realWorkDone(HELD);
   assert.deepEqual(exits, []);
   assert.equal(standing(timers).length, 1);
   // Thirty seconds after the step, not after the shutdown began.
@@ -1090,7 +1293,7 @@ test("a shutdown that makes progress is not cut by the limit however long it tak
     });
     for (let i = 0; i < 4000 && !returned; i += 1) {
       await d.clock.advance(0.5);
-      await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
+      await realWorkDone(HELD);
     }
   });
   await d.connected.wait();
@@ -1105,7 +1308,7 @@ test("a shutdown that makes progress is not cut by the limit however long it tak
   d.signals.emit("SIGINT");
   for (let i = 0; i < 4000 && exits.length === 0; i += 1) {
     await d.clock.advance(0.5);
-    await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
+    await realWorkDone(HELD);
   }
   assert.deepEqual(exits, [0]);
   assert.ok(d.clock.now - began > SHUTDOWN_LIMIT_SECONDS, "the shutdown must outlast the limit");
@@ -1137,7 +1340,7 @@ test("a failure during a signal's shutdown makes its deadline the one a failure 
   assert.equal(timers.at(-1)?.at, 10); // from the failure
   hung.set(); // the steps that follow do not move it
   await d.clock.advance(0);
-  await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
+  await realWorkDone(HELD);
   assert.equal(timers.length, armed);
   await running;
   assert.deepEqual(exits, [1]);

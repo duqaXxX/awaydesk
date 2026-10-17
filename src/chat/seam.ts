@@ -479,6 +479,12 @@ export interface SessionIndex {
 export interface ChatProvider {
   /** The chat's name as the daemon's texts say it. */
   readonly name: string;
+  /**
+   * What the daemon connects to in the chat, as opaque keys: stable for one app in one workspace,
+   * and known once the provider is built, before `start`. A daemon refuses to start while any of
+   * them is held by another daemon, since two connections on one app would share its events.
+   */
+  readonly identities: readonly string[];
   readonly capabilities: ChatCapabilities;
   thread(ref: ThreadRef): ThreadChat;
   channel(channel: string): ChannelChat;

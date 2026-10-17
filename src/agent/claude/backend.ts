@@ -5,6 +5,7 @@
  */
 import { homedir } from "node:os";
 import type { Clock } from "../../clock.ts";
+import { shellQuote } from "../../text.ts";
 import type {
   AgentBackend,
   AgentSession,
@@ -17,12 +18,17 @@ import type {
 } from "../seam.ts";
 import { CAPABILITIES } from "./capabilities.ts";
 import { chromeEnabled } from "./chrome.ts";
-import { aliveSessions, byLastActivity, directorySessions } from "./listing.ts";
+import { aliveSessions, byLastActivity, directorySessions, projectsDir } from "./listing.ts";
 import { ClaudeSession, type QueryFunction } from "./session.ts";
 import { trustedRepository, workspaceTrusted } from "./trust.ts";
 import { type BareStart, UsageProbe } from "./usage-probe.ts";
 
 export const NAME = "Claude Code";
+
+/** The shell line that forks a session in a terminal; `environment` is what precedes `claude`. */
+function terminalWith(environment: string): string {
+  return `cd {directory} && ${environment}claude --resume {session} --fork-session`;
+}
 
 export const WORDS: AgentWords = Object.freeze({
   author: "Claude",
@@ -34,14 +40,33 @@ export const WORDS: AgentWords = Object.freeze({
   newSession: ["clear", "reset", "new"],
   login: "login",
   logout: "logout",
-  terminal: "cd {directory} && claude --resume {session} --fork-session",
+  terminal: terminalWith(""),
 });
+
+/**
+ * `WORDS` for a back end whose sessions use the login in `configDir`: the line that continues a
+ * session in a terminal names that folder, since a terminal reads `~/.claude` without it. The
+ * folder is quoted for a shell as `{directory}` is; a brace in it is kept out of reach of the
+ * template's fields, `'"{"'` being the same word to a shell.
+ */
+function wordsFor(configDir: string | undefined): AgentWords {
+  if (configDir === undefined) return WORDS;
+  const folder = shellQuote(configDir).replaceAll("{", `'"{"'`);
+  return Object.freeze({ ...WORDS, terminal: terminalWith(`CLAUDE_CONFIG_DIR=${folder} `) });
+}
 
 export interface ClaudeBackendOptions {
   /** The SDK's `query`; a test passes a fake. */
   readonly query?: QueryFunction;
   /** The owner's home, where Claude Code keeps its record of trust and of Chrome. */
   readonly home?: string;
+  /**
+   * The folder of a login with its own (`CLAUDE_CONFIG_DIR`), absolute: the records and the
+   * transcripts are read there. Absent, the daemon's environment's, else the owner's home. The
+   * SDK's listing reads the environment alone, so a caller that gives a folder here has it there
+   * too (the module writes it).
+   */
+  readonly configDir?: string;
   /** How the usage probe starts its session: `startBare`, unless a test gives another. */
   readonly bareStart?: BareStart;
   /** Every wait of the usage probe; the system clock when absent. */
@@ -52,17 +77,23 @@ export interface ClaudeBackendOptions {
 
 export class ClaudeBackend implements AgentBackend {
   readonly name = NAME;
-  readonly words = WORDS;
+  readonly words: AgentWords;
   readonly capabilities = CAPABILITIES;
   readonly #query: QueryFunction | undefined;
   readonly #home: string;
   readonly #variables: Readonly<Record<string, string>>;
+  readonly #configDir: string | undefined;
+  readonly #projects: string;
   readonly #probe: UsageProbe;
 
   constructor(options: ClaudeBackendOptions = {}) {
     this.#query = options.query;
     this.#home = options.home ?? homedir();
     this.#variables = options.variables ?? {};
+    // An empty variable is no folder, as Claude Code reads it.
+    this.#configDir = options.configDir ?? (process.env.CLAUDE_CONFIG_DIR || undefined);
+    this.#projects = projectsDir(this.#configDir, this.#home);
+    this.words = wordsFor(this.#configDir);
     const bare = options.bareStart ?? ((folder, requests) => this.startBare(folder, requests));
     this.#probe = new UsageProbe(this.#home, bare, { clock: options.clock });
   }
@@ -74,7 +105,7 @@ export class ClaudeBackend implements AgentBackend {
    */
   async start(options: StartOptions, requests: RequestHandler): Promise<AgentSession> {
     // Read at every start, so a change in `/chrome` holds from a session's next start.
-    const chrome = await chromeEnabled(this.#home);
+    const chrome = await chromeEnabled(this.#home, this.#configDir);
     const session = new ClaudeSession(
       { ...options, chrome, variables: this.#variables },
       requests,
@@ -118,20 +149,20 @@ export class ClaudeBackend implements AgentBackend {
    * those alone.
    */
   datedSessions(folder: string, sessions: readonly ListedSession[]): Promise<ListedSession[]> {
-    return byLastActivity(folder, sessions);
+    return byLastActivity(folder, sessions, { projects: this.#projects });
   }
 
   /** The session ids alive in `folder`, or null when it cannot tell (the pruning keeps them). */
   aliveSessions(folder: string): Promise<ReadonlySet<string> | null> {
-    return aliveSessions(folder);
+    return aliveSessions(folder, this.#projects);
   }
 
   folderTrusted(folder: string): Promise<boolean> {
-    return workspaceTrusted(folder, this.#home);
+    return workspaceTrusted(folder, this.#home, this.#configDir);
   }
 
   trustedRepository(folder: string): Promise<Repository | null> {
-    return trustedRepository(folder, this.#home);
+    return trustedRepository(folder, this.#home, this.#configDir);
   }
 
   /** The limits `/usage` reports now, read by a session of the back end's own. */

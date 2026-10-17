@@ -24,6 +24,9 @@
         "files:read",
         "files:write",
         "reactions:write"
+      ],
+      "user": [
+        "chat:write"
       ]
     },
     "pkce_enabled": false

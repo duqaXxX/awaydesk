@@ -80,7 +80,7 @@ else of it.
 
 | Part | Owns |
 |---|---|
-| `main` | the startup order, the single-instance lock, the build of both modules from the registry, signals and the shutdown drain |
+| `main` | the startup order, the instance's folders, the single-instance lock, the build of both modules from the registry, signals and the shutdown drain |
 | `registry.REGISTRY` | the agents and the chats by name, and the two names taken when `.env` selects none |
 | `flows.buildFlows`, `Inbound` | the core's side of `ChatInbound`: what a message, an answer, a pick and an unbound channel mean and what follows each (`src/core/flows/`: `messages`, `words`, `status`, `asking`, `lists`, `resume`, `bind`, `repair`, `notices`), all answering the owner through `Talk` |
 | `CorePort` | what a provider may call and read of the core: the live sessions, `state.json`, the pending requests and holds, the agent's name, words and session listing |
@@ -186,7 +186,7 @@ changing the code: [Writing to Slack](slack-provider.md#writing-to-slack),
 
 ## Modules
 
-An agent and a chat are modules: each is chosen by a name in `~/.config/awaydesk/.env` and built
+An agent and a chat are modules: each is chosen by a name in the instance's `.env` (`~/.config/awaydesk/.env` for the default instance) and built
 at start. Two ship, the agent `claude` and the chat `slack`.
 
 `registry.REGISTRY` (`src/registry.ts`) maps a name to an entry. `Registry.agents` holds
@@ -202,12 +202,17 @@ entry (`slackChat`, `claudeAgent`).
 An entry names the variables its module reads (`required` and `optional`) and builds it.
 `AgentEntry.build` returns an `AgentBackend` from an `AgentContext` (the module's variables and a
 clock). `ChatEntry.build` returns a `ChatProvider` from a `ChatContext`: the variables, the folder
-sessions may start under, two clocks, and `ChatContext.core`, which returns the `CorePort` once
+sessions may start under, the instance's scratch folder (`ChatContext.scratchDir`), two clocks, and `ChatContext.core`, which returns the `CorePort` once
 the daemon has built its sessions. The chat is built before the sessions exist, so `build` must
 not call `core`; a provider calls it when it first needs the core. `config.loadConfig` gives a
 module the values of its own variables only, and a required one that is missing stops the start.
-The Claude entry requires none and reads `BASH_DEFAULT_TIMEOUT_MS`, a variable of Claude Code that
-it hands to each thread's session; the Slack entry requires `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`
+The Claude entry requires none and reads `BASH_DEFAULT_TIMEOUT_MS` and `CLAUDE_CONFIG_DIR`, variables
+of Claude Code that it hands to each thread's session. `CLAUDE_CONFIG_DIR` is the folder of a login
+of its own: the entry expands it (`~` is the home), refuses a relative path with an
+`AgentConfigError`, which the daemon logs as it logs a `ConfigError`, and gives it to the trust,
+Chrome and listing code that read Claude Code's records. It also writes it into the daemon's own
+environment once, when it builds, because the Agent SDK's `listSessions` has no option for the
+folder and reads the environment alone; the Slack entry requires `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`
 and `SLACK_OWNER_USER_ID` and reads `SLACK_USER_TOKEN`. A module reads each of its variables by
 name: `loadConfig` gives them readable by lookup and not enumerable, so that nothing prints them.
 
@@ -335,10 +340,12 @@ request it already withdrew.
 every store and clock the layers use is built here and handed down; the registry is the only way it
 reaches an agent or a chat.
 
-1. It loads the configuration (`config.loadConfig`) for the modules the registry holds, so a bad
-   `.env` or a name it does not hold fails before anything else.
-2. It takes the single-instance lock (`lock.singleInstance`), so a second daemon fails before it
-   opens a Socket Mode connection.
+1. It loads the configuration (`config.loadConfig`) from the instance's configuration folder, for
+   the modules the registry holds, so a bad `.env` or a name it does not hold fails before
+   anything else.
+2. It takes the single-instance lock of the instance's configuration folder
+   (`lock.singleInstance`), so a second daemon of the same instance fails before it opens a Socket
+   Mode connection.
 3. It reads `state.json` (`StateStore`, given the names of the agent and the chat selected) and
    builds the selected agent from the registry (for Claude, the `ClaudeBackend`).
 4. It builds the selected chat from the registry (for Slack, `module.slackChat`, whose `build`
@@ -347,7 +354,14 @@ reaches an agent or a chat.
    user id, the `SlackChat` with the shared `UpdateLimiter`, the `ThreadDeleter` when the owner's
    user token is configured (`module.deleter`, which calls `auth.test` with that token), the
    `Home`, the `ChannelGuard` and the attachments folder (`attachments.prepareUploads`, see
-   "Attached files").
+   "Attached files"). The provider's `ChatProvider.identities` (for Slack two keys: the workspace and the bot,
+   `<team id>:<bot user id>`, and a SHA-256 of the app-level token, `app-token:<hex>`) are known
+   from here, and `main.run` takes the second lock on each of them (`lock.chatIdentityLocks`, see
+   "State and the single-instance lock") before anything else starts. A daemon that finds one held
+   lets go of what it built (`ChatProvider.stop` and `close`,
+   `AgentBackend.close`; nothing is connected yet, since `SlackChat.start` is what opens the
+   Socket Mode connection) and ends with `lock.ChatIdentityTaken`, the same status as
+   `lock.AlreadyRunning`, which it extends.
 5. It builds the `UsageCache` over `AgentBackend.usageLimits` when the back end has one (for Claude,
    `UsageProbe` is the back end's own and `AgentBackend.close` ends it), then `Approvals`, `Holds`
    and the `SessionManager`, and the flows over them (`flows.buildFlows`), whose `Inbound` the
@@ -392,7 +406,7 @@ the last wait 26 minutes (run on mocked timers, 2026-10-10). The log holds
 `socket mode: reconnecting`, then one warning per failed try.
 
 Logs are lines on standard error (`log.getLogger`), which the LaunchAgent writes to
-`~/Library/Logs/awaydesk/awaydesk.log`. A line reads `<time> <LEVEL> <name>: <message>`, the time
+`~/Library/Logs/awaydesk/awaydesk.log` (`~/Library/Logs/awaydesk/<name>.log` for a named instance). A line reads `<time> <LEVEL> <name>: <message>`, the time
 local, the name that of the module (`awaydesk.core.state`); lines below `INFO` are not written, and
 nothing in `src` calls `log.setLevel`, the only way to lower the threshold. A line carries ids, counts and error names, never the
 text of a prompt or of a reply. The Slack libraries are given loggers that never write their own
@@ -474,10 +488,28 @@ as soon as the start is over.
 
 ## Configuration
 
-`config.loadConfig` reads `~/.config/awaydesk/.env` without copying anything into the process
-environment. It refuses a file that is not a regular file, belongs to another user, or grants any
+`config.loadConfig` reads the `.env` of the instance's configuration folder without copying anything
+into the process environment. It refuses a file that is not a regular file, belongs to another user, or grants any
 permission to group or others. The ownership and the mode are not checked on Windows.
 [setup.md](setup.md) lists the variables.
+
+Several daemons may run on one machine, one per instance (`src/core/instance.ts`). An instance is a
+name, or none for the default instance, and everything that is its own derives from the name by one
+rule on every system: its configuration folder (`instance.configDirOf`: `~/.config/awaydesk`, or
+`~/.config/awaydesk-<name>`), the scratch folder handed to the chat in `ChatContext.scratchDir`
+(`instance.scratchDirOf`: `$TMPDIR/awaydesk`, or `$TMPDIR/awaydesk-<name>`), and, on macOS, the
+LaunchAgent's label, plist and log (`launchd.labelOf`, `launchd.plistPath`, `launchd.logPath`). A
+name is 1 to 32 characters of `a-z`, `0-9` and `-`, starting with a letter or a digit, and
+`default` and `awaydesk` are refused (`instance.parseInstanceName`: the first would read as the
+default instance, the second would share its log); the length keeps the lock socket's path inside
+`sun_path`. The command line (`src/cli.ts`) takes the name from `--instance`, else from
+`AWAYDESK_INSTANCE`; it is the only reader of that variable, and the host layer, which imports
+nothing of the core, receives the name as a string. `main.run` takes the instance and derives the
+two folders from it; `RunOptions.configDir` and `RunOptions.scratchDir` replace them in a test.
+It also writes the name to `AWAYDESK_INSTANCE` in its own environment, and removes the variable for
+the default instance (`RunOptions.environment` replaces `process.env` in a test): the sessions
+inherit that environment, so an `awaydesk` command one runs is about its own instance.
+`state.json` is the same for every instance, in its own folder.
 
 `AWAYDESK_AGENT` and `AWAYDESK_CHAT` name the agent and the chat, each a key of the registry
 (`registry.REGISTRY`, the one file outside the two modules that names them). Absent, they mean the
@@ -505,7 +537,7 @@ fields of the `Config`, and each holds only non-enumerable properties, so a log 
 the folder it was opened in, its Claude Code session id, its bypass choice (on, off, or never
 chosen), the effort level set with `/effort` and `ended`, the status of its root once it is done or
 in error (cleared when the root turns working or waiting again; read only by the session index), in
-`~/.config/awaydesk/state.json` (version 3: version 2 plus `agent` and `chat`, the names of the agent
+`state.json` in the instance's configuration folder (version 3: version 2 plus `agent` and `chat`, the names of the agent
 and the chat that wrote the file). `bypass` is `true` for on and `false` for not on; an
 explicit off also writes `bypass_off: true`, and a thread with `bypass` false and no `bypass_off`
 has never chosen. A reader that does not know `bypass_off` takes an off as not on. Every change is
@@ -596,8 +628,28 @@ answering `channel_not_found`, `message_not_found` or `thread_not_found` (`error
 message is gone, which counts as done. A reply that already carries the note in a context block is
 left as it is: a rewrite whose answer was lost may have landed.
 
-`lock.singleInstance` takes the lock by the mechanism of the platform, and a second process fails to
-start with `AlreadyRunning`. macOS is the only supported host.
+`lock.singleInstance` takes the lock of the instance's configuration folder by the mechanism of the
+platform, and a second process of the same instance fails to start with `AlreadyRunning`. Two
+instances have two folders, so they hold two locks and run side by side. macOS is the only supported host.
+
+A second lock keeps two instances from sharing one chat app. Socket Mode spreads an app's events
+across its open connections, so two daemons on one app would each receive part of them, and an
+`.env` copied for a new instance with the old tokens in it would do it with no error. After the
+chat is built and before it starts, `main.run` takes `lock.chatIdentityLocks` on
+`ChatProvider.identities`, a list of strings opaque to the core, each stable for one app. Slack
+gives two, because it has two tokens and Slack documents no call that maps the app-level token to
+its app: the bot (`<team id>:<bot user id>`, from `auth.test` on the bot token) and the app-level
+token Socket Mode connects with (`app-token:` and the SHA-256 of the token, computed in
+`module.appTokenKey` so that the token itself never leaves the Slack module). A copied `.env` that
+keeps either token collides on that key. Each lock is the same mechanism of the platform
+(`lock.singleInstance`, table below) on the folder `lock.identityDirectory` names:
+`~/.config/awaydesk_identities/` and the first 16 hexadecimal digits of the SHA-256 of the key,
+created at mode `700`. The keys are taken in order, and a refusal releases the ones already taken. The underscore keeps it apart from
+every instance's folder, since an instance name cannot hold one. Another process holding it fails
+the start with `lock.ChatIdentityTaken`, whose message tells it from the instance lock's:
+`another awaydesk instance is connected to this chat app (lock on <folder>): give each instance
+its own app`. It is released at the end of the shutdown, with the instance lock. `RunOptions.home`
+replaces the home folder in a test.
 
 | Platform | The lock | Its limits |
 |---|---|---|
@@ -736,7 +788,7 @@ files are downloaded together, with the bot token and no redirect followed, each
 token. Slack answers 302 when the app lacks `files:read` (measured: "Download without files:read").
 An image becomes an image part, and the turn's prompt one user message of content parts
 (`attachments.promptFor`), which the back end sends through the SDK's streaming input
-(`prompt.userMessage`); any other file is saved to `$TMPDIR/awaydesk/` and its path is appended to
+(`prompt.userMessage`); any other file is saved to the instance's scratch folder (`ChatContext.scratchDir`, `$TMPDIR/awaydesk/` for the default instance) and its path is appended to
 the prompt, but only once every file arrived, so a failed message leaves no copy. The folder must be
 a real directory of this user with no group or other permission bit set (it is created with mode 700),
 or nothing is written there; at each start the files older
@@ -1081,8 +1133,10 @@ session works in another folder than the one it was opened in, a `Working in:` l
 the values. Once the thread has a session id, a `Terminal:` line under `Session:` gives
 `cd <folder> && claude --resume <id> --fork-session` (`directory.terminalLine`): a session created
 through the SDK stays out of the terminal's picker, and a fork made in the terminal is listed
-(`docs/setup.md`, "Continuing a session in the terminal"). The folder is the thread's own, quoted
-for the shell, so the fork is listed where `!resume` in the channel looks; the id is stored from the
+(`docs/setup.md`, "Continuing a session in the terminal"). For a back end with a login folder of
+its own (`CLAUDE_CONFIG_DIR`) the command carries `CLAUDE_CONFIG_DIR=<folder>` before `claude`,
+since `AgentBackend.words` is built from the folder the back end resolved. The folder is the
+thread's own, quoted for the shell, so the fork is listed where `!resume` in the channel looks; the id is stored from the
 first turn's `session_started` event, so the line shows during that turn too. A command holding a
 backtick is written as escaped text, since a code span cannot hold one, and the line is left out
 when the folder cannot be used (`DirectoryUnavailable`). It starts the thread's agent process when

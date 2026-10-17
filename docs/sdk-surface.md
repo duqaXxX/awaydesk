@@ -125,6 +125,7 @@ a release with no notice, so it is the first place to look when a release misbeh
 | `Settings` | `effortLevel` | option | session.ts: ClaudeSession.setEffort | package | none |
 | `listSessions` | `dir` | option | listing.ts: directorySessions | reference | none |
 | `listSessions` | `includeWorktrees` | option | listing.ts: directorySessions | reference | none |
+| `listSessions` | `CLAUDE_CONFIG_DIR` | option | module.ts: claudeAgent | measured | P29 |
 | `BaseHookInput` | `cwd` | field | hooks.ts: folderChanged | reference | P14 |
 | `BaseHookInput` | `effort` | field | hooks.ts: stopHookEvents | reference | none |
 | `BaseHookInput.effort` | `level` | field | hooks.ts: stopHookEvents | package | none |
@@ -426,9 +427,15 @@ no check covers them here.
   transcript where the rule puts it and has the SDK's own `listSessions` find it. `lastMessageMs`
   in `listing.ts` reads the `type` and `timestamp` of the transcript's lines, a format the
   documentation does not describe.
+- `listSessions` has no option for the folder of Claude Code's records and reads
+  `process.env.CLAUDE_CONFIG_DIR` in the daemon's own process (bundled `sdk.mjs` 0.3.301; neither
+  `ListSessionsOptions` nor the reference mentions it). When the daemon's file sets the variable,
+  `module.ts: claudeAgent` writes it into `process.env` once, at build. The row names it as an
+  `option` the daemon passes, though it travels in the environment.
 - `trust.ts: workspaceTrusted` reads `projects["<path>"].hasTrustDialogAccepted` and
   `chrome.ts: chromeEnabled` reads `claudeInChromeDefaultEnabled`, both in Claude Code's own
-  `~/.claude.json`. They are records of the CLI, not names of the SDK.
+  `~/.claude.json`, or in `<CLAUDE_CONFIG_DIR>/.claude.json` when the daemon's file sets that
+  folder. They are records of the CLI, not names of the SDK.
 - `usage.ts: parseUsage` reads the wording Claude Code writes in the result of `/usage`, which the
   usage probe in `usage-probe.ts` sends as a prompt. The wording belongs to the CLI.
 - The two keys under `Options.extraArgs` are flags of the CLI that the SDK forwards.

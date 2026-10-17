@@ -414,7 +414,9 @@ class ClaudeWorld implements AgentWorld {
 
   async trust(folder: string): Promise<void> {
     const projects = { [folder]: { hasTrustDialogAccepted: true } };
-    await writeFile(join(this.#home, ".claude.json"), JSON.stringify({ projects }));
+    // The world sets `CLAUDE_CONFIG_DIR`, so Claude Code's record is that folder's, not the home's.
+    await mkdir(this.#config, { recursive: true });
+    await writeFile(join(this.#config, ".claude.json"), JSON.stringify({ projects }));
   }
 
   arrangeUsage(): void {
