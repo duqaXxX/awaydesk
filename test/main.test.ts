@@ -403,7 +403,7 @@ test("a named instance's name reaches the sessions it starts through the environ
 
 test("the default instance leaves no instance name in the environment", async (t) => {
   const d = new Daemon(t);
-  // A foreground run of the default instance from a shell that has another instance's name.
+  // A caller that hands `run` an environment holding another instance's name.
   const environment: NodeJS.ProcessEnv = { AWAYDESK_INSTANCE: "work", PATH: "/usr/bin" };
   d.start({ environment });
   await d.booted();

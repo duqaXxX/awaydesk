@@ -84,6 +84,18 @@ test("the terminal line names the folder of the file, and is today's without one
 });
 
 test(
+  "past the tilde the folder is kept as written, since the Keychain entry follows the string",
+  LIMIT,
+  () => {
+    claudeAgent({ query: new FakeSdk().query, home }).build({
+      variables: { CLAUDE_CONFIG_DIR: "~/./work//" },
+      clock: systemClock,
+    });
+    assert.equal(process.env.CLAUDE_CONFIG_DIR, `${home}/./work//`);
+  },
+);
+
+test(
   "a tilde in the folder is the owner's home, and the session gets the expanded path",
   LIMIT,
   async () => {

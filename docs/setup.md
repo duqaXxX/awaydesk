@@ -858,7 +858,8 @@ refused. A name that breaks the rule ends the command with status 2 and the reas
 The daemon sets `AWAYDESK_INSTANCE` to its name in its own environment (and removes it for the
 default instance), which every session it starts inherits. A session of `work` that runs
 `awaydesk service status` therefore asks about `work`, under launchd and in a foreground run
-alike, with no flag typed.
+alike, with no flag typed. To reach the default instance from such a session, empty the variable:
+`AWAYDESK_INSTANCE= awaydesk service status`.
 
 Everything that is an instance's own derives from its name:
 

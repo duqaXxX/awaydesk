@@ -1,6 +1,6 @@
 /** The Claude back end as the registry holds it: the entry `claude`. */
 import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute } from "node:path";
 import { AgentConfigError, type AgentEntry } from "../seam.ts";
 import { ClaudeBackend, type ClaudeBackendOptions } from "./backend.ts";
 
@@ -40,7 +40,9 @@ function configDirOf(written: string | undefined, home: string): string | undefi
   const inherited = written === undefined ? process.env.CLAUDE_CONFIG_DIR || undefined : undefined;
   const value = written ?? inherited;
   if (value === undefined) return undefined;
-  const expanded = value === "~" || value.startsWith("~/") ? join(home, value.slice(1)) : value;
+  // Concatenated, not joined: `join` would rewrite `~/./work` or a doubled slash, and the Keychain
+  // entry follows the string.
+  const expanded = value === "~" || value.startsWith("~/") ? home + value.slice(1) : value;
   if (!isAbsolute(expanded)) {
     const where =
       inherited === undefined ? "" : ", set in the daemon's environment and not in .env,";
@@ -69,8 +71,9 @@ export function claudeAgent(options: ClaudeBackendOptions = {}): AgentEntry {
         // `process.env.CLAUDE_CONFIG_DIR` (bundled sdk.mjs, not documented): without this, it
         // would look in the default login's folder, and `!resume` and the Home tab's session
         // list would come up empty. (The cleanup reads the back end's own projects folder and
-        // is not affected.) It is written once, at build. The usage probe's bare session passes no `env`, so the SDK
-        // gives it this environment, and the limits it reads are those of this login.
+        // is not affected.) It is written once, at build. The usage probe's bare session passes
+        // no `env`, so the SDK gives it this environment, and the limits it reads are those of
+        // this login.
         process.env.CLAUDE_CONFIG_DIR = configDir;
       }
       return new ClaudeBackend({
