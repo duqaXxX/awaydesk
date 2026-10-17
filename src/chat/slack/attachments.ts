@@ -12,7 +12,6 @@
 
 import { lstatSync } from "node:fs";
 import { lstat, mkdir, readdir, unlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ImagePart, PromptContent, TextPart } from "../../agent/seam.ts";
 import { type Names, named, texts } from "../../core/port.ts";
@@ -312,11 +311,6 @@ export function savedName(file: SlackFile): string {
   if (id === undefined || id === null) throw new TypeError("a Slack file has an id");
   const name = lastPart(String(field(file, "name") || ""));
   return name !== "" && name !== "." && name !== ".." ? `${id}-${name}` : String(id);
-}
-
-/** The folder of the saved files: `$TMPDIR/awaydesk`. */
-export function uploadsDir(): string {
-  return join(tmpdir(), "awaydesk");
 }
 
 /** The folder is a real directory of this user that no one else can open. */

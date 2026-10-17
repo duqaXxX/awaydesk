@@ -80,7 +80,7 @@ export interface SlackApp {
   readonly guard: ChannelGuard;
   /** The session index: the Home tab. */
   readonly home: Home;
-  /** The folder a message's files that are no image are saved in (`attachments.uploadsDir`). */
+  /** The folder a message's files that are no image are saved in (`ChatContext.scratchDir`). */
   readonly uploads: string;
   /** Where Slack's payloads come from: `socketReceiver(appToken)` in the daemon. */
   readonly receiver: Receiver;

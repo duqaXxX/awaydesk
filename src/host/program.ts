@@ -3,7 +3,7 @@
  * commands need on their `PATH`. Read from the command being run, so `awaydesk service install`
  * names the copy it was started from.
  */
-import { accessSync, constants, realpathSync, statSync } from "node:fs";
+import { accessSync, constants, readFileSync, realpathSync, statSync } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
 
 export interface Program {
@@ -52,4 +52,21 @@ export function programOf(entry: string, pathVariable: string, execPath: string)
 export function servicePath(program: Program, system: readonly string[]): string {
   const folders = [dirname(program.node), program.npmBin, ...system];
   return [...new Set(folders.filter((folder) => folder !== null))].join(":");
+}
+
+/** The package folder of the copy whose entry file is `main`: the folder above `dist/`. */
+export function copyOf(main: string): string {
+  return dirname(dirname(main));
+}
+
+/** The `version` of the package in `copy`, or null when its `package.json` cannot be read. */
+export function copyVersion(copy: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(join(copy, "package.json"), "utf8"));
+    const version =
+      typeof parsed === "object" && parsed !== null && "version" in parsed ? parsed.version : null;
+    return typeof version === "string" && version !== "" ? version : null;
+  } catch {
+    return null;
+  }
 }

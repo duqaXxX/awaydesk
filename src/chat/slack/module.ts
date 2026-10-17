@@ -18,7 +18,7 @@ import { ChatError, type ChatProvider } from "../seam.ts";
 import type { Fetch } from "./app/answers.ts";
 import { socketReceiver } from "./app/app.ts";
 import { ChannelGuard, type Identity } from "./app/guards.ts";
-import { prepareUploads, uploadsDir } from "./attachments.ts";
+import { prepareUploads } from "./attachments.ts";
 import { type DeleterState, ThreadDeleter } from "./delete.ts";
 import { Home } from "./home.ts";
 import { type ClientOptions, repliesClient, sharedClient } from "./reply/clients.ts";
@@ -61,7 +61,7 @@ export interface SlackOptions {
   readonly clients?: Clients | undefined;
   /** Where Slack's payloads come from: `socketReceiver`. */
   readonly receiver?: ((appToken: string) => Receiver) | undefined;
-  /** The folder of the files saved from messages: `$TMPDIR/awaydesk`. */
+  /** The folder of the files saved from messages; `ChatContext.scratchDir` when absent. */
   readonly uploads?: string | undefined;
   /** How a file is downloaded. */
   readonly fetch?: Fetch | undefined;
@@ -204,7 +204,7 @@ async function assemble(options: SlackOptions, context: ChatContext): Promise<Ch
     }),
     clock: context.clock,
   });
-  const uploads = options.uploads ?? uploadsDir();
+  const uploads = options.uploads ?? context.scratchDir;
   await prepareUploads(uploads);
   const chat = new SlackChat({
     slack,

@@ -185,6 +185,7 @@ export class ListsWorld {
     const provider = await chat.build({
       variables: {},
       allowedRoot: root,
+      scratchDir: join(root, "scratch"),
       clock,
       steady: clock,
       core: () => {

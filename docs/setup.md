@@ -9,8 +9,9 @@ Status: an early release (0.x); [CHANGELOG.md](CHANGELOG.md) lists each one, and
 
 The install is one numbered sequence that runs through Parts 0 to 4. Three checkpoints in it say
 what to run and what you should see, so a wrong turn shows up where it happened. Part 5 is the
-security checklist, "Using it" describes the daily use, and the reference at the end holds the
-detail the sequence leaves out.
+security checklist, "Using it" describes the daily use, [Several instances](#several-instances)
+covers more than one daemon on a Mac, and the reference at the end holds the detail the sequence
+leaves out.
 
 ## Requirements
 
@@ -143,7 +144,8 @@ The bot sees private channels it was invited to, and nothing else.
 
 ## Part 2: configuration
 
-awaydesk keeps its files in `~/.config/awaydesk/`. `.env` is the one you write;
+awaydesk keeps its files in `~/.config/awaydesk/` (a named instance has a folder of its own, see
+[Several instances](#several-instances)). `.env` is the one you write;
 `state.json` is written by awaydesk and never needs editing (what it holds is under
 [The config directory and `state.json`](#the-config-directory-and-statejson)).
 
@@ -253,7 +255,7 @@ for example:
 and exit status 1. A token that Slack itself refuses ends the start with
 `ERROR awaydesk.main: stopped by an unexpected error: <name>` instead, where the name is Slack's
 error code (`invalid_auth`, for a bot token Slack does not know). `another awaydesk is running`
-means another instance holds the lock: stop it first. Leave no foreground run going when you
+means another daemon of the same instance holds the lock: stop it first. Leave no foreground run going when you
 start the LaunchAgent in Part 4.
 
 ## Part 3: Claude Code
@@ -285,9 +287,11 @@ awaydesk runs as a user LaunchAgent: it starts when you log in and restarts if i
 It has to run inside your login session, because Claude Code keeps its credentials in the macOS
 Keychain. After the Mac restarts, it starts again when you log in.
 
-Only one instance may run. Slack spreads a Socket Mode app's events across all its open
-connections, so a second instance would receive part of your messages; awaydesk refuses to
-start while another instance holds its lock.
+One daemon runs per instance. Slack spreads a Socket Mode app's events across all its open
+connections, so a second daemon on the same Slack app would receive part of your messages;
+awaydesk refuses to start while another daemon holds its instance's lock. This part sets up the
+default instance; a second daemon on the Mac is a second instance, under
+[Several instances](#several-instances).
 
 ### Folders macOS protects
 
@@ -330,7 +334,8 @@ all.
     It writes the plist `~/Library/LaunchAgents/local.awaydesk.plist`, checks it with `plutil
     -lint`, and loads it with `launchctl bootstrap` in your login session. awaydesk starts at once,
     and again at every login. The command prints the plist's path and the log's,
-    `~/Library/Logs/awaydesk/awaydesk.log`, and ends with status 0.
+    `~/Library/Logs/awaydesk/awaydesk.log`, then the copy of the package the plist starts and that
+    copy's version (`Runs the copy in <folder>, version <version>.`), and ends with status 0.
 
 launchd does not expand `~` or `$HOME` and gives a service a minimal `PATH`, so the plist names
 everything by absolute paths. `ProgramArguments` has two entries: the first `node` on the `PATH`
@@ -376,6 +381,9 @@ awaydesk service status
 awaydesk service uninstall
 ```
 
+`awaydesk service list` shows every instance's service on the Mac
+(see [Several instances](#several-instances)).
+
 `restart` sends `SIGTERM` to the running daemon (`launchctl kill TERM gui/$(id -u)/local.awaydesk`):
 running turns finish first, then launchd starts it again. `status` reads `launchctl list`.
 `uninstall` unloads the service (`launchctl bootout`) and removes the plist; it leaves
@@ -414,8 +422,8 @@ The bot answers one person, and the rest of this list protects what that person 
 - `~/.config/awaydesk/.env` is mode `600`.
 - `SLACK_USER_TOKEN` is set only if you use the Home tab's Delete or Clean up: it acts as you in the whole
   workspace, and whoever reads `.env` can post and delete under your name.
-- Files you attach are copied to `$TMPDIR/awaydesk/` (mode `700`) and stay there for 3
-  days, so a conversation resumed after a restart still finds them.
+- Files you attach are copied to `$TMPDIR/awaydesk/` (`$TMPDIR/awaydesk-<name>/` for a named
+  instance; mode `700`) and stay there for 3 days, so a conversation resumed after a restart still finds them.
 - Trust a folder in Claude Code only after reading its `.claude/` settings and hooks: trusting it
   is what lets a session from Slack start there.
 - With Chrome enabled by default in Claude Code, a session from Slack acts in your browser with
@@ -686,7 +694,8 @@ session never runs in two threads at once.
 A message with files: Claude sees a JPEG, PNG, GIF or WebP image (up to 7.5 MB and 8000x8000 px;
 at most 5 images and 15 MB of images per message) as an image. Any other image type (SVG, HEIC,
 TIFF...) is refused. A text, source code, PDF, JSON, XML, YAML or Jupyter notebook file, up to 100
-MB, reaches Claude as the path of a copy in `$TMPDIR/awaydesk/`, kept 3 days; any other
+MB, reaches Claude as the path of a copy in `$TMPDIR/awaydesk/` (an instance's own folder, see
+[Several instances](#several-instances)), kept 3 days; any other
 file (archives, Office documents, binaries) is refused. A file past a limit, or one that fails to
 download, stops the whole message, and the reply says which file and why.
 
@@ -821,6 +830,85 @@ own list, the upgrade notice): with **Just mentions** those stay silent, since t
 The measurements behind this (what was tried, on what Slack plan and app, and on what date) are
 in [features.md](features.md#notifications), not restated here.
 
+## Several instances
+
+One daemon serves one Slack app. A second daemon on the same Mac is a second instance, with a name
+and files of its own. Two reasons to run one: a second login for the agent, and a copy of awaydesk
+under development beside the release you use every day.
+
+`--instance <name>` picks the instance a command is about, and so does `AWAYDESK_INSTANCE` in the
+environment of the command when the flag is absent; the flag wins. With neither, the command is
+about the default instance, which has no name and keeps the paths of Parts 2 to 4. A name is 1 to
+32 characters of `a-z`, `0-9` and `-`, and starts with a letter or a digit; `default` is refused.
+A name that breaks the rule ends the command with status 2 and the reason on stderr. `--version`
+and `--help` take no instance.
+
+Everything that is an instance's own derives from its name:
+
+| What | Default instance | Instance `work` |
+|---|---|---|
+| Configuration folder (`.env`, `state.json`, the lock) | `~/.config/awaydesk/` | `~/.config/awaydesk-work/` |
+| Files you attach | `$TMPDIR/awaydesk/` | `$TMPDIR/awaydesk-work/` |
+| LaunchAgent label | `local.awaydesk` | `local.awaydesk.work` |
+| Plist | `~/Library/LaunchAgents/local.awaydesk.plist` | `~/Library/LaunchAgents/local.awaydesk.work.plist` |
+| Log | `~/Library/Logs/awaydesk/awaydesk.log` | `~/Library/Logs/awaydesk/work.log` |
+| Arguments of the plist after the entry file | none | `--instance work` |
+
+The default instance's plist is the one earlier versions wrote, so the default instance runs the
+same under a version that knows instances and one that does not.
+
+To add an instance:
+
+1. Create a Slack app for it, from the same manifest (Part 1), with a bot name of its own in
+   `features.bot_user.display_name`: Slack shows it on every reply. Two instances never share an
+   app, since Slack spreads an app's events across its open connections.
+2. Write its `.env` in its folder (Part 2), with the tokens of that app:
+   `mkdir -p ~/.config/awaydesk-work`, then `~/.config/awaydesk-work/.env` at mode `600`.
+3. Install its service: `awaydesk service install --instance work`. `uninstall`, `status` and
+   `restart` take the same flag. In a terminal, `awaydesk --instance work` runs its daemon in the
+   foreground.
+
+`awaydesk service list` shows every instance's service, whatever `--instance` or
+`AWAYDESK_INSTANCE` say: it takes no instance. It reads each `local.awaydesk.plist` and
+`local.awaydesk.<name>.plist` in `~/Library/LaunchAgents/`, and prints the instance, whether
+`launchctl` has it loaded (with the pid when it runs), the copy of the package the plist starts and
+that copy's version:
+
+```
+INSTANCE  STATE              COPY                                                     VERSION
+default   running, pid 4242  /opt/homebrew/lib/node_modules/awaydesk                  0.1.1
+dev       not loaded         /usr/local/share/awaydesk-dev/lib/node_modules/awaydesk  0.2.0
+```
+
+A plist it cannot read is listed with `unreadable plist` as its copy, and a copy whose
+`package.json` is gone with the version `unknown`. Instances installed from one copy run it
+together: `npm install -g awaydesk@latest` replaces that copy, and each of them needs its own
+`awaydesk service restart --instance <name>` to run the new one.
+
+### A development copy beside the release
+
+Install a build of a clone in a prefix of its own, never in npm's global one, which holds the
+release and which `npm install -g` replaces:
+
+```bash
+npm install -g --prefix ~/.local/share/awaydesk-dev "./$(npm pack --silent)"
+alias awaydesk-dev=~/.local/share/awaydesk-dev/bin/awaydesk
+awaydesk-dev service install --instance dev
+```
+
+Run from the clone, `npm pack` builds the tarball. The alias (put it in the shell's profile) makes
+`awaydesk-dev` the command of that copy, and `awaydesk-dev service install --instance dev` writes
+a plist that starts it; its output names the copy and its version. The release keeps running as
+the default instance from the global prefix.
+
+### Instances that share a login and a folder
+
+Two instances that use the same Claude Code login and are bound to the same folder list each
+other's sessions in `!resume`, since Claude Code keeps the sessions of a folder in one place.
+Resuming a session that another process has open gives two branches of one transcript, as it does
+with two terminals. Keep the instances' folders apart, or resume only sessions of the instance you
+are in.
+
 ## Troubleshooting
 
 | Symptom | Cause |
@@ -828,7 +916,7 @@ in [features.md](features.md#notifications), not restated here.
 | The bot does not see a channel | The channel is public, or the bot was not invited: the manifest subscribes the app to the messages of private channels only (`message.groups`) |
 | ``awaydesk does not work in this channel: <reason>. It answers only in a private channel whose only members are you and the bot.`` | The bot checked the channel on its own and refused it; only you see the message, in the channel for a message sent there and in the thread for a reply. `<reason>` is one of `it is not a private channel`, `it is shared with another workspace`, `it has members other than you and the bot` and `the bot cannot read its details`. Remove the other members, or use a channel of your own. The first reason can come only from an event of a channel that is not private, which the manifest does not subscribe to |
 | `Claude Code is not logged in on the host` | Claude Code on the machine is logged out: run `claude`, then `/login` |
-| Some messages get no reply | A second instance is running and receiving part of the events |
+| Some messages get no reply | A second daemon is running on the same Slack app and receiving part of the events: each instance needs an app of its own |
 | `This thread's session no longer exists: Claude Code deleted it or cannot find it. Send a new message in the channel to start one.` | The stored session id can no longer be resumed (its transcript was deleted); send a new message in the channel to start one |
 | ``This thread holds no session. In the channel, send a new message to start one, or `!resume` to continue an earlier one.`` | The thread holds no session (a word's own thread, or one with no entry in `state.json`); send a new message in the channel to start one, send `!resume` there to continue a session Claude Code still has, or type a word, which works as if typed there |
 | ``This thread already holds a session: send `!resume` again in the channel to pick another.`` | A Resume click or `!resume <id or name>` was sent to a thread that already has a session; a new `!resume` in the channel gives a thread of its own |
@@ -839,7 +927,7 @@ in [features.md](features.md#notifications), not restated here.
 | `macOS does not let awaydesk read ...` | The directory is in a folder macOS protects: see Part 4, "Folders macOS protects" |
 | `awaydesk needs Node 22.18.0 or later and this is Node ...` in the log, or on the terminal | The Node that runs awaydesk is older than 22.18; the process ends with status 1. Install a newer Node and run `awaydesk` again. The LaunchAgent names the Node executable in its plist: change it there too |
 | `ALLOWED_ROOT must be an absolute path, or one starting with ~/; it is "..."` | `ALLOWED_ROOT` in `.env` is a relative path, which would be read from the folder the process starts in. Write the whole path, or start it with `~/` |
-| `another awaydesk is running` in the log | A second instance tried to start; only one may run |
+| `another awaydesk is running` in the log | A second daemon of the same instance tried to start; one daemon runs per instance |
 | The app has no **Home** tab, or it stays empty | **Home Tab** is off in the app's settings, and the log says `the Home tab is not enabled in the Slack app`: turn it on under **App Home**, **Show Tabs**, then restart awaydesk |
 | `forgot channel ...: Slack no longer has it` in the log | The channel was deleted, or the bot was removed from it: its binding and its threads are gone from `state.json`. If the bot is back in it, send `!bind` there again |
 | `Slack finds none of the ... bound channels: nothing is forgotten` in the log | Every bound channel is out of the bot's reach: check that `SLACK_BOT_TOKEN` is the one of this workspace and that the bot is still in its channels |

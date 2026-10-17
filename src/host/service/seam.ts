@@ -4,7 +4,7 @@
  */
 import type { Program } from "../program.ts";
 
-export const SERVICE_ACTIONS = ["install", "uninstall", "status", "restart"] as const;
+export const SERVICE_ACTIONS = ["install", "uninstall", "status", "restart", "list"] as const;
 export type ServiceAction = (typeof SERVICE_ACTIONS)[number];
 
 /** What one action printed and its exit status: `out` for stdout, `err` for stderr. */
@@ -15,7 +15,10 @@ export interface Report {
 }
 
 export interface ServiceManager {
-  /** Writes the service's definition for `program` and loads it, so the daemon starts now and at login. */
+  /**
+   * Writes the service's definition for `program` and loads it, so the daemon starts now and at
+   * login. The report names the copy of the package the definition starts.
+   */
   install(program: Program): Report;
   /** Unloads the service and removes its definition; leaves the configuration and the logs. */
   uninstall(): Report;
@@ -23,6 +26,8 @@ export interface ServiceManager {
   status(): Report;
   /** Sends the daemon `SIGTERM`, the stop that lets running turns finish; the manager starts it again. */
   restart(): Report;
+  /** Every instance's service on the machine, loaded or not, with the copy each one runs. */
+  list(): Report;
 }
 
 /** How a manager runs a system command: its exit status (null when killed) and its output. */

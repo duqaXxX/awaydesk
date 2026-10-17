@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { test } from "node:test";
-import { findOnPath, programOf, servicePath } from "../../src/host/program.ts";
+import { copyOf, copyVersion, findOnPath, programOf, servicePath } from "../../src/host/program.ts";
 
 // Executable bits and symlinks: not on Windows, where the service does not exist yet.
 const POSIX = { skip: process.platform === "win32" };
@@ -79,4 +79,19 @@ test("the service PATH starts with Node's folder, then npm's, without repeats", 
     servicePath({ ...program, npmBin: null }, ["/usr/bin"]),
     "/opt/homebrew/bin:/usr/bin",
   );
+});
+
+test("the copy of an entry file is the package folder above its dist", () => {
+  assert.equal(copyOf(join("/p", "awaydesk", "dist", "main.js")), join("/p", "awaydesk"));
+});
+
+test("a copy's version is the version of its package.json, null when it cannot be read", (t) => {
+  const copy = folder(t);
+  assert.equal(copyVersion(copy), null);
+  writeFileSync(join(copy, "package.json"), "not json");
+  assert.equal(copyVersion(copy), null);
+  writeFileSync(join(copy, "package.json"), JSON.stringify({ name: "awaydesk" }));
+  assert.equal(copyVersion(copy), null);
+  writeFileSync(join(copy, "package.json"), JSON.stringify({ version: "0.2.0" }));
+  assert.equal(copyVersion(copy), "0.2.0");
 });

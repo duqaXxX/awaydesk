@@ -1,14 +1,11 @@
-/** Load the daemon's configuration from ~/.config/awaydesk/.env. */
+/** Load the daemon's configuration from the `.env` of its instance's configuration folder. */
 import { lstatSync, readFileSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { parseEnv } from "node:util";
 import { strip } from "../text.ts";
 import { errorCode } from "../values.ts";
 import { SETUP_SECTIONS, setupGuide } from "../version.ts";
 import { expandUser, resolvePath } from "./paths.ts";
-
-export const CONFIG_DIR = join(homedir(), ".config", "awaydesk");
 
 /** The variables that select the agent and the chat; absent, the registry's defaults hold. */
 export const SELECTORS = ["AWAYDESK_AGENT", "AWAYDESK_CHAT"] as const;
@@ -172,11 +169,7 @@ function selected(
  * `process.env`. The values a module's own checks refuse (the shape of a token) are its to
  * judge when it is built.
  */
-export function loadConfig(
-  modules: Modules,
-  configDir: string = CONFIG_DIR,
-  env: Env = process.env,
-): Config {
+export function loadConfig(modules: Modules, configDir: string, env: Env = process.env): Config {
   const envPath = join(configDir, ".env");
   let st: ReturnType<typeof lstatSync>;
   try {

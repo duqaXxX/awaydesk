@@ -189,6 +189,7 @@ export class MessagesWorld {
     const provider = await chat.build({
       variables: {},
       allowedRoot: folder,
+      scratchDir: join(folder, "scratch"),
       clock: { sleep: async () => {}, time: () => 1_780_000_000 },
       steady: { sleep: async () => {}, time: () => 1_780_000_000 },
       core: () => {

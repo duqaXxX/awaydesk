@@ -19,7 +19,15 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
@@ -155,7 +163,14 @@ class Daemon {
   running: Promise<number> | null = null;
   startFails: Error | null = null;
 
-  constructor(t: TestContext, options: { scripts?: Script[]; userToken?: boolean } = {}) {
+  /** Whether the chat saves into the folder the daemon hands it, as it does outside a test. */
+  readonly scratch: boolean;
+
+  constructor(
+    t: TestContext,
+    options: { scripts?: Script[]; userToken?: boolean; scratch?: boolean } = {},
+  ) {
+    this.scratch = options.scratch ?? false;
     this.dir = configDirectory(t, options);
     this.backend = new FakeAgentBackend(options.scripts ?? []);
     this.signals.setMaxListeners(0);
@@ -211,7 +226,7 @@ class Daemon {
           this.tokens.push(["receiver", token]);
           return this.receiver;
         },
-        uploads: join(this.dir, "uploads"),
+        ...(!this.scratch && { uploads: join(this.dir, "uploads") }),
       }),
       clock: this.clock,
       signals: this.signals as SignalSource,
@@ -306,6 +321,15 @@ test("the clients are told when the daemon stops, and not before", async (t) => 
   assert.equal(d.clientsStopped?.aborted, false);
   await d.stop();
   assert.equal(d.clientsStopped?.aborted, true);
+});
+
+test("the chat saves files in the scratch folder of the instance the daemon was given", async (t) => {
+  const d = new Daemon(t, { scratch: true });
+  const scratchDir = join(d.dir, "scratch-dev");
+  d.start({ scratchDir });
+  await d.booted();
+  assert.equal(statSync(scratchDir).mode & 0o777, 0o700);
+  await d.stop();
 });
 
 test("run prunes stale threads and survives alive raising", async (t) => {

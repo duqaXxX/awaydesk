@@ -79,6 +79,7 @@ async function memoryRig(): Promise<ChatRig> {
   const provider = await chat.build({
     variables: {},
     allowedRoot: "/work",
+    scratchDir: "/scratch",
     clock: STEADY,
     steady: STEADY,
     core: () => {

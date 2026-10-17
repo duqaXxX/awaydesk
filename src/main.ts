@@ -58,17 +58,19 @@
  *   refusal on an older Node (see `node-version.ts`); it does not rest on `import.meta.main`.
  */
 import "./require-node.ts";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentEntry } from "./agent/seam.ts";
 import { answer, parseArguments } from "./cli.ts";
 import { type Clock, monotonicClock, systemClock } from "./clock.ts";
 import { CLEAN_EVERY_SECONDS, clean } from "./core/cleanup.ts";
-import { CONFIG_DIR, ConfigError, loadConfig } from "./core/config.ts";
+import { ConfigError, loadConfig } from "./core/config.ts";
 import { buildFlows } from "./core/flows/flows.ts";
 import { postUpgradeNotices } from "./core/flows/notices.ts";
 import { repair } from "./core/flows/repair.ts";
 import { UsageCache } from "./core/footer.ts";
 import { Holds } from "./core/hold.ts";
+import { configDirOf, DEFAULT_INSTANCE, type Instance, scratchDirOf } from "./core/instance.ts";
 import { AlreadyRunning, singleInstance } from "./core/lock.ts";
 import type { ChatContext, ChatEntry, CorePort } from "./core/port.ts";
 import { Approvals } from "./core/requests.ts";
@@ -113,8 +115,12 @@ export interface ProcessEvents {
 
 /** Every outside thing `run` uses, with the real one as the default. */
 export interface RunOptions {
-  /** `~/.config/awaydesk`. */
+  /** The default instance. A named one has folders of its own (`core/instance.ts`). */
+  readonly instance?: Instance;
+  /** `configDirOf(instance, homedir())`: `~/.config/awaydesk` for the default instance. */
   readonly configDir?: string;
+  /** `scratchDirOf(instance, tmpdir())`: the folder handed to the chat for the files it saves. */
+  readonly scratchDir?: string;
   /**
    * The agents and the chats the configuration may select: `REGISTRY`. What a test replaces of a
    * module is an option of that module's entry (`slackChat({ clients })`), never of `run`.
@@ -267,7 +273,9 @@ async function step(name: string, work: () => unknown, done: () => void): Promis
  * asked for (`RunOptions.failure`).
  */
 export async function run(options: RunOptions = {}): Promise<number> {
-  const configDir = options.configDir ?? CONFIG_DIR;
+  const instance = options.instance ?? DEFAULT_INSTANCE;
+  const configDir = options.configDir ?? configDirOf(instance, homedir());
+  const scratchDir = options.scratchDir ?? scratchDirOf(instance, tmpdir());
   // Wall time for what is dated (a reply's footer, the page's hours), the monotonic clock for
   // what is paced.
   const wall = options.clock ?? systemClock;
@@ -294,6 +302,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
     const context: ChatContext = {
       variables: config.chatVariables,
       allowedRoot: config.allowedRoot,
+      scratchDir,
       clock: wall,
       steady,
       core: () => {
@@ -481,9 +490,9 @@ export async function main(options: MainOptions = {}): Promise<void> {
 }
 
 if (import.meta.main) {
-  const invocation = parseArguments(process.argv.slice(2));
+  const invocation = parseArguments(process.argv.slice(2), process.env);
   if (invocation.kind === "run") {
-    void main();
+    void main({ instance: invocation.instance });
   } else {
     // An exit code, not `process.exit`: a write to a pipe can still be pending on macOS.
     process.exitCode = answer(invocation, {

@@ -22,6 +22,7 @@ async function built(chat = memoryChat()) {
   const provider = await chat.build({
     variables: {},
     allowedRoot: "/work",
+    scratchDir: "/scratch",
     clock: CLOCK,
     steady: CLOCK,
     core: () => {
