@@ -6,9 +6,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { guideText } from "../../src/core/guide.ts";
-import { shellQuote } from "../../src/core/sessions/directory.ts";
 import * as texts from "../../src/core/texts.ts";
 import { fill, named } from "../../src/core/texts.ts";
+import { shellQuote } from "../../src/text.ts";
 import { hold, say } from "../support/plain-agent.ts";
 import { NAMES, World } from "./world.ts";
 

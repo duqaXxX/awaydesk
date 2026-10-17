@@ -40,7 +40,6 @@ import {
 import {
   checkDirectory,
   resolveDirectory,
-  shellQuote,
   terminalLine,
 } from "../../../src/core/sessions/directory.ts";
 import { DirectoryMissing, SessionClosed } from "../../../src/core/sessions/errors.ts";
@@ -50,6 +49,7 @@ import { asked, Turn } from "../../../src/core/sessions/turn.ts";
 import { StateStore } from "../../../src/core/state.ts";
 import * as texts from "../../../src/core/texts.ts";
 import { setLevel, setWriter } from "../../../src/log.ts";
+import { shellQuote } from "../../../src/text.ts";
 import {
   AsyncEvent,
   CHANNEL,

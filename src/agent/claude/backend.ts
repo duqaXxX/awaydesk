@@ -5,6 +5,7 @@
  */
 import { homedir } from "node:os";
 import type { Clock } from "../../clock.ts";
+import { shellQuote } from "../../text.ts";
 import type {
   AgentBackend,
   AgentSession,
@@ -24,6 +25,11 @@ import { type BareStart, UsageProbe } from "./usage-probe.ts";
 
 export const NAME = "Claude Code";
 
+/** The shell line that forks a session in a terminal; `environment` is what precedes `claude`. */
+function terminalWith(environment: string): string {
+  return `cd {directory} && ${environment}claude --resume {session} --fork-session`;
+}
+
 export const WORDS: AgentWords = Object.freeze({
   author: "Claude",
   command: "claude",
@@ -34,8 +40,20 @@ export const WORDS: AgentWords = Object.freeze({
   newSession: ["clear", "reset", "new"],
   login: "login",
   logout: "logout",
-  terminal: "cd {directory} && claude --resume {session} --fork-session",
+  terminal: terminalWith(""),
 });
+
+/**
+ * `WORDS` for a back end whose sessions use the login in `configDir`: the line that continues a
+ * session in a terminal names that folder, since a terminal reads `~/.claude` without it. The
+ * folder is quoted for a shell as `{directory}` is; a brace in it is kept out of reach of the
+ * template's fields, `'"{"'` being the same word to a shell.
+ */
+function wordsFor(configDir: string | undefined): AgentWords {
+  if (configDir === undefined) return WORDS;
+  const folder = shellQuote(configDir).replaceAll("{", `'"{"'`);
+  return Object.freeze({ ...WORDS, terminal: terminalWith(`CLAUDE_CONFIG_DIR=${folder} `) });
+}
 
 export interface ClaudeBackendOptions {
   /** The SDK's `query`; a test passes a fake. */
@@ -59,7 +77,7 @@ export interface ClaudeBackendOptions {
 
 export class ClaudeBackend implements AgentBackend {
   readonly name = NAME;
-  readonly words = WORDS;
+  readonly words: AgentWords;
   readonly capabilities = CAPABILITIES;
   readonly #query: QueryFunction | undefined;
   readonly #home: string;
@@ -75,6 +93,7 @@ export class ClaudeBackend implements AgentBackend {
     // An empty variable is no folder, as Claude Code reads it.
     this.#configDir = options.configDir ?? (process.env.CLAUDE_CONFIG_DIR || undefined);
     this.#projects = projectsDir(this.#configDir, this.#home);
+    this.words = wordsFor(this.#configDir);
     const bare = options.bareStart ?? ((folder, requests) => this.startBare(folder, requests));
     this.#probe = new UsageProbe(this.#home, bare, { clock: options.clock });
   }

@@ -310,8 +310,8 @@ export const CLAIMS: readonly Claim[] = [
       "lists a transcript written under `<folder>/projects/<project key>/<id>.jsonl`",
     "src/agent/claude/module.ts#claudeAgent",
     "this scene needs no login: it writes a transcript of its own. If it fails, an instance with " +
-      "`CLAUDE_CONFIG_DIR` in its `.env` lists no session in `!resume` and its cleanup finds " +
-      "none: read `docs/sdk-surface.md` for the row that names the variable, and look for an " +
+      "`CLAUDE_CONFIG_DIR` in its `.env` lists no session in `!resume` and in the Home tab's " +
+      "session list: read `docs/sdk-surface.md` for the row that names the variable, and look for an " +
       "option of `ListSessionsOptions` that names the folder, which would replace the write the " +
       "module makes into `process.env`",
   ),

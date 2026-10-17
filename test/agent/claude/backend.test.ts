@@ -5,6 +5,7 @@
  * folder and home.
  */
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, realpath, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,6 +16,7 @@ import { claudeAgent } from "../../../src/agent/claude/module.ts";
 import type { RequestHandler, StartOptions } from "../../../src/agent/seam.ts";
 import { ResumeRefused } from "../../../src/agent/seam.ts";
 import { systemClock } from "../../../src/clock.ts";
+import { fill } from "../../../src/core/texts.ts";
 import { FakeSdk, fail } from "../../support/fake-query.ts";
 import { type JsonObject, sdkRecords } from "../../support/fixtures.ts";
 import { gitInit, trust } from "../../support/git-layouts.ts";
@@ -98,6 +100,35 @@ test("a variable the daemon hands over by lookup alone reaches the session", LIM
   assert.equal(sdk.only.options.env?.BASH_DEFAULT_TIMEOUT_MS, "21600000");
   await session.close();
   await backend.close();
+});
+
+const DEFAULT_TERMINAL = "cd {directory} && claude --resume {session} --fork-session";
+
+test("the terminal line is today's for a back end with no config dir of its own", () => {
+  const saved = process.env.CLAUDE_CONFIG_DIR;
+  delete process.env.CLAUDE_CONFIG_DIR;
+  try {
+    assert.equal(new ClaudeBackend({ home }).words.terminal, DEFAULT_TERMINAL);
+  } finally {
+    if (saved !== undefined) process.env.CLAUDE_CONFIG_DIR = saved;
+  }
+});
+
+test("the terminal line of a login of its own names its config dir", () => {
+  const configDir = join(tmp, "login-two");
+  assert.equal(
+    new ClaudeBackend({ home, configDir }).words.terminal,
+    `cd {directory} && CLAUDE_CONFIG_DIR=${configDir} claude --resume {session} --fork-session`,
+  );
+});
+
+test("the config dir is quoted as the folder is, and a brace in it fills as written", () => {
+  const configDir = join(tmp, "my login {x}");
+  const { terminal } = new ClaudeBackend({ home, configDir }).words;
+  const line = fill(terminal, { directory: "/srv/alice/app", session: "0000-id" });
+  // A shell reads the quoted word back as the folder.
+  const word = /CLAUDE_CONFIG_DIR=(.*) claude/.exec(line)?.[1] ?? "";
+  assert.equal(execFileSync("sh", ["-c", `printf %s ${word}`], { encoding: "utf8" }), configDir);
 });
 
 test(

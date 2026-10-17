@@ -1132,8 +1132,10 @@ session works in another folder than the one it was opened in, a `Working in:` l
 the values. Once the thread has a session id, a `Terminal:` line under `Session:` gives
 `cd <folder> && claude --resume <id> --fork-session` (`directory.terminalLine`): a session created
 through the SDK stays out of the terminal's picker, and a fork made in the terminal is listed
-(`docs/setup.md`, "Continuing a session in the terminal"). The folder is the thread's own, quoted
-for the shell, so the fork is listed where `!resume` in the channel looks; the id is stored from the
+(`docs/setup.md`, "Continuing a session in the terminal"). For a back end with a login folder of
+its own (`CLAUDE_CONFIG_DIR`) the command carries `CLAUDE_CONFIG_DIR=<folder>` before `claude`,
+since `AgentBackend.words` is built from the folder the back end resolved. The folder is the
+thread's own, quoted for the shell, so the fork is listed where `!resume` in the channel looks; the id is stored from the
 first turn's `session_started` event, so the line shows during that turn too. A command holding a
 backtick is written as escaped text, since a code span cannot hold one, and the line is left out
 when the folder cannot be used (`DirectoryUnavailable`). It starts the thread's agent process when

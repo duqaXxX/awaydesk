@@ -956,12 +956,22 @@ two of those apart. To give an instance a second account:
    `~/.claude` is not trusted there.
 3. Put `CLAUDE_CONFIG_DIR=~/.claude-work` in the instance's `.env` and restart the instance.
 
+Write in `.env` exactly the path you used with `/login`. On macOS Claude Code keys the Keychain
+entry of the login by the folder's string as it is written, so `~/.claude-work/` (with a trailing
+slash) is another entry from `~/.claude-work`, and the instance would find no login. awaydesk
+reads `~` as your home and passes the rest on unchanged. The value must be absolute or start with
+`~/`; a relative path ends the start with an error that names the variable. The same rule holds
+for a `CLAUDE_CONFIG_DIR` the daemon inherits from its environment when `.env` sets none, and the
+error then says it came from the environment.
+
 That instance then reads the settings of `~/.claude-work`, not those of `~/.claude`: your
 `CLAUDE.md`, skills, hooks, MCP servers and permission rules are the other folder's, and have to
 be set there. Its sessions are written there as well, so in a terminal `claude --resume <id>`
 finds them only with the same variable: `CLAUDE_CONFIG_DIR=~/.claude-work claude --resume <id>`.
-The command `!status` prints does not carry the variable. The default instance, and any instance
-whose `.env` does not set it, keep using `~/.claude`.
+The command `!status` prints carries it: `cd <folder> && CLAUDE_CONFIG_DIR=<folder of the login>
+claude --resume <session id> --fork-session`, the login's folder quoted for the shell as the
+project folder is. The default instance, and any instance whose `.env` does not set it, keep using
+`~/.claude`, and its line is the one shown in "Continuing a session in the terminal".
 
 ### Instances that share a login and a folder
 

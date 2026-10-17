@@ -68,6 +68,21 @@ test("the folder of the file reaches a thread's session", LIMIT, async () => {
   await backend.close();
 });
 
+test("the terminal line names the folder of the file, and is today's without one", () => {
+  const config = join(tmp, "second-login");
+  const own = claudeAgent({ home }).build({
+    variables: { CLAUDE_CONFIG_DIR: config },
+    clock: systemClock,
+  });
+  assert.equal(
+    own.words.terminal,
+    `cd {directory} && CLAUDE_CONFIG_DIR=${config} claude --resume {session} --fork-session`,
+  );
+  delete process.env.CLAUDE_CONFIG_DIR;
+  const plain = claudeAgent({ home }).build({ variables: {}, clock: systemClock });
+  assert.equal(plain.words.terminal, "cd {directory} && claude --resume {session} --fork-session");
+});
+
 test(
   "a tilde in the folder is the owner's home, and the session gets the expanded path",
   LIMIT,
@@ -131,6 +146,52 @@ test("the environment is left alone when the file does not set the folder", () =
   process.env.CLAUDE_CONFIG_DIR = inherited;
   claudeAgent({ home }).build({ variables: {}, clock: systemClock });
   assert.equal(process.env.CLAUDE_CONFIG_DIR, inherited);
+});
+
+// The environment's folder follows the file's rule: the daemon started from a shell with the
+// variable set would otherwise read a relative path from its working directory.
+for (const inherited of ["relative/folder", "./folder", "~other/folder"]) {
+  test(`an inherited folder that is not absolute is refused [${inherited}]`, () => {
+    process.env.CLAUDE_CONFIG_DIR = inherited;
+    assert.throws(
+      () => claudeAgent({ home }).build({ variables: {}, clock: systemClock }),
+      (error: unknown) =>
+        error instanceof AgentConfigError &&
+        error.message ===
+          `CLAUDE_CONFIG_DIR, set in the daemon's environment and not in .env, must be an absolute path, or one starting with ~/; it is "${inherited}"`,
+    );
+  });
+}
+
+test(
+  "an inherited folder starting with a tilde is the owner's home, in both places",
+  LIMIT,
+  async () => {
+    process.env.CLAUDE_CONFIG_DIR = "~/.claude-work";
+    const sdk = new FakeSdk();
+    const backend = claudeAgent({ query: sdk.query, home }).build({
+      variables: {},
+      clock: systemClock,
+    });
+    const session = await backend.start(START, NO_REQUESTS);
+    assert.equal(sdk.only.options.env?.CLAUDE_CONFIG_DIR, join(home, ".claude-work"));
+    assert.equal(process.env.CLAUDE_CONFIG_DIR, join(home, ".claude-work"));
+    await session.close();
+    await backend.close();
+  },
+);
+
+test("an empty inherited folder is no folder", () => {
+  process.env.CLAUDE_CONFIG_DIR = "";
+  claudeAgent({ home }).build({ variables: {}, clock: systemClock });
+  assert.equal(process.env.CLAUDE_CONFIG_DIR, "");
+});
+
+test("the file's folder is not judged by the environment's", () => {
+  process.env.CLAUDE_CONFIG_DIR = "relative/folder";
+  const config = join(tmp, "second-login");
+  claudeAgent({ home }).build({ variables: { CLAUDE_CONFIG_DIR: config }, clock: systemClock });
+  assert.equal(process.env.CLAUDE_CONFIG_DIR, config);
 });
 
 test("the trust and Chrome records are the folder's, not the home's", LIMIT, async () => {

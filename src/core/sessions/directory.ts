@@ -3,6 +3,7 @@ import { realpathSync, statSync } from "node:fs";
 import { opendir, stat } from "node:fs/promises";
 import { isAbsolute, sep } from "node:path";
 import type { AgentBackend, Repository } from "../../agent/seam.ts";
+import { shellQuote } from "../../text.ts";
 import { errorCode } from "../../values.ts";
 import { ABSENT, expandUser, resolvePath } from "../paths.ts";
 import * as texts from "../texts.ts";
@@ -73,13 +74,6 @@ export function resolveDirectory(raw: string, root: string): string | null {
   } catch {
     return null; // it names nothing, or goes through a loop of links
   }
-}
-
-/** `shlex.quote`: the word as one shell argument, quoted only when it needs to be. */
-export function shellQuote(word: string): string {
-  if (word === "") return "''";
-  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(word)) return word;
-  return `'${word.replaceAll("'", "'\"'\"'")}'`;
 }
 
 /**

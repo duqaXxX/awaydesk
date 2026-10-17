@@ -28,18 +28,24 @@ function set(variables: Readonly<Record<string, string>>): Record<string, string
 }
 
 /**
- * The folder the owner's file names, `~` read as the home and `${HOME}` already expanded by the
- * daemon; undefined when the file names none. Refused unless absolute: a relative path would read
- * from the working directory, the terminal's folder in one run and `/` under launchd. (The core's
- * `expandUser` is not importable from an agent module, so the tilde is read here.)
+ * The folder the owner's file names, else the one the daemon's environment holds (an empty one is
+ * none), `~` read as the home and `${HOME}` already expanded by the daemon; undefined when neither
+ * names one. Refused unless absolute: a relative path would read from the working directory, the
+ * terminal's folder in one run and `/` under launchd. The value is passed on as written once the
+ * tilde is read: Claude Code keys the Keychain entry of a login by the folder's string, so a
+ * trailing slash is another entry. (The core's `expandUser` is not importable from an agent
+ * module, so the tilde is read here.)
  */
 function configDirOf(written: string | undefined, home: string): string | undefined {
-  if (written === undefined) return undefined;
-  const expanded =
-    written === "~" || written.startsWith("~/") ? join(home, written.slice(1)) : written;
+  const inherited = written === undefined ? process.env.CLAUDE_CONFIG_DIR || undefined : undefined;
+  const value = written ?? inherited;
+  if (value === undefined) return undefined;
+  const expanded = value === "~" || value.startsWith("~/") ? join(home, value.slice(1)) : value;
   if (!isAbsolute(expanded)) {
+    const where =
+      inherited === undefined ? "" : ", set in the daemon's environment and not in .env,";
     throw new AgentConfigError(
-      `CLAUDE_CONFIG_DIR must be an absolute path, or one starting with ~/; it is "${written}"`,
+      `CLAUDE_CONFIG_DIR${where} must be an absolute path, or one starting with ~/; it is "${value}"`,
     );
   }
   return expanded;
@@ -60,11 +66,11 @@ export function claudeAgent(options: ClaudeBackendOptions = {}): AgentEntry {
         variables.CLAUDE_CONFIG_DIR = configDir;
         // The SDK's `listSessions`, which the back end calls in the daemon's own process, has no
         // option for the folder (`ListSessionsOptions`, sdk.d.ts 0.3.301) and reads
-        // `process.env.CLAUDE_CONFIG_DIR` (bundled sdk.mjs, not documented): without this, the
-        // listing and the cleanup would look in the default login's folder and prune the live
-        // threads of this one. It is the one write the daemon makes to its environment, once, at
-        // build. The usage probe's bare session passes no `env`, so the SDK gives it this
-        // environment, and the limits it reads are those of this login.
+        // `process.env.CLAUDE_CONFIG_DIR` (bundled sdk.mjs, not documented): without this, it
+        // would look in the default login's folder, and `!resume` and the Home tab's session
+        // list would come up empty. (The cleanup reads the back end's own projects folder and
+        // is not affected.) It is written once, at build. The usage probe's bare session passes no `env`, so the SDK
+        // gives it this environment, and the limits it reads are those of this login.
         process.env.CLAUDE_CONFIG_DIR = configDir;
       }
       return new ClaudeBackend({

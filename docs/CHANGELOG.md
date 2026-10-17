@@ -32,10 +32,15 @@ All notable changes to this project are documented here. The format follows
   module declares the variable, expands `~`, refuses a relative path with `AgentConfigError`, and
   gives the folder to the trust record, the Chrome setting and the transcripts it reads
   (`<folder>/.claude.json`, `<folder>/projects`); absent, the daemon's environment's folder, else
-  `~/.claude`. It writes the folder into the daemon's environment once, at build, since the SDK's
-  `listSessions` reads it from there alone; without that the cleanup would find no transcript of
-  the instance and prune its threads. `docs/sdk-surface.md` lists the dependency, and the probe's
-  claim P29 checks it with no token.
+  `~/.claude`. A `CLAUDE_CONFIG_DIR` inherited from the daemon's environment follows the same rule
+  (absolute, or `~/` expanded), and the error says it came from the environment. The value is
+  passed on as written after the tilde, since the Keychain entry of a login is keyed by the string.
+  The module writes the folder into the daemon's environment once, at build, since the SDK's
+  `listSessions` reads it from there alone; without that `!resume` and the Home tab's session list
+  would be empty (the cleanup reads the back end's own folder and does not depend on it).
+  `docs/sdk-surface.md` lists the dependency, and the probe's claim P29 checks it with no token.
+  The `Terminal:` line of `!status` names the folder: `cd <folder> && CLAUDE_CONFIG_DIR=<login
+  folder> claude --resume <id> --fork-session`.
 
 ### Changed
 
