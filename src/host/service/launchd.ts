@@ -320,7 +320,7 @@ export class Launchd implements ServiceManager {
       }
       this.#launchctl(["bootstrap", `gui/${this.#options.uid}`, this.#plist]);
       const copy = copyOf(program.main);
-      const version = packageVersion(copy);
+      const version = packageVersion(join(copy, "package.json"));
       return ok([
         `Wrote ${this.#plist}.`,
         `Loaded ${this.#label}: awaydesk starts now and at every login.`,
@@ -435,7 +435,7 @@ export class Launchd implements ServiceManager {
         if (plistGone) return [name, `${state}; its plist is gone`, "-", "-"];
         if (main === undefined) return [name, state, "unreadable plist", "-"];
         const copy = copyOf(main);
-        return [name, state, copy, packageVersion(copy) ?? "unknown"];
+        return [name, state, copy, packageVersion(join(copy, "package.json")) ?? "unknown"];
       });
       // What no command of an instance could find or remove is named, not listed as one.
       const refused = found.flatMap(({ file, what }) =>
