@@ -48,6 +48,16 @@ function line(id: string, title: string, folded: string | null = null): TaskUpda
   };
 }
 
+test("its identity is the one it is given, and a default otherwise", async () => {
+  assert.equal(
+    (await built(memoryChat({ identity: "T000ACME:U000BOT" }))).provider.identity,
+    "T000ACME:U000BOT",
+  );
+  const { provider } = await built();
+  assert.equal(typeof provider.identity, "string");
+  assert.notEqual(provider.identity, "");
+});
+
 test("its names are no numbers, and a thread is dated from the clock of its context", async () => {
   const { chat, provider, channel } = await built();
   await provider.start(NOBODY);

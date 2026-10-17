@@ -42,7 +42,7 @@ import type { Clock } from "../src/clock.ts";
 import { CLEAN_EVERY_SECONDS, logger as cleanupLogger } from "../src/core/cleanup.ts";
 import { ConfigError } from "../src/core/config.ts";
 import { postUpgradeNotices } from "../src/core/flows/notices.ts";
-import { AlreadyRunning, singleInstance } from "../src/core/lock.ts";
+import { AlreadyRunning, identityDirectory, singleInstance } from "../src/core/lock.ts";
 import { StateError, StateStore } from "../src/core/state.ts";
 import * as texts from "../src/core/texts.ts";
 import {
@@ -160,6 +160,8 @@ class Daemon {
   /** The app the receiver was given, once built: where a test delivers a payload from. */
   app: App | null = null;
   readonly dir: string;
+  /** The home the daemon takes the lock of its chat identity under, never the real one. */
+  home: string;
   running: Promise<number> | null = null;
   startFails: Error | null = null;
 
@@ -172,6 +174,7 @@ class Daemon {
   ) {
     this.scratch = options.scratch ?? false;
     this.dir = configDirectory(t, options);
+    this.home = join(this.dir, "home");
     this.backend = new FakeAgentBackend(options.scripts ?? []);
     this.signals.setMaxListeners(0);
     t.after(async () => {
@@ -210,6 +213,7 @@ class Daemon {
   options(extra: RunOptions = {}): RunOptions {
     return {
       configDir: this.dir,
+      home: this.home,
       registry: registryOf(this.backend, {
         clients: {
           bot: (token, stopped) => {
@@ -310,6 +314,31 @@ test("a second instance stops before slack", async (t) => {
   } finally {
     await held.release();
   }
+});
+
+test("a second daemon on the same Slack app refuses before it connects", async (t) => {
+  const first = new Daemon(t);
+  first.start();
+  await first.booted();
+  // Its own configuration folder, with the tokens of the same app: a copied `.env`.
+  const second = new Daemon(t);
+  second.home = first.home;
+  const errors = written(t, logger, "error");
+  const exits: number[] = [];
+  await main({
+    ...second.options(),
+    exit: (code) => exits.push(code),
+    process: new EventEmitter(),
+  });
+  assert.deepEqual(exits, [1]);
+  assert.deepEqual(errors(), [
+    `another awaydesk instance is connected to this chat app (lock on ${identityDirectory(first.home, `${TEAM}:${BOT}`)}): give each instance its own app`,
+  ]);
+  // Built (auth.test answered) and never connected; what it built is let go of.
+  assert.ok(second.slack.callsTo("auth.test").length > 0);
+  assert.deepEqual(second.events, []);
+  assert.deepEqual(first.events, ["connect"]);
+  await first.stop();
 });
 
 // Issue #236: a call Slack rate limited waits as long as Slack says before it is sent again, and

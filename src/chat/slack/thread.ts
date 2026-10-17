@@ -140,6 +140,8 @@ const CAPABILITIES: ChatCapabilities = {
 export class SlackChat implements ChatProvider {
   readonly name = "Slack";
   readonly capabilities = CAPABILITIES;
+  /** The workspace and the app's bot: the connection Socket Mode spreads events across. */
+  readonly identity: string;
   /** Present when the provider holds the Home tab (`SlackApp.home`). */
   readonly index?: SessionIndex;
   private readonly options: SlackChatOptions;
@@ -154,6 +156,7 @@ export class SlackChat implements ChatProvider {
 
   constructor(options: SlackChatOptions) {
     this.options = options;
+    this.identity = `${options.identity.teamId}:${options.identity.botUserId}`;
     const home = options.app?.home;
     if (home !== undefined) this.index = { refresh: (changed) => home.request(changed) };
   }

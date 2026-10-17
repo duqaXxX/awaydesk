@@ -349,7 +349,13 @@ reaches an agent or a chat.
    user id, the `SlackChat` with the shared `UpdateLimiter`, the `ThreadDeleter` when the owner's
    user token is configured (`module.deleter`, which calls `auth.test` with that token), the
    `Home`, the `ChannelGuard` and the attachments folder (`attachments.prepareUploads`, see
-   "Attached files").
+   "Attached files"). The provider's `ChatProvider.identity` (for Slack the workspace and the bot,
+   `<team id>:<bot user id>`) is known from here, and `main.run` takes the second lock on it
+   (`lock.chatIdentityLock`, see "State and the single-instance lock") before anything else
+   starts. A daemon that finds it held lets go of what it built (`ChatProvider.stop` and `close`,
+   `AgentBackend.close`; nothing is connected yet, since `SlackChat.start` is what opens the
+   Socket Mode connection) and ends with `lock.ChatIdentityTaken`, the same status as
+   `lock.AlreadyRunning`, which it extends.
 5. It builds the `UsageCache` over `AgentBackend.usageLimits` when the back end has one (for Claude,
    `UsageProbe` is the back end's own and `AgentBackend.close` ends it), then `Approvals`, `Holds`
    and the `SessionManager`, and the flows over them (`flows.buildFlows`), whose `Inbound` the
@@ -615,6 +621,20 @@ left as it is: a rewrite whose answer was lost may have landed.
 `lock.singleInstance` takes the lock of the instance's configuration folder by the mechanism of the
 platform, and a second process of the same instance fails to start with `AlreadyRunning`. Two
 instances have two folders, so they hold two locks and run side by side. macOS is the only supported host.
+
+A second lock keeps two instances from sharing one chat app. Socket Mode spreads an app's events
+across its open connections, so two daemons on one app would each receive part of them, and an
+`.env` copied for a new instance with the old tokens in it would do it with no error. After the
+chat is built and before it starts, `main.run` takes `lock.chatIdentityLock` on `ChatProvider.identity`,
+a string opaque to the core that is stable for one app in one workspace. The lock is the same
+mechanism of the platform (`lock.singleInstance`, table below) on the folder
+`lock.identityDirectory` names: `~/.config/awaydesk_identities/` and the first 16 hexadecimal
+digits of the SHA-256 of the identity, created at mode `700`. The underscore keeps it apart from
+every instance's folder, since an instance name cannot hold one. Another process holding it fails
+the start with `lock.ChatIdentityTaken`, whose message tells it from the instance lock's:
+`another awaydesk instance is connected to this chat app (lock on <folder>): give each instance
+its own app`. It is released at the end of the shutdown, with the instance lock. `RunOptions.home`
+replaces the home folder in a test.
 
 | Platform | The lock | Its limits |
 |---|---|---|

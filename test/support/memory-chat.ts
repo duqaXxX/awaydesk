@@ -39,13 +39,24 @@ export { DAEMON, OWNER, SOMEONE } from "./memory-chat/room.ts";
 export interface MemoryChatOptions {
   /** The owner's user id; `OWNER` when absent. */
   readonly owner?: string;
+  /** The identity the provider reports (`ChatProvider.identity`); `MEMORY_IDENTITY` when absent. */
+  readonly identity?: string;
 }
+
+/** The identity of a memory chat given none. */
+export const MEMORY_IDENTITY = "memory:daemon";
 
 /** The registry entry of the memory chat, and the handle on its room. */
 export class MemoryChat extends Room implements ChatEntry {
   readonly required: readonly string[] = [];
   readonly optional: readonly string[] = [];
+  readonly #identity: string;
   #built: MemoryProvider | null = null;
+
+  constructor(owner: string, identity: string) {
+    super(owner);
+    this.#identity = identity;
+  }
 
   /** The provider `build` made last; throws before the first build. */
   get provider(): ChatProvider {
@@ -55,12 +66,12 @@ export class MemoryChat extends Room implements ChatEntry {
 
   async build(context: ChatContext): Promise<ChatProvider> {
     this.bind(context.clock);
-    this.#built = new MemoryProvider(this);
+    this.#built = new MemoryProvider(this, this.#identity);
     return this.#built;
   }
 }
 
 /** A memory chat with no channel yet. */
 export function memoryChat(options: MemoryChatOptions = {}): MemoryChat {
-  return new MemoryChat(options.owner ?? OWNER);
+  return new MemoryChat(options.owner ?? OWNER, options.identity ?? MEMORY_IDENTITY);
 }

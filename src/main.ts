@@ -71,7 +71,12 @@ import { repair } from "./core/flows/repair.ts";
 import { UsageCache } from "./core/footer.ts";
 import { Holds } from "./core/hold.ts";
 import { configDirOf, DEFAULT_INSTANCE, type Instance, scratchDirOf } from "./core/instance.ts";
-import { AlreadyRunning, singleInstance } from "./core/lock.ts";
+import {
+  AlreadyRunning,
+  chatIdentityLock,
+  type InstanceLock,
+  singleInstance,
+} from "./core/lock.ts";
 import type { ChatContext, ChatEntry, CorePort } from "./core/port.ts";
 import { Approvals } from "./core/requests.ts";
 import { SessionManager } from "./core/sessions/manager.ts";
@@ -121,6 +126,11 @@ export interface RunOptions {
   readonly configDir?: string;
   /** `scratchDirOf(instance, tmpdir())`: the folder handed to the chat for the files it saves. */
   readonly scratchDir?: string;
+  /**
+   * `homedir()`: the owner's home, under which the lock of the chat's identity lives
+   * (`.config/awaydesk_identities`), shared by every instance.
+   */
+  readonly home?: string;
   /**
    * The agents and the chats the configuration may select: `REGISTRY`. What a test replaces of a
    * module is an option of that module's entry (`slackChat({ clients })`), never of `run`.
@@ -276,6 +286,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
   const instance = options.instance ?? DEFAULT_INSTANCE;
   const configDir = options.configDir ?? configDirOf(instance, homedir());
   const scratchDir = options.scratchDir ?? scratchDirOf(instance, tmpdir());
+  const home = options.home ?? homedir();
   // Wall time for what is dated (a reply's footer, the page's hours), the monotonic clock for
   // what is paced.
   const wall = options.clock ?? systemClock;
@@ -284,6 +295,7 @@ export async function run(options: RunOptions = {}): Promise<number> {
   const registry = options.registry ?? REGISTRY;
   const config = loadConfig(registry, configDir);
   const lock = await singleInstance(configDir);
+  let identityLock: InstanceLock | null = null;
   let stop: StopSignals | null = null;
   const onFailure = (): void => stop?.fail();
   try {
@@ -311,6 +323,18 @@ export async function run(options: RunOptions = {}): Promise<number> {
       },
     };
     const chat = await chatEntry.build(context);
+    // After the build, which knows who the daemon is in the chat, and before `chat.start`, which
+    // is what connects: a second daemon on the same chat app would be sent half of its events.
+    try {
+      identityLock = await chatIdentityLock(chat.identity, home);
+    } catch (error) {
+      // Nothing is connected yet: what the chat and the agent hold is let go of, as a stop does.
+      const none = (): void => {};
+      await step("stop the chat", () => chat.stop(), none);
+      await step("close the chat", () => chat.close(), none);
+      await step("close the agent", () => backend.close(), none);
+      throw error;
+    }
     const names = namesOf(backend, chat);
     const approvals = new Approvals(names);
     const holds = new Holds();
@@ -418,9 +442,13 @@ export async function run(options: RunOptions = {}): Promise<number> {
   } finally {
     options.failure?.removeEventListener("abort", onFailure);
     try {
-      await lock.release();
+      await identityLock?.release();
     } finally {
-      stop?.dispose();
+      try {
+        await lock.release();
+      } finally {
+        stop?.dispose();
+      }
     }
   }
   return stop?.failed ? 1 : 0;

@@ -17,6 +17,12 @@ All notable changes to this project are documented here. The format follows
 - `awaydesk service list` shows every instance's service: loaded or not, the pid, the copy of the
   package it runs and that copy's version. `awaydesk service install` prints the copy it puts in
   the plist and its version.
+- A second lock, on the chat app. `ChatProvider.identity` (for Slack `<team id>:<bot user id>`)
+  names the app in its workspace; after the chat is built and before it connects, the daemon takes
+  a lock on it in `~/.config/awaydesk_identities/<16 hex digits>/`, shared by every instance of the
+  user. A copied `.env` with the old tokens left in it no longer gives two daemons on one app: the
+  second ends before it opens its connection, with `another awaydesk instance is connected to this
+  chat app (lock on <folder>): give each instance its own app`.
 
 ### Changed
 

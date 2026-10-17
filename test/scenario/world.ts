@@ -23,7 +23,7 @@ import type { ChatProvider, Reply, ThreadChat, ThreadRef } from "../../src/chat/
 import type { ChatEntry } from "../../src/core/port.ts";
 import { StateStore } from "../../src/core/state.ts";
 import type { Names } from "../../src/core/texts.ts";
-import { run, type SignalSource, type Stop } from "../../src/main.ts";
+import { type RunOptions, run, type SignalSource, type Stop } from "../../src/main.ts";
 import type { Registry } from "../../src/registry.ts";
 import { type MemoryChat, memoryChat, OWNER } from "../support/memory-chat.ts";
 import {
@@ -117,6 +117,10 @@ export interface WorldOptions {
   };
   /** The entries taken when the `.env` selects none; the two modules under test when absent. */
   readonly defaults?: { readonly agent: string; readonly chat: string };
+  /** The home folder whose identity locks the daemon takes; a private one when absent. */
+  readonly home?: string;
+  /** The identity of the memory chat (`ChatProvider.identity`); its default when absent. */
+  readonly identity?: string;
 }
 
 /** A promise settled from outside. */
@@ -133,6 +137,10 @@ export class World {
   readonly config: string;
   /** The temp folder that holds the other two. */
   readonly base: string;
+  /** The home folder: the chat identity's lock lives under it, never under the real one. */
+  readonly home: string;
+  /** The calls the daemon made on the chat that mark its life: `start`, `stop`, `close`. */
+  readonly chatCalls: string[] = [];
   /** `ALLOWED_ROOT`. */
   readonly root: string;
   /** The folder the channel is bound to. */
@@ -158,6 +166,7 @@ export class World {
   private constructor(t: TestContext, options: WorldOptions) {
     const base = realpathSync(mkdtempSync(join(tmpdir(), "awaydesk-scenario-")));
     this.base = base;
+    this.home = options.home ?? join(base, "home");
     this.root = join(base, "root");
     mkdirSync(this.root);
     this.config = join(base, "config");
@@ -179,7 +188,7 @@ export class World {
     this.signals.setMaxListeners(0);
     this.store = new PlainStore({ now: () => START_TIME * 1000 });
     this.entry = plainAgent({ store: this.store, turns: this.turns });
-    this.chat = memoryChat();
+    this.chat = memoryChat(options.identity === undefined ? {} : { identity: options.identity });
     this.channel = this.chat.openChannel("work");
     // The channel is bound before the first start, as the owner's `!bind` of an earlier day left it.
     const state = new StateStore(join(this.config, "state.json"), {
@@ -224,13 +233,21 @@ export class World {
   #watchStart(provider: ChatProvider): ChatProvider {
     const started = this.#started;
     const handed = this.handed;
+    const calls = this.chatCalls;
     return new Proxy(provider, {
       get(target, property) {
         const member = Reflect.get(target, property, target);
         if (property === "start") {
           return async (...args: Parameters<ChatProvider["start"]>) => {
+            calls.push("start");
             await target.start(...args);
             started.open();
+          };
+        }
+        if (property === "stop" || property === "close") {
+          return async () => {
+            calls.push(property);
+            await target[property]();
           };
         }
         if (property === "thread") {
@@ -269,16 +286,22 @@ export class World {
     return built;
   }
 
+  /** What `run` is given for this world. */
+  runOptions(): RunOptions {
+    return {
+      configDir: this.config,
+      home: this.home,
+      registry: this.registry,
+      clock: this.clock,
+      signals: this.signals as SignalSource,
+    };
+  }
+
   /** The daemon starts, and is waited for until it hears the owner. */
   async start(): Promise<void> {
     assert.equal(this.running, null, "the daemon is running");
     this.#started = latch();
-    this.running = run({
-      configDir: this.config,
-      registry: this.registry,
-      clock: this.clock,
-      signals: this.signals as SignalSource,
-    });
+    this.running = run(this.runOptions());
     await Promise.race([
       this.#started.promise,
       this.running.then(() => assert.fail("run ended before it started the chat")),

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -15,7 +16,10 @@ import { after, test } from "node:test";
 import { pathToFileURL } from "node:url";
 import {
   AlreadyRunning,
+  ChatIdentityTaken,
   CLAIM_STALE_MS,
+  chatIdentityLock,
+  identityDirectory,
   listenLocal,
   singleInstance,
   socketLock,
@@ -348,3 +352,83 @@ test(
     );
   },
 );
+
+// ---- the lock on a chat identity
+
+const IDENTITY = "T000ACME:U000BOT";
+
+test("the identity's folder is the first 16 hex of its hash, under a name no instance can hold", () => {
+  const home = `${"/ho"}me/alice`;
+  const digest = createHash("sha256").update(IDENTITY).digest("hex").slice(0, 16);
+  assert.equal(
+    identityDirectory(home, IDENTITY),
+    join(home, ".config", "awaydesk_identities", digest),
+  );
+});
+
+test("a second daemon on the same identity is refused, with its own error", async () => {
+  const home = scratch();
+  const first = await chatIdentityLock(IDENTITY, home);
+  try {
+    await assert.rejects(
+      chatIdentityLock(IDENTITY, home),
+      (error: unknown) =>
+        error instanceof ChatIdentityTaken &&
+        error instanceof AlreadyRunning &&
+        error.message ===
+          `another awaydesk instance is connected to this chat app (lock on ${identityDirectory(home, IDENTITY)}): give each instance its own app`,
+    );
+  } finally {
+    await first.release();
+  }
+});
+
+test("the instance lock's refusal is not the identity's", async () => {
+  const directory = scratch();
+  const first = await singleInstance(directory);
+  try {
+    await assert.rejects(
+      singleInstance(directory),
+      (error: unknown) => error instanceof AlreadyRunning && !(error instanceof ChatIdentityTaken),
+    );
+  } finally {
+    await first.release();
+  }
+});
+
+test("two identities are both held", async () => {
+  const home = scratch();
+  const first = await chatIdentityLock(IDENTITY, home);
+  const second = await chatIdentityLock("T000ACME:U000OTHER", home);
+  await first.release();
+  await second.release();
+});
+
+test("a released identity is free for the next daemon", async () => {
+  const home = scratch();
+  await (await chatIdentityLock(IDENTITY, home)).release();
+  await (await chatIdentityLock(IDENTITY, home)).release();
+});
+
+test("an identity held by another process is refused", { timeout: 20000 }, async () => {
+  const home = scratch();
+  const directory = identityDirectory(home, IDENTITY);
+  mkdirSync(directory, { recursive: true });
+  const other = await holder(directory, "singleInstance");
+  try {
+    await assert.rejects(chatIdentityLock(IDENTITY, home), ChatIdentityTaken);
+  } finally {
+    await killed(other);
+  }
+});
+
+test("the identities' folders are private to the owner", POSIX_ONLY, async () => {
+  const home = scratch();
+  const lock = await chatIdentityLock(IDENTITY, home);
+  try {
+    assert.equal(statSync(identityDirectory(home, IDENTITY)).mode & 0o777, 0o700);
+    assert.equal(statSync(join(home, ".config", "awaydesk_identities")).mode & 0o777, 0o700);
+  } finally {
+    await lock.release();
+  }
+});
