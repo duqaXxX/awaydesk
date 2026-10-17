@@ -470,7 +470,7 @@ test("the setup guide names every variable scope and word", () => {
     ...read(join(SRC, "core", "config.ts")).matchAll(/\bvalues(?:\.([A-Z_]+)|\["([A-Z_]+)"\])/g),
   ].map((m) => m[1] ?? m[2] ?? "");
   const manifest = JSON.parse(read(join(ROOT, "slack-app-manifest.json"))) as {
-    oauth_config: { scopes: { bot: string[] } };
+    oauth_config: { scopes: { bot: string[]; user: string[] } };
   };
   // Every variable the daemon reads: the core's, and those each module of the registry names.
   const modules = [...Object.values(REGISTRY.agents), ...Object.values(REGISTRY.chats)];
@@ -481,6 +481,7 @@ test("the setup guide names every variable scope and word", () => {
     ...variables,
     ...read_,
     ...manifest.oauth_config.scopes.bot,
+    ...manifest.oauth_config.scopes.user,
   ]);
   for (const name of names) {
     assert.ok(text.includes(`\`${name}\``), `docs/setup.md does not name ${name}`);

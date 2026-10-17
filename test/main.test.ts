@@ -673,6 +673,9 @@ test("the manifest asks for the minimum", () => {
     "groups:read",
     "reactions:write", // the status reaction on a session's root message
   ]);
+  // The owner's own token, for the Home tab's Delete and Clean up (`chat.delete` on messages the
+  // bot did not post); an install yields it beside the bot token. Nothing else acts as the owner.
+  assert.deepEqual(manifest.oauth_config.scopes.user, ["chat:write"]);
   assert.deepEqual(manifest.settings.event_subscriptions.bot_events, [
     "message.groups",
     // Slack sends it while it writes a clip's transcript, the only sign that one is ready

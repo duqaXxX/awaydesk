@@ -93,35 +93,36 @@ awaydesk needs none of the app's agent features: leave **Agent experience** and 
 **Slack Model Context Protocol (MCP) Server** off in the app settings. The MCP server lets an app
 act on behalf of Slack users, which awaydesk never needs.
 
-### Install it and collect two tokens
+### Install it and collect the tokens
 
 3. Open **Install App** and install the app to your workspace. Copy the **Bot User OAuth Token**
-   (`xoxb-…`).
+   (`xoxb-…`) and the **User OAuth Token** (`xoxp-…`). Slack lists the tokens of an installed app
+   under **OAuth Tokens** on the **OAuth & Permissions** page (Slack's app settings quickstart,
+   read 2026-10-17). The manifest's `oauth_config.scopes.user` lists the user scopes requested at
+   installation (manifest reference, read 2026-10-17).
 4. Open **Basic Information**, find **App-Level Tokens**, and choose **Generate Token and
    Scopes**. Name it, add the scope `connections:write`, and generate it. Copy the token
    (`xapp-…`).
 
-Treat both as passwords: they go in the `.env` file of Part 2 and nowhere else. If one leaks,
-regenerate it on the same page.
+Treat all three as passwords: they go in the `.env` file of Part 2 and nowhere else. If one
+leaks, regenerate it on the same page.
 
-### Optional: a user token, to delete threads from the Home tab
+The user token is the one that acts as you. It enables the Home tab's **Edit** mode, which
+deletes a session's whole thread and cleans up a channel (see "Deleting a thread" and "Cleaning
+up a channel" under "Using it"). Slack lets a bot delete only its own messages (`chat.delete`
+reference), and the first message of a thread and your replies are yours, so deleting them
+takes a token that acts as you. Without `SLACK_USER_TOKEN` in `.env` awaydesk still starts and
+the Home tab still lists the sessions, with no **Edit** button.
 
-Skip this unless you want the Home tab's **Edit** mode, which deletes a session's whole thread
-and cleans up a channel (see "Deleting a thread" and "Cleaning up a channel" under "Using
-it"). Slack lets a bot delete only its own messages
-(`chat.delete` reference), and the first message of a thread and your replies are yours, so
-deleting them takes a token that acts as you.
+The token can post, edit and delete messages as you, anywhere you can. awaydesk uses it for two
+calls: `auth.test` at startup, to check the token is yours, and `chat.delete`, on the messages
+that are not the bot's in a thread you chose to delete or a channel you chose to clean up. It is
+the one credential in `.env` that acts under your name: if you do not want those two features,
+leave it out of `.env`.
 
-- Open **OAuth & Permissions**, and under **Scopes**, **User Token Scopes**, add `chat:write`.
-- Reinstall the app to your workspace when Slack asks.
-- Copy the **User OAuth Token** (`xoxp-…`) into `.env` as `SLACK_USER_TOKEN` (Part 2).
-
-This token can post, edit and delete messages as you, anywhere you can. awaydesk uses it
-for two calls: `auth.test` at startup, to check the token is yours, and `chat.delete`, on the
-messages that are not the bot's in a thread you chose to delete or a channel you chose to clean
-up. It is the one credential in `.env` that acts under your name: leave it out if you do not
-need those two features. The manifest does not ask for the scope, so an app created from it has
-no such token.
+An app created before the manifest asked for the user scope has no such token. Open **OAuth &
+Permissions**, and under **Scopes**, **User Token Scopes**, add `chat:write`; reinstall the app
+to your workspace when Slack asks, and copy the **User OAuth Token**.
 
 ### Find your member ID
 
@@ -175,12 +176,10 @@ named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one
    ```
    SLACK_BOT_TOKEN=<bot token>
    SLACK_APP_TOKEN=<app-level token>
+   SLACK_USER_TOKEN=<user token>
    SLACK_OWNER_USER_ID=<member id>
    ALLOWED_ROOT=~/code
    ```
-
-   Add `SLACK_USER_TOKEN=<user token>` on a line of its own only if you took the optional step in
-   Part 1.
 
 | Variable | Value |
 |---|---|
@@ -188,7 +187,7 @@ named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one
 | `SLACK_APP_TOKEN` | the `xapp-…` token |
 | `SLACK_OWNER_USER_ID` | your member ID, the only person the bot answers |
 | `ALLOWED_ROOT` | the directory `!bind` accepts paths under, for example `~/code` |
-| `SLACK_USER_TOKEN` | optional: your own `xoxp-…` token, for the Home tab's Delete and Clean up |
+| `SLACK_USER_TOKEN` | your own `xoxp-…` token, for the Home tab's Delete and Clean up; awaydesk starts without it, and the Home tab then has no Edit button |
 | `AWAYDESK_AGENT` | optional: the agent awaydesk drives; `claude` when absent, the only one this release has |
 | `AWAYDESK_CHAT` | optional: the chat awaydesk is driven from; `slack` when absent, the only one this release has |
 | `BASH_DEFAULT_TIMEOUT_MS` | optional: Claude Code's own variable, in milliseconds, for how long a command may run; see below |
@@ -437,8 +436,8 @@ The bot answers one person, and the rest of this list protects what that person 
 - The Slack MCP server stays off.
 - The Home tab is published to you alone: awaydesk writes that page for no other member.
 - `~/.config/awaydesk/.env` is mode `600`.
-- `SLACK_USER_TOKEN` is set only if you use the Home tab's Delete or Clean up: it acts as you in the whole
-  workspace, and whoever reads `.env` can post and delete under your name.
+- `SLACK_USER_TOKEN` acts as you in the whole workspace, and whoever reads `.env` can post and
+  delete under your name. Leave the line out if you do not use the Home tab's Delete or Clean up.
 - Files you attach are copied to `$TMPDIR/awaydesk/` (`$TMPDIR/awaydesk-<name>/` for a named
   instance; mode `700`) and stay there for 3 days, so a conversation resumed after a restart still finds them.
 - Trust a folder in Claude Code only after reading its `.claude/` settings and hooks: trusting it
@@ -495,10 +494,10 @@ refuses to start the second ([One app per instance](#one-app-per-instance)).
     chmod 600 ~/.config/awaydesk-work/.env
     ```
 
-    Write the variables of step 8 in it, with the two tokens of the new app and your member ID.
+    Write the variables of step 8 in it, with the three tokens of the new app and your member ID.
     The instance does not read `~/.config/awaydesk/.env`. A `SLACK_USER_TOKEN` belongs to the app
-    that issued it: give the instance one from its own app ("Optional: a user token" in Part 1)
-    or leave the line out, rather than copying another instance's.
+    that issued it: use the one the new app's install gave you (step 3), or leave the line out,
+    rather than copying another instance's.
 
 ### Optional: its own Claude Code login
 
@@ -1173,7 +1172,9 @@ kills the daemon and that turn with it after `ExitTimeOut`.
 The manifest asks for private channels only (`groups:history`, `groups:read`,
 `message.groups`), `chat:write`, `files:read` to download the files you attach to a message,
 `files:write` for `!open`, which shares a file of the session's folder into its thread, and
-`reactions:write` for the status reaction on a session's root message. It subscribes to one more
+`reactions:write` for the status reaction on a session's root message. It also asks for one user
+scope, `chat:write`, which gives the app your `xoxp-` token for the Home tab's Delete and Clean
+up (Part 1, step 3). It subscribes to one more
 event, `file_change`, which is how the app learns that Slack has written the transcript of an
 audio clip you sent; reading it needs `files:read` and no scope of its own. It also switches on the
 app's **Home** tab, where awaydesk keeps the list of your sessions; publishing it needs no

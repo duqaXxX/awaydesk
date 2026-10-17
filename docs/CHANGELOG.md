@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `slack-app-manifest.json` asks for the user scope `chat:write` (`oauth_config.scopes.user`), so
+  an app created from it issues the owner's User OAuth Token at install, beside the bot token,
+  for the Home tab's Delete and Clean up. `docs/setup.md` copies it in step 3, writes
+  `SLACK_USER_TOKEN` in step 8's `.env`, and keeps the note for an app created from the earlier
+  manifest: add `chat:write` under User Token Scopes, reinstall and copy the token. The variable
+  stays optional in the code: without it the daemon starts and the Home tab has no Edit button.
 - Several daemons on one machine, one per instance. An instance is a name: `--instance <name>`, or
   `AWAYDESK_INSTANCE` when the flag is absent (`src/core/instance.ts`, read by `src/cli.ts`). The configuration folder
   (`~/.config/awaydesk-<name>`), the folder for attached files (`$TMPDIR/awaydesk-<name>`, handed to the chat as `ChatContext.scratchDir`), the LaunchAgent
