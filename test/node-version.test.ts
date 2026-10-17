@@ -32,13 +32,13 @@ test("a version below the minimum is refused with both versions named", () => {
 });
 
 test("the minimum and every version above it are accepted", () => {
-  for (const version of [MINIMUM_NODE, "22.11.1", "22.18.0", "22.23.1", "23.0.0", "26.5.1"]) {
+  for (const version of [MINIMUM_NODE, "22.19.1", "22.23.1", "23.0.0", "26.5.1"]) {
     assert.equal(nodeRefusal(version), null, version);
   }
 });
 
 test("versions are compared as numbers, not as text", () => {
-  // As text "100.0.0" sorts before "22.11.0"; as numbers it is above.
+  // As text "100.0.0" sorts before "22.19.0"; as numbers it is above.
   assert.equal(nodeRefusal("100.0.0"), null);
   assert.equal(nodeRefusal("22.100.0"), null);
   assert.notEqual(nodeRefusal("22.9.0"), null);
@@ -52,7 +52,7 @@ test("a lower major is refused whatever its minor", () => {
 });
 
 test("a pre-release of a supported version is accepted", () => {
-  assert.equal(nodeRefusal("22.11.0-rc.1"), null);
+  assert.equal(nodeRefusal("22.19.0-rc.1"), null);
   assert.equal(nodeRefusal("24.0.0-nightly20260101"), null);
 });
 

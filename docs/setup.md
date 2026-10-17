@@ -22,7 +22,7 @@ sequence leaves out.
   nothing until it wakes.
 - Claude Code installed and logged in with a claude.ai subscription: run `claude`, then `/login`.
   The 5-hour and weekly usage figures in the status footer exist only with a subscription.
-- [Node.js](https://nodejs.org/) 22.11 or later, which brings `npm`. It does not have to be the
+- [Node.js](https://nodejs.org/) 22.19 or later, which brings `npm`. It does not have to be the
   Node your terminal uses: see [A Node of its own](#a-node-of-its-own).
 - A Slack workspace where you are the only member: a workspace admin could read or export what
   Claude prints, and whoever controls your Slack account controls the machine. On the free plan
@@ -33,9 +33,9 @@ sequence leaves out.
 
 ## A Node of its own
 
-awaydesk needs one Node, 22.11 or later, and the service of Part 4 runs on it. That Node can sit
+awaydesk needs one Node, 22.19 or later, and the service of Part 4 runs on it. That Node can sit
 beside the one your terminal uses for everything else, so trying awaydesk changes nothing for your
-other projects. On a Node older than 22.11, `awaydesk` ends at once with status 1 and a line that
+other projects. On a Node older than 22.19, `awaydesk` ends at once with status 1 and a line that
 points here.
 
 The service runs the Node that was first on the `PATH` of the command that installed it: `awaydesk
@@ -121,8 +121,8 @@ installed, such as `0.1.0`, without starting anything. If the first prints nothi
 folder of npm's global prefix is not on your `PATH`: add `$(npm prefix -g)/bin` to it in your
 shell profile and open a new terminal. Running `awaydesk` now, before `.env` exists, ends at
 once with `ERROR awaydesk.main:` and a line that says `.env` does not exist and gives the address
-of Part 2 of this guide, and exit status 1. On a Node older than 22.11 the same command ends with
-a line that starts `ERROR awaydesk.main: awaydesk needs Node 22.11.0 or later and this is Node`,
+of Part 2 of this guide, and exit status 1. On a Node older than 22.19 the same command ends with
+a line that starts `ERROR awaydesk.main: awaydesk needs Node 22.19.0 or later and this is Node`,
 followed by the version found and the address of [A Node of its own](#a-node-of-its-own), and also
 with status 1: install a newer Node, beside the one you have if you like.
 
@@ -1182,7 +1182,7 @@ in [features.md](features.md#notifications), not restated here.
 | The terminal shows the trust dialog in a folder you already use from Slack, or Slack asks for approvals the folder's allow rules cover | The folder is outside a repository and only a parent folder is trusted, which Claude Code does not count for the `permissions.allow` rules and `additionalDirectories` of the folder's `.claude/settings.json`. Accept the dialog in that folder: it lists them |
 | `The directory ... no longer exists` | The thread's directory was moved or deleted: restore it to keep using this thread, or, in the channel, bind another folder with `!bind <path>` and send a new message to start a session there |
 | `macOS does not let awaydesk read ...` | The directory is in a folder macOS protects: see Part 4, "Folders macOS protects" |
-| `awaydesk needs Node 22.11.0 or later and this is Node ...` in the log, or on the terminal | The Node that runs awaydesk is older than 22.11; the process ends with status 1. Install a newer Node, beside yours if you want ([A Node of its own](#a-node-of-its-own)), and run `awaydesk` again. The LaunchAgent names the Node executable in its plist: change it there too |
+| `awaydesk needs Node 22.19.0 or later and this is Node ...` in the log, or on the terminal | The Node that runs awaydesk is older than 22.19; the process ends with status 1. Install a newer Node, beside yours if you want ([A Node of its own](#a-node-of-its-own)), and run `awaydesk` again. The LaunchAgent names the Node executable in its plist: change it there too |
 | `ALLOWED_ROOT must be an absolute path, or one starting with ~/; it is "..."` | `ALLOWED_ROOT` in `.env` is a relative path, which would be read from the folder the process starts in. Write the whole path, or start it with `~/` |
 | `another awaydesk is running` in the log | A second daemon of the same instance tried to start; one daemon runs per instance |
 | The app has no **Home** tab, or it stays empty | **Home Tab** is off in the app's settings, and the log says `the Home tab is not enabled in the Slack app`: turn it on under **App Home**, **Show Tabs**, then restart awaydesk |

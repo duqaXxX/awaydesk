@@ -58,15 +58,12 @@ All notable changes to this project are documented here. The format follows
   instance's, `awaydesk.log`.
 - The rule that one daemon runs per machine is now one daemon per instance
   (`docs/setup.md`, Part 6).
-- The minimum Node is 22.11 (`engines.node` and `node-version.MINIMUM_NODE`), the first Node 22
-  with long-term support, in place of 22.18. The only reason for 22.18 was `import.meta.main`,
-  which the entry no longer uses. No Node API the source uses is newer than 20.12
-  (`util.parseEnv`). The dependencies set the floor: `@slack/socket-mode` takes `undici` 7 or 8,
-  8 declares Node 22.19 and fails to load on 22.0.0 (measured on 2026-10-17), and the npm of 22.11
-  and later installs 7 on a Node below 22.19. A package packed from this branch and installed
-  with the npm of each Node ran `awaydesk --version`, `--help` and the start up to the missing
-  `.env` on 22.11.0, 22.12.0, 22.18.0 and 22.19.0. The releases from 22.1.0 to 22.10.x were not
-  measured.
+- The minimum Node is 22.19 (`engines.node` and `node-version.MINIMUM_NODE`) in place of 22.18.
+  The entry no longer uses `import.meta.main`, the reason for 22.18, and no Node API the source
+  uses is newer than 20.12 (`util.parseEnv`): the dependencies set the floor. `@slack/socket-mode`
+  takes `undici` 7 or 8, the lockfile the tests run holds 8, and `undici` 8 declares Node 22.19.
+  On a lower Node 22 which of the two npm installs depends on the user's npm, and 8 fails to load
+  on 22.0.0 (measured on 2026-10-17), so the floor is the one the tested tree declares.
 - `src/main.ts` is only the entry (`bin` and the LaunchAgent still run `dist/main.js`); the
   daemon and the command's wiring moved to `src/daemon.ts`, and `test/main.test.ts` to
   `test/daemon.test.ts`. `test/imports.test.ts` lets only `src/daemon.ts` import the registry and
