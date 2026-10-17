@@ -58,6 +58,11 @@ test("npm's README links to GitHub by absolute URL, pinned to the version's tag"
   }
 });
 
+test("npm's README links the guide's part on the Slack app and the manifest", () => {
+  assert.ok(NPM_README.includes("/blob/v{{VERSION}}/docs/setup.md#part-1-the-slack-app)"));
+  assert.ok(NPM_README.includes("/blob/v{{VERSION}}/slack-app-manifest.json)"));
+});
+
 test("npm's README names the commands the package has", () => {
   for (const command of [
     "npm install -g awaydesk",
