@@ -6,7 +6,7 @@
  * by advancing `FakeClock`.
  *
  * Which sessions are alive is the Claude back end's (`ClaudeBackend.aliveSessions`, tested in
- * `test/agent/claude/listing.test.ts` and `backend.test.ts`); what `main.ts` owns of it, that the
+ * `test/agent/claude/listing.test.ts` and `backend.test.ts`); what `daemon.ts` owns of it, that the
  * cleanup is given the back end's function, is the test `prune uses alive sessions to drop a
  * gone thread`.
  *
@@ -70,7 +70,7 @@ import {
   type SignalSource,
   type Stop,
   StopSignals,
-} from "../src/main.ts";
+} from "../src/daemon.ts";
 import type { Registry } from "../src/registry.ts";
 import { FakeSdk } from "./support/fake-query.ts";
 import {

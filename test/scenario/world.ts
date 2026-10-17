@@ -1,5 +1,5 @@
 /**
- * What the eight steps of the scenario share: the real daemon (`run` of `src/main.ts`) started
+ * What the eight steps of the scenario share: the real daemon (`run` of `src/daemon.ts`) started
  * in a config folder of its own, whose `.env` selects the plain agent and the memory chat by
  * name, over a registry that holds those two entries and nothing else. The test plays the owner
  * through the memory chat and scripts the plain agent; nothing is mocked below `run`.
@@ -23,7 +23,7 @@ import type { ChatProvider, Reply, ThreadChat, ThreadRef } from "../../src/chat/
 import type { ChatEntry } from "../../src/core/port.ts";
 import { StateStore } from "../../src/core/state.ts";
 import type { Names } from "../../src/core/texts.ts";
-import { type RunOptions, run, type SignalSource, type Stop } from "../../src/main.ts";
+import { type RunOptions, run, type SignalSource, type Stop } from "../../src/daemon.ts";
 import type { Registry } from "../../src/registry.ts";
 import { MEMORY_IDENTITY, type MemoryChat, memoryChat, OWNER } from "../support/memory-chat.ts";
 import {

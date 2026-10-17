@@ -1,6 +1,6 @@
 /**
  * The lookup of a bound channel the cleanup is given. Moved with `channelLookup` from
- * `test/main.test.ts`, where it was tested while the function lived in `main.ts`.
+ * `test/daemon.test.ts`, where it was tested while the function lived in `main.ts`.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";

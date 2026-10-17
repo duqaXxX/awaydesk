@@ -58,6 +58,32 @@ All notable changes to this project are documented here. The format follows
   instance's, `awaydesk.log`.
 - The rule that one daemon runs per machine is now one daemon per instance
   (`docs/setup.md`, Part 6).
+- The minimum Node is 22.11 (`engines.node` and `node-version.MINIMUM_NODE`), the first Node 22
+  with long-term support, in place of 22.18. The only reason for 22.18 was `import.meta.main`,
+  which the entry no longer uses. No Node API the source uses is newer than 20.12
+  (`util.parseEnv`). The dependencies set the floor: `@slack/socket-mode` takes `undici` 7 or 8,
+  8 declares Node 22.19 and fails to load on 22.0.0 (measured on 2026-10-17), and the npm of 22.11
+  and later installs 7 on a Node below 22.19. A package packed from this branch and installed
+  with the npm of each Node ran `awaydesk --version`, `--help` and the start up to the missing
+  `.env` on 22.11.0, 22.12.0, 22.18.0 and 22.19.0. The releases from 22.1.0 to 22.10.x were not
+  measured.
+- `src/main.ts` is only the entry (`bin` and the LaunchAgent still run `dist/main.js`); the
+  daemon and the command's wiring moved to `src/daemon.ts`, and `test/main.test.ts` to
+  `test/daemon.test.ts`. `test/imports.test.ts` lets only `src/daemon.ts` import the registry and
+  only `src/main.ts` import `src/daemon.ts`.
+- `docs/setup.md` has a section, "A Node of its own", on running awaydesk on a Node installed
+  beside the terminal's, with nvm or with an unpacked official archive.
+
+### Fixed
+
+- `awaydesk` on a Node older than the minimum printed a `SyntaxError` about `parseEnv` of
+  `node:util` (Node 18.19.0, measured on 2026-10-17) in place of its refusal. An ES module graph
+  is linked whole before any module runs, so `require-node.ts`, the first import of `main.ts`,
+  never ran. The entry now has no static import and loads the daemon only after the version
+  check, and the refusal says how to run awaydesk on a newer Node beside the current one and
+  points at that section of `docs/setup.md`. `test/node-version.test.ts` fails on a static import
+  in `src/main.ts` and on one in the modules the entry loads first. `src/require-node.ts` is
+  removed.
 
 ## [0.1.1] - 2026-10-17
 

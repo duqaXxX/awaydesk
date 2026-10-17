@@ -142,7 +142,7 @@ test("the connection's states are logged by their names", async () => {
 // `connected`, `reconnecting`, `disconnecting`, `disconnected` and `authenticated`, and
 // `disconnected` only when reconnecting is off or `disconnect()` was called. So the rejection is
 // the one sign: the daemon logs it by its code and goes on, deaf until its token is fixed and it
-// is restarted (`installProcessHandlers` in `src/main.ts`). A request error or an HTTP error
+// is restarted (`installProcessHandlers` in `src/daemon.ts`). A request error or an HTTP error
 // reaches that point only once the client's own 100 retries are spent. Run in a child process,
 // since an unhandled rejection in this one is the test runner's to fail.
 test("a reconnect that cannot get a new URL shows only as an unhandled rejection", () => {

@@ -23,11 +23,11 @@ version that runs, `version.installedVersion`, and the address of a section of i
 GitHub, `version.setupGuide`, which the texts that send the owner to the guide use, since the
 package does not carry `docs/`). Beside the layers,
 `src/host/` holds what concerns the machine awaydesk is installed on: none of the layers imports it
-and it imports none of them; the entry files (`src/main.ts`, `src/cli.ts`) do. `test/imports.test.ts`
+and it imports none of them; the entry files (`src/daemon.ts`, `src/cli.ts`) do. `test/imports.test.ts`
 reads the imports of every source file and fails on one the table does not allow. The rules are
 written by layer, so that they hold for a module that is not there yet: the core imports no
-module, a module imports no other module, only `src/main.ts` imports `src/registry.ts` and
-nothing imports `src/main.ts`, the host layer and the three layers do not import each other, and
+module, a module imports no other module, only `src/daemon.ts` imports `src/registry.ts`, only
+`src/main.ts` imports `src/daemon.ts` and nothing imports `src/main.ts`, the host layer and the three layers do not import each other, and
 a package is imported only by the module that lists it in
 `LIBRARIES` (`@anthropic-ai/claude-agent-sdk` for `agent/claude`, `@slack/` for `chat/slack`).
 The scan reads a specifier written as a string or a plain template, and fails on an `import()` or
@@ -41,7 +41,8 @@ The scan reads a specifier written as a string or a plain template, and fails on
 | `src/registry.ts` | the agents and the chats the daemon can run, by name | the two modules: the one file outside them that names them |
 | `src/host/` | the machine awaydesk is installed on: the program a service starts (`host/program.programOf`), and the service itself behind `host/service/seam.ServiceManager`, implemented for launchd (`host/service/launchd.Launchd`: the LaunchAgent `local.awaydesk`) | Node's built-ins alone; none of the layers |
 | `src/cli.ts` | the command line: no argument runs the daemon; `--version`, `--help` and `service install\|uninstall\|status\|restart` answer and end; any other argument is refused with status 2 | the host layer, `src/version.ts`, and `core/config.CONFIG_DIR`, which `service uninstall` names |
-| `src/main.ts` | the startup order and the shutdown; its first import, `src/require-node.ts`, ends the process with a refusal on a Node older than `node-version.MINIMUM_NODE` | the registry, the core, the command line; neither module |
+| `src/main.ts` | the entry the package's `bin` and the LaunchAgent name: it has no static import, checks the Node against `node-version.MINIMUM_NODE`, prints a refusal and ends with status 1 on an older one, else loads `src/daemon.ts` | `src/node-version.ts`, `src/log.ts`, `src/daemon.ts` (dynamic imports) |
+| `src/daemon.ts` | the startup order and the shutdown | the registry, the core, the command line; neither module |
 
 The core talks to the two libraries through the seams alone. No type of the Agent SDK appears in
 `src/agent/seam.ts` and no type of a Slack package in `src/chat/seam.ts`. The same holds for
@@ -194,7 +195,7 @@ at start. Two ship, the agent `claude` and the chat `slack`.
 (`src/core/port.ts`) and `Registry.defaults` the two names taken when the file selects none.
 `AWAYDESK_AGENT` and `AWAYDESK_CHAT` select; absent, they mean `claude` and `slack`, so an `.env`
 written without them works as it did. `config.loadConfig` stops the start with a `ConfigError`
-that lists the valid names when one selects a name the registry does not hold. `main.run` builds
+that lists the valid names when one selects a name the registry does not hold. `daemon.run` builds
 the selected entries and imports neither module; a test passes its own registry in
 `RunOptions.registry`, and what a test replaces inside a module is an option of that module's
 entry (`slackChat`, `claudeAgent`).
@@ -267,7 +268,7 @@ values of the core that a provider's own code works with.
 
 Two tests hold the boundary. `test/imports.test.ts` allows a chat provider to import the chat seam,
 the agent seam's types and the core's port, and refuses any other import of the core, an import of
-any other module, of the registry or of `src/main.ts`, and an import of a package outside the
+any other module, of the registry or of `src/daemon.ts`, and an import of a package outside the
 module that lists it. `test/vocabulary.test.ts` refuses a word of one module outside it. A new
 module adds its package to `LIBRARIES` in the first test, and the words only it has (not its
 name, which comes from its directory) to `MODULE_WORDS` in the second.
@@ -336,7 +337,7 @@ request it already withdrew.
 
 ## Startup
 
-`main.run` starts the daemon in this order. It is the one module that wires all three layers, and
+`daemon.run` starts the daemon in this order. It is the one module that wires all three layers, and
 every store and clock the layers use is built here and handed down; the registry is the only way it
 reaches an agent or a chat.
 
@@ -356,7 +357,7 @@ reaches an agent or a chat.
    `Home`, the `ChannelGuard` and the attachments folder (`attachments.prepareUploads`, see
    "Attached files"). The provider's `ChatProvider.identities` (for Slack two keys: the workspace and the bot,
    `<team id>:<bot user id>`, and a SHA-256 of the app-level token, `app-token:<hex>`) are known
-   from here, and `main.run` takes the second lock on each of them (`lock.chatIdentityLocks`, see
+   from here, and `daemon.run` takes the second lock on each of them (`lock.chatIdentityLocks`, see
    "State and the single-instance lock") before anything else starts. A daemon that finds one held
    lets go of what it built (`ChatProvider.stop` and `close`,
    `AgentBackend.close`; nothing is connected yet, since `SlackChat.start` is what opens the
@@ -367,14 +368,14 @@ reaches an agent or a chat.
    and the `SessionManager`, and the flows over them (`flows.buildFlows`), whose `Inbound` the
    chat is given at its start. `SessionManager`, `StateStore`, `Approvals`, `Holds` and the agent
    together are the core the provider reaches through `CorePort`, which is set last.
-6. It installs the `SIGTERM` and `SIGINT` listeners (`main.StopSignals`), so a signal that arrives
+6. It installs the `SIGTERM` and `SIGINT` listeners (`daemon.StopSignals`), so a signal that arrives
    during a long repair is caught and not left to the default disposition, which would end the
    process at once.
 7. With the connection not opened yet, it repairs what a crashed daemon left open
    (`repair.repair`, see "State and the single-instance lock") and then cleans `state.json`
    (`cleanup.clean`, see "Cleaning `state.json`"). Cleaning runs only after repair, so a pruned
    thread's leftovers are still repaired first, and it runs again every
-   `cleanup.CLEAN_EVERY_SECONDS` until a stop begins (`main.cleanEvery`).
+   `cleanup.CLEAN_EVERY_SECONDS` until a stop begins (`daemon.cleanEvery`).
 8. It sets `StateStore.onSessionsChange` and, for a chat that has a session index
    (`ChatProvider.index`), asks for the first one (for Slack `Home.request`, see "The session
    index").
@@ -383,10 +384,10 @@ reaches an agent or a chat.
    connected, the daemon posts the version 1 to version 2 upgrade notice to each channel that still
    owes one (`notices.postUpgradeNotices`), as a message of its own, not a reply.
 
-`main.main` is the entry point. A `ConfigError`, a `StateError` or `AlreadyRunning` is logged with
-its message, any other failure of `main.run` by its name alone, and the process exits with 1. A
+`daemon.main` is the daemon's entry point. A `ConfigError`, a `StateError` or `AlreadyRunning` is logged with
+its message, any other failure of `daemon.run` by its name alone, and the process exits with 1. A
 rejected promise or an exception nobody handled is logged by its name
-(`main.installProcessHandlers`). After a rejected promise the daemon goes on. An uncaught
+(`daemon.installProcessHandlers`). After a rejected promise the daemon goes on. An uncaught
 exception stops it the way a `SIGINT` does, with the shutdown below and no drain, and the process
 exits with 1, so that launchd, which keeps the service alive, starts a clean daemon and the crash repair runs: Node documents the process as
 unsafe to resume after one, and letting Node end it there would skip the shutdown and leave open
@@ -446,7 +447,7 @@ warning or error that names the library, and the daemon logs the states of the c
   and of `texts.RESTART_WAITS`. The drain still waits for that session's turn and for every other
   task.
 
-When no session is working, after `main.DRAIN_LIMIT_SECONDS`, or on a second signal, the daemon
+When no session is working, after `daemon.DRAIN_LIMIT_SECONDS`, or on a second signal, the daemon
 stops the scheduled cleanup and stops the chat (`ChatProvider.stop`: Slack closes the connection,
 tells the listeners it is stopping and gives up the clips still waiting for a transcript, in
 `SlackChat.stop`), closes every session (`SessionManager.closeAll`), closes the chat
@@ -462,16 +463,16 @@ posts, reacts, opens a modal, submits a prompt or deletes a request. From the
 first line of `SessionManager.closeAll` the manager hands out no session (`get` answers null),
 and `open`, `resume` and `bind` throw `SessionClosed` before they read or write `state.json`;
 `release` answers false. A session started then would never be closed, and with the real back end
-its Claude Code process would keep Node alive after the lock was released. Once `main.run` has
-returned, `main.main` ends the process with the code `run` gave. Node would otherwise stay alive
+its Claude Code process would keep Node alive after the lock was released. Once `daemon.run` has
+returned, `daemon.main` ends the process with the code `run` gave. Node would otherwise stay alive
 while anything holds its event loop, and the Socket Mode connection does after every stop:
 `@slack/socket-mode` 3.1.0 closed its WebSocket 5.9 seconds after the stop in each of three runs
 on 2026-10-10, with the lock already free. A shutdown that completes
-no step for `main.SHUTDOWN_LIMIT_SECONDS` ends the process with 1, on a timer that does not keep it
-alive (`main.deferred`). For a signal's stop the limit starts once the drain is over, so the drain
-keeps its own limit, and it runs from the last step that completed: `main.run` reports through
+no step for `daemon.SHUTDOWN_LIMIT_SECONDS` ends the process with 1, on a timer that does not keep it
+alive (`daemon.deferred`). For a signal's stop the limit starts once the drain is over, so the drain
+keeps its own limit, and it runs from the last step that completed: `daemon.run` reports through
 `RunOptions.shutdownProgress` when the shutdown begins, after each of its steps and after each
-session `SessionManager.closeAll` has closed, and `main.main` arms the timer again at each report.
+session `SessionManager.closeAll` has closed, and `daemon.main` arms the timer again at each report.
 A shutdown with many replies to end takes longer than the limit (each costs two acquires of the
 shared update limiter, 1.5 seconds a token past a burst of 5: 20 sessions took 53 seconds on
 the fake clock) and is not cut. A start of the agent that a word of the daemon made (`!status`, the
@@ -504,7 +505,7 @@ name is 1 to 32 characters of `a-z`, `0-9` and `-`, starting with a letter or a 
 default instance, the second would share its log); the length keeps the lock socket's path inside
 `sun_path`. The command line (`src/cli.ts`) takes the name from `--instance`, else from
 `AWAYDESK_INSTANCE`; it is the only reader of that variable, and the host layer, which imports
-nothing of the core, receives the name as a string. `main.run` takes the instance and derives the
+nothing of the core, receives the name as a string. `daemon.run` takes the instance and derives the
 two folders from it; `RunOptions.configDir` and `RunOptions.scratchDir` replace them in a test.
 It also writes the name to `AWAYDESK_INSTANCE` in its own environment, and removes the variable for
 the default instance (`RunOptions.environment` replaces `process.env` in a test): the sessions
@@ -635,7 +636,7 @@ instances have two folders, so they hold two locks and run side by side. macOS i
 A second lock keeps two instances from sharing one chat app. Socket Mode spreads an app's events
 across its open connections, so two daemons on one app would each receive part of them, and an
 `.env` copied for a new instance with the old tokens in it would do it with no error. After the
-chat is built and before it starts, `main.run` takes `lock.chatIdentityLocks` on
+chat is built and before it starts, `daemon.run` takes `lock.chatIdentityLocks` on
 `ChatProvider.identities`, a list of strings opaque to the core, each stable for one app. Slack
 gives two, because it has two tokens and Slack documents no call that maps the app-level token to
 its app: the bot (`<team id>:<bot user id>`, from `auth.test` on the bot token) and the app-level
@@ -664,7 +665,7 @@ same directory, and fails with `EAGAIN`.
 
 ### Cleaning `state.json`
 
-`cleanup.clean` runs on start and then every `cleanup.CLEAN_EVERY_SECONDS` (`main.cleanEvery`), and
+`cleanup.clean` runs on start and then every `cleanup.CLEAN_EVERY_SECONDS` (`daemon.cleanEvery`), and
 removes only what an answer makes certain:
 
 - `cleanup.forgetGoneChannels` asks about each bound channel through the lookup it is given

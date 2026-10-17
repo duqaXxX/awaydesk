@@ -74,11 +74,11 @@ is last or overtaken. The footer goes under the reply the session names.
 
 Two tests refuse what a module must not do, by layer, so that they hold for a module that is not
 there yet. `test/imports.test.ts` fails when the core imports a module, when a module imports
-another module (of its layer or the other), when anything but `src/main.ts` imports
-`src/registry.ts`, when anything imports `src/main.ts`, when a chat provider imports anything of
-the core but its port, when the host layer (`src/host/`) and the three layers import each other,
-and when a package is imported by a module that does not list it; it also
-fails on an `import()` whose specifier is not a literal and on `createRequire`, which it cannot
+another module (of its layer or the other), when anything but `src/daemon.ts` imports
+`src/registry.ts`, when anything but `src/main.ts` imports `src/daemon.ts`, when anything imports
+`src/main.ts`, when a chat provider imports anything of the core but its port, when the host layer
+(`src/host/`) and the three layers import each other, and when a package is imported by a module
+that does not list it; it also fails on an `import()` whose specifier is not a literal and on `createRequire`, which it cannot
 read. A new module adds its package to `LIBRARIES` in that test. `test/vocabulary.test.ts` fails on
 an identifier or a string outside the module directories under `src/agent/` and `src/chat/` and
 `src/registry.ts` that names an agent or a chat: the name of each module directory is one of the
@@ -88,18 +88,20 @@ words only it has (its library, what it calls things) to `MODULE_WORDS` in that 
 
 ## Checks
 
-The daemon is TypeScript on Node 22.18 or later, in three layers: `src/agent/` (the Claude back
-end), `src/core/` and `src/chat/` (the Slack provider), with `src/registry.ts` and `src/main.ts`
-joining them. `test/imports.test.ts` fails when a layer imports what it must not. Run from the
-repository root:
+The daemon is TypeScript, in three layers: `src/agent/` (the Claude back end), `src/core/` and
+`src/chat/` (the Slack provider), with `src/registry.ts` and `src/daemon.ts` joining them
+(`src/main.ts` is the entry: it checks the Node and loads `src/daemon.ts`).
+`test/imports.test.ts` fails when a layer imports what it must not. Run from the repository root:
 
 ```bash
 npm ci
 npm run check
 ```
 
-`npm run check` runs Biome (`biome check .`), `tsc --noEmit` and the tests. Node runs the tests
-from the sources, with the types stripped, so they need no build; they start no Claude Code process
+`npm run check` runs Biome (`biome check .`), `tsc --noEmit` and the tests. They need Node 22.18 or
+later, the first 22 that runs TypeScript with the types stripped and no flag (the installed
+package needs only the Node of `engines` in `package.json`). Node runs the tests from the sources,
+with the types stripped, so they need no build; they start no Claude Code process
 and open no connection. One file: `node --test test/core/config.test.ts`. `npm run format` applies
 Biome's fixes, and `npm run build` compiles `src/` to `dist/`.
 

@@ -24,7 +24,8 @@ awaydesk runs Claude Code through the
   workspace admin could still read or export what Claude prints, and whoever controls your Slack
   account controls the machine.
 - It needs Claude Code logged in with a claude.ai subscription and
-  [Node 22.18](https://nodejs.org/) or later.
+  [Node 22.11](https://nodejs.org/) or later. It can sit beside the Node your terminal uses:
+  see [A Node of its own](docs/setup.md#a-node-of-its-own).
 - Each instance needs a Slack app of its own, and a free workspace allows 10 apps. Each bot has
   its own Home tab: there is no index across instances.
 - If your projects live in a folder macOS protects, such as `~/Documents` or `~/Desktop`, the

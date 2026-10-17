@@ -1,11 +1,12 @@
 /**
  * The dependency rule of the three layers, read off the imports, written by layer so that it holds
  * for a module that does not exist yet. A module is a directory under `src/agent/` or
- * `src/chat/`. The core imports no module; a module imports no other module; only `main.ts`
- * imports `registry.ts`, which is the one file outside a module that imports one, and nothing
- * imports `main.ts`; a package is imported only by the module that lists it in `LIBRARIES`. The
- * host layer (`src/host/`: the machine the daemon is installed on) imports none of the layers,
- * and none of them imports it: the entry files above the layers do.
+ * `src/chat/`. The core imports no module; a module imports no other module; only `daemon.ts`
+ * imports `registry.ts`, which is the one file outside a module that imports one; only `main.ts`
+ * imports `daemon.ts`, and nothing imports `main.ts`; a package is imported only by the module
+ * that lists it in `LIBRARIES`. The host layer (`src/host/`: the machine the daemon is installed
+ * on) imports none of the layers, and none of them imports it: the entry files above the layers
+ * do.
  */
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
@@ -83,7 +84,10 @@ export function refusal(file: string, specifier: string): string | null {
   if (there !== null && there !== own && file !== "registry.ts") {
     return "a module is imported by itself and by the registry alone";
   }
-  if (target === "registry.ts" && file !== "main.ts") return "only main.ts imports the registry";
+  if (target === "registry.ts" && file !== "daemon.ts") {
+    return "only daemon.ts imports the registry";
+  }
+  if (target === "daemon.ts" && file !== "main.ts") return "only main.ts imports daemon.ts";
   if (target === "main.ts") return "nothing imports main.ts";
   if (file.startsWith("agent/") && /^(chat|core)\//.test(target)) {
     return "the agent module imports neither the chat module nor the core";
@@ -148,7 +152,7 @@ test("the rule refuses a library outside the module that lists it", () => {
   assert.ok(refusal("core/sessions.ts", "@slack/web-api"));
   assert.ok(refusal("chat/slack/app.ts", AGENT_SDK));
   assert.ok(refusal("agent/claude/session.ts", "@slack/bolt"));
-  assert.ok(refusal("main.ts", `${AGENT_SDK}/sdk-tools`));
+  assert.ok(refusal("daemon.ts", `${AGENT_SDK}/sdk-tools`));
   assert.ok(refusal("agent/seam.ts", AGENT_SDK));
 });
 
@@ -165,7 +169,7 @@ test("the rule lets a module import its own library, and any file a built-in", (
   assert.equal(refusal("chat/slack/app.ts", "@slack/bolt"), null);
   assert.equal(refusal("chat/slack/app/requests.ts", "@slack/web-api"), null);
   assert.equal(refusal("core/state.ts", "node:fs"), null);
-  assert.equal(refusal("main.ts", "node:path"), null);
+  assert.equal(refusal("daemon.ts", "node:path"), null);
 });
 
 test("the core imports no module, whichever it is", () => {
@@ -182,7 +186,7 @@ test("a module imports no other module, of its layer or of the other", () => {
   assert.ok(refusal("chat/slack/app.ts", "../../agent/claude/session.ts"));
   assert.ok(refusal("agent/claude/session.ts", "../../chat/slack/thread.ts"));
   assert.ok(refusal("agent/seam.ts", "./claude/session.ts"));
-  assert.ok(refusal("main.ts", "./agent/claude/backend.ts"));
+  assert.ok(refusal("daemon.ts", "./agent/claude/backend.ts"));
 });
 
 test("the host layer and the other layers do not import each other", () => {
@@ -194,21 +198,26 @@ test("the host layer and the other layers do not import each other", () => {
   assert.ok(refusal("agent/claude/session.ts", "../../host/program.ts"));
   assert.ok(refusal("host/program.ts", "left-pad"));
   assert.equal(refusal("cli.ts", "./host/program.ts"), null);
-  assert.equal(refusal("main.ts", "./host/program.ts"), null);
+  assert.equal(refusal("daemon.ts", "./host/program.ts"), null);
   assert.equal(refusal("host/service/launchd.ts", "../program.ts"), null);
   assert.equal(refusal("host/program.ts", "node:fs"), null);
   // The version file is above the layers: any of them may read it.
   assert.equal(refusal("host/service/launchd.ts", "../../version.ts"), null);
 });
 
-test("only main.ts imports the registry, and nothing imports main.ts", () => {
+test("only daemon.ts imports the registry, only main.ts imports daemon.ts, nothing imports main.ts", () => {
   assert.ok(refusal("core/sessions/session.ts", "../../registry.ts"));
   assert.ok(refusal("chat/slack/thread.ts", "../../registry.ts"));
   assert.ok(refusal("agent/claude/session.ts", "../../registry.ts"));
   assert.ok(refusal("core/sessions/session.ts", "../../main.ts"));
   assert.ok(refusal("registry.ts", "./main.ts"));
+  assert.ok(refusal("main.ts", "./registry.ts"));
+  assert.ok(refusal("cli.ts", "./daemon.ts"));
+  assert.ok(refusal("registry.ts", "./daemon.ts"));
+  assert.equal(refusal("main.ts", "./daemon.ts"), null);
+  assert.equal(refusal("main.ts", "./node-version.ts"), null);
   assert.ok(refusal("chat/slack/module.ts", "../../main.ts"));
-  assert.equal(refusal("main.ts", "./registry.ts"), null);
+  assert.equal(refusal("daemon.ts", "./registry.ts"), null);
 });
 
 test("the registry imports the modules, and a module its own files and the seams", () => {

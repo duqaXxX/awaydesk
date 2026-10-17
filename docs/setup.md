@@ -22,13 +22,70 @@ sequence leaves out.
   nothing until it wakes.
 - Claude Code installed and logged in with a claude.ai subscription: run `claude`, then `/login`.
   The 5-hour and weekly usage figures in the status footer exist only with a subscription.
-- [Node.js](https://nodejs.org/) 22.18 or later, which brings `npm`.
+- [Node.js](https://nodejs.org/) 22.11 or later, which brings `npm`. It does not have to be the
+  Node your terminal uses: see [A Node of its own](#a-node-of-its-own).
 - A Slack workspace where you are the only member: a workspace admin could read or export what
   Claude prints, and whoever controls your Slack account controls the machine. On the free plan
   Slack allows one workspace; use it only if nobody else is in it (see Part 5).
 - Full Disk Access for the Node executable that runs awaydesk, only if your projects
   live in a folder macOS protects, such as `~/Documents` or `~/Desktop`. Without it a session
   there fails to start. The step is under [Folders macOS protects](#folders-macos-protects).
+
+## A Node of its own
+
+awaydesk needs one Node, 22.11 or later, and the service of Part 4 runs on it. That Node can sit
+beside the one your terminal uses for everything else, so trying awaydesk changes nothing for your
+other projects. On a Node older than 22.11, `awaydesk` ends at once with status 1 and a line that
+points here.
+
+The service runs the Node that was first on the `PATH` of the command that installed it: `awaydesk
+service install` writes that Node's path into the plist (Part 4, "Install the service"). So the
+Node to use is the one you install the package and the service with, whatever your shell's default
+is.
+
+With [nvm](https://github.com/nvm-sh/nvm), whose README gives `nvm install`, `nvm exec` and
+`nvm which` (read 2026-10-17):
+
+```bash
+nvm install 22
+nvm exec 22 npm install -g awaydesk
+nvm exec 22 awaydesk --version
+nvm exec 22 awaydesk service install
+```
+
+`nvm install 22` installs the latest 22.x beside your other versions. `nvm exec 22 <command>` runs
+one command in a subshell with that version first on the `PATH`, which leaves your shell as it was.
+Global npm packages belong to the Node that installed them (nvm's `NVM_BIN` is where the active
+version's Node, npm and global packages live), so `awaydesk` is installed for 22 only and the
+command is not on your default Node's `PATH`. Put an alias for it in your shell profile:
+
+```bash
+alias awaydesk='nvm exec 22 awaydesk'
+```
+
+`nvm which 22` prints the path of that Node, which `ProgramArguments` in the plist names. When 22
+is the first version nvm installs, nvm also makes it the default of new shells; `nvm alias default
+<version>` sets another.
+
+With nvm that path holds the version folder (`.../v22.x.y/bin/node`). When you remove that version,
+or replace it with a newer 22.x, the service stops starting. Run `nvm exec 22 awaydesk service
+uninstall`, then `nvm exec 22 awaydesk service install` again, with the version that is installed.
+
+Without nvm, unpack an official archive from [nodejs.org/dist](https://nodejs.org/dist/) (each
+release folder lists the macOS archives and a `SHASUMS256.txt` to check them against) into a
+folder of your own, and put its `bin` first on the `PATH` of each command. npm's global prefix
+defaults to the location where Node is installed (npm's documentation of
+[folders](https://docs.npmjs.com/cli/v10/configuring-npm/folders), read 2026-10-17), so the package
+goes into that folder too:
+
+```bash
+PATH="<folder>/bin:$PATH" npm install -g awaydesk
+PATH="<folder>/bin:$PATH" awaydesk service install
+```
+
+The same warning holds: the plist records the path of that folder's Node, so moving or deleting the
+folder stops the service until you uninstall and install it again. A Node installed with Homebrew
+is not covered here.
 
 ## Part 0: install
 
@@ -42,7 +99,9 @@ That puts the `awaydesk` command in the `bin` folder of npm's global prefix (`np
 the package beside it, in `lib/node_modules/awaydesk`; the service of Part 4 runs that copy. When
 npm answers `EACCES`, your user cannot write to that prefix: npm's page
 [Resolving EACCES permissions errors](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally)
-gives the remedies. To update, `npm install -g awaydesk@latest`, then `awaydesk service restart`:
+gives the remedies. To install on a Node other than your terminal's default, see
+[A Node of its own](#a-node-of-its-own). To update, `npm install -g awaydesk@latest`, then
+`awaydesk service restart`:
 the running daemon keeps the old copy until it restarts. To run a copy built from the repository
 instead, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
@@ -62,10 +121,10 @@ installed, such as `0.1.0`, without starting anything. If the first prints nothi
 folder of npm's global prefix is not on your `PATH`: add `$(npm prefix -g)/bin` to it in your
 shell profile and open a new terminal. Running `awaydesk` now, before `.env` exists, ends at
 once with `ERROR awaydesk.main:` and a line that says `.env` does not exist and gives the address
-of Part 2 of this guide, and exit status 1. On a Node older than 22.18 the same command ends with
-a line that starts `ERROR awaydesk.main: awaydesk needs Node 22.18.0 or later and this is Node`,
-followed by the version found and the address of Requirements, and also with status 1: install a
-newer Node.
+of Part 2 of this guide, and exit status 1. On a Node older than 22.11 the same command ends with
+a line that starts `ERROR awaydesk.main: awaydesk needs Node 22.11.0 or later and this is Node`,
+followed by the version found and the address of [A Node of its own](#a-node-of-its-own), and also
+with status 1: install a newer Node, beside the one you have if you like.
 
 ## Part 1: the Slack app
 
@@ -1123,7 +1182,7 @@ in [features.md](features.md#notifications), not restated here.
 | The terminal shows the trust dialog in a folder you already use from Slack, or Slack asks for approvals the folder's allow rules cover | The folder is outside a repository and only a parent folder is trusted, which Claude Code does not count for the `permissions.allow` rules and `additionalDirectories` of the folder's `.claude/settings.json`. Accept the dialog in that folder: it lists them |
 | `The directory ... no longer exists` | The thread's directory was moved or deleted: restore it to keep using this thread, or, in the channel, bind another folder with `!bind <path>` and send a new message to start a session there |
 | `macOS does not let awaydesk read ...` | The directory is in a folder macOS protects: see Part 4, "Folders macOS protects" |
-| `awaydesk needs Node 22.18.0 or later and this is Node ...` in the log, or on the terminal | The Node that runs awaydesk is older than 22.18; the process ends with status 1. Install a newer Node and run `awaydesk` again. The LaunchAgent names the Node executable in its plist: change it there too |
+| `awaydesk needs Node 22.11.0 or later and this is Node ...` in the log, or on the terminal | The Node that runs awaydesk is older than 22.11; the process ends with status 1. Install a newer Node, beside yours if you want ([A Node of its own](#a-node-of-its-own)), and run `awaydesk` again. The LaunchAgent names the Node executable in its plist: change it there too |
 | `ALLOWED_ROOT must be an absolute path, or one starting with ~/; it is "..."` | `ALLOWED_ROOT` in `.env` is a relative path, which would be read from the folder the process starts in. Write the whole path, or start it with `~/` |
 | `another awaydesk is running` in the log | A second daemon of the same instance tried to start; one daemon runs per instance |
 | The app has no **Home** tab, or it stays empty | **Home Tab** is off in the app's settings, and the log says `the Home tab is not enabled in the Slack app`: turn it on under **App Home**, **Show Tabs**, then restart awaydesk |
