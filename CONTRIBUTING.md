@@ -98,10 +98,9 @@ npm ci
 npm run check
 ```
 
-`npm run check` runs Biome (`biome check .`), `tsc --noEmit` and the tests. They need Node 22.18 or
-later, the first 22 that runs TypeScript with the types stripped and no flag (the installed
-package needs only the Node of `engines` in `package.json`). Node runs the tests from the sources,
-with the types stripped, so they need no build; they start no Claude Code process
+`npm run check` runs Biome (`biome check .`), `tsc --noEmit` and the tests. They need Node 22.19 or
+later, the `engines` of `package.json` that the installed package needs too. Node runs the tests
+from the sources, with the types stripped, so they need no build; they start no Claude Code process
 and open no connection. One file: `node --test test/core/config.test.ts`. `npm run format` applies
 Biome's fixes, and `npm run build` compiles `src/` to `dist/`.
 
