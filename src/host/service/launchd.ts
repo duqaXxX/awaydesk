@@ -114,15 +114,43 @@ export interface ListedJob {
   lastExit: number | null;
 }
 
+/** The jobs `launchctl list` prints, one per row of three columns; the header and noise are skipped. */
+function listedRows(output: string): Array<ListedJob & { label: string }> {
+  const number = (text: string): number | null => (/^-?\d+$/.test(text) ? Number(text) : null);
+  return output.split("\n").flatMap((line) => {
+    const columns = line.trim().split(/\s+/);
+    if (columns.length !== 3) return [];
+    return [
+      {
+        label: columns[2] as string,
+        pid: number(columns[0] as string),
+        lastExit: number(columns[1] as string),
+      },
+    ];
+  });
+}
+
 /** The job `label` in the output of `launchctl list`, or null when it is not loaded. */
 export function listedJob(output: string, label: string): ListedJob | null {
-  for (const line of output.split("\n")) {
-    const columns = line.trim().split(/\s+/);
-    if (columns.length !== 3 || columns[2] !== label) continue;
-    const number = (text: string): number | null => (/^-?\d+$/.test(text) ? Number(text) : null);
-    return { pid: number(columns[0] as string), lastExit: number(columns[1] as string) };
+  const row = listedRows(output).find((job) => job.label === label);
+  return row === undefined ? null : { pid: row.pid, lastExit: row.lastExit };
+}
+
+/**
+ * The instances of awaydesk that `launchctl list` shows loaded: the default instance as null, the
+ * others by name. A label is one when it is `local.awaydesk` or `local.awaydesk.<name>` with a
+ * name the rule allows, exactly as `listedJob` matches one.
+ */
+function listedInstances(output: string): Array<string | null> {
+  const found: Array<string | null> = [];
+  for (const { label } of listedRows(output)) {
+    if (label === DEFAULT_LABEL) found.push(null);
+    else if (label.startsWith(`${DEFAULT_LABEL}.`)) {
+      const name = label.slice(DEFAULT_LABEL.length + 1);
+      if (isInstanceName(name)) found.push(name);
+    }
   }
-  return null;
+  return found;
 }
 
 class LaunchctlError extends Error {}
@@ -374,17 +402,26 @@ export class Launchd implements ServiceManager {
             .filter((name) => OWN_PLIST.test(name))
             .sort()
         : [];
-      if (files.length === 0) return ok(["No awaydesk service is installed."]);
       const listing = this.#launchctl(["list"]);
+      // A job can outlive its plist (the file removed by hand): launchd keeps it loaded, and only
+      // `launchctl list` knows. A loaded instance whose plist file is not there is listed as such.
+      const gone = listedInstances(listing).filter(
+        (instance) => !files.includes(`${labelOf(instance)}.plist`),
+      );
+      if (files.length === 0 && gone.length === 0) {
+        return ok(["No awaydesk service is installed."]);
+      }
       const found = files.map((file) => ({
         file,
         what: inspected(file, plistFacts(this.#options.run, join(directory, file))),
       }));
-      const instances = found
-        .flatMap(({ what }) => ("reason" in what ? [] : [what]))
+      const instances = [
+        ...found.flatMap(({ what }) => ("reason" in what ? [] : [{ ...what, gone: false }])),
+        ...gone.map((instance) => ({ instance, main: undefined, gone: true })),
+      ]
         // The default instance first, then the others by name.
         .sort((a, b) => (a.instance ?? "").localeCompare(b.instance ?? ""));
-      const rows: Row[] = instances.map(({ instance, main }) => {
+      const rows: Row[] = instances.map(({ instance, main, gone: plistGone }) => {
         const job = listedJob(listing, labelOf(instance));
         const state =
           job === null
@@ -392,7 +429,9 @@ export class Launchd implements ServiceManager {
             : job.pid === null
               ? "loaded, not running"
               : `running, pid ${job.pid}`;
-        const name = instance ?? "default";
+        // Not a name to type: `--instance default` is refused.
+        const name = instance ?? "(default)";
+        if (plistGone) return [name, `${state}; its plist is gone`, "-", "-"];
         if (main === undefined) return [name, state, "unreadable plist", "-"];
         const copy = copyOf(main);
         return [name, state, copy, copyVersion(copy) ?? "unknown"];

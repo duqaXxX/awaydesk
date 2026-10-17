@@ -541,7 +541,7 @@ awaydesk service status --instance work
 tail -n 5 ~/Library/Logs/awaydesk/work.log
 ```
 
-The first prints a table with one row for `default` and one for `work`, each with the state
+The first prints a table with one row for `(default)` and one for `work`, each with the state
 `running, pid` and a pid. The second prints `local.awaydesk.work is running, pid` and the pid.
 After a few seconds the log ends with the line of checkpoint 2, `connected to Slack workspace`.
 Then bind a channel of the new bot with `!bind <folder>` and send a message, as in step 12: each
@@ -587,10 +587,15 @@ alike, with no flag typed. To reach the default instance from such a session, em
 that copy's version:
 
 ```
-INSTANCE  STATE              COPY                                                     VERSION
-default   running, pid 4242  /opt/homebrew/lib/node_modules/awaydesk                  0.1.1
-dev       not loaded         /usr/local/share/awaydesk-dev/lib/node_modules/awaydesk  0.2.0
+INSTANCE   STATE              COPY                                                     VERSION
+(default)  running, pid 4242  /opt/homebrew/lib/node_modules/awaydesk                  0.1.1
+dev        not loaded         /usr/local/share/awaydesk-dev/lib/node_modules/awaydesk  0.2.0
 ```
+
+The default instance is written `(default)`: it has no name, and `--instance default` is refused.
+A job `launchctl` has loaded whose plist file is gone (removed by hand) is listed too, with
+`its plist is gone` after its state and `-` for the copy and the version; `service uninstall`
+stops it.
 
 A plist with no entry file is listed with `unreadable plist` as its copy, and a copy whose
 `package.json` is gone with the version `unknown`. A plist that does not agree with itself is not

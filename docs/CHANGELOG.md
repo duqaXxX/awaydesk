@@ -24,8 +24,10 @@ All notable changes to this project are documented here. The format follows
 - `awaydesk service list` shows every instance's service: loaded or not, the pid, the copy of the
   package it runs and that copy's version. The instance comes from the plist's `--instance`
   argument, checked against the plist's `Label`, its file name and the name rule; a plist that
-  disagrees is named below the table as not an instance it can manage. `awaydesk service install` prints the copy it puts in
-  the plist and its version.
+  disagrees is named below the table as not an instance it can manage. A job `launchctl list` shows
+  loaded whose plist file is gone is listed too, with `its plist is gone` after its state. The
+  default instance is written `(default)`, a word `--instance` refuses. `awaydesk service install`
+  prints the copy it puts in the plist and its version.
 - A second lock, on the chat app. `ChatProvider.identities` is a list of opaque keys, and for Slack
   it holds two: `<team id>:<bot user id>` (the bot token) and `app-token:<SHA-256 of the app-level
   token>` (the token Socket Mode connects with, hashed in the Slack module so the token never

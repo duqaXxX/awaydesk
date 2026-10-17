@@ -558,7 +558,7 @@ test("service list shows every awaydesk plist: instance, state, copy and version
   const copyOfDevelopment = join(path, "development", "lib", "node_modules", "awaydesk");
   assert.deepEqual(cells(report.out), [
     ["INSTANCE", "STATE", "COPY", "VERSION"],
-    ["default", "running, pid 4242", copyOfRelease, "0.1.1"],
+    ["(default)", "running, pid 4242", copyOfRelease, "0.1.1"],
     ["dev", "loaded, not running", copyOfDevelopment, "0.2.0"],
     ["work", "not loaded", copyOfDevelopment, "0.2.0"],
   ]);
@@ -596,7 +596,7 @@ test("service list names a copy whose package.json is gone, and a plist with no 
   assert.equal(report.code, 0);
   assert.deepEqual(cells(report.out), [
     ["INSTANCE", "STATE", "COPY", "VERSION"],
-    ["default", "running, pid 7", "unreadable plist", "-"],
+    ["(default)", "running, pid 7", "unreadable plist", "-"],
     ["gone", "not loaded", join(path, "lib", "node_modules", "awaydesk"), "unknown"],
   ]);
 });
@@ -676,6 +676,60 @@ test("service list takes the instance from the program arguments and checks the 
   assert.match(said("local.awaydesk.noname.plist"), /--instance/);
   assert.match(said("local.awaydesk.extra.plist"), /arguments/);
   assert.match(said("local.awaydesk.bad.plist"), /cannot be read/);
+});
+
+test("service list names a job that is loaded and whose plist is gone", (t) => {
+  const path = home(t);
+  const release = copyIn(path, "0.1.1");
+  agents(path, ["local.awaydesk.plist"]);
+  const listing = [
+    "PID\tStatus\tLabel",
+    `4242\t0\t${LABEL}`,
+    `5151\t0\t${labelOf("work")}`,
+    `-\t78\t${labelOf("idle")}`,
+    // Not instances of awaydesk: another job, a longer word, and names the rule refuses.
+    "300\t0\tcom.example.other",
+    "301\t0\tlocal.awaydeskish",
+    "302\t0\tlocal.awaydesk.default",
+    "303\t0\tlocal.awaydesk.Bad",
+    "304\t0\tlocal.awaydesk.foo.bar",
+    "",
+  ].join("\n");
+  const run = listingRun(listing, {
+    "local.awaydesk.plist": { stdout: converted(release.main) },
+  });
+  const report = manager(path, run).list();
+  assert.equal(report.code, 0);
+  assert.deepEqual(report.err, []);
+  assert.deepEqual(cells(report.out), [
+    ["INSTANCE", "STATE", "COPY", "VERSION"],
+    ["(default)", "running, pid 4242", join(path, "lib", "node_modules", "awaydesk"), "0.1.1"],
+    ["idle", "loaded, not running; its plist is gone", "-", "-"],
+    ["work", "running, pid 5151; its plist is gone", "-", "-"],
+  ]);
+});
+
+test("service list shows a loaded job whose plist is gone when no plist is left", (t) => {
+  const path = home(t);
+  const run = listingRun(`PID\tStatus\tLabel\n8\t0\t${LABEL}\n`, {});
+  const report = manager(path, run).list();
+  assert.equal(report.code, 0);
+  assert.deepEqual(cells(report.out), [
+    ["INSTANCE", "STATE", "COPY", "VERSION"],
+    ["(default)", "running, pid 8; its plist is gone", "-", "-"],
+  ]);
+});
+
+test("service list does not call a job gone when its plist exists but cannot be managed", (t) => {
+  const path = home(t);
+  const release = copyIn(path, "0.1.1");
+  agents(path, ["local.awaydesk.dev.plist"]);
+  const run = listingRun(`PID\tStatus\tLabel\n9\t0\t${DEV_LABEL}\n`, {
+    "local.awaydesk.dev.plist": { stdout: converted(release.main, [], "local.awaydesk.dev") },
+  });
+  const report = manager(path, run).list();
+  assert.equal(report.out.length, 1);
+  assert.ok((report.out[0] as string).includes(NOT_MANAGEABLE));
 });
 
 test("service list with only plists it cannot manage prints no table", (t) => {
