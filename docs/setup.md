@@ -78,9 +78,10 @@ newer Node.
    - On the **JSON** tab, replace the example with the contents of
      [`slack-app-manifest.json`](../slack-app-manifest.json). To give the bot a name of your own,
      change `features.bot_user.display_name`: it is the name Slack shows on every reply and at
-     the top of the bot's profile. It takes up to 80 characters of `a-z`, `0-9`, `-`, `_` and `.`
-     (no capitals, no spaces), while the app's name takes up to 35 characters (manifest reference,
-     read 2026-10-17). For your first instance, leave `display_information.name`,
+     the top of the bot's profile, up to 80 characters; the app's name takes up to 35 (manifest
+     reference, read 2026-10-17). The reference lists `a-z`, `0-9`, `-`, `_` and `.` for the bot's
+     name, yet Slack saved and shows a name with capitals, a space and parentheses, such as
+     `Alice (dev)` (measured 2026-10-17). For your first instance, leave `display_information.name`,
      the app's name, as `awaydesk`; the app of a second instance takes a name of its own in both
      fields (step 14 of [Part 6](#part-6-a-second-instance)). Choose **Next**.
    - Check the summary and choose **Create**.
@@ -473,8 +474,9 @@ commands use the name `work`.
 
 14. Create a Slack app for the instance from the same manifest: repeat steps 2 to 4 of Part 1,
     with a name of its own in both `display_information.name` and
-    `features.bot_user.display_name`, for example `awaydesk work` for the app and `awaydesk-work`
-    for the bot, which takes no space. Slack shows the bot's name on every reply. Then repeat step 6 for the channels this bot serves, inviting it by that name. Your
+    `features.bot_user.display_name`, for example `awaydesk-work` for the app and `Alice (work)`
+    for the bot. Slack shows the bot's name on every reply. Then repeat step 6 for the channels
+    this bot serves, inviting it by that name. Your
     member ID (step 5) is the same. To tell apart an app you created earlier under the default
     names, open it at <https://api.slack.com/apps>, choose **App Manifest** in the sidebar, change
     the same two fields, and save.
