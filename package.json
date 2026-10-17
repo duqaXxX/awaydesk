@@ -1,7 +1,15 @@
 {
   "name": "awaydesk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Drive the coding-agent sessions on your own computer from private Slack channels.",
+  "keywords": [
+    "slack",
+    "coding-agent",
+    "claude-code",
+    "agent-sdk",
+    "remote",
+    "daemon"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

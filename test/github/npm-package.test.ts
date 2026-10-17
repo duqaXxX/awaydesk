@@ -38,6 +38,8 @@ test("the published package.json keeps what an install needs and nothing to buil
   assert.deepEqual(published.dependencies, MANIFEST.dependencies);
   assert.deepEqual(published.bin, MANIFEST.bin);
   assert.deepEqual(published.engines, MANIFEST.engines);
+  // npm's search reads them.
+  assert.deepEqual(published.keywords, MANIFEST.keywords);
   assert.equal(published.version, MANIFEST.version);
   assert.equal(published.scripts, undefined);
   assert.equal(published.devDependencies, undefined);
