@@ -244,7 +244,8 @@ test("a system with no service manager refuses service with status 1", () => {
 /** The entry run as a command, with a `HOME` that holds no `.env`. */
 function runEntry(args: string[], home: string, extra: Record<string, string> = {}) {
   return spawnSync(process.execPath, [join(ROOT, "src", "main.ts"), ...args], {
-    env: { HOME: home, PATH: process.env.PATH ?? "", ...extra },
+    // Windows reads the home from USERPROFILE, where POSIX reads HOME.
+    env: { HOME: home, USERPROFILE: home, PATH: process.env.PATH ?? "", ...extra },
     encoding: "utf8",
   });
 }

@@ -14,10 +14,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { test } from "node:test";
 import { parseInstanceName } from "../../../src/core/instance.ts";
-import type { Program } from "../../../src/host/program.ts";
+import { copyOf, type Program } from "../../../src/host/program.ts";
 import { runCommand } from "../../../src/host/run.ts";
 import {
   isInstanceName,
@@ -217,7 +217,7 @@ test("install writes the plist, lints it and bootstraps it in the user's domain"
     `Wrote ${plistPath(path, null)}.`,
     `Loaded ${LABEL}: awaydesk starts now and at every login.`,
     `Log: ${logPath(path, null)}`,
-    `Runs the copy in ${join(PROGRAM.main, "..", "..")}, whose package.json cannot be read.`,
+    `Runs the copy in ${copyOf(PROGRAM.main)}, whose package.json cannot be read.`,
   ]);
 });
 
@@ -521,7 +521,7 @@ function listingRun(
     assert.equal(command, "plutil");
     assert.deepEqual(args.slice(0, 3), ["-convert", "json", "-o"]);
     assert.equal(args[3], "-");
-    const file = String(args[4]).split("/").at(-1) as string;
+    const file = basename(String(args[4]));
     const answer = plists[file] ?? { status: 1 };
     return { status: answer.status ?? 0, stdout: answer.stdout ?? "", stderr: "" };
   }) as Run & { calls: Call[] };

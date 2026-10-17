@@ -15,6 +15,7 @@ import {
   type StartOptions,
 } from "../../../src/agent/seam.ts";
 import { systemClock } from "../../../src/clock.ts";
+import { shellQuote } from "../../../src/text.ts";
 import { FakeSdk } from "../../support/fake-query.ts";
 
 const LIMIT = { timeout: 10_000 };
@@ -76,7 +77,7 @@ test("the terminal line names the folder of the file, and is today's without one
   });
   assert.equal(
     own.words.terminal,
-    `cd {directory} && CLAUDE_CONFIG_DIR=${config} claude --resume {session} --fork-session`,
+    `cd {directory} && CLAUDE_CONFIG_DIR=${shellQuote(config)} claude --resume {session} --fork-session`,
   );
   delete process.env.CLAUDE_CONFIG_DIR;
   const plain = claudeAgent({ home }).build({ variables: {}, clock: systemClock });
@@ -105,8 +106,8 @@ test(
       clock: systemClock,
     });
     const session = await backend.start(START, NO_REQUESTS);
-    assert.equal(sdk.only.options.env?.CLAUDE_CONFIG_DIR, join(home, ".claude-work"));
-    assert.equal(process.env.CLAUDE_CONFIG_DIR, join(home, ".claude-work"));
+    assert.equal(sdk.only.options.env?.CLAUDE_CONFIG_DIR, `${home}/.claude-work`);
+    assert.equal(process.env.CLAUDE_CONFIG_DIR, `${home}/.claude-work`);
     await session.close();
     await backend.close();
   },
@@ -186,8 +187,8 @@ test(
       clock: systemClock,
     });
     const session = await backend.start(START, NO_REQUESTS);
-    assert.equal(sdk.only.options.env?.CLAUDE_CONFIG_DIR, join(home, ".claude-work"));
-    assert.equal(process.env.CLAUDE_CONFIG_DIR, join(home, ".claude-work"));
+    assert.equal(sdk.only.options.env?.CLAUDE_CONFIG_DIR, `${home}/.claude-work`);
+    assert.equal(process.env.CLAUDE_CONFIG_DIR, `${home}/.claude-work`);
     await session.close();
     await backend.close();
   },

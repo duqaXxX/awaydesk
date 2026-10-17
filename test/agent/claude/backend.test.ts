@@ -17,6 +17,7 @@ import type { RequestHandler, StartOptions } from "../../../src/agent/seam.ts";
 import { ResumeRefused } from "../../../src/agent/seam.ts";
 import { systemClock } from "../../../src/clock.ts";
 import { fill } from "../../../src/core/texts.ts";
+import { shellQuote } from "../../../src/text.ts";
 import { FakeSdk, fail } from "../../support/fake-query.ts";
 import { type JsonObject, sdkRecords } from "../../support/fixtures.ts";
 import { gitInit, trust } from "../../support/git-layouts.ts";
@@ -118,7 +119,7 @@ test("the terminal line of a login of its own names its config dir", () => {
   const configDir = join(tmp, "login-two");
   assert.equal(
     new ClaudeBackend({ home, configDir }).words.terminal,
-    `cd {directory} && CLAUDE_CONFIG_DIR=${configDir} claude --resume {session} --fork-session`,
+    `cd {directory} && CLAUDE_CONFIG_DIR=${shellQuote(configDir)} claude --resume {session} --fork-session`,
   );
 });
 

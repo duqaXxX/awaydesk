@@ -402,7 +402,9 @@ test("the chat saves files in the scratch folder of the instance the daemon was 
   const scratchDir = join(d.dir, "scratch-dev");
   d.start({ scratchDir });
   await d.booted();
-  assert.equal(statSync(scratchDir).mode & 0o777, 0o700);
+  const mode = statSync(scratchDir).mode & 0o777;
+  // Windows keeps no POSIX mode: a folder reports 0o666 there.
+  if (process.platform !== "win32") assert.equal(mode, 0o700);
   await d.stop();
 });
 
