@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ChatIdentityTaken, singleInstance } from "../../src/core/lock.ts";
-import { run } from "../../src/main.ts";
+import { run } from "../../src/daemon.ts";
 import { World } from "./world.ts";
 
 test("a second daemon on the same chat identity refuses before it connects", async (t) => {

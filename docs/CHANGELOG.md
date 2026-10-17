@@ -58,6 +58,29 @@ All notable changes to this project are documented here. The format follows
   instance's, `awaydesk.log`.
 - The rule that one daemon runs per machine is now one daemon per instance
   (`docs/setup.md`, Part 6).
+- The minimum Node is 22.19 (`engines.node` and `node-version.MINIMUM_NODE`) in place of 22.18.
+  The entry no longer uses `import.meta.main`, the reason for 22.18, and no Node API the source
+  uses is newer than 20.12 (`util.parseEnv`): the dependencies set the floor. `@slack/socket-mode`
+  takes `undici` 7 or 8, the lockfile the tests run holds 8, and `undici` 8 declares Node 22.19.
+  On a lower Node 22 which of the two npm installs depends on the user's npm, and 8 fails to load
+  on 22.0.0 (measured on 2026-10-17), so the floor is the one the tested tree declares.
+- `src/main.ts` is only the entry (`bin` and the LaunchAgent still run `dist/main.js`); the
+  daemon and the command's wiring moved to `src/daemon.ts`, and `test/main.test.ts` to
+  `test/daemon.test.ts`. `test/imports.test.ts` lets only `src/daemon.ts` import the registry and
+  only `src/main.ts` import `src/daemon.ts`.
+- `docs/setup.md` has a section, "A Node of its own", on running awaydesk on a Node installed
+  beside the terminal's, with nvm or with an unpacked official archive.
+
+### Fixed
+
+- `awaydesk` on a Node older than the minimum printed a `SyntaxError` about `parseEnv` of
+  `node:util` (Node 18.19.0, measured on 2026-10-17) in place of its refusal. An ES module graph
+  is linked whole before any module runs, so `require-node.ts`, the first import of `main.ts`,
+  never ran. The entry now has no static import and loads the daemon only after the version
+  check, and the refusal says how to run awaydesk on a newer Node beside the current one and
+  points at that section of `docs/setup.md`. `test/node-version.test.ts` fails on a static import
+  in `src/main.ts` and on one in the modules the entry loads first. `src/require-node.ts` is
+  removed.
 
 ## [0.1.1] - 2026-10-17
 

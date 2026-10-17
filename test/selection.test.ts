@@ -1,5 +1,5 @@
 /**
- * The agent and the chat are selected, never constructed: `src/main.ts` reads two names from the
+ * The agent and the chat are selected, never constructed: `src/daemon.ts` reads two names from the
  * configuration and takes each module from a registry.
  */
 import assert from "node:assert/strict";
@@ -10,7 +10,7 @@ import { type TestContext, test } from "node:test";
 import type { AgentEntry } from "../src/agent/seam.ts";
 import { ConfigError } from "../src/core/config.ts";
 import type { ChatEntry } from "../src/core/port.ts";
-import { run } from "../src/main.ts";
+import { run } from "../src/daemon.ts";
 import type { Registry } from "../src/registry.ts";
 import { World } from "./scenario/world.ts";
 import { say } from "./support/plain-agent.ts";

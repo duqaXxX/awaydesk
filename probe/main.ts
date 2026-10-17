@@ -269,7 +269,7 @@ async function main(): Promise<number> {
   return values.latest ? onLatest(values.force) : run(values.certificate, values.force);
 }
 
-// `import.meta.main`, as in `src/main.ts`: `--latest` starts this file in a worktree under
+// `import.meta.main`, as `src/main.ts` did before it became a Node-version check: `--latest` starts this file in a worktree under
 // macOS's tmpdir, a `/var` that links to `/private/var`, where `process.argv[1]` and the module's
 // own path differ and a comparison of the two would skip `main` and exit 0.
 if (import.meta.main) {
