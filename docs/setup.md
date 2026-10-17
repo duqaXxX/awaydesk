@@ -496,7 +496,9 @@ refuses to start the second ([One app per instance](#one-app-per-instance)).
     ```
 
     Write the variables of step 8 in it, with the two tokens of the new app and your member ID.
-    The instance does not read `~/.config/awaydesk/.env`.
+    The instance does not read `~/.config/awaydesk/.env`. A `SLACK_USER_TOKEN` belongs to the app
+    that issued it: give the instance one from its own app ("Optional: a user token" in Part 1)
+    or leave the line out, rather than copying another instance's.
 
 ### Optional: its own Claude Code login
 
