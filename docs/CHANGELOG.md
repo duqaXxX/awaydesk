@@ -8,12 +8,13 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - Several daemons on one machine, one per instance. An instance is a name: `--instance <name>`, or
-  `AWAYDESK_INSTANCE` when the flag is absent (`src/core/instance.ts`, read by `src/cli.ts`
-  alone). The configuration folder (`~/.config/awaydesk-<name>`), the folder for attached files
-  (`$TMPDIR/awaydesk-<name>`, handed to the chat as `ChatContext.scratchDir`), the LaunchAgent
+  `AWAYDESK_INSTANCE` when the flag is absent (`src/core/instance.ts`, read by `src/cli.ts`). The configuration folder
+  (`~/.config/awaydesk-<name>`), the folder for attached files (`$TMPDIR/awaydesk-<name>`, handed to the chat as `ChatContext.scratchDir`), the LaunchAgent
   (`local.awaydesk.<name>`, started with `--instance <name>`) and the log
   (`~/Library/Logs/awaydesk/<name>.log`) derive from it. The default instance keeps today's paths
-  and its plist, byte for byte.
+  and its plist, byte for byte. The daemon writes its name to its own `AWAYDESK_INSTANCE` (and
+  removes it for the default instance), which its sessions inherit, so an `awaydesk` command a
+  session runs is about its own instance, under launchd and in a foreground run.
 - `awaydesk service list` shows every instance's service: loaded or not, the pid, the copy of the
   package it runs and that copy's version. `awaydesk service install` prints the copy it puts in
   the plist and its version.

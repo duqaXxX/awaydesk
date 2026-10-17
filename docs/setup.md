@@ -854,6 +854,11 @@ about the default instance, which has no name and keeps the paths of Parts 2 to 
 A name that breaks the rule ends the command with status 2 and the reason on stderr. `--version`
 and `--help` take no instance.
 
+The daemon sets `AWAYDESK_INSTANCE` to its name in its own environment (and removes it for the
+default instance), which every session it starts inherits. A session of `work` that runs
+`awaydesk service status` therefore asks about `work`, under launchd and in a foreground run
+alike, with no flag typed.
+
 Everything that is an instance's own derives from its name:
 
 | What | Default instance | Instance `work` |

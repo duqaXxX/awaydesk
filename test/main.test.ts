@@ -391,6 +391,26 @@ test("the chat saves files in the scratch folder of the instance the daemon was 
   await d.stop();
 });
 
+test("a named instance's name reaches the sessions it starts through the environment", async (t) => {
+  const d = new Daemon(t);
+  const environment: NodeJS.ProcessEnv = {};
+  d.start({ instance: { name: "work" }, environment });
+  await d.booted();
+  // Sessions inherit the daemon's environment: `awaydesk ...` run by one is about this instance.
+  assert.equal(environment.AWAYDESK_INSTANCE, "work");
+  await d.stop();
+});
+
+test("the default instance leaves no instance name in the environment", async (t) => {
+  const d = new Daemon(t);
+  // A foreground run of the default instance from a shell that has another instance's name.
+  const environment: NodeJS.ProcessEnv = { AWAYDESK_INSTANCE: "work", PATH: "/usr/bin" };
+  d.start({ environment });
+  await d.booted();
+  assert.deepEqual(environment, { PATH: "/usr/bin" });
+  await d.stop();
+});
+
 test("run prunes stale threads and survives alive raising", async (t) => {
   const d = new Daemon(t);
   // A bound channel with a stored session id: `run` must ask the back end about it before

@@ -70,7 +70,13 @@ import { postUpgradeNotices } from "./core/flows/notices.ts";
 import { repair } from "./core/flows/repair.ts";
 import { UsageCache } from "./core/footer.ts";
 import { Holds } from "./core/hold.ts";
-import { configDirOf, DEFAULT_INSTANCE, type Instance, scratchDirOf } from "./core/instance.ts";
+import {
+  configDirOf,
+  DEFAULT_INSTANCE,
+  INSTANCE_VARIABLE,
+  type Instance,
+  scratchDirOf,
+} from "./core/instance.ts";
 import {
   AlreadyRunning,
   chatIdentityLocks,
@@ -131,6 +137,12 @@ export interface RunOptions {
    * (`.config/awaydesk_identities`), shared by every instance.
    */
   readonly home?: string;
+  /**
+   * `process.env`: the environment every session inherits. The daemon writes the instance's name
+   * to it (`AWAYDESK_INSTANCE`, and removes it for the default instance), so that an `awaydesk`
+   * command a session runs is about the instance that session belongs to.
+   */
+  readonly environment?: NodeJS.ProcessEnv;
   /**
    * The agents and the chats the configuration may select: `REGISTRY`. What a test replaces of a
    * module is an option of that module's entry (`slackChat({ clients })`), never of `run`.
@@ -287,6 +299,9 @@ export async function run(options: RunOptions = {}): Promise<number> {
   const configDir = options.configDir ?? configDirOf(instance, homedir());
   const scratchDir = options.scratchDir ?? scratchDirOf(instance, tmpdir());
   const home = options.home ?? homedir();
+  const environment = options.environment ?? process.env;
+  if (instance.name === null) delete environment[INSTANCE_VARIABLE];
+  else environment[INSTANCE_VARIABLE] = instance.name;
   // Wall time for what is dated (a reply's footer, the page's hours), the monotonic clock for
   // what is paced.
   const wall = options.clock ?? systemClock;

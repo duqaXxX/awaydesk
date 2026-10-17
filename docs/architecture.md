@@ -505,6 +505,9 @@ name is 1 to 32 characters of `a-z`, `0-9` and `-`, starting with a letter or a 
 `AWAYDESK_INSTANCE`; it is the only reader of that variable, and the host layer, which imports
 nothing of the core, receives the name as a string. `main.run` takes the instance and derives the
 two folders from it; `RunOptions.configDir` and `RunOptions.scratchDir` replace them in a test.
+It also writes the name to `AWAYDESK_INSTANCE` in its own environment, and removes the variable for
+the default instance (`RunOptions.environment` replaces `process.env` in a test): the sessions
+inherit that environment, so an `awaydesk` command one runs is about its own instance.
 `state.json` is the same for every instance, in its own folder.
 
 `AWAYDESK_AGENT` and `AWAYDESK_CHAT` name the agent and the chat, each a key of the registry

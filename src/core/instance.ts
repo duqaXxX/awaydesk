@@ -6,7 +6,10 @@
  */
 import { join } from "node:path";
 
-/** The variable that selects an instance when `--instance` is absent; only the command line reads it. */
+/**
+ * The variable that selects an instance when `--instance` is absent. The command line reads it;
+ * the daemon writes it to its own environment, so that the sessions it starts inherit it.
+ */
 export const INSTANCE_VARIABLE = "AWAYDESK_INSTANCE";
 
 /** `name` is null for the default instance, which keeps the folders of a single-instance install. */
