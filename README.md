@@ -10,6 +10,9 @@ channel is one project and each thread in it is one session: you write a message
 runs in the project's folder with your own login, settings and permissions, and the reply shows
 up in the thread while Claude works. Nobody else can talk to it.
 
+One Slack workspace can drive several of these daemons, each through a bot of its own: another
+Mac, a second Claude Code account, or a development copy beside the release.
+
 awaydesk runs Claude Code through the
 [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview).
 
@@ -22,6 +25,8 @@ awaydesk runs Claude Code through the
   account controls the machine.
 - It needs Claude Code logged in with a claude.ai subscription and
   [Node 22.18](https://nodejs.org/) or later.
+- Each instance needs a Slack app of its own, and a free workspace allows 10 apps. Each bot has
+  its own Home tab: there is no index across instances.
 - If your projects live in a folder macOS protects, such as `~/Documents` or `~/Desktop`, the
   daemon needs Full Disk Access.
 - Status: version 0.1.1, an early release. [docs/features.md](docs/features.md) lists what is
@@ -54,7 +59,9 @@ npm install -g awaydesk
 - Claude Code's own commands with `!` in place of `/`, such as `!compact` or `!model opus`.
 - Images and files attached to a message reach Claude.
 - A Home tab that lists your sessions by channel, the last used first.
-- Several daemons on one Mac, one per Slack app: a second Claude Code login, or a development copy beside the release. `--instance <name>` gives each one its own settings, service and log; `awaydesk service list` shows them all.
+- Several instances, one per Slack app, on one Mac or several: a second Claude Code login,
+  another machine, a development copy beside the release. Each has its own settings, service and
+  log; `awaydesk service list` shows those of a Mac.
 
 ## Commands
 
