@@ -16,7 +16,6 @@ const REPOSITORY = "https://github.com/duqaXxX/awaydesk";
  * heading of the page.
  */
 export const SETUP_SECTIONS = {
-  requirements: "requirements",
   nodeOfItsOwn: "a-node-of-its-own",
   configuration: "part-2-configuration",
   protectedFolders: "folders-macos-protects",

@@ -30,8 +30,8 @@ test("a package's version is the version of its package.json, null when it canno
 
 test("the guide's address names the setup page at the version's tag", () => {
   assert.equal(
-    setupGuide(SETUP_SECTIONS.requirements),
-    `https://github.com/duqaXxX/awaydesk/blob/v${installedVersion()}/docs/setup.md#requirements`,
+    setupGuide(SETUP_SECTIONS.configuration),
+    `https://github.com/duqaXxX/awaydesk/blob/v${installedVersion()}/docs/setup.md#part-2-configuration`,
   );
 });
 
