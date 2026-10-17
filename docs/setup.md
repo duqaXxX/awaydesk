@@ -95,11 +95,11 @@ act on behalf of Slack users, which awaydesk never needs.
 
 ### Install it and collect the tokens
 
-3. Open **Install App** and install the app to your workspace. Copy the **Bot User OAuth Token**
-   (`xoxb-…`) and the **User OAuth Token** (`xoxp-…`). Slack lists the tokens of an installed app
-   under **OAuth Tokens** on the **OAuth & Permissions** page (Slack's app settings quickstart,
-   read 2026-10-17). The manifest's `oauth_config.scopes.user` lists the user scopes requested at
-   installation (manifest reference, read 2026-10-17).
+3. Open **Install App** and install the app to your workspace. Once it is installed the page is
+   titled **Installed App Settings** and shows both tokens: copy the **Bot User OAuth Token**
+   (`xoxb-…`) and the **User OAuth Token** (`xoxp-…`) (seen 2026-10-17). The user token is
+   there because the manifest's `oauth_config.scopes.user` asks for a user scope at installation
+   (manifest reference, read 2026-10-17).
 4. Open **Basic Information**, find **App-Level Tokens**, and choose **Generate Token and
    Scopes**. Name it, add the scope `connections:write`, and generate it. Copy the token
    (`xapp-…`).
@@ -663,6 +663,23 @@ The command `!status` prints carries it: `cd <folder> && CLAUDE_CONFIG_DIR=<fold
 claude --resume <session id> --fork-session`, the login's folder quoted for the shell as the
 project folder is. The default instance, and any instance whose `.env` does not set it, keep using
 `~/.claude`, and its line is the one shown in "Continuing a session in the terminal".
+
+### Renaming an instance
+
+No command renames an instance: its name is in its folder, its label and its log, so moving the
+folder between an uninstall and an install renames it. From `dev` to `lab`, at a time when no
+session of `dev` is working (the uninstall ends turns still running after 60 seconds), and from a
+terminal rather than a session of that instance, which the uninstall would stop:
+
+```bash
+awaydesk service uninstall --instance dev
+mv ~/.config/awaydesk-dev ~/.config/awaydesk-lab
+awaydesk service install --instance lab
+```
+
+`.env` and `state.json` move with the folder, so the bound channels and their sessions stay. The
+Slack app and its tokens do not change. The new log is `lab.log`; `dev.log` stays where it was.
+The files you attached are saved under `$TMPDIR/awaydesk-lab/` from then on.
 
 ### One bot per channel
 
