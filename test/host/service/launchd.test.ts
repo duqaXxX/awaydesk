@@ -567,7 +567,7 @@ test("service list shows every awaydesk plist: instance, state, copy and version
   assert.equal(new Set(starts).size, 1);
   // One `launchctl list`, then one reading of each plist, in the order of the file names.
   assert.deepEqual(
-    run.calls.map((call) => [call.command, call.args[0], String(call.args[4]).split("/").at(-1)]),
+    run.calls.map((call) => [call.command, call.args[0], basename(String(call.args[4]))]),
     [
       ["launchctl", "list", "undefined"],
       ["plutil", "-convert", "local.awaydesk.dev.plist"],
