@@ -23,6 +23,7 @@ export const KEPT_FIELDS = [
   "name",
   "version",
   "description",
+  "keywords",
   "license",
   "repository",
   "type",

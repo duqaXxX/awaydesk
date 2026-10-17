@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [0.1.1] - 2026-10-17
+
+### Added
+
+- The package on npm carries keywords (`slack`, `coding-agent`, `claude-code`, `agent-sdk`,
+  `remote`, `daemon`), which npm's search reads; `.github/scripts/npm-package.mjs` keeps them in
+  the published `package.json`. The first version published by the Release workflow through
+  trusted publishing, with provenance.
+
 ## [0.1.0] - 2026-10-17
 
 ### Added
