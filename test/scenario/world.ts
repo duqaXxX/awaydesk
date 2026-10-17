@@ -25,7 +25,7 @@ import { StateStore } from "../../src/core/state.ts";
 import type { Names } from "../../src/core/texts.ts";
 import { type RunOptions, run, type SignalSource, type Stop } from "../../src/main.ts";
 import type { Registry } from "../../src/registry.ts";
-import { type MemoryChat, memoryChat, OWNER } from "../support/memory-chat.ts";
+import { MEMORY_IDENTITY, type MemoryChat, memoryChat, OWNER } from "../support/memory-chat.ts";
 import {
   type PlainAgent,
   type PlainEntry,
@@ -33,7 +33,7 @@ import {
   PlainStore,
   plainAgent,
 } from "../support/plain-agent.ts";
-import { HELD_BY_A_RUNNING_DAEMON, realWorkDone, SettledClock } from "../support/sessions.ts";
+import { heldByARunningDaemon, realWorkDone, SettledClock } from "../support/sessions.ts";
 
 /** The names the registry holds the two modules under, and so the values of the `.env`. */
 export const AGENT_NAME = "plain";
@@ -147,6 +147,8 @@ export class World {
   readonly folder: string;
   readonly channel: string;
   readonly chat: MemoryChat;
+  /** How many locks the chat's identity takes: one per key. */
+  readonly identityKeys: number;
   /** The plain agent's entry: `built` holds every agent a start made. */
   readonly entry: PlainEntry;
   /** What the agent keeps of its sessions: it outlives a stop of the daemon. */
@@ -191,6 +193,7 @@ export class World {
     this.chat = memoryChat(
       options.identities === undefined ? {} : { identities: options.identities },
     );
+    this.identityKeys = (options.identities ?? [MEMORY_IDENTITY]).length;
     this.channel = this.chat.openChannel("work");
     // The channel is bound before the first start, as the owner's `!bind` of an earlier day left it.
     const state = new StateStore(join(this.config, "state.json"), {
@@ -335,8 +338,8 @@ export class World {
     for (let round = 0; round < 20; round += 1) {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
-    // The daemon's lock stays open while it runs: it is not work to wait for.
-    await realWorkDone(this.running === null ? 0 : HELD_BY_A_RUNNING_DAEMON);
+    // The daemon's locks stay open while it runs: they are not work to wait for.
+    await realWorkDone(this.running === null ? 0 : heldByARunningDaemon(this.identityKeys));
   }
 
   /** Settles until `done` holds; fails with `what` when it never does. */

@@ -88,12 +88,15 @@ import { slackPayload } from "./support/fixtures.ts";
 import { NAMES } from "./support/names.ts";
 import {
   FakeAgentBackend,
-  HELD_BY_A_RUNNING_DAEMON,
+  heldByARunningDaemon,
   realWorkDone,
   type Script,
   sdkMessages,
 } from "./support/sessions.ts";
 import { homeAction, reply } from "./support/slack-app.ts";
+
+// The Slack provider's identity has two keys: the workspace and bot, and the app-level token.
+const HELD = heldByARunningDaemon(2);
 
 const ROOT = join(import.meta.dirname, "..");
 const GONE = "C000GONE";
@@ -282,7 +285,7 @@ class Daemon {
     for (let round = 0; round < 100; round += 1) {
       if (done()) return;
       await this.clock.advance(1);
-      await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
+      await realWorkDone(HELD);
     }
     assert.ok(done(), "the daemon never reached the state the test waited for");
   }
@@ -1220,7 +1223,7 @@ test("a stop by a signal that waits on a start of the agent ends the process aft
   await d.clock.advance(20);
   hung.set(); // the last step that completes: the shutdown then waits on the start
   await d.clock.advance(0);
-  await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
+  await realWorkDone(HELD);
   assert.deepEqual(exits, []);
   assert.equal(standing(timers).length, 1);
   // Thirty seconds after the step, not after the shutdown began.
@@ -1290,7 +1293,7 @@ test("a shutdown that makes progress is not cut by the limit however long it tak
     });
     for (let i = 0; i < 4000 && !returned; i += 1) {
       await d.clock.advance(0.5);
-      await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
+      await realWorkDone(HELD);
     }
   });
   await d.connected.wait();
@@ -1305,7 +1308,7 @@ test("a shutdown that makes progress is not cut by the limit however long it tak
   d.signals.emit("SIGINT");
   for (let i = 0; i < 4000 && exits.length === 0; i += 1) {
     await d.clock.advance(0.5);
-    await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
+    await realWorkDone(HELD);
   }
   assert.deepEqual(exits, [0]);
   assert.ok(d.clock.now - began > SHUTDOWN_LIMIT_SECONDS, "the shutdown must outlast the limit");
@@ -1337,7 +1340,7 @@ test("a failure during a signal's shutdown makes its deadline the one a failure 
   assert.equal(timers.at(-1)?.at, 10); // from the failure
   hung.set(); // the steps that follow do not move it
   await d.clock.advance(0);
-  await realWorkDone(HELD_BY_A_RUNNING_DAEMON);
+  await realWorkDone(HELD);
   assert.equal(timers.length, armed);
   await running;
   assert.deepEqual(exits, [1]);
