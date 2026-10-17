@@ -78,8 +78,9 @@ newer Node.
    - On the **JSON** tab, replace the example with the contents of
      [`slack-app-manifest.json`](../slack-app-manifest.json). To give the bot a name of your own,
      change `features.bot_user.display_name`: it is the name Slack shows on every reply and at
-     the top of the bot's profile. Leave `display_information.name`, the app's name, as
-     `awaydesk`. Choose **Next**.
+     the top of the bot's profile. For your first instance, leave `display_information.name`,
+     the app's name, as `awaydesk`; the app of a second instance takes a name of its own in both
+     fields (step 14 of [Part 6](#part-6-a-second-instance)). Choose **Next**.
    - Check the summary and choose **Create**.
 
 What each scope and event of the manifest is for is under
@@ -236,10 +237,11 @@ How the file is read:
   It must name a directory that exists once links are followed; the message shows the path it
   resolved to.
 - The `.env` of a repository is never read. `BASH_DEFAULT_TIMEOUT_MS` and `CLAUDE_CONFIG_DIR` are
-  handed on to the Claude Code sessions awaydesk starts. Nothing else is put in awaydesk's own
-  process environment, and `CLAUDE_CONFIG_DIR` is the one value that is, once, at start: the
-  Agent SDK finds a folder's sessions through the environment of the process and has no other way
-  to be told where Claude Code keeps them.
+  handed on to the Claude Code sessions awaydesk starts. Of the file's values, `CLAUDE_CONFIG_DIR`
+  is the one awaydesk also puts in its own process environment, once, at start: the Agent SDK
+  finds a folder's sessions through the environment of the process and has no other way to be
+  told where Claude Code keeps them. The other value awaydesk puts there is not from the file:
+  `AWAYDESK_INSTANCE`, the instance's name ([Part 6](#choosing-the-instance-a-command-is-about)).
 
 ### Checkpoint 2: the daemon reads `.env` and connects
 
@@ -471,7 +473,9 @@ commands use the name `work`.
     with a name of its own in both `display_information.name` and
     `features.bot_user.display_name`, for example `awaydesk work`. Slack shows the second on every
     reply. Then repeat step 6 for the channels this bot serves, inviting it by that name. Your
-    member ID (step 5) is the same.
+    member ID (step 5) is the same. To tell apart an app you created earlier under the default
+    names, open it at <https://api.slack.com/apps>, choose **App Manifest** in the sidebar, change
+    the same two fields, and save.
 
 Each instance needs an app of its own. Slack spreads a Socket Mode app's events across its open
 connections, so two daemons on one app would each receive part of your messages, and awaydesk
