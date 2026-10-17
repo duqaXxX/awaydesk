@@ -30,7 +30,7 @@ awaydesk runs Claude Code through the
   its own Home tab: there is no index across instances.
 - If your projects live in a folder macOS protects, such as `~/Documents` or `~/Desktop`, the
   daemon needs Full Disk Access.
-- Status: version 0.1.1, an early release. [docs/features.md](docs/features.md) lists what is
+- Status: version 0.2.0, an early release. [docs/features.md](docs/features.md) lists what is
   tested and what is still checked by hand.
 
 ## Install
