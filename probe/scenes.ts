@@ -22,7 +22,7 @@ import { crc32, deflateSync } from "node:zlib";
 import { query, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { ClaudeBackend } from "../src/agent/claude/backend.ts";
 import { CAPABILITIES } from "../src/agent/claude/capabilities.ts";
-import { directorySessions, projectsDir } from "../src/agent/claude/listing.ts";
+import { directorySessions, projectKey, projectsDir } from "../src/agent/claude/listing.ts";
 import { AsyncQueue } from "../src/agent/claude/session.ts";
 import { locate } from "../src/agent/claude/trust.ts";
 import type {
@@ -1156,7 +1156,7 @@ export async function configFolderListing(root: string): Promise<Seen> {
   const config = join(root, "login");
   const project = join(root, "listed");
   await mkdir(project);
-  const folder = join(config, "projects", project.replace(/[^a-zA-Z0-9]/g, "-"));
+  const folder = join(config, "projects", await projectKey(project));
   await mkdir(folder, { recursive: true });
   const id = randomUUID();
   const line = {
