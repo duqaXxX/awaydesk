@@ -292,15 +292,21 @@ test("a long folder name keeps its first 200 characters and a hash", LIMIT, asyn
 });
 
 test("the projects directory is the config directory's, else the owner's home", () => {
-  assert.equal(
-    projectsDir({ CLAUDE_CONFIG_DIR: "/srv/config" }, "/home/dev"),
-    join("/srv/config", "projects"),
-  );
-  assert.equal(projectsDir({}, "/home/dev"), join("/home/dev", ".claude", "projects"));
-  assert.equal(
-    projectsDir({ CLAUDE_CONFIG_DIR: "" }, "/home/dev"),
-    join("/home/dev", ".claude", "projects"),
-  );
+  assert.equal(projectsDir("/srv/config", "/home/dev"), join("/srv/config", "projects"));
+  assert.equal(projectsDir(undefined, "/home/dev"), join("/home/dev", ".claude", "projects"));
+  assert.equal(projectsDir("", "/home/dev"), join("/home/dev", ".claude", "projects"));
+});
+
+test("with no config directory given the projects directory is the environment's", (t) => {
+  const previous = process.env.CLAUDE_CONFIG_DIR;
+  t.after(() => {
+    if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = previous;
+  });
+  process.env.CLAUDE_CONFIG_DIR = "/srv/inherited";
+  assert.equal(projectsDir(), join("/srv/inherited", "projects"));
+  delete process.env.CLAUDE_CONFIG_DIR;
+  assert.equal(projectsDir(undefined, "/home/dev"), join("/home/dev", ".claude", "projects"));
 });
 
 // The review round of 2026-10-10: a transcript is a regular file, opened without following a link

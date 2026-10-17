@@ -92,7 +92,7 @@ test("a variable the daemon hands over by lookup alone reaches the session", LIM
   });
   const sdk = new FakeSdk();
   const entry = claudeAgent({ query: sdk.query, home });
-  assert.deepEqual(entry.optional, ["BASH_DEFAULT_TIMEOUT_MS"]);
+  assert.deepEqual(entry.optional, ["BASH_DEFAULT_TIMEOUT_MS", "CLAUDE_CONFIG_DIR"]);
   const backend = entry.build({ variables: hidden, clock: systemClock });
   const session = await backend.start(START, NO_REQUESTS);
   assert.equal(sdk.only.options.env?.BASH_DEFAULT_TIMEOUT_MS, "21600000");
@@ -201,3 +201,51 @@ test(
     assert.equal(dated[0]?.lastModified, Date.UTC(2026, 8, 21, 10, 0, 0, 0));
   },
 );
+
+// An instance with its own Claude Code login. The module writes the same folder into the
+// daemon's environment for the SDK's listing, so a test that gives the backend a folder sets both.
+test("the records and the transcripts are the config folder's", LIMIT, async (t) => {
+  const config = join(tmp, "second-login");
+  const previous = process.env.CLAUDE_CONFIG_DIR;
+  process.env.CLAUDE_CONFIG_DIR = config;
+  t.after(() => {
+    if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = previous;
+  });
+  const project = join(tmp, "project");
+  await mkdir(project);
+  const folder = join(config, "projects", project.replace(/[^a-zA-Z0-9]/g, "-"));
+  await mkdir(folder, { recursive: true });
+  const sid = "68da9311-0000-4000-8000-0000000000d1";
+  await writeFile(join(folder, `${sid}.jsonl`), `${JSON.stringify({ type: "ledger" })}\n`);
+  await writeFile(
+    join(config, ".claude.json"),
+    JSON.stringify({
+      claudeInChromeDefaultEnabled: true,
+      projects: { [project]: { hasTrustDialogAccepted: true } },
+    }),
+  );
+  // The home's record trusts nothing and has no Chrome: it is another login's.
+  const sdk = new FakeSdk();
+  const backend = new ClaudeBackend({ query: sdk.query, home, configDir: config });
+  assert.equal(await backend.folderTrusted(project), true);
+  assert.deepEqual(await backend.aliveSessions(project), new Set([sid]));
+  const session = await backend.start({ ...START, folder: project }, NO_REQUESTS);
+  assert.deepEqual(sdk.only.options.extraArgs, { "replay-user-messages": null, chrome: null });
+  await session.close();
+  await backend.close();
+});
+
+test("a backend with no config folder reads the home's records", LIMIT, async (t) => {
+  const previous = process.env.CLAUDE_CONFIG_DIR;
+  delete process.env.CLAUDE_CONFIG_DIR;
+  t.after(() => {
+    if (previous !== undefined) process.env.CLAUDE_CONFIG_DIR = previous;
+  });
+  const project = join(tmp, "project");
+  await mkdir(project);
+  await claudeRecord({ projects: { [project]: { hasTrustDialogAccepted: true } } });
+  const backend = new ClaudeBackend({ home });
+  assert.equal(await backend.folderTrusted(project), true);
+  await backend.close();
+});

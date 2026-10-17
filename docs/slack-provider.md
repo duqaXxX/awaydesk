@@ -810,7 +810,8 @@ transcript only while that session can still be among the 20 shown: a file's mti
 message from above (`listing.byLastActivity`). The SDK dates a listed session by its transcript
 file's mtime and names no path for a transcript, so the back end finds the folder's transcript
 directory itself (`listing.projectFolder`): under `~/.claude/projects/`, or under
-`CLAUDE_CONFIG_DIR` when that is set, in a directory named after the folder's real path (composed to
+`CLAUDE_CONFIG_DIR` when that is set (by the daemon's `.env` or its environment: the Claude module
+gives the folder to the listing, `claudeAgent`), in a directory named after the folder's real path (composed to
 NFC on macOS) with every character that is not an ASCII letter or digit turned into `-`; past
 `listing.LONG_PROJECT_KEY` (200) characters, the first 200, a `-` and a hash, and since that hash is
 Claude Code's to compute, the first directory that starts with the same 200 characters and `-`

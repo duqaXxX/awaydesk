@@ -187,6 +187,7 @@ named in the message, and an `ALLOWED_ROOT` that is not an absolute path (or one
 | `AWAYDESK_AGENT` | optional: the agent awaydesk drives; `claude` when absent, the only one this release has |
 | `AWAYDESK_CHAT` | optional: the chat awaydesk is driven from; `slack` when absent, the only one this release has |
 | `BASH_DEFAULT_TIMEOUT_MS` | optional: Claude Code's own variable, in milliseconds, for how long a command may run; see below |
+| `CLAUDE_CONFIG_DIR` | optional: Claude Code's own variable, the folder of a login of its own, for an instance that drives a second account; see [Several instances](#an-instance-with-its-own-claude-code-login) |
 
 `AWAYDESK_AGENT` and `AWAYDESK_CHAT` can be set or left out: `claude` and `slack` are the only
 agent and chat this release has, and a file without them works as one with them. A value awaydesk does not know
@@ -200,6 +201,13 @@ running in the background after 30 minutes, where a terminal session lets it run
 dev server or a long build 4 hours. The same value becomes how long a command in the foreground
 may run before Claude Code stops waiting for it, 2 minutes when the variable is absent. Claude
 Code reads the value and decides what an invalid one means; awaydesk does not check it.
+
+`CLAUDE_CONFIG_DIR` is a variable of Claude Code too, and awaydesk reads it as well: it looks in
+that folder for Claude Code's trust record, its Chrome setting and the transcripts of the
+sessions. It is an absolute path, or starts with `~/`, and a relative one stops the start with
+`CLAUDE_CONFIG_DIR must be an absolute path, or one starting with ~/; it is "<value>"`. When the
+file leaves it out, the variable in awaydesk's own environment applies, and when that is absent
+too, Claude Code's usual `~/.claude` and `~/.claude.json`.
 
 The workspace ID is not configured: awaydesk reads it from Slack at startup with the bot
 token and rejects events from any other workspace.
@@ -226,8 +234,11 @@ How the file is read:
   relative path is refused, since launchd starts awaydesk in `/` and a terminal in its own folder.
   It must name a directory that exists once links are followed; the message shows the path it
   resolved to.
-- Nothing is put in awaydesk's own process environment, and the `.env` of a repository is never
-  read. `BASH_DEFAULT_TIMEOUT_MS` alone is handed on, to the Claude Code sessions awaydesk starts.
+- The `.env` of a repository is never read. `BASH_DEFAULT_TIMEOUT_MS` and `CLAUDE_CONFIG_DIR` are
+  handed on to the Claude Code sessions awaydesk starts. Nothing else is put in awaydesk's own
+  process environment, and `CLAUDE_CONFIG_DIR` is the one value that is, once, at start: the
+  Agent SDK finds a folder's sessions through the environment of the process and has no other way
+  to be told where Claude Code keeps them.
 
 ### Checkpoint 2: the daemon reads `.env` and connects
 
@@ -919,6 +930,29 @@ Run from the clone, `npm pack` builds the tarball. The alias (put it in the shel
 `awaydesk-dev` the command of that copy, and `awaydesk-dev service install --instance dev` writes
 a plist that starts it; its output names the copy and its version. The release keeps running as
 the default instance from the global prefix.
+
+### An instance with its own Claude Code login
+
+An instance drives the Claude Code login of the machine unless its `.env` names another folder
+with `CLAUDE_CONFIG_DIR`. Claude Code keeps a login, its settings, its trust record and its
+sessions in such a folder, and on macOS the Keychain entry of the login is keyed to the folder
+([authentication](https://code.claude.com/docs/en/authentication), read 2026-10-17). A Claude
+Console sign-in made without an API key is stored outside that folder, so two folders do not keep
+two of those apart. To give an instance a second account:
+
+1. Log in once, in a terminal, with the folder you chose:
+   `CLAUDE_CONFIG_DIR=~/.claude-work claude`, then `/login`.
+2. In that same terminal session, trust each project folder the instance will be bound to, as in
+   Part 3: awaydesk reads the trust record of that folder, and a folder trusted only in
+   `~/.claude` is not trusted there.
+3. Put `CLAUDE_CONFIG_DIR=~/.claude-work` in the instance's `.env` and restart the instance.
+
+That instance then reads the settings of `~/.claude-work`, not those of `~/.claude`: your
+`CLAUDE.md`, skills, hooks, MCP servers and permission rules are the other folder's, and have to
+be set there. Its sessions are written there as well, so in a terminal `claude --resume <id>`
+finds them only with the same variable: `CLAUDE_CONFIG_DIR=~/.claude-work claude --resume <id>`.
+The command `!status` prints does not carry the variable. The default instance, and any instance
+whose `.env` does not set it, keep using `~/.claude`.
 
 ### Instances that share a login and a folder
 

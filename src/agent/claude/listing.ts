@@ -36,14 +36,15 @@ export const LONG_PROJECT_KEY = 200;
 /**
  * Where Claude Code keeps every project's transcripts: "Claude Code stores session transcripts
  * locally in plaintext under `~/.claude/projects/`" (https://code.claude.com/docs/en/data-usage,
- * read 2026-09-28), under `CLAUDE_CONFIG_DIR` when that is set.
+ * read 2026-09-28), under `CLAUDE_CONFIG_DIR` when that is set. `configDir` is that folder: the
+ * daemon's environment's when the caller gives none, so the probe, which builds no module, reads
+ * what a terminal would.
  */
 export function projectsDir(
-  env: { readonly CLAUDE_CONFIG_DIR?: string | undefined } = process.env,
+  configDir: string | undefined = process.env.CLAUDE_CONFIG_DIR,
   home: string = homedir(),
 ): string {
-  const override = env.CLAUDE_CONFIG_DIR;
-  const config = override ? override : join(home, ".claude");
+  const config = configDir ? configDir : join(home, ".claude");
   return join(process.platform === "darwin" ? config.normalize("NFC") : config, "projects");
 }
 

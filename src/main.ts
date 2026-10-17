@@ -60,7 +60,7 @@
 import "./require-node.ts";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentEntry } from "./agent/seam.ts";
+import { AgentConfigError, type AgentEntry } from "./agent/seam.ts";
 import { answer, parseArguments } from "./cli.ts";
 import { type Clock, monotonicClock, systemClock } from "./clock.ts";
 import { CLEAN_EVERY_SECONDS, clean } from "./core/cleanup.ts";
@@ -506,6 +506,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
   } catch (error) {
     if (
       error instanceof ConfigError ||
+      error instanceof AgentConfigError ||
       error instanceof StateError ||
       error instanceof AlreadyRunning
     ) {

@@ -3,8 +3,9 @@
  * No type of an agent SDK appears here. One back end exists, `agent/claude`, and it is the only
  * module that imports the SDK.
  *
- * The one value declared here is `ResumeRefused`: the core has to tell that failure of a start
- * from every other, and it may import nothing of a back end.
+ * The values declared here are errors the core has to tell from every other, and it may import
+ * nothing of a back end: `ResumeRefused`, the failure of a start, and `AgentConfigError`, a
+ * setting of the owner's the agent cannot use.
  */
 import type { Clock } from "../clock.ts";
 
@@ -17,6 +18,17 @@ export class ResumeRefused extends Error {
   constructor(options?: ErrorOptions) {
     super("the agent could not resume the session", options);
     this.name = "ResumeRefused";
+  }
+}
+
+/**
+ * A setting the owner gave the agent in the daemon's file cannot be used; the message names the
+ * variable and says what to fix. The daemon logs it as it does its own configuration errors.
+ */
+export class AgentConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AgentConfigError";
   }
 }
 

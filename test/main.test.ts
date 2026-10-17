@@ -33,7 +33,7 @@ import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import type { App } from "@slack/bolt";
 import { type FetchFunction, LogLevel, WebAPIRequestError } from "@slack/web-api";
-import type { AgentBackend } from "../src/agent/seam.ts";
+import { type AgentBackend, AgentConfigError } from "../src/agent/seam.ts";
 import type { BuildAppOptions } from "../src/chat/slack/app/app.ts";
 import { DELETE_ACTION, EDIT_ACTION, EDIT_ON } from "../src/chat/slack/home.ts";
 import { deleter, makeClients, type SlackOptions, slackChat } from "../src/chat/slack/module.ts";
@@ -940,6 +940,35 @@ test("an unexpected error ends with 1 and logs only its name", async (t) => {
   await main({ ...d.options(), exit: (code) => exits.push(code), process: new EventEmitter() });
   assert.deepEqual(exits, [1]);
   assert.deepEqual(errors(), ["stopped by an unexpected error: invalid_auth"]);
+});
+
+test("an agent setting that cannot be used ends with 1 and logs its sentence", async (t) => {
+  const d = new Daemon(t);
+  const errors = written(t, logger, "error");
+  const exits: number[] = [];
+  const options = d.options();
+  const registry: Registry = {
+    ...(options.registry as Registry),
+    agents: {
+      claude: {
+        required: [],
+        optional: [],
+        build: () => {
+          throw new AgentConfigError("SETTING must be an absolute path");
+        },
+      },
+    },
+  };
+  await main({
+    ...options,
+    registry,
+    exit: (code) => exits.push(code),
+    process: new EventEmitter(),
+  });
+  assert.deepEqual(exits, [1]);
+  assert.deepEqual(errors(), ["SETTING must be an absolute path"]);
+  // The lock is free again for the next start.
+  await (await singleInstance(d.dir)).release();
 });
 
 test("a rejection and an exception nobody handled are logged by name, and the exception alone stops the daemon", (t) => {

@@ -22,7 +22,7 @@ import { crc32, deflateSync } from "node:zlib";
 import { query, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { ClaudeBackend } from "../src/agent/claude/backend.ts";
 import { CAPABILITIES } from "../src/agent/claude/capabilities.ts";
-import { projectsDir } from "../src/agent/claude/listing.ts";
+import { directorySessions, projectsDir } from "../src/agent/claude/listing.ts";
 import { AsyncQueue } from "../src/agent/claude/session.ts";
 import { locate } from "../src/agent/claude/trust.ts";
 import type {
@@ -108,6 +108,7 @@ export const SCENES: Readonly<Record<string, readonly string[]>> = {
   "commands not offered": ["P23"],
   "computer use": ["P24"],
   "background wake": ["P25"],
+  "config folder listing": ["P29"],
 };
 
 /** `text` without any path of this machine, one line, cut to `limit` characters. */
@@ -1144,6 +1145,42 @@ async function backgroundWake(s: Stage): Promise<Seen> {
 }
 
 /**
+ * P29: the SDK's listing reads the folder `CLAUDE_CONFIG_DIR` names from the process environment,
+ * the only way it takes one (`ListSessionsOptions` has no such option, sdk.d.ts 0.3.301). A
+ * session cannot show it: a fresh folder has no login. So a transcript of the shape Claude Code
+ * writes is placed in a folder of its own and listed with the variable pointing there, which
+ * needs no token. The variable is put back whatever happens, since the scenes after this one
+ * start sessions that inherit the environment.
+ */
+export async function configFolderListing(root: string): Promise<Seen> {
+  const config = join(root, "login");
+  const project = join(root, "listed");
+  await mkdir(project);
+  const folder = join(config, "projects", project.replace(/[^a-zA-Z0-9]/g, "-"));
+  await mkdir(folder, { recursive: true });
+  const id = randomUUID();
+  const line = {
+    type: "user",
+    timestamp: "2026-10-17T10:00:00.000Z",
+    sessionId: id,
+    uuid: randomUUID(),
+    parentUuid: null,
+    message: { role: "user", content: "a question" },
+  };
+  await writeFile(join(folder, `${id}.jsonl`), `${JSON.stringify(line)}\n`);
+  const previous = process.env.CLAUDE_CONFIG_DIR;
+  process.env.CLAUDE_CONFIG_DIR = config;
+  try {
+    const found = await directorySessions(project);
+    const listed = found.some((entry) => entry.id === id);
+    return { P29: observation(true, listed, listed ? "" : `${found.length} sessions listed`) };
+  } finally {
+    if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = previous;
+  }
+}
+
+/**
  * Removes the transcripts the probe's sessions left under Claude Code's projects folder: only
  * the folders whose name holds this run's random temporary folder. Anything else is left alone.
  */
@@ -1202,6 +1239,10 @@ export async function runScenes(log: Log): Promise<Seen> {
       Object.assign(seen, await attempt("commands not offered", s, () => commandsNotOffered(s)));
       Object.assign(seen, await attempt("computer use", s, () => computerUse(s)));
       Object.assign(seen, await attempt("background wake", s, () => backgroundWake(s)));
+      Object.assign(
+        seen,
+        await attempt("config folder listing", s, () => configFolderListing(s.root)),
+      );
     } finally {
       await Promise.allSettled(s.lives.map((live) => live.session.close()));
       await forgetSessions(root, log);

@@ -24,6 +24,15 @@ All notable changes to this project are documented here. The format follows
   second ends before it opens its connection, with `another awaydesk instance is connected to this
   chat app (lock on <folder>): give each instance its own app`.
 
+- `CLAUDE_CONFIG_DIR` in an instance's `.env` gives it a Claude Code login of its own. The Claude
+  module declares the variable, expands `~`, refuses a relative path with `AgentConfigError`, and
+  gives the folder to the trust record, the Chrome setting and the transcripts it reads
+  (`<folder>/.claude.json`, `<folder>/projects`); absent, the daemon's environment's folder, else
+  `~/.claude`. It writes the folder into the daemon's environment once, at build, since the SDK's
+  `listSessions` reads it from there alone; without that the cleanup would find no transcript of
+  the instance and prune its threads. `docs/sdk-surface.md` lists the dependency, and the probe's
+  claim P29 checks it with no token.
+
 ### Changed
 
 - The rule that one daemon runs per machine is now one daemon per instance

@@ -68,3 +68,20 @@ test("a change holds from the next read", async () => {
   await record({ claudeInChromeDefaultEnabled: true });
   assert.ok(await chromeEnabled(home));
 });
+
+// An instance with its own Claude Code login (`CLAUDE_CONFIG_DIR`) keeps the record in that
+// folder, and the owner's `~/.claude.json` is another login's.
+test("the record is the config folder's when one is given, and the home's otherwise", async () => {
+  const config = join(tmp, "config");
+  await mkdir(config);
+  await record({ claudeInChromeDefaultEnabled: true });
+  assert.ok(await chromeEnabled(home));
+  assert.ok(!(await chromeEnabled(home, config))); // no record in the folder: off
+  await writeFile(
+    join(config, ".claude.json"),
+    JSON.stringify({ claudeInChromeDefaultEnabled: true }),
+  );
+  await record({ claudeInChromeDefaultEnabled: false });
+  assert.ok(await chromeEnabled(home, config));
+  assert.ok(!(await chromeEnabled(home)));
+});

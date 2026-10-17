@@ -1,5 +1,7 @@
 /** The Claude back end as the registry holds it: the entry `claude`. */
-import type { AgentEntry } from "../seam.ts";
+import { homedir } from "node:os";
+import { isAbsolute, join } from "node:path";
+import { AgentConfigError, type AgentEntry } from "../seam.ts";
 import { ClaudeBackend, type ClaudeBackendOptions } from "./backend.ts";
 
 // Claude Code's own variables the owner may set in the daemon's file; each reaches a thread's
@@ -7,7 +9,10 @@ import { ClaudeBackend, type ClaudeBackendOptions } from "./backend.ts";
 // milliseconds, is how long a command may run: above 30 minutes it also replaces the limit a
 // session of the SDK puts on a command in the background, which a terminal session does not
 // have (tools reference, "Time limit for background commands", read 2026-10-13).
-export const VARIABLES: readonly string[] = ["BASH_DEFAULT_TIMEOUT_MS"];
+// `CLAUDE_CONFIG_DIR` is the folder of a login of its own, for an instance that drives a second
+// Claude Code account (environment variables page, "useful for running multiple accounts side by
+// side", read 2026-10-17); it is handled below, since the daemon reads the folder too.
+export const VARIABLES: readonly string[] = ["BASH_DEFAULT_TIMEOUT_MS", "CLAUDE_CONFIG_DIR"];
 
 /**
  * The declared variables the owner's file sets, each read by its name: the daemon hands a module
@@ -23,6 +28,24 @@ function set(variables: Readonly<Record<string, string>>): Record<string, string
 }
 
 /**
+ * The folder the owner's file names, `~` read as the home and `${HOME}` already expanded by the
+ * daemon; undefined when the file names none. Refused unless absolute: a relative path would read
+ * from the working directory, the terminal's folder in one run and `/` under launchd. (The core's
+ * `expandUser` is not importable from an agent module, so the tilde is read here.)
+ */
+function configDirOf(written: string | undefined, home: string): string | undefined {
+  if (written === undefined) return undefined;
+  const expanded =
+    written === "~" || written.startsWith("~/") ? join(home, written.slice(1)) : written;
+  if (!isAbsolute(expanded)) {
+    throw new AgentConfigError(
+      `CLAUDE_CONFIG_DIR must be an absolute path, or one starting with ~/; it is "${written}"`,
+    );
+  }
+  return expanded;
+}
+
+/**
  * The entry that builds the Claude back end. `options` are what a test replaces: the SDK's
  * query, the owner's home, the usage probe's start.
  */
@@ -30,7 +53,26 @@ export function claudeAgent(options: ClaudeBackendOptions = {}): AgentEntry {
   return {
     required: [],
     optional: VARIABLES,
-    build: (context) =>
-      new ClaudeBackend({ clock: context.clock, variables: set(context.variables), ...options }),
+    build: (context) => {
+      const variables = set(context.variables);
+      const configDir = configDirOf(variables.CLAUDE_CONFIG_DIR, options.home ?? homedir());
+      if (configDir !== undefined) {
+        variables.CLAUDE_CONFIG_DIR = configDir;
+        // The SDK's `listSessions`, which the back end calls in the daemon's own process, has no
+        // option for the folder (`ListSessionsOptions`, sdk.d.ts 0.3.301) and reads
+        // `process.env.CLAUDE_CONFIG_DIR` (bundled sdk.mjs, not documented): without this, the
+        // listing and the cleanup would look in the default login's folder and prune the live
+        // threads of this one. It is the one write the daemon makes to its environment, once, at
+        // build. The usage probe's bare session passes no `env`, so the SDK gives it this
+        // environment, and the limits it reads are those of this login.
+        process.env.CLAUDE_CONFIG_DIR = configDir;
+      }
+      return new ClaudeBackend({
+        clock: context.clock,
+        variables,
+        ...(configDir !== undefined && { configDir }),
+        ...options,
+      });
+    },
   };
 }

@@ -11,7 +11,8 @@
  *   a worktree) and a trusted parent does not cover it;
  * - outside a repository, a trusted folder covers its subdirectories.
  *
- * The record is `projects["<path>"].hasTrustDialogAccepted` in `~/.claude.json`.
+ * The record is `projects["<path>"].hasTrustDialogAccepted` in `~/.claude.json`, or in
+ * `<CLAUDE_CONFIG_DIR>/.claude.json` for a login that has its own folder (`recordPath`).
  *
  * Claude Code holds one kind of content to a stricter rule than this gate: the `permissions.allow`
  * rules and `additionalDirectories` of a folder's `.claude/settings.json` need that folder's own
@@ -44,6 +45,7 @@ import { basename, dirname, isAbsolute, join, parse, resolve, sep } from "node:p
 import { getLogger } from "../../log.ts";
 import { errorName } from "../../values.ts";
 import type { Repository } from "../seam.ts";
+import { recordPath } from "./record.ts";
 
 export const logger = getLogger("awaydesk.agent.claude.trust");
 
@@ -442,8 +444,8 @@ async function locateFolder(folder: string): Promise<Repository | null> {
 // arrive while the first is still reading wait for it instead of parsing the record each.
 let reading: { key: string; trusted: Promise<ReadonlySet<string>> } | null = null;
 
-async function trustedPaths(home: string): Promise<ReadonlySet<string>> {
-  const record = `${home}/.claude.json`;
+async function trustedPaths(home: string, configDir?: string): Promise<ReadonlySet<string>> {
+  const record = recordPath(home, configDir);
   let found: BigIntStats;
   try {
     found = await stat(record, { bigint: true });
@@ -521,8 +523,8 @@ async function spellsFolder(recorded: string, mine: BigIntStats): Promise<boolea
  * Whether `path` is a folder the owner trusted: the same directory on disk as a recorded path,
  * so a path in another case or Unicode form is that folder and `app ` is not `app`.
  */
-async function isTrusted(path: string, home: string): Promise<boolean> {
-  const trusted = await trustedPaths(home);
+async function isTrusted(path: string, home: string, configDir?: string): Promise<boolean> {
+  const trusted = await trustedPaths(home, configDir);
   if (trusted.has(path)) {
     return true;
   }
@@ -567,6 +569,7 @@ async function isTrusted(path: string, home: string): Promise<boolean> {
 export async function trustedRepository(
   directory: string,
   home: string = homedir(),
+  configDir?: string,
 ): Promise<Repository | null> {
   let repository: Repository | null;
   try {
@@ -580,7 +583,7 @@ export async function trustedRepository(
   if (repository === null) {
     return null;
   }
-  return (await isTrusted(repository.key, home)) ? repository : null;
+  return (await isTrusted(repository.key, home, configDir)) ? repository : null;
 }
 
 /**
@@ -590,6 +593,7 @@ export async function trustedRepository(
 export async function workspaceTrusted(
   directory: string,
   home: string = homedir(),
+  configDir?: string,
 ): Promise<boolean> {
   let repository: Repository | null;
   try {
@@ -601,7 +605,7 @@ export async function workspaceTrusted(
     throw error;
   }
   if (repository !== null) {
-    return isTrusted(repository.key, home);
+    return isTrusted(repository.key, home, configDir);
   }
   let folder: string;
   try {
@@ -613,7 +617,7 @@ export async function workspaceTrusted(
     throw error;
   }
   for (const path of withParents(folder)) {
-    if (await isTrusted(path, home)) {
+    if (await isTrusted(path, home, configDir)) {
       return true;
     }
   }
