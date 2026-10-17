@@ -19,6 +19,7 @@ import {
   ChatIdentityTaken,
   CLAIM_STALE_MS,
   chatIdentityLock,
+  chatIdentityLocks,
   identityDirectory,
   listenLocal,
   singleInstance,
@@ -402,6 +403,35 @@ test("two identities are both held", async () => {
   const second = await chatIdentityLock("T000ACME:U000OTHER", home);
   await first.release();
   await second.release();
+});
+
+test("several identities are all taken, and all released together", async () => {
+  const home = scratch();
+  const keys = [IDENTITY, "app-token:0123abcd"];
+  const held = await chatIdentityLocks(keys, home);
+  for (const key of keys) {
+    await assert.rejects(chatIdentityLock(key, home), ChatIdentityTaken);
+  }
+  await held.release();
+  for (const key of keys) await (await chatIdentityLock(key, home)).release();
+});
+
+test("one identity of several taken by another daemon refuses them all, and frees the ones it took", async () => {
+  const home = scratch();
+  const other = await chatIdentityLock("app-token:0123abcd", home);
+  try {
+    await assert.rejects(
+      chatIdentityLocks([IDENTITY, "app-token:0123abcd"], home),
+      (error: unknown) =>
+        error instanceof ChatIdentityTaken &&
+        error.message ===
+          `another awaydesk instance is connected to this chat app (lock on ${identityDirectory(home, "app-token:0123abcd")}): give each instance its own app`,
+    );
+    // The first key was taken before the second was refused: it is free again.
+    await (await chatIdentityLock(IDENTITY, home)).release();
+  } finally {
+    await other.release();
+  }
 });
 
 test("a released identity is free for the next daemon", async () => {

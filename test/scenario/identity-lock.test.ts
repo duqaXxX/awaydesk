@@ -1,7 +1,8 @@
 /**
- * Two daemons on one chat identity: an `.env` copied for a new instance with the old tokens left
- * in it. Socket Mode would send each event to one of the two connections, so the second daemon
- * refuses before it opens its connection, whatever its configuration folder.
+ * Two daemons on one chat app: an `.env` copied for a new instance with the old tokens left in it,
+ * or with one of the two replaced. Socket Mode would send each event to one of the two
+ * connections, so the second daemon refuses before it opens its connection, whatever its
+ * configuration folder, when it shares any of the keys the chat reports.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -34,9 +35,47 @@ test("a second daemon on the same chat identity refuses before it connects", asy
 test("another identity runs beside it", async (t) => {
   const first = World.make(t);
   await first.start();
-  const second = World.make(t, { home: first.home, identity: "memory:other" });
+  const second = World.make(t, {
+    home: first.home,
+    identities: ["memory:other", "memory:other-app"],
+  });
   await second.start();
   await second.finish();
+  await first.finish();
+});
+
+test("the same app token with another bot token is refused", async (t) => {
+  const first = World.make(t, { identities: ["workspace:bot-a", "app-token:one"] });
+  await first.start();
+  const second = World.make(t, {
+    home: first.home,
+    identities: ["workspace:bot-b", "app-token:one"],
+  });
+  await assert.rejects(
+    run(second.runOptions()),
+    (error: unknown) =>
+      error instanceof ChatIdentityTaken &&
+      error.message.endsWith("give each instance its own app"),
+  );
+  assert.ok(!second.chatCalls.includes("start"), "the second daemon opened its connection");
+  // The bot key it took before the app key was refused is free: a third daemon may use it.
+  const third = World.make(t, {
+    home: first.home,
+    identities: ["workspace:bot-b", "app-token:two"],
+  });
+  await third.start();
+  await third.finish();
+  await first.finish();
+});
+
+test("the same bot token with another app token is refused", async (t) => {
+  const first = World.make(t, { identities: ["workspace:bot-a", "app-token:one"] });
+  await first.start();
+  const second = World.make(t, {
+    home: first.home,
+    identities: ["workspace:bot-a", "app-token:two"],
+  });
+  await assert.rejects(run(second.runOptions()), ChatIdentityTaken);
   await first.finish();
 });
 

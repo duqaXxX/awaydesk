@@ -17,12 +17,15 @@ All notable changes to this project are documented here. The format follows
 - `awaydesk service list` shows every instance's service: loaded or not, the pid, the copy of the
   package it runs and that copy's version. `awaydesk service install` prints the copy it puts in
   the plist and its version.
-- A second lock, on the chat app. `ChatProvider.identity` (for Slack `<team id>:<bot user id>`)
-  names the app in its workspace; after the chat is built and before it connects, the daemon takes
-  a lock on it in `~/.config/awaydesk_identities/<16 hex digits>/`, shared by every instance of the
-  user. A copied `.env` with the old tokens left in it no longer gives two daemons on one app: the
-  second ends before it opens its connection, with `another awaydesk instance is connected to this
-  chat app (lock on <folder>): give each instance its own app`.
+- A second lock, on the chat app. `ChatProvider.identities` is a list of opaque keys, and for Slack
+  it holds two: `<team id>:<bot user id>` (the bot token) and `app-token:<SHA-256 of the app-level
+  token>` (the token Socket Mode connects with, hashed in the Slack module so the token never
+  reaches the core). After the chat is built and before it connects, the daemon takes a lock on
+  each key, in order, in `~/.config/awaydesk_identities/<16 hex digits>/`, shared by every instance
+  of the user, and releases the ones it took if a later one is refused. A copied `.env` with the old
+  tokens left in it, or with only one of the two replaced, no longer gives two daemons on one app:
+  the second ends before it opens its connection, with `another awaydesk instance is connected to
+  this chat app (lock on <folder>): give each instance its own app`.
 
 - `CLAUDE_CONFIG_DIR` in an instance's `.env` gives it a Claude Code login of its own. The Claude
   module declares the variable, expands `~`, refuses a relative path with `AgentConfigError`, and

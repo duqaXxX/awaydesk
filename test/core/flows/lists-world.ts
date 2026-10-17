@@ -57,8 +57,8 @@ class Faulty implements ChatProvider {
     return this.#inner.name;
   }
 
-  get identity(): string {
-    return this.#inner.identity;
+  get identities(): readonly string[] {
+    return this.#inner.identities;
   }
 
   get capabilities(): ChatCapabilities {

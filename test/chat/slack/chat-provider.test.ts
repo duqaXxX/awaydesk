@@ -179,6 +179,7 @@ function started(world: ReturnType<typeof worldOf>, options: { stuck?: boolean }
       home: world.home,
       uploads: world.uploads,
       receiver: socket,
+      appKey: "app-token:0123abcd",
     },
   });
   return { chat, receiver, cores: () => cores };

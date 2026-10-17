@@ -425,11 +425,14 @@ export function chatConformance(
         for (const [flag, value] of flags) assert.equal(typeof value, "boolean", flag);
       });
 
-      check("has an identity, and the same one for the same configuration", async (s, t) => {
-        assert.equal(typeof s.provider.identity, "string");
-        assert.notEqual(s.provider.identity, "");
+      check("has identities, and the same ones for the same configuration", async (s, t) => {
+        assert.ok(s.provider.identities.length > 0, "no identity");
+        for (const key of s.provider.identities) {
+          assert.equal(typeof key, "string");
+          assert.notEqual(key, "");
+        }
         const again = await make(t);
-        assert.equal(again.provider.identity, s.provider.identity);
+        assert.deepEqual(again.provider.identities, s.provider.identities);
       });
 
       check("has openFile exactly when it declares fileUpload", async ({ provider }) => {

@@ -48,14 +48,14 @@ function line(id: string, title: string, folded: string | null = null): TaskUpda
   };
 }
 
-test("its identity is the one it is given, and a default otherwise", async () => {
-  assert.equal(
-    (await built(memoryChat({ identity: "T000ACME:U000BOT" }))).provider.identity,
-    "T000ACME:U000BOT",
+test("its identities are the ones it is given, and one default otherwise", async () => {
+  assert.deepEqual(
+    (await built(memoryChat({ identities: ["T000ACME:U000BOT", "app-token:0123abcd"] }))).provider
+      .identities,
+    ["T000ACME:U000BOT", "app-token:0123abcd"],
   );
   const { provider } = await built();
-  assert.equal(typeof provider.identity, "string");
-  assert.notEqual(provider.identity, "");
+  assert.deepEqual(provider.identities, ["memory:daemon"]);
 });
 
 test("its names are no numbers, and a thread is dated from the clock of its context", async () => {

@@ -119,8 +119,8 @@ export interface WorldOptions {
   readonly defaults?: { readonly agent: string; readonly chat: string };
   /** The home folder whose identity locks the daemon takes; a private one when absent. */
   readonly home?: string;
-  /** The identity of the memory chat (`ChatProvider.identity`); its default when absent. */
-  readonly identity?: string;
+  /** The identities of the memory chat (`ChatProvider.identities`); its default when absent. */
+  readonly identities?: readonly string[];
 }
 
 /** A promise settled from outside. */
@@ -188,7 +188,9 @@ export class World {
     this.signals.setMaxListeners(0);
     this.store = new PlainStore({ now: () => START_TIME * 1000 });
     this.entry = plainAgent({ store: this.store, turns: this.turns });
-    this.chat = memoryChat(options.identity === undefined ? {} : { identity: options.identity });
+    this.chat = memoryChat(
+      options.identities === undefined ? {} : { identities: options.identities },
+    );
     this.channel = this.chat.openChannel("work");
     // The channel is bound before the first start, as the owner's `!bind` of an earlier day left it.
     const state = new StateStore(join(this.config, "state.json"), {

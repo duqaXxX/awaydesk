@@ -73,7 +73,7 @@ import { Holds } from "./core/hold.ts";
 import { configDirOf, DEFAULT_INSTANCE, type Instance, scratchDirOf } from "./core/instance.ts";
 import {
   AlreadyRunning,
-  chatIdentityLock,
+  chatIdentityLocks,
   type InstanceLock,
   singleInstance,
 } from "./core/lock.ts";
@@ -323,10 +323,11 @@ export async function run(options: RunOptions = {}): Promise<number> {
       },
     };
     const chat = await chatEntry.build(context);
-    // After the build, which knows who the daemon is in the chat, and before `chat.start`, which
-    // is what connects: a second daemon on the same chat app would be sent half of its events.
+    // After the build, which knows what the daemon connects to in the chat, and before
+    // `chat.start`, which is what connects: a second daemon on the same chat app would be sent
+    // half of its events.
     try {
-      identityLock = await chatIdentityLock(chat.identity, home);
+      identityLock = await chatIdentityLocks(chat.identities, home);
     } catch (error) {
       // Nothing is connected yet: what the chat and the agent hold is let go of, as a stop does.
       const none = (): void => {};

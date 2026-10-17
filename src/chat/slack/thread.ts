@@ -84,6 +84,12 @@ export interface SlackApp {
   readonly uploads: string;
   /** Where Slack's payloads come from: `socketReceiver(appToken)` in the daemon. */
   readonly receiver: Receiver;
+  /**
+   * The key of the app-level token the receiver connects with, `appTokenKey(appToken)`: a digest,
+   * since the token itself stays in the Slack module. It is what `ChatProvider.identities` says
+   * of the connection.
+   */
+  readonly appKey: string;
   /** How a file is downloaded; `attachments.download` with the bot token when absent. */
   readonly fetch?: Fetch;
   /** Wall-clock seconds as a Slack ts counts them; `Date.now` when absent. */
@@ -140,8 +146,12 @@ const CAPABILITIES: ChatCapabilities = {
 export class SlackChat implements ChatProvider {
   readonly name = "Slack";
   readonly capabilities = CAPABILITIES;
-  /** The workspace and the app's bot: the connection Socket Mode spreads events across. */
-  readonly identity: string;
+  /**
+   * The bot of the workspace, and the app-level token of the connection when there is one: the
+   * two things a copied `.env` can leave the same, each of which makes Socket Mode spread events
+   * across the connections of two daemons.
+   */
+  readonly identities: readonly string[];
   /** Present when the provider holds the Home tab (`SlackApp.home`). */
   readonly index?: SessionIndex;
   private readonly options: SlackChatOptions;
@@ -156,7 +166,10 @@ export class SlackChat implements ChatProvider {
 
   constructor(options: SlackChatOptions) {
     this.options = options;
-    this.identity = `${options.identity.teamId}:${options.identity.botUserId}`;
+    this.identities = [
+      `${options.identity.teamId}:${options.identity.botUserId}`,
+      ...(options.app !== undefined ? [options.app.appKey] : []),
+    ];
     const home = options.app?.home;
     if (home !== undefined) this.index = { refresh: (changed) => home.request(changed) };
   }

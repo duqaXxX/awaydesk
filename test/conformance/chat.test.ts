@@ -326,6 +326,7 @@ async function slackRig(t: Parameters<typeof worldOf>[0]): Promise<ChatRig> {
       home: world.home,
       uploads: world.uploads,
       receiver,
+      appKey: "app-token:0123abcd",
     },
   });
   const app = (): App | null => built;

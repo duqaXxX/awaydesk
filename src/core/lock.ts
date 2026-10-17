@@ -291,7 +291,7 @@ export function singleInstance(directory: string): Promise<InstanceLock> {
 }
 
 /**
- * The folder whose lock stands for `identity` (`ChatProvider.identity`): per user and outside
+ * The folder whose lock stands for `identity` (one of `ChatProvider.identities`): per user and outside
  * every instance's folder. The underscore keeps it apart from them, since an instance name
  * cannot hold one (`core/instance.ts`).
  */
@@ -314,4 +314,34 @@ export async function chatIdentityLock(identity: string, home: string): Promise<
   } catch (error) {
     throw error instanceof AlreadyRunning ? new ChatIdentityTaken(directory) : error;
   }
+}
+
+/**
+ * Takes the lock of every key of `ChatProvider.identities`, in order, each by `chatIdentityLock`.
+ * A refusal of one releases the ones already taken and rejects with `ChatIdentityTaken`; the
+ * returned lock releases them all, last taken first.
+ */
+export async function chatIdentityLocks(
+  identities: readonly string[],
+  home: string,
+): Promise<InstanceLock> {
+  const taken: InstanceLock[] = [];
+  const releaseAll = async (): Promise<void> => {
+    let failure: unknown = null;
+    for (const lock of taken.splice(0).reverse()) {
+      try {
+        await lock.release();
+      } catch (error) {
+        failure ??= error;
+      }
+    }
+    if (failure !== null) throw failure;
+  };
+  try {
+    for (const identity of identities) taken.push(await chatIdentityLock(identity, home));
+  } catch (error) {
+    await releaseAll().catch(() => {});
+    throw error;
+  }
+  return { release: releaseAll };
 }

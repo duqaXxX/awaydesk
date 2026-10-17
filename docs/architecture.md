@@ -354,10 +354,11 @@ reaches an agent or a chat.
    user id, the `SlackChat` with the shared `UpdateLimiter`, the `ThreadDeleter` when the owner's
    user token is configured (`module.deleter`, which calls `auth.test` with that token), the
    `Home`, the `ChannelGuard` and the attachments folder (`attachments.prepareUploads`, see
-   "Attached files"). The provider's `ChatProvider.identity` (for Slack the workspace and the bot,
-   `<team id>:<bot user id>`) is known from here, and `main.run` takes the second lock on it
-   (`lock.chatIdentityLock`, see "State and the single-instance lock") before anything else
-   starts. A daemon that finds it held lets go of what it built (`ChatProvider.stop` and `close`,
+   "Attached files"). The provider's `ChatProvider.identities` (for Slack two keys: the workspace and the bot,
+   `<team id>:<bot user id>`, and a SHA-256 of the app-level token, `app-token:<hex>`) are known
+   from here, and `main.run` takes the second lock on each of them (`lock.chatIdentityLocks`, see
+   "State and the single-instance lock") before anything else starts. A daemon that finds one held
+   lets go of what it built (`ChatProvider.stop` and `close`,
    `AgentBackend.close`; nothing is connected yet, since `SlackChat.start` is what opens the
    Socket Mode connection) and ends with `lock.ChatIdentityTaken`, the same status as
    `lock.AlreadyRunning`, which it extends.
@@ -630,11 +631,16 @@ instances have two folders, so they hold two locks and run side by side. macOS i
 A second lock keeps two instances from sharing one chat app. Socket Mode spreads an app's events
 across its open connections, so two daemons on one app would each receive part of them, and an
 `.env` copied for a new instance with the old tokens in it would do it with no error. After the
-chat is built and before it starts, `main.run` takes `lock.chatIdentityLock` on `ChatProvider.identity`,
-a string opaque to the core that is stable for one app in one workspace. The lock is the same
-mechanism of the platform (`lock.singleInstance`, table below) on the folder
-`lock.identityDirectory` names: `~/.config/awaydesk_identities/` and the first 16 hexadecimal
-digits of the SHA-256 of the identity, created at mode `700`. The underscore keeps it apart from
+chat is built and before it starts, `main.run` takes `lock.chatIdentityLocks` on
+`ChatProvider.identities`, a list of strings opaque to the core, each stable for one app. Slack
+gives two, because it has two tokens and Slack documents no call that maps the app-level token to
+its app: the bot (`<team id>:<bot user id>`, from `auth.test` on the bot token) and the app-level
+token Socket Mode connects with (`app-token:` and the SHA-256 of the token, computed in
+`module.appTokenKey` so that the token itself never leaves the Slack module). A copied `.env` that
+keeps either token collides on that key. Each lock is the same mechanism of the platform
+(`lock.singleInstance`, table below) on the folder `lock.identityDirectory` names:
+`~/.config/awaydesk_identities/` and the first 16 hexadecimal digits of the SHA-256 of the key,
+created at mode `700`. The keys are taken in order, and a refusal releases the ones already taken. The underscore keeps it apart from
 every instance's folder, since an instance name cannot hold one. Another process holding it fails
 the start with `lock.ChatIdentityTaken`, whose message tells it from the instance lock's:
 `another awaydesk instance is connected to this chat app (lock on <folder>): give each instance

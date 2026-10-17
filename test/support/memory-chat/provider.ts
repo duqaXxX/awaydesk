@@ -399,14 +399,14 @@ class MemoryChannel implements ChannelChat {
 /** The chat provider over a room. */
 export class MemoryProvider implements ChatProvider {
   readonly name = "Memory chat";
-  readonly identity: string;
+  readonly identities: readonly string[];
   readonly capabilities = CAPABILITIES;
   readonly #room: Room;
   #inbound: ChatInbound | null = null;
 
-  constructor(room: Room, identity: string) {
+  constructor(room: Room, identities: readonly string[]) {
     this.#room = room;
-    this.identity = identity;
+    this.identities = identities;
   }
 
   thread(ref: ThreadRef): ThreadChat {

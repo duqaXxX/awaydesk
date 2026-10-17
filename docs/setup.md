@@ -903,10 +903,14 @@ Each instance has its own lock, in its own configuration folder, so copying an i
 to start another and leaving the old tokens in it would give two daemons on one Slack app. Slack
 would then send each event to one of the two connections, and half of your messages would reach
 the wrong daemon with no error. A second lock guards against it. Once the daemon has asked Slack
-who its bot is, and before it opens its connection, it takes a lock named after the workspace and
-the bot, in `~/.config/awaydesk_identities/<16 hex digits>/` (the same folder for every instance
-of the user, created at mode `700`; no instance name can hold the underscore, so no instance's
-folder can be it). A daemon that finds the lock held ends with status 1 and this line in its log:
+who its bot is, and before it opens its connection, it takes two locks: one named after the
+workspace and the bot (the bot token), one named after a hash of the app-level token (`xapp-`),
+which is what the connection uses. They are in `~/.config/awaydesk_identities/<16 hex digits>/`
+(the same folder for every instance of the user, created at mode `700`; no instance name can hold
+the underscore, so no instance's folder can be it). Both are checked because a copied `.env` with
+only one token replaced, say a new bot token and the old `xapp-` token, still connects to the first
+app. The hash is all that is stored: the token itself is never written to the folder name. A daemon
+that finds either lock held ends with status 1 and this line in its log:
 
 ```
 ERROR awaydesk.main: another awaydesk instance is connected to this chat app (lock on <folder>): give each instance its own app
@@ -969,8 +973,8 @@ are in.
 | The bot does not see a channel | The channel is public, or the bot was not invited: the manifest subscribes the app to the messages of private channels only (`message.groups`) |
 | ``awaydesk does not work in this channel: <reason>. It answers only in a private channel whose only members are you and the bot.`` | The bot checked the channel on its own and refused it; only you see the message, in the channel for a message sent there and in the thread for a reply. `<reason>` is one of `it is not a private channel`, `it is shared with another workspace`, `it has members other than you and the bot` and `the bot cannot read its details`. Remove the other members, or use a channel of your own. The first reason can come only from an event of a channel that is not private, which the manifest does not subscribe to |
 | `Claude Code is not logged in on the host` | Claude Code on the machine is logged out: run `claude`, then `/login` |
-| Some messages get no reply | A second daemon is running on the same Slack app and receiving part of the events: each instance needs an app of its own. Since the chat identity lock, a daemon that starts beside another on the same app ends with the line of the next row, so this one points at a daemon of an older version |
-| `another awaydesk instance is connected to this chat app (lock on ...)` in the log | The daemon ended at start because another daemon of this user, of any instance, holds the lock of the same Slack app (the same workspace and bot). Give each instance its own app: [One app per instance](#one-app-per-instance) |
+| Some messages get no reply | A second daemon is running on the same Slack app and receiving part of the events: each instance needs an app of its own. Since the chat identity locks, a daemon that starts beside another on the same app ends with the line of the next row, so this one points at a daemon of an older version |
+| `another awaydesk instance is connected to this chat app (lock on ...)` in the log | The daemon ended at start because another daemon of this user, of any instance, holds the lock of the same Slack app (the same workspace and bot, or the same `xapp-` token). Give each instance its own app: [One app per instance](#one-app-per-instance) |
 | `This thread's session no longer exists: Claude Code deleted it or cannot find it. Send a new message in the channel to start one.` | The stored session id can no longer be resumed (its transcript was deleted); send a new message in the channel to start one |
 | ``This thread holds no session. In the channel, send a new message to start one, or `!resume` to continue an earlier one.`` | The thread holds no session (a word's own thread, or one with no entry in `state.json`); send a new message in the channel to start one, send `!resume` there to continue a session Claude Code still has, or type a word, which works as if typed there |
 | ``This thread already holds a session: send `!resume` again in the channel to pick another.`` | A Resume click or `!resume <id or name>` was sent to a thread that already has a session; a new `!resume` in the channel gives a thread of its own |

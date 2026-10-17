@@ -36,7 +36,13 @@ import { type FetchFunction, LogLevel, WebAPIRequestError } from "@slack/web-api
 import { type AgentBackend, AgentConfigError } from "../src/agent/seam.ts";
 import type { BuildAppOptions } from "../src/chat/slack/app/app.ts";
 import { DELETE_ACTION, EDIT_ACTION, EDIT_ON } from "../src/chat/slack/home.ts";
-import { deleter, makeClients, type SlackOptions, slackChat } from "../src/chat/slack/module.ts";
+import {
+  appTokenKey,
+  deleter,
+  makeClients,
+  type SlackOptions,
+  slackChat,
+} from "../src/chat/slack/module.ts";
 import { SlackChat } from "../src/chat/slack/thread.ts";
 import type { Clock } from "../src/clock.ts";
 import { CLEAN_EVERY_SECONDS, logger as cleanupLogger } from "../src/core/cleanup.ts";
@@ -336,6 +342,30 @@ test("a second daemon on the same Slack app refuses before it connects", async (
   ]);
   // Built (auth.test answered) and never connected; what it built is let go of.
   assert.ok(second.slack.callsTo("auth.test").length > 0);
+  assert.deepEqual(second.events, []);
+  assert.deepEqual(first.events, ["connect"]);
+  await first.stop();
+});
+
+test("a copied .env with a new bot token and the old app token refuses before it connects", async (t) => {
+  const first = new Daemon(t);
+  first.start();
+  await first.booted();
+  const second = new Daemon(t);
+  second.home = first.home;
+  // Another bot in the same workspace; the app-level token is the first's.
+  second.slack.responses["auth.test"] = { ok: true, team_id: TEAM, user_id: "U000BOT2" };
+  const errors = written(t, logger, "error");
+  const exits: number[] = [];
+  await main({
+    ...second.options(),
+    exit: (code) => exits.push(code),
+    process: new EventEmitter(),
+  });
+  assert.deepEqual(exits, [1]);
+  assert.deepEqual(errors(), [
+    `another awaydesk instance is connected to this chat app (lock on ${identityDirectory(first.home, appTokenKey(APP_TOKEN))}): give each instance its own app`,
+  ]);
   assert.deepEqual(second.events, []);
   assert.deepEqual(first.events, ["connect"]);
   await first.stop();
